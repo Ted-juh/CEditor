@@ -388,3 +388,30 @@ Seen in the player log while pluginval ran the GAIA panel as a plug-in:
   `set()` as a MIDI send, including a label's text and colours, which never send anything. Painting
   the preset list spent the whole budget, and a bound control set in the rest of that second lost
   its MIDI. Now only writes to bound paths count.
+
+## Device profiles
+
+Found while building the profile library in November 2026
+([device-profile-library.md](device-profile-library.md)). None is a defect in a profile; each is
+something the program does with every profile, which the larger library makes easier to hit.
+
+- **The JavaScript engine does not check a value against the parameter's range.** The C++ engine
+  refuses a value outside `range`; `localCompileParameter` sends it. Found when a generated test
+  vector set the SE-02's Bank select (0 - 3) to 100: the C++ engine failed it and the JavaScript
+  one produced `B0 00 64`. The generator now keeps vectors in range and its test checks that, which
+  covers the profiles, not the engine. Closing it means `encodeParameterValue` in
+  `deviceProfileLocalEngine.js` refusing what `validateAndEncodeValue` in `DeviceProfileEngine.cpp`
+  refuses, and a test that the two agree on an out-of-range value.
+- **Reading a controller back ignores its channel.** `inboundParameterIndex.js` masks the channel
+  nibble of a CC's status byte, so `B1 4A 40` matches a parameter compiled on channel 1. For the
+  JP-08, whose Lower part sends on `lowerChannel`, a knob turned on the Lower part is read as the
+  Upper part's (`matchInbound` returns `upper.vcf.cutoff` for `B0`, `B1` and `B5`). A recipe whose
+  channel is a variable other than `channel` should keep that channel in its fingerprint.
+- **The startup read stops at the first request that is not answered.**
+  `processPendingRequestTimeouts` drops a timed-out request without starting the next in the
+  `startup.sync` chain. Generated profiles work around it (blocks that may not answer are read on
+  request), but one unanswered block still ends the read for every block after it.
+- **The program parses every profile it finds.** `loadInternalTestProfiles` reads every file in
+  `CE/profiles/test` when a profile is first needed: about 234 MB of JSON across 94 files, the
+  largest about 9 MB. Not measured on Windows. If it is slow, load a profile's header first and its
+  parameters when it is chosen.

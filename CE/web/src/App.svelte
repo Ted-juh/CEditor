@@ -54,6 +54,7 @@
   import ScriptNotifications from './CE_Application/layout/ScriptNotifications.svelte';
   import ScriptDialog from './CE_Application/layout/ScriptDialog.svelte';
   import NewPanelDialog from './CE_Application/layout/NewPanelDialog.svelte';
+  import DeviceProfilePicker from './CE_Application/layout/DeviceProfilePicker.svelte';
   import HistoryWindow from './CE_Application/layout/HistoryWindow.svelte';
   import { openNewPanelDialog } from './CE_Application/stores/newPanelDialog.js';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
@@ -556,6 +557,7 @@
   <ScriptDialog />
 
   <NewPanelDialog />
+  <DeviceProfilePicker />
   <ComponentExportDialog />
   <ApplyControlSetDialog />
   <ApplyToSetDialog />

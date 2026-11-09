@@ -11,7 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  componentPickerEntries, deviceProfilePickerEntries, shouldOpenDirectly,
+  componentPickerEntries, shouldOpenDirectly,
 } from '../src/CE_Application/utils/workspacePickerEntries.js';
 
 test('component rows carry a name, a version and a category', () => {
@@ -27,16 +27,8 @@ test('component rows carry a name, a version and a category', () => {
   assert.equal(rows[1].subtitle, '1.0.0 · custom');
 });
 
-test('device rows fall back the same way', () => {
-  const rows = deviceProfilePickerEntries([{ id: 'p1' }, { id: 'p2', name: 'JD-Xi', manufacturer: 'Roland', status: 'verified' }]);
-  assert.equal(rows[0].title, 'p1');
-  assert.equal(rows[0].subtitle, 'device · profile');
-  assert.equal(rows[1].subtitle, 'Roland · verified');
-});
-
 test('a missing or empty library yields no rows rather than throwing', () => {
   assert.deepEqual(componentPickerEntries(null), []);
-  assert.deepEqual(deviceProfilePickerEntries(undefined), []);
 });
 
 test('exactly one saved thing opens straight away; none or many show the picker', () => {

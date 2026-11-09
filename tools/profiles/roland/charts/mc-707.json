@@ -1,0 +1,33 @@
+{
+  "source": {"model":"MC-707","date":"Sep. 25, 2020","version":"1.60","file":"MC-707_MIDIImpleChart_eng03_W.pdf","sha256":"9e2b15b507e63523b02d40fe4e6793cbb2525e36efbfa2627ef9dea0c58c9697","pages":2,"chartPage":1,"url":"https://static.roland.com/assets/media/pdf/MC-707_MIDIImpleChart_eng03_W.pdf"},
+  "format": "chart",
+  "chart": {"numbers":[1,5,7,10,11,64,65,66,67,68,71,72,73,74,75,76,77,78,80,81,82,83,84,91,92],"spans":[],"notes":{"1":"for MC-101 compatibility.","2":"Scene change (0-127) on control channel, Clip change (0-15) on track channel.","3":"Scatter Pad (60-75) on control channel"}},
+  "issues": [],
+  "rows": [
+    {"cc":1,"name":"Modulation","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":5,"name":"Portamento Time","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":7,"name":"Volume","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":10,"name":"Panpot","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":11,"name":"Expression","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":64,"name":"Hold 1","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":65,"name":"Portamento","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":66,"name":"Sostenuto","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":67,"name":"Soft","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":68,"name":"Legato Foot Switch","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":71,"name":"Resonance","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":72,"name":"Release Time","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":73,"name":"Attack time","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":74,"name":"Cutoff","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":75,"name":"Decay Time","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":76,"name":"Vibrato Rate","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":77,"name":"Vibrato Depth","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":78,"name":"Vibrato Delay","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":80,"name":"FILTER Knob","tx":true,"rx":true,"marks":[],"page":1},
+    {"cc":81,"name":"MOD Knob","tx":true,"rx":true,"marks":[],"page":1},
+    {"cc":82,"name":"FX Knob","tx":true,"rx":true,"marks":[],"page":1},
+    {"cc":83,"name":"SOUND Knob","tx":true,"rx":true,"marks":["1"],"page":1},
+    {"cc":84,"name":"Portamento control","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":91,"name":"General Purpose Effect 1 (Reverb Send Level)","tx":false,"rx":true,"marks":[],"page":1},
+    {"cc":92,"name":"General Purpose Effect 3 (Chorus Send Level)","tx":false,"rx":true,"marks":[],"page":1}
+  ]
+}

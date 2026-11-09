@@ -94,6 +94,13 @@ export const HELP_DOCUMENTS = [
     blurb: 'Worked recipes for the things people actually ask for.',
   },
   {
+    id: 'device-profile-library',
+    file: 'docs/device-profile-library.md',
+    section: 'Reference',
+    title: 'The device profile library',
+    blurb: 'The synth profiles that come with CEditor: where each comes from, what it covers, and what is not checked yet.',
+  },
+  {
     id: 'known-issues',
     file: 'docs/known-issues.md',
     section: 'Reference',

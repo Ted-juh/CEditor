@@ -49,17 +49,25 @@ test('control-set management is reachable from the settings sidebar', () => {
 test('every MIDI port control has a name', () => {
   // Both here and in the Device tab. A select whose only clue is its current value tells you
   // nothing about what it selects, and there are three of them side by side.
-  const deviceTab = readText(fileURLToPath(new URL('../src/CE_Application/components/ParameterBrowserTab.svelte', import.meta.url)));
-  for (const label of ['MIDI output', 'MIDI input', 'Device profile']) {
+  // The profile is chosen through DeviceProfileTrigger, which opens the device profile picker; it
+  // carries the "Device profile" name itself, so both pages get it by using it.
+  const source = (file) => readText(fileURLToPath(new URL(`../src/CE_Application/${file}`, import.meta.url)));
+  const trigger = source('components/DeviceProfileTrigger.svelte');
+  assert.ok(trigger.includes('aria-label="Device profile"'), 'the device profile control is unlabelled');
+
+  const deviceTab = source('components/ParameterBrowserTab.svelte');
+  for (const label of ['MIDI output', 'MIDI input']) {
     assert.ok(deviceTab.includes(`aria-label="${label}"`), `the Device tab's ${label} select is still unlabelled`);
   }
+  assert.ok(deviceTab.includes('<DeviceProfileTrigger'), 'the Device tab chooses its profile some other way');
 
   // Read the settings page as source rather than as output: without a backend it renders the
   // explanation instead of the selects, so the labels are not in the markup to be found.
-  const page = readText(fileURLToPath(new URL('../src/CE_Application/settings/MidiSettings.svelte', import.meta.url)));
-  for (const label of ['MIDI output', 'MIDI input', 'Device profile']) {
+  const page = source('settings/MidiSettings.svelte');
+  for (const label of ['MIDI output', 'MIDI input']) {
     assert.ok(page.includes(`aria-label="${label}"`), `the MIDI page's ${label} select is unlabelled`);
   }
+  assert.ok(page.includes('<DeviceProfileTrigger'), 'the MIDI page chooses its profile some other way');
   assert.ok(page.includes('Send To') && page.includes('Listen To'),
     'the MIDI page does not name which direction each port is');
 });

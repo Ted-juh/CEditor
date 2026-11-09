@@ -151,6 +151,54 @@
       "encoding": {
         "type": "u14-msb-lsb"
       }
+    },
+    {
+      "id": "osc.wave",
+      "name": "Oscillator Wave",
+      "group": "Oscillator",
+      "type": "choice",
+      "default": "saw",
+      "choices": [
+        {
+          "id": "saw",
+          "label": "Saw",
+          "value": 0
+        },
+        {
+          "id": "square",
+          "label": "Square",
+          "value": 1
+        },
+        {
+          "id": "triangle",
+          "label": "Triangle",
+          "value": 2
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "Wave"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      },
+      "messageRecipe": "waveNrpn14",
+      "ui": {
+        "preferredComponent": "Combobox"
+      }
     }
   ],
   "messageRecipes": [
@@ -194,6 +242,16 @@
       "valueResolution": 14,
       "value": "$encodedValue",
       "nullAfterSend": false
+    },
+    {
+      "id": "waveNrpn14",
+      "kind": "nrpn",
+      "channel": "$channel",
+      "parameterMsb": 2,
+      "parameterLsb": 17,
+      "valueResolution": 14,
+      "value": "$encodedValue",
+      "nullAfterSend": false
     }
   ],
   "tests": [
@@ -220,6 +278,12 @@
       "parameter": "global.fineTune",
       "value": 8192,
       "expectedHex": "B0 65 00\nB0 64 01\nB0 06 40\nB0 26 00"
+    },
+    {
+      "name": "Osc Wave Triangle: a choice on a 14-bit NRPN is MSB 0, LSB its value",
+      "parameter": "osc.wave",
+      "value": "triangle",
+      "expectedHex": "B0 63 02\nB0 62 11\nB0 06 00\nB0 26 02"
     }
   ],
   "sources": [

@@ -375,6 +375,22 @@ a JDK with `jlink` and `dotnet`, and skips each check it cannot run. CI runs it 
 `--require`, where a skip fails; pass the same flag locally when you touch
 `tools/scripts/nativeHandlers/` or the loader, so a missing toolchain does not read as a pass.
 
+### Device profiles
+
+The profiles in `CE/profiles/test/` are generated; never edit one by hand. The rules and the
+commands are in `tools/profiles/README.md`. Before pushing a change to a profile or its tools:
+
+```bash
+node tools/profiles/roland/make-profiles.mjs --check && node tools/profiles/roland/make-cc-profiles.mjs --check
+node tools/profiles/sequential/make-profiles.mjs --check
+node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
+```
+
+and build `CEditorDeviceProfileTests` **in Release** (`cmake --build build/native --config Release
+--target CEditorDeviceProfileTests`): `ctest -C Release` runs the Release binary, and a Debug-only
+build leaves it stale, so a new profile is silently not run. The C++ engine refuses an out-of-range
+value the JavaScript one accepts, which is how the first CC profiles' broken vector was caught.
+
 `docs/verify-end-to-end.md` is the full gated checklist for the export toolchain, most of which is
 Windows-only. Gates 0 and 1 run anywhere and are the cheapest way to catch a broken script/export
 path.

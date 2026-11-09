@@ -1548,6 +1548,51 @@ int runDumpShapeAndCodecTests (const juce::File& file)
  * reload back, fifty messages cost fifty cold loads. The budget is one cold load for all fifty, so a
  * regression fails by ~50x — far outside anything a slow or loaded machine could account for.
  */
+// The device profile picker lists, groups and describes profiles from this summary alone, so what
+// it says has to be what the profile says: a CC-only Boutique cannot claim to read the synth back,
+// and an address-map workstation must not lose its preset recall on the way to the list.
+int runCatalogSummaryTests (const juce::File& root)
+{
+    struct Expected { const char* file; const char* manufacturer; int parameters; const char* kind; bool readsBack; bool presets; bool identifies; };
+    const Expected cases[] {
+        { "roland-jd-xi.ceditor-device.json", "Roland", 6199, "sysex", true, true, true },
+        { "roland-jp-08.ceditor-device.json", "Roland", 85, "cc", false, true, false },
+        { "sequential-prophet-6.ceditor-device.json", "Sequential", 876, "nrpn", false, true, true },
+        { "sequential-prophet-rev2.ceditor-device.json", "Sequential", 1961, "nrpn", false, false, true },
+    };
+
+    auto failures = 0;
+    for (const auto& expected : cases)
+    {
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromFile (root.getChildFile (expected.file), error))
+        {
+            std::cerr << "[FAIL] catalog summary: cannot load " << expected.file << ": " << error << "\n";
+            ++failures;
+            continue;
+        }
+        const auto summary = engine.getCatalogSummary();
+        const auto* kinds = summary["messageKinds"].getArray();
+        const bool ok = summary["manufacturer"].toString() == expected.manufacturer
+                     && (int) summary["parameterCount"] == expected.parameters
+                     && kinds != nullptr && kinds->size() == 1 && (*kinds)[0].toString() == expected.kind
+                     && (bool) summary["readsBack"] == expected.readsBack
+                     && (bool) summary["presetRecall"] == expected.presets
+                     && (bool) summary["identifies"] == expected.identifies
+                     && ! (bool) summary["verifiedOnHardware"]
+                     && summary["source"].toString().isNotEmpty();
+        if (! ok)
+        {
+            std::cerr << "[FAIL] catalog summary of " << expected.file << ": " << juce::JSON::toString (summary, true) << "\n";
+            ++failures;
+            continue;
+        }
+        std::cout << "[PASS] catalog summary :: " << expected.file << "\n";
+    }
+    return failures;
+}
+
 int runProfileCacheTests()
 {
     // The cold load: a fresh service reads and compiles every shipped profile once. This is the unit
@@ -3992,7 +4037,100 @@ int main (int argc, char** argv)
         root.getChildFile ("test-sysex-synth.ceditor-device.json"),
         root.getChildFile ("test-nrpn-synth.ceditor-device.json"),
         root.getChildFile ("roland-sh-201.ceditor-device.json"),
-        root.getChildFile ("roland-gaia.ceditor-device.json")
+        root.getChildFile ("roland-gaia.ceditor-device.json"),
+        // Generated from Roland's MIDI Implementation by tools/profiles/roland/. Its vectors are the
+        // manual's own printed example message, so this is the engine against Roland, not against us.
+        root.getChildFile ("roland-jd-xi.ceditor-device.json"),
+        root.getChildFile ("roland-jd-xa.ceditor-device.json"),
+        root.getChildFile ("roland-gaia-2.ceditor-device.json"),
+        root.getChildFile ("roland-fa-06.ceditor-device.json"),
+        root.getChildFile ("roland-juno-x.ceditor-device.json"),
+        root.getChildFile ("roland-jupiter-x.ceditor-device.json"),
+        root.getChildFile ("roland-fantom.ceditor-device.json"),
+        root.getChildFile ("roland-ax-edge.ceditor-device.json"),
+        root.getChildFile ("roland-juno-ds.ceditor-device.json"),
+        root.getChildFile ("roland-xps-30.ceditor-device.json"),
+        root.getChildFile ("roland-xps-10.ceditor-device.json"),
+        root.getChildFile ("roland-integra-7.ceditor-device.json"),
+        root.getChildFile ("roland-mc-808.ceditor-device.json"),
+        root.getChildFile ("roland-mc-909.ceditor-device.json"),
+        root.getChildFile ("roland-fantom-g.ceditor-device.json"),
+        root.getChildFile ("roland-juno-di.ceditor-device.json"),
+        root.getChildFile ("roland-juno-gi.ceditor-device.json"),
+        root.getChildFile ("roland-juno-d.ceditor-device.json"),
+        root.getChildFile ("roland-juno-d6.ceditor-device.json"),
+        root.getChildFile ("roland-xps-10x.ceditor-device.json"),
+        root.getChildFile ("roland-xps-60.ceditor-device.json"),
+        root.getChildFile ("roland-fantom-0.ceditor-device.json"),
+        root.getChildFile ("roland-fantom-ex.ceditor-device.json"),
+        root.getChildFile ("roland-jupiter-80.ceditor-device.json"),
+        root.getChildFile ("roland-jupiter-50.ceditor-device.json"),
+        root.getChildFile ("roland-sd-90.ceditor-device.json"),
+        root.getChildFile ("roland-vr-700.ceditor-device.json"),
+        root.getChildFile ("roland-v-synth-gt.ceditor-device.json"),
+        root.getChildFile ("roland-fantom-x.ceditor-device.json"),
+        root.getChildFile ("roland-fantom-xr.ceditor-device.json"),
+        root.getChildFile ("roland-v-synth.ceditor-device.json"),
+        root.getChildFile ("roland-v-synth-xt.ceditor-device.json"),
+        root.getChildFile ("roland-sh-32.ceditor-device.json"),
+        root.getChildFile ("roland-juno-g.ceditor-device.json"),
+        root.getChildFile ("roland-juno-stage.ceditor-device.json"),
+        root.getChildFile ("roland-soniccell.ceditor-device.json"),
+        root.getChildFile ("roland-xv-5080.ceditor-device.json"),
+        root.getChildFile ("roland-xv-3080.ceditor-device.json"),
+        root.getChildFile ("roland-xv-2020.ceditor-device.json"),
+        root.getChildFile ("roland-xv-88.ceditor-device.json"),
+        root.getChildFile ("roland-xv-5050.ceditor-device.json"),
+        root.getChildFile ("roland-rd-300nx.ceditor-device.json"),
+        root.getChildFile ("roland-rd-700nx.ceditor-device.json"),
+        root.getChildFile ("roland-rd-88.ceditor-device.json"),
+        root.getChildFile ("roland-rd-88ex.ceditor-device.json"),
+        root.getChildFile ("roland-rd-08.ceditor-device.json"),
+        root.getChildFile ("roland-rd-800.ceditor-device.json"),
+        root.getChildFile ("roland-rd-300gx.ceditor-device.json"),
+        root.getChildFile ("roland-rd-700gx.ceditor-device.json"),
+        root.getChildFile ("roland-rd-700.ceditor-device.json"),
+        root.getChildFile ("roland-rd-2000.ceditor-device.json"),
+        root.getChildFile ("roland-rd-2000ex.ceditor-device.json"),
+        // The instruments whose MIDI is a Control Change list, read from their charts by
+        // tools/profiles/roland/read-cc-list.mjs. Each vector's bytes are worked out from the
+        // chart's controller number and channel, not by asking an engine.
+        root.getChildFile ("roland-jp-08.ceditor-device.json"),
+        root.getChildFile ("roland-ju-06.ceditor-device.json"),
+        root.getChildFile ("roland-ju-06a.ceditor-device.json"),
+        root.getChildFile ("roland-jx-08.ceditor-device.json"),
+        root.getChildFile ("roland-jd-08.ceditor-device.json"),
+        root.getChildFile ("roland-sh-01a.ceditor-device.json"),
+        root.getChildFile ("roland-se-02.ceditor-device.json"),
+        root.getChildFile ("roland-tr-06.ceditor-device.json"),
+        root.getChildFile ("roland-tr-08.ceditor-device.json"),
+        root.getChildFile ("roland-system-1.ceditor-device.json"),
+        root.getChildFile ("roland-s-1.ceditor-device.json"),
+        root.getChildFile ("roland-p-6.ceditor-device.json"),
+        root.getChildFile ("roland-sh-4d.ceditor-device.json"),
+        root.getChildFile ("roland-tr-6s.ceditor-device.json"),
+        root.getChildFile ("roland-tr-8s.ceditor-device.json"),
+        root.getChildFile ("roland-tr-1000.ceditor-device.json"),
+        root.getChildFile ("roland-mc-101.ceditor-device.json"),
+        root.getChildFile ("roland-mc-707.ceditor-device.json"),
+        root.getChildFile ("roland-vt-4.ceditor-device.json"),
+        // Sequential and Dave Smith Instruments, from the NRPN tables in their manuals, read by
+        // tools/profiles/sequential/. Each vector's bytes are worked out from the printed NRPN number
+        // and value, one CC per line, not by asking an engine.
+        root.getChildFile ("sequential-prophet-6.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-rev2.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-12.ceditor-device.json"),
+        root.getChildFile ("sequential-pro-2.ceditor-device.json"),
+        root.getChildFile ("sequential-trigon-6.ceditor-device.json"),
+        root.getChildFile ("sequential-take-5.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-5.ceditor-device.json"),
+        root.getChildFile ("sequential-fourm.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-x.ceditor-device.json"),
+        root.getChildFile ("sequential-tetra.ceditor-device.json"),
+        root.getChildFile ("sequential-mopho.ceditor-device.json"),
+        root.getChildFile ("sequential-mopho-keyboard.ceditor-device.json"),
+        root.getChildFile ("sequential-mopho-x4.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-08.ceditor-device.json")
     };
 
     auto failures = 0;
@@ -4004,6 +4142,7 @@ int main (int argc, char** argv)
     failures += runLsbFirstEncodingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
+    failures += runCatalogSummaryTests (root);
     failures += runMonitorClearTests();
     failures += runRealtimeMonitorTests();
     failures += runRequestRetryTests();

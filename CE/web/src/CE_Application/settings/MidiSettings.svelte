@@ -49,6 +49,7 @@
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, isJuceAvailable } from '../bridge/bridge.js';
   import { panels, updatePanel } from '../stores/panels.js';
   import { deviceRoleRows, profileForDevice, renameRoleInPanel } from '../utils/deviceRoles.js';
+  import DeviceProfileTrigger from '../components/DeviceProfileTrigger.svelte';
   import { identityEventMatches, identityOutcome, identityTestBlocker } from '../utils/deviceIdentity.js';
 
   let hasBackend = $state(false);
@@ -408,16 +409,15 @@
               the ports above decide where it goes.
             </span>
           </div>
-          <select
-            class="port-select"
-            aria-label="Device profile"
-            value={profileOf(row)}
-            onchange={(event) => apply(row, { profile: event.currentTarget.value })}
-          >
-            {#each $deviceProfiles as profile (profile.id)}
-              <option value={profile.id}>{profile.name || profile.id}</option>
-            {/each}
-          </select>
+          <!-- The picker, not a dropdown: ninety-odd profiles by brand, family and model. -->
+          <div class="profile-trigger">
+            <DeviceProfileTrigger
+              profileId={profileOf(row)}
+              role={row.role}
+              panelProfileIds={[row.requiredProfileId]}
+              onChange={(id) => apply(row, { profile: id })}
+            />
+          </div>
         </div>
       </section>
     {/each}
@@ -447,6 +447,11 @@
 </div>
 
 <style>
+  .profile-trigger {
+    flex: 0 1 360px;
+    min-width: 0;
+  }
+
   .midi-settings {
     display: flex;
     flex-direction: column;
