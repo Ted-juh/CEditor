@@ -7,6 +7,10 @@ node tools/profiles/roland/import-manual.mjs <MIDI_Imple.pdf> <name> --url <wher
 cd CE/web && node --import ./test/support/register-svelte.mjs --test test/rolandManualProfiles.test.js
 ```
 
+What the library as a whole holds, and what it can be trusted for, is
+[docs/device-profile-library.md](../../../docs/device-profile-library.md); the rules every brand's
+profiles follow are in [tools/profiles/README.md](../README.md).
+
 Roland has printed the **Parameter Address Map** in its MIDI Implementations in one fixed-width
 table grammar for twenty years. So a profile is not retyped from the manual; the manual is *read*:
 
