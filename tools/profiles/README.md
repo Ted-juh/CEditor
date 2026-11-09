@@ -75,6 +75,29 @@ They exist because each one was broken once, and the breakage looked like a work
    `CE/web`, because the library page ships in the program's help) and say in the brand's README
    what is done, what is not, and what the documents got wrong.
 
+## The message recipes
+
+A parameter names a recipe in `messageRecipes`, and both engines build its message from it. The
+fields a generator here can use, every one of them run by both engines with tests:
+
+| Kind | Fields | What goes out |
+|---|---|---|
+| `cc` | `channel`, `controller` | One control change, the value's single byte. |
+| `cc` with `lsbController` | `channel`, `controller`, `lsbController` | A 14-bit pair: the MSB on `controller`, then the LSB on `lsbController` (usually `controller` + 32), as two messages. The parameter takes a 14-bit encoder (`u14-msb-lsb`) and a range up to 0 - 16383; a 7-bit value goes out as the MSB with an LSB of 0. `lsbController` must be 0 - 127 and not `controller`. |
+| `nrpn`, `rpn` | `channel`, `parameterMsb`, `parameterLsb`, `valueResolution` (7 or 14), `nullAfterSend` | CC 99/98 (101/100 for an RPN) select the parameter, then the value on CC 6, and its LSB on CC 38 when `valueResolution` is 14; `nullAfterSend` closes the selection with 127/127. |
+| `nrpn` with `lowBitsController` | `lowBitsController`, `lowBits` (1 - 7) | Korg's wide value: its low `lowBits` bits first on `lowBitsController`, then the rest on CC 6. |
+| `sysex` | `template`, `checksum` | The template's bytes, with `$encodedValue`, `$address`, `$size`, `$checksum` and any variable (`$deviceId`, `$unitId`) filled in. |
+
+**Following the instrument back.** `CE/web/src/CE_Application/utils/inboundParameterIndex.js`
+finds which parameter an incoming message belongs to by compiling each one, so a new recipe needs
+nothing there unless its message arrives in pieces. A 14-bit CC pair does: it is indexed on both of
+its controllers. The MSB is a value on its own (MIDI has a receiver reset the fine half when the
+coarse one arrives), so an instrument that sends only 7 bits is still followed; the LSB is put
+together with the value the parameter already has, and ignored when there is none yet. Use a pair
+only where the document says which controller carries the low bits: the Moog manuals print `MSB` and
+`LSB`; Novation's guides print `CC pair 14,46` without saying, so those profiles send the first
+controller alone.
+
 ## About midi.guide
 
 [midi.guide](https://midi.guide) (`github.com/pencilresearch/midi`) is licensed CC BY-SA 4.0. It is

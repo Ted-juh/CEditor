@@ -239,6 +239,10 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **The library is large.** The profiles total about 234 MB, the largest workstation profiles about
   9 MB each, and the program parses every one when it first needs a profile. How long that takes on
   a typical Windows machine has not been measured.
+- **A 14-bit knob is followed from its coarse half.** A knob sent as two controllers (the Moog
+  profiles' MSB and LSB) moves its control when either arrives: the coarse half on its own, the fine
+  half together with the value the control already has. A fine half that arrives before any coarse
+  one is ignored, so an instrument that sends only the fine half of a knob is not followed.
 - **Korg's wide NRPN values are send-only.** A minilogue xd value wider than 7 bits goes out low bits
   first on CC 63, as Korg prints it; when the instrument sends one, CEditor does not put the halves
   back together.

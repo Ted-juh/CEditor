@@ -862,6 +862,11 @@ the top, search with **Search parameters**, and bind by selecting a control and 
 the panel to the synth, or both, all the time. **Scan presets** asks the synth for its preset names, and
 **Designer** opens the profile beside the panel.
 
+Some synths send a knob as two controllers, a coarse one and a fine one, for 16,384 steps instead of
+128 (the Moog profiles do this wherever the manual prints both). CEditor sends both, and when you turn
+the knob on the synth the control follows either: the coarse controller on its own, the fine one
+together with it.
+
 ### The Device Profile Designer
 
 Open it with **Designer** in the Device tool, **DPD** under the context bar's **Device** button, or **File → Open
