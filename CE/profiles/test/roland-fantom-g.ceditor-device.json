@@ -12,7 +12,7 @@
   "sources": [
     {
       "type": "manual",
-      "title": "Roland Fantom-G6/G7/G8 MIDI Implementation",
+      "title": "Roland Fantom-G6/G7/G8 MIDI Implementation (version 1.00, Feb. 1, 2008)",
       "notes": "Parameter Address Map read by tools/profiles/roland/parse-address-map.mjs from Fantom-G_MI.pdf (sha256 7e87d1aefda01c1a753f4352dc427f63c082d5cf52e99485c9d30f53f6b64c87). Model ID 00 00 27, DT1 = 12, RQ1 = 11, Roland checksum. Not yet checked against the instrument itself."
     }
   ],

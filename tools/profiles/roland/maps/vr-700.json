@@ -1,10 +1,9 @@
 {
   "source": {"model":null,"date":"Version:","version":"VR-700","file":"VR-700_MI.pdf","sha256":"fb19b091ab02021f7dacf4cf6a5c176584290babb09e0e0fe82988498c08e7a0","pages":11,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/VR-700_MI.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 42",
-  "modelIdFrom": "byte list",
   "issues": [],
   "tables": [
-    {"name":"Data set 1 (DT1)","page":7,"kind":"offsets","totalSize":null,
+    {"name":"■ VR-700 (Model ID = 00H 00H 42H)","page":7,"kind":"offsets","totalSize":null,
      "entries": [
       {"address":"00 00 00 00","name":"System"},
       {"address":"10 00 00 00","name":"Favorite (Temporary)"}

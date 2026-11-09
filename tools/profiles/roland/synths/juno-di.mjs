@@ -113,4 +113,7 @@ export default {
 
   // Read on request, not at connect. The patch-mode part holds a patch or a rhythm set, not both; the one it does not hold is not answered, and the startup read stops at the first request that is not.
   noPull: [/^(patch|rhythm)(\.|$)/],
+
+  // The manual's own date and version (the cover; the importer read its labels as values).
+  manual: { date: 'May 1, 2009', version: '1.00' },
 };

@@ -21,6 +21,9 @@ const NUMBER = /^[-+]?\d+(?:\.\d+)?$/;
 /** More than this many labels is a list nobody can scroll; keep the number, keep the line as text. */
 const MAX_LABELS = 32;
 
+/** Beyond this many wire values a row is a number whatever its display line says. */
+const MAX_LISTED = 4096;
+
 const decimals = (text) => (text.includes('.') ? text.split('.')[1].length : 0);
 
 /** `"-12, -24 [dB]"` -> { text: '-12, -24', unit: 'dB' } */
@@ -69,8 +72,11 @@ function isUnitStep(labels) {
  * set when the manual prints one, `(0, 5 - 8)`.
  */
 export function interpretRow(row) {
-  const values = row.values ?? Array.from({ length: row.max - row.min + 1 }, (unused, i) => row.min + i);
   const display = row.display?.trim();
+  // Every wire value, listed only when there are few enough to be labels: a 28-bit sample offset
+  // (the V-Synth GT's, 0 - 268435455) listed in full ran the generator out of memory.
+  const count = row.values ? row.values.length : row.max - row.min + 1;
+  const values = row.values ?? (count <= MAX_LISTED ? Array.from({ length: count }, (unused, i) => row.min + i) : null);
 
   if (!display) {
     // A set with no labels still must not offer the values between its members.
@@ -103,6 +109,7 @@ export function interpretRow(row) {
     return { kind: 'number', displayMin: -Number(pan[1]), displayMax: Number(pan[2]), unit: '' };
   }
 
+  if (!values) return { kind: 'number', description: display, ...(unit ? { unit } : {}) };
   const expansion = expandLabels(text);
   const labels = expansion?.labels;
   if (labels && labels.length === values.length) {

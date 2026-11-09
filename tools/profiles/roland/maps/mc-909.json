@@ -1,10 +1,9 @@
 {
   "source": {"model":"MC-909 (sampling groovebox)","date":"Sep. 20, 2002","version":"1.00","file":"MC-909_MI.pdf","sha256":"a5bfd8996a4d4d80d96d72c06f6c63773a14c01960ba6407d6ee2d3c43d4364b","pages":17,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/MC-909_MI.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 59",
-  "modelIdFrom": "byte list",
   "issues": [],
   "tables": [
-    {"name":"Data set 1 DT1 (12H)","page":7,"kind":"offsets","totalSize":null,
+    {"name":"■1. MC-909 (Model ID = 00H 59H)","page":7,"kind":"offsets","totalSize":null,
      "entries": [
       {"address":"01 00 00 00","name":"Setup"},
       {"address":"02 00 00 00","name":"System"},

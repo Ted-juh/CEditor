@@ -1,10 +1,9 @@
 {
   "source": {"model":"JUNO-D","date":null,"version":"2004.4.1","file":"JUNO-D_MI.pdf","sha256":"9023216b42bfb5f2e0fff5cfdca222335fdfedc609bfdce068c2eb4346fac5d9","pages":24,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/JUNO-D_MI.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 64",
-  "modelIdFrom": "byte list",
   "issues": [],
   "tables": [
-    {"name":"Identity Reply Message","page":9,"kind":"offsets","totalSize":null,
+    {"name":"■ JUNO-D (MODEL ID = 00H 64H)","page":9,"kind":"offsets","totalSize":null,
      "entries": [
       {"address":"00 00 00 00","name":"Setup"},
       {"address":"01 00 00 00","name":"System"},

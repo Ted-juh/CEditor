@@ -73,4 +73,7 @@ export default {
   ],
 
   noPull: NO_PULL,
+
+  // The cover prints the model as "JUNO-D" (the importer read it so); the manual covers the D6, D7 and D8.
+  manual: { model: 'JUNO-D6/D7/D8' },
 };

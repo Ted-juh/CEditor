@@ -159,10 +159,12 @@ function buildParameter(row, block, address, stripName) {
       used.add(id);
       return { id, label, value };
     });
+    // The manual's own default where it prints one (the SD-90's `default: (1) ON`), else the first.
+    const printed = choices.find((choice) => choice.value === row.printedDefault);
     return {
       ...base,
       type: 'choice',
-      default: choices[0].id,
+      default: (printed ?? choices[0]).id,
       choices,
       display: { mode: 'choice', shortLabel: camel(leafName) },
       normalization: { mode: 'choiceIndex' },
@@ -179,7 +181,9 @@ function buildParameter(row, block, address, stripName) {
     type: bipolar ? 'bipolar' : 'integer',
     ...(meaning.description && !impossible ? { description: meaning.description } : {}),
     range: { min: row.min, max: row.max },
-    default: bipolar ? Math.round((row.min + row.max) / 2) : row.min,
+    default: Number.isInteger(row.printedDefault) && row.printedDefault >= row.min && row.printedDefault <= row.max
+      ? row.printedDefault
+      : bipolar ? Math.round((row.min + row.max) / 2) : row.min,
     display: {
       mode: 'number',
       unit: meaning.unit ?? '',
@@ -313,16 +317,14 @@ export function buildProfile(map, synth) {
     for (const m of members) {
       if (m.offset + widthOf(m.p) - cuts.at(-1) > packet) cuts.push(m.offset);
     }
-    while (size - cuts.at(-1) > packet) cuts.push(cuts.at(-1) + packet); // a reserved tail
+    // A piece ends after its last parameter, not at the next cut: reserved bytes between two
+    // parameters (the JUPITER-80's Registration Controller has 53 of them before V-Link Switch)
+    // would otherwise carry a piece past one packet.
     return cuts.map((start, k) => {
-      const end = k + 1 < cuts.length ? cuts[k + 1] : size;
-      return {
-        block,
-        id: `${block.id}.part${k + 1}`,
-        start,
-        size: end - start,
-        members: members.filter((m) => m.offset >= start && m.offset < end),
-      };
+      const next = k + 1 < cuts.length ? cuts[k + 1] : size;
+      const inside = members.filter((m) => m.offset >= start && m.offset < next);
+      const end = inside.length ? Math.max(...inside.map((m) => m.offset + widthOf(m.p))) : start;
+      return { block, id: `${block.id}.part${k + 1}`, start, size: end - start, members: inside };
     }).filter((piece) => piece.members.length);
   });
   const sizeBytes = (n, length) => formatBytes(Array.from({ length }, (unused, i) => Math.floor(n / 128 ** (length - 1 - i)) % 128));
@@ -404,7 +406,9 @@ export function buildProfile(map, synth) {
     tests.push({ name: `${example.name} (manual, ${example.where})`, parameter: example.parameter, value: example.value, expectedHex: example.expectedHex });
   }
 
-  const source = map.source ?? {};
+  // A layout may state the manual's date and version where its cover reads badly (the VR-700's
+  // and JUNO-Di's put the labels where the values should be): `manual: { date, version }`.
+  const source = { ...(map.source ?? {}), ...(synth.manual ?? {}) };
   return {
     schemaVersion: 1,
     profileVersion: synth.profileVersion ?? '0.1.0',

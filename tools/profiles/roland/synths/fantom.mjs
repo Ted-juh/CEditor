@@ -100,6 +100,10 @@ export default {
     { id: 'sna1.common', table: '[SN-A Tone Common]', path: ['Temporary SN-A Tone (zone 1)', 'SN-A Tone Common'], group: 'Zone 1 SN-A · Common' },
     { id: 'sna1.mfx', table: '[MFX]', path: ['Temporary SN-A Tone (zone 1)', 'SN-A Tone MFX'], group: 'Zone 1 SN-A · MFX', strip: /^MFX\s+/ },
 
+    // The EXSN tone: printed below the top table's closing border on p14, which the parser now reads on through.
+    { id: 'exsn1.common', table: '[EXSN Tone Common]', path: ['Temporary EXSN Tone (zone 1)', 'EXSN Tone Common'], group: 'Zone 1 EXSN · Common' },
+    { id: 'exsn1.mfx', table: '[MFX]', path: ['Temporary EXSN Tone (zone 1)', 'EXSN Tone MFX'], group: 'Zone 1 EXSN · MFX', strip: /^MFX\s+/ },
+
     { id: 'kit1.common', table: '[Drum Kit Common]', path: [KIT, 'Drum Kit Common'], group: 'Zone 1 Kit · Common' },
     { id: 'kit1.mfx', table: '[MFX]', path: [KIT, 'Drum Kit MFX'], group: 'Zone 1 Kit · MFX', strip: /^MFX\s+/ },
     ...[1, 2, 3, 4, 5, 6].map((n) => ({ id: `kit1.comp${n}`, table: '[Drum Kit Comp]', path: [KIT, `Drum Kit Comp ${n}`], group: `Zone 1 Kit · Comp ${n}`, strip: /^Comp\s+/ })),
@@ -160,8 +164,8 @@ export default {
       + 'Drum Kit Inst Set 03 04 00 00 - 03 3C 00 00 (step 04 00 00) and SN-A 04 01 00 00 - 04 0F 00 00 (step 01 00 00), and are not laid out',
     drumInstruments: 'zone 1\'s drum kit has every key\'s partial and partial EQ (keys 21-108); its instruments (Inst Common and the '
       + 'three Inst envelopes) only for keys 36-72. Keys 21-35 (03 00 00 00 - 03 00 46 00) and 73-108 (03 02 04 00 - 03 03 33 00) are left out',
-    exsnTone: 'not laid out: the map read from the manual does not have the Temporary EXSN Tone entries (05 00 00 00 - 05 0F 00 00, p14), '
-      + 'which the manual prints after the top table\'s closing border',
+    exsnTone: 'zone 1\'s EXSN tone (05 00 00 00) is laid out; zones 2-16 are 05 01 00 00 - 05 0F 00 00. The manual prints these entries '
+      + 'below the top table\'s closing border (p14)',
     pianoDesignerKeys: 'the V-Piano\'s per-key Level and Character tables have 128 entries each; the map holds only the first and '
       + 'the last, the two rows p54 prints. Piano Designer Tuning (04 20 04 00, 512 bytes) is not laid out: its reply is two 256-byte '
       + 'packets, which a one-message block dump cannot read',
@@ -174,10 +178,9 @@ export default {
     'One profile answers FANTOM-6, -7 and -8: they share the address map, the model id (00 00 00 5B) and the identity family code (5B 03); only the software revision tells them apart (p11).',
     'Scene-level blocks for all 16 zones (Zone, Zone EQ, Zone Control); tones for zone 1 only: Z-Core at 02 10 00 00, drum kit at 02 30 00 00 with its instruments at 03 00 00 00, SN-A at 04 00 00 00, and the one V-Piano tone at 04 20 00 00.',
     'Zone 1\'s drum-kit instruments cover keys 36-72; keys 21-35 and 73-108 are the same Inst blocks every 00 05 00 from 03 00 00 00 and are left out to keep the profile near 12,000 parameters.',
-    'The EXSN tones (05 00 00 00 + zone) are missing: the manual prints them below the closing border of the top table on p14, and the map stops at that border.',
-    'Many rows are printed without a number where they repeat: Name (16 bytes, as 16 rows), the two LFOs of a Partial LFO block, the 16 LFO steps, the four partials of a PMT, the four matrix controls of a partial, the four waves of a drum instrument. Their ids carry the address after the first.',
+    'Many rows are printed without a number where they repeat: Name (16 bytes, as 16 rows), the two LFOs of a Partial LFO block, the 16 LFO steps, the four partials of a PMT, the four matrix controls of a partial, the four waves of a drum instrument. They are numbered in printed order.',
   ],
 
   // Read on request, not at connect. Zone 1 plays one kind of tone at a time; the instrument does not answer for the others, and the startup read stops at the first request that is not answered.
-  noPull: [/^(zcore1|sna1|kit1|vpiano)(\.|$)/],
+  noPull: [/^(zcore1|sna1|exsn1|kit1|vpiano)(\.|$)/],
 };

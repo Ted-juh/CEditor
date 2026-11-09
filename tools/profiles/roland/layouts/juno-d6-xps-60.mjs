@@ -37,7 +37,7 @@
 //     each per-part list as "(Part 1)", "(Part 2)", ":", "(Part R)"; the parser fills a ":" run only
 //     when a numbered series closes on a number, and "R" is not one, so the map has no entry for
 //     parts 3-7 and the generator has no way to address a block by anything but an entry name.
-//     ELIDED_PART_ADDRESSES says where they are.
+//     The parser now fills them in (the run closes on Part R); ELIDED_PART_ADDRESSES records where they are.
 //   - Part 1's Temporary Tone, whole. Parts 2-7's are the same blocks at their own base.
 //   - The Temporary Drum Kit, whole: all eighty-eight keys fit (the three profiles stay under
 //     4,300 parameters with it), and it is the only kit there is to edit.
@@ -54,10 +54,12 @@ const TONE_ROOT = (part) => `Temporary Tone (Part ${part})`;
 const KIT = 'Temporary Drum Kit';
 const KIT_INST = 'Temporary Drum Kit Inst';
 
-/** The parts the map has offset entries for. Parts 3-7 are elided in the manual's [Scene] table. */
+/**
+ * All eight parts. The manual's [Scene] table prints Part 1, Part 2, ":" and Part R; the parser
+ * fills Parts 3-7 in because the run closes, at the printed stride, on the lettered slot.
+ */
 export const PARTS = [
-  { key: '1', id: 'part1', label: 'Part 1' },
-  { key: '2', id: 'part2', label: 'Part 2' },
+  ...[1, 2, 3, 4, 5, 6, 7].map((n) => ({ key: String(n), id: `part${n}`, label: `Part ${n}` })),
   { key: 'R', id: 'partR', label: 'Part R' },
 ];
 
@@ -215,9 +217,8 @@ export const sharedCoverage = ({ scenePage, instPage }) => ({
   effectParameterMeanings: 'type-dependent: MFX, IFX, chorus, reverb and vocoder parameters are Roland\'s 4-nibble container '
     + '(12768-52768, shown -20000..+20000); what each slot does depends on the selected type, which the MIDI Implementation does not list',
   inboundControllers: 'not modelled: what the front panel transmits is in the Control Change section, not the address map',
-  sceneParts: `parts 1, 2 and R only. The [Scene] offset table (p${scenePage}) prints every per-part list as "(Part 1)", "(Part 2)", ":", `
-    + '"(Part R)", which the map does not fill, so the generator cannot name parts 3-7. They are: '
-    + Object.entries(ELIDED_PART_ADDRESSES).map(([name, where]) => `${name} ${where}`).join('; '),
+  sceneParts: `all eight parts, 1-7 and R. The [Scene] offset table (p${scenePage}) prints each per-part list as "(Part 1)", `
+    + '"(Part 2)", ":", "(Part R)"; the map fills Parts 3-7 in from the stride, since the run closes on Part R.',
   partTones: 'part 1 only: Temporary Tone (Part 2)-(Part 7) are the same [Tone] blocks at 02 01 00 00, 02 02 00 00, … 02 06 00 00',
   drumKit: 'complete: the Temporary Drum Kit (03 00 00 00), all 88 keys (21-108), each with its partial and its partial EQ',
   drumKitInst: `Inst Common only: the [Drum Kit Inst] offset table (p${instPage}) lists Inst Pitch Env (03 30 02 00), Inst Filter Env `
@@ -228,9 +229,8 @@ export const sharedCoverage = ({ scenePage, instPage }) => ({
 });
 
 export const sharedNotes = ({ scenePage, pmtPage }) => [
-  `Scene parts: the profile has the Part, EQ, MFX, Zone and Arpeggio blocks of Part 1, Part 2 and Part R (the rhythm part). Parts 3-7 are `
-    + `elided in the manual's [Scene] table (p${scenePage}) between "(Part 2)" and "(Part R)", so the map has no entries for them; `
-    + 'their addresses are in coverage.sceneParts.',
+  `Scene parts: the profile has the Part, EQ, MFX, Zone and Arpeggio blocks of all eight parts, 1-7 and Part R (the rhythm part). `
+    + `The manual's [Scene] table (p${scenePage}) prints only "(Part 1)", "(Part 2)", ":" and "(Part R)"; Parts 3-7 are filled in from the stride.`,
   'Part 1\'s tone is at 02 00 00 00. A tone is one type (common, MFX, PMT, four partials with envelopes, LFO and EQ, and the synth '
     + 'layer), so Part 1 has no alternative tone types to keep out of the startup read.',
   'The drum kit (03 00 00 00) is the rhythm part\'s: seven Temporary Tones for Part 1-7, one Temporary Drum Kit, and an eighth part, R. '

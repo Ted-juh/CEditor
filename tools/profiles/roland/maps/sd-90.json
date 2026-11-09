@@ -1,10 +1,9 @@
 {
   "source": {"model":"SD-90","date":"December 12, 2001","version":"1.02","file":"SD-90_MI.pdf","sha256":"ebe9294cefcda57b5ac40fc716459593b17c02800882c70d42a978c1b19e2d47","pages":20,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/SD-90_MI.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 48",
-  "modelIdFrom": "byte list",
   "issues": [],
   "tables": [
-    {"name":"Data set 1DT1 (12H)","page":7,"kind":"offsets","totalSize":null,
+    {"name":"SD-90 (Model ID = 00H 48H)","page":7,"kind":"offsets","totalSize":null,
      "entries": [
       {"address":"00 00 00 00","name":"Setup"},
       {"address":"01 00 00 00","name":"System"},
@@ -272,71 +271,71 @@
      "entries": [
      ],
      "rows": [
-      {"offset":"00 00","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Master Tune","display":"-100.0 - 100.0 [cent] default: (1024) 0","packets":true,"min":24,"max":2024,"nibbles":4},
-      {"offset":"00 04","bits":["00aa aaaa"],"name":"Master Key Shift","display":"-24 - +24 default: (64) 0","min":40,"max":88},
-      {"offset":"00 05","bits":["0aaa aaaa"],"name":"Master Level","display":"default: (127) 127","min":0,"max":127},
-      {"offset":"00 06","bits":["0aaa aaaa"],"name":"System Control 1 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT default: (0) OFF","min":0,"max":97},
-      {"offset":"00 07","bits":["0aaa aaaa"],"name":"System Control 2 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT default: (0) OFF","min":0,"max":97},
-      {"offset":"00 08","bits":["0aaa aaaa"],"name":"System Control 3 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT default: (0) OFF","min":0,"max":97},
-      {"offset":"00 09","bits":["0aaa aaaa"],"name":"System Control 4 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT default: (0) OFF","min":0,"max":97}
+      {"offset":"00 00","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Master Tune","display":"-100.0 - 100.0 [cent]","packets":true,"min":24,"max":2024,"printedDefault":1024,"nibbles":4},
+      {"offset":"00 04","bits":["00aa aaaa"],"name":"Master Key Shift","display":"-24 - +24","min":40,"max":88,"printedDefault":64},
+      {"offset":"00 05","bits":["0aaa aaaa"],"name":"Master Level","min":0,"max":127,"printedDefault":127},
+      {"offset":"00 06","bits":["0aaa aaaa"],"name":"System Control 1 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT","min":0,"max":97,"printedDefault":0},
+      {"offset":"00 07","bits":["0aaa aaaa"],"name":"System Control 2 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT","min":0,"max":97,"printedDefault":0},
+      {"offset":"00 08","bits":["0aaa aaaa"],"name":"System Control 3 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT","min":0,"max":97,"printedDefault":0},
+      {"offset":"00 09","bits":["0aaa aaaa"],"name":"System Control 4 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT","min":0,"max":97,"printedDefault":0}
      ]
     },
     {"name":"System EQ","page":7,"kind":"parameters","totalSize":"00 00 00 09",
      "entries": [
      ],
      "rows": [
-      {"offset":"00 00","bits":["0000 000a"],"name":"EQ Switch","display":"BYPASS, ON default: (1) ON","min":0,"max":1},
-      {"offset":"00 01","bits":["0000 000a"],"name":"EQ-Left Low Frequency","display":"200, 400 [Hz] default: (0) 200 [Hz]","min":0,"max":1},
-      {"offset":"00 02","bits":["000a aaaa"],"name":"EQ-Left Low Gain","display":"-15 - +15 default: (15) 0","min":0,"max":30},
-      {"offset":"00 03","bits":["0000 00aa"],"name":"EQ-Left High Frequency","display":"2000, 4000, 8000 [Hz] default: (0) 2000 [Hz]","min":0,"max":2},
-      {"offset":"00 04","bits":["000a aaaa"],"name":"EQ-Left High Gain","display":"-15 - +15 default: (15) 0","min":0,"max":30},
-      {"offset":"00 05","bits":["0000 000a"],"name":"EQ-Right Low Frequency","display":"200, 400 [Hz] default: (0) 200 [Hz]","min":0,"max":1},
-      {"offset":"00 06","bits":["000a aaaa"],"name":"EQ-Right Low Gain","display":"-15 - +15 default: (15) 0","min":0,"max":30},
-      {"offset":"00 07","bits":["0000 00aa"],"name":"EQ-Right High Frequency","display":"2000, 4000, 8000 [Hz] default: (0) 2000 [Hz]","min":0,"max":2},
-      {"offset":"00 08","bits":["000a aaaa"],"name":"EQ-Right High Gain","display":"-15 - +15 default: (15) 0","min":0,"max":30}
+      {"offset":"00 00","bits":["0000 000a"],"name":"EQ Switch","display":"BYPASS, ON","min":0,"max":1,"printedDefault":1},
+      {"offset":"00 01","bits":["0000 000a"],"name":"EQ-Left Low Frequency","display":"200, 400 [Hz]","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 02","bits":["000a aaaa"],"name":"EQ-Left Low Gain","display":"-15 - +15","min":0,"max":30,"printedDefault":15},
+      {"offset":"00 03","bits":["0000 00aa"],"name":"EQ-Left High Frequency","display":"2000, 4000, 8000 [Hz]","min":0,"max":2,"printedDefault":0},
+      {"offset":"00 04","bits":["000a aaaa"],"name":"EQ-Left High Gain","display":"-15 - +15","min":0,"max":30,"printedDefault":15},
+      {"offset":"00 05","bits":["0000 000a"],"name":"EQ-Right Low Frequency","display":"200, 400 [Hz]","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 06","bits":["000a aaaa"],"name":"EQ-Right Low Gain","display":"-15 - +15","min":0,"max":30,"printedDefault":15},
+      {"offset":"00 07","bits":["0000 00aa"],"name":"EQ-Right High Frequency","display":"2000, 4000, 8000 [Hz]","min":0,"max":2,"printedDefault":0},
+      {"offset":"00 08","bits":["000a aaaa"],"name":"EQ-Right High Gain","display":"-15 - +15","min":0,"max":30,"printedDefault":15}
      ]
     },
     {"name":"Audio Common","page":7,"kind":"parameters","totalSize":"00 00 00 04",
      "entries": [
      ],
      "rows": [
-      {"offset":"00 00","bits":["0aaa aaaa"],"name":"Master Volume","display":"0 - 127 (-inf - +6dB) default: (100) +0dB","min":0,"max":127},
-      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Rec Vol","display":"0 - 127 (-inf - +6dB) default: (100) +0dB","min":0,"max":127},
-      {"offset":"00 02","bits":["0000 000a"],"name":"Rec Monitor SW","display":"OFF, ON default: (0) OFF","min":0,"max":1},
-      {"offset":"00 03","bits":["0000 000a"],"name":"Mixer Mute","display":"OFF, ON default: (0) OFF","min":0,"max":1}
+      {"offset":"00 00","bits":["0aaa aaaa"],"name":"Master Volume","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":100},
+      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Rec Vol","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":100},
+      {"offset":"00 02","bits":["0000 000a"],"name":"Rec Monitor SW","display":"OFF, ON","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 03","bits":["0000 000a"],"name":"Mixer Mute","display":"OFF, ON","min":0,"max":1,"printedDefault":0}
      ]
     },
     {"name":"Audio Common Mixer Preset Mode","page":7,"kind":"parameters","totalSize":"00 00 00 01",
      "entries": [
      ],
      "rows": [
-      {"offset":"00 00","bits":["000a aaaa"],"name":"Mixer Preset","display":"0x00-0x12 # 0x00:Default Mixer # 0x01:Default Ana Rec # 0x02:Default Dig Rec # 0x03:Default Wav Rec # 0x04:Default Syn Rec # 0x05:Send/Return AFX # 0x06:Mix to AFX # 0x07:Ins Ana, Mix Rec # 0x08:Ins Dig, Mix Rec # 0x09:Ins Wav, Mix Rec # 0x0A:Ins Syn, Mix Rec # 0x0B:Ins Ana, Src Rec # 0x0C:Ins Dig, Src Rec # 0x0D:Ins Wav, Src Rec # 0x0E:Ins Syn, Src Rec # 0x0F:Ins Ana, Dry Rec # 0x10:Ins Dig, Dry Rec # 0x11:Ins Wav, Dry Rec # 0x12:Ins Syn, Dry Rec default: (0) Default Mixer","min":0,"max":18}
+      {"offset":"00 00","bits":["000a aaaa"],"name":"Mixer Preset","display":"0x00-0x12 # 0x00:Default Mixer # 0x01:Default Ana Rec # 0x02:Default Dig Rec # 0x03:Default Wav Rec # 0x04:Default Syn Rec # 0x05:Send/Return AFX # 0x06:Mix to AFX # 0x07:Ins Ana, Mix Rec # 0x08:Ins Dig, Mix Rec # 0x09:Ins Wav, Mix Rec # 0x0A:Ins Syn, Mix Rec # 0x0B:Ins Ana, Src Rec # 0x0C:Ins Dig, Src Rec # 0x0D:Ins Wav, Src Rec # 0x0E:Ins Syn, Src Rec # 0x0F:Ins Ana, Dry Rec # 0x10:Ins Dig, Dry Rec # 0x11:Ins Wav, Dry Rec # 0x12:Ins Syn, Dry Rec","min":0,"max":18,"printedDefault":0}
      ]
     },
     {"name":"Audio Common Mixer Free Edit Mode","page":7,"kind":"parameters","totalSize":"00 00 00 44",
      "entries": [
      ],
      "rows": [
-      {"offset":"00 00","bits":["0aaa aaaa"],"name":"Analog Vol","display":"0 - 127 (-inf - +6dB) default: (100) +0dB","min":0,"max":127},
-      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Analog Send","display":"0 - 127 (-inf - +6dB) default: (0) -inf","min":0,"max":127},
-      {"offset":"00 02","bits":["0000 000a"],"name":"Analog Mute","display":"OFF, ON default: (0) OFF","min":0,"max":1},
-      {"offset":"00 10","bits":["0aaa aaaa"],"name":"Digital Vol","display":"0 - 127 (-inf - +6dB) default: (100) +0dB","min":0,"max":127},
-      {"offset":"00 11","bits":["0aaa aaaa"],"name":"Digital Send","display":"0 - 127 (-inf - +6dB) default: (0) -inf","min":0,"max":127},
-      {"offset":"00 12","bits":["0000 000a"],"name":"Digital Mute","display":"OFF, ON default: (0) OFF","min":0,"max":1},
-      {"offset":"00 20","bits":["0aaa aaaa"],"name":"Wave Vol","display":"0 - 127 (-inf - +6dB) default: (100) +0dB","min":0,"max":127},
-      {"offset":"00 21","bits":["0aaa aaaa"],"name":"Wave Send","display":"0 - 127 (-inf - +6dB) default: (0) -inf","min":0,"max":127},
-      {"offset":"00 22","bits":["0000 000a"],"name":"Wave Mute","display":"OFF, ON default: (0) OFF","min":0,"max":1},
-      {"offset":"00 30","bits":["0aaa aaaa"],"name":"Synth Vol","display":"0 - 127 (-inf - +6dB) default: (100) +0dB","min":0,"max":127},
-      {"offset":"00 31","bits":["0aaa aaaa"],"name":"Synth Send","display":"0 - 127 (-inf - +6dB) default: (0) -inf","min":0,"max":127},
-      {"offset":"00 32","bits":["0000 000a"],"name":"Syhth Mute","display":"OFF, ON default: (0) OFF","min":0,"max":1},
-      {"offset":"00 43","bits":["0000 000a"],"name":"AFX SW","display":"OFF, ON default: (0) OFF","min":0,"max":1}
+      {"offset":"00 00","bits":["0aaa aaaa"],"name":"Analog Vol","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":100},
+      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Analog Send","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":0},
+      {"offset":"00 02","bits":["0000 000a"],"name":"Analog Mute","display":"OFF, ON","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 10","bits":["0aaa aaaa"],"name":"Digital Vol","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":100},
+      {"offset":"00 11","bits":["0aaa aaaa"],"name":"Digital Send","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":0},
+      {"offset":"00 12","bits":["0000 000a"],"name":"Digital Mute","display":"OFF, ON","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 20","bits":["0aaa aaaa"],"name":"Wave Vol","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":100},
+      {"offset":"00 21","bits":["0aaa aaaa"],"name":"Wave Send","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":0},
+      {"offset":"00 22","bits":["0000 000a"],"name":"Wave Mute","display":"OFF, ON","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 30","bits":["0aaa aaaa"],"name":"Synth Vol","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":100},
+      {"offset":"00 31","bits":["0aaa aaaa"],"name":"Synth Send","display":"0 - 127 (-inf - +6dB)","min":0,"max":127,"printedDefault":0},
+      {"offset":"00 32","bits":["0000 000a"],"name":"Syhth Mute","display":"OFF, ON","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 43","bits":["0000 000a"],"name":"AFX SW","display":"OFF, ON","min":0,"max":1,"printedDefault":0}
      ]
     },
     {"name":"Audio Common AFX Parameter","page":8,"kind":"parameters","totalSize":"00 00 01 11",
      "entries": [
      ],
      "rows": [
-      {"offset":"00 00","bits":["0aaa aaaa"],"name":"AFX Type","display":"# 0x10:Space Multi (for Ins/Send/Mix) # 0x20:Guitar Multi (for Ins) # 0x30:Vocal/Bass Multi (for Ins) # 0x40:Groove Multi (for Ins/Mix) # 0x48:Isolator (for Ins/Mix) # 0x50:Center Canceler (for Ins/Mix) # 0x60:Lo-Fi Processor (for Ins/Mix) # 0x70:Suround RV (for Send/Mix) # 0x78:Mastering (for Ins/Mix) default: (16) Space Multi","min":0,"max":127},
+      {"offset":"00 00","bits":["0aaa aaaa"],"name":"AFX Type","display":"# 0x10:Space Multi (for Ins/Send/Mix) # 0x20:Guitar Multi (for Ins) # 0x30:Vocal/Bass Multi (for Ins) # 0x40:Groove Multi (for Ins/Mix) # 0x48:Isolator (for Ins/Mix) # 0x50:Center Canceler (for Ins/Mix) # 0x60:Lo-Fi Processor (for Ins/Mix) # 0x70:Suround RV (for Send/Mix) # 0x78:Mastering (for Ins/Mix)","min":0,"max":127,"printedDefault":16},
       {"offset":"00 01","bits":["0000 aaaa"],"name":"AFX Time out         -- Receive Only --","display":"# 1: 2ms # 2: 4ms # 3: 7ms # 4: 10ms # 5: 20ms # 6: 40ms # 7: 70ms # 8: 100ms # 9: 200ms # 10: 400ms # 11: 700ms # 12: 1000ms # 13: 2000ms # 14: 4000ms # 15: 7000ms","min":1,"max":15},
       {"offset":"00 11","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"AFX Parameter 1","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
       {"offset":"00 15","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"AFX Parameter 2","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
@@ -389,7 +388,7 @@
       {"offset":"00 0A","bits":["0aaa aaaa"],"name":"Multitimbre Name 11","display":"32 - 127 [ASCII]","min":32,"max":127},
       {"offset":"00 0B","bits":["0aaa aaaa"],"name":"Multitimbre Name 12","display":"32 - 127 [ASCII]","min":32,"max":127},
       {"offset":"00 0C","bits":["00aa aaaa"],"name":"Solo Part Select","display":"OFF, 1 - 32","min":0,"max":32},
-      {"offset":"00 10","bits":["0aaa aaaa"],"name":"Voice Reserve 1","display":"0 - 63, FULL default: (12) 12","min":0,"max":64},
+      {"offset":"00 10","bits":["0aaa aaaa"],"name":"Voice Reserve 1","display":"0 - 63, FULL","min":0,"max":64,"printedDefault":12},
       {"offset":"00 11","bits":["0aaa aaaa"],"name":"Voice Reserve 2","display":"0 - 63, FULL default: ( 4) 4","min":0,"max":64},
       {"offset":"00 12","bits":["0aaa aaaa"],"name":"Voice Reserve 3","display":"0 - 63, FULL default: ( 4) 4","min":0,"max":64},
       {"offset":"00 13","bits":["0aaa aaaa"],"name":"Voice Reserve 4","display":"0 - 63, FULL default: ( 4) 4","min":0,"max":64},
@@ -421,25 +420,25 @@
       {"offset":"00 2D","bits":["0aaa aaaa"],"name":"Voice Reserve 30","display":"0 - 63, FULL default: ( 0) 0","min":0,"max":64},
       {"offset":"00 2E","bits":["0aaa aaaa"],"name":"Voice Reserve 31","display":"0 - 63, FULL default: ( 0) 0","min":0,"max":64},
       {"offset":"00 2F","bits":["0aaa aaaa"],"name":"Voice Reserve 32","display":"0 - 63, FULL default: ( 0) 0","min":0,"max":64},
-      {"offset":"00 30","bits":["00aa aaaa"],"name":"MFX1 Source","display":"COMMON, 1 - 32 default: (1) 1","min":0,"max":32},
-      {"offset":"00 31","bits":["00aa aaaa"],"name":"MFX2 Source","display":"COMMON, 1 - 32 default: (2) 2","min":0,"max":32},
-      {"offset":"00 32","bits":["00aa aaaa"],"name":"MFX3 Source","display":"COMMON, 1 - 32 default: (3) 3","min":0,"max":32},
-      {"offset":"00 33","bits":["00aa aaaa"],"name":"Chorus Source","display":"COMMON, 1 - 32 default: (0) COMMON","min":0,"max":32},
-      {"offset":"00 34","bits":["00aa aaaa"],"name":"Reverb Source","display":"COMMON, 1 - 32 default: (0) COMMON","min":0,"max":32},
-      {"offset":"00 35","bits":["000a aaaa"],"name":"MFX1 Control Channel","display":"1 - 16, OFF default: (0) 1","min":0,"max":16},
-      {"offset":"00 36","bits":["0000 000a"],"name":"MFX1 Control PORT","display":"PORT A, PORT B default: (0) PORT A","min":0,"max":1},
-      {"offset":"00 37","bits":["000a aaaa"],"name":"MFX2 Control Channel","display":"1 - 16, OFF default: (1) 2","min":0,"max":16},
-      {"offset":"00 38","bits":["0000 000a"],"name":"MFX2 Control PORT","display":"PORT A, PORT B default: (0) PORT A","min":0,"max":1},
-      {"offset":"00 39","bits":["000a aaaa"],"name":"MFX3 Control Channel","display":"1 - 16, OFF default: (2) 3","min":0,"max":16},
-      {"offset":"00 3A","bits":["0000 000a"],"name":"MFX3 Control PORT","display":"PORT A, PORT B default: (0) PORT A","min":0,"max":1}
+      {"offset":"00 30","bits":["00aa aaaa"],"name":"MFX1 Source","display":"COMMON, 1 - 32","min":0,"max":32,"printedDefault":1},
+      {"offset":"00 31","bits":["00aa aaaa"],"name":"MFX2 Source","display":"COMMON, 1 - 32","min":0,"max":32,"printedDefault":2},
+      {"offset":"00 32","bits":["00aa aaaa"],"name":"MFX3 Source","display":"COMMON, 1 - 32","min":0,"max":32,"printedDefault":3},
+      {"offset":"00 33","bits":["00aa aaaa"],"name":"Chorus Source","display":"COMMON, 1 - 32","min":0,"max":32,"printedDefault":0},
+      {"offset":"00 34","bits":["00aa aaaa"],"name":"Reverb Source","display":"COMMON, 1 - 32","min":0,"max":32,"printedDefault":0},
+      {"offset":"00 35","bits":["000a aaaa"],"name":"MFX1 Control Channel","display":"1 - 16, OFF","min":0,"max":16,"printedDefault":0},
+      {"offset":"00 36","bits":["0000 000a"],"name":"MFX1 Control PORT","display":"PORT A, PORT B","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 37","bits":["000a aaaa"],"name":"MFX2 Control Channel","display":"1 - 16, OFF","min":0,"max":16,"printedDefault":1},
+      {"offset":"00 38","bits":["0000 000a"],"name":"MFX2 Control PORT","display":"PORT A, PORT B","min":0,"max":1,"printedDefault":0},
+      {"offset":"00 39","bits":["000a aaaa"],"name":"MFX3 Control Channel","display":"1 - 16, OFF","min":0,"max":16,"printedDefault":2},
+      {"offset":"00 3A","bits":["0000 000a"],"name":"MFX3 Control PORT","display":"PORT A, PORT B","min":0,"max":1,"printedDefault":0}
      ]
     },
     {"name":"Multitimbre Common MFX","page":9,"kind":"parameters","totalSize":"00 00 01 11",
      "entries": [
      ],
      "rows": [
-      {"offset":"00 00","bits":["0aaa aaaa"],"name":"MFX Type","display":"default: (0) THROUGH","min":0,"max":127},
-      {"offset":"00 01","bits":["0aaa aaaa"],"name":"MFX Dry Send Level","display":"default: (127) 127","min":0,"max":127},
+      {"offset":"00 00","bits":["0aaa aaaa"],"name":"MFX Type","min":0,"max":127,"printedDefault":0},
+      {"offset":"00 01","bits":["0aaa aaaa"],"name":"MFX Dry Send Level","min":0,"max":127,"printedDefault":127},
       {"offset":"00 02","bits":["0aaa aaaa"],"name":"MFX Chorus Send Level","display":"default: ( 0) 0","min":0,"max":127},
       {"offset":"00 03","bits":["0aaa aaaa"],"name":"MFX Reverb Send Level","display":"default: ( 0) 0","min":0,"max":127},
       {"offset":"00 05","bits":["0aaa aaaa"],"name":"MFX Control 1 Source","display":"OFF, CC01 - CC31, CC33 - CC95, BEND, AFT, SYS1 - SYS4 default: ( 0) OFF","min":0,"max":101},
@@ -493,7 +492,7 @@
      ],
      "rows": [
       {"offset":"00 00","bits":["0000 aaaa"],"name":"Chorus Type","display":"OFF, CHORUS, DELAY, GM2-CHORUS default: ( 1) CHORUS","min":0,"max":3},
-      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Chorus Level","display":"default: (127) 127","min":0,"max":127},
+      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Chorus Level","min":0,"max":127,"printedDefault":127},
       {"offset":"00 03","bits":["0000 00aa"],"name":"Chorus Output Select","display":"MAIN, REV, MAIN+REV default: ( 0) MAIN","min":0,"max":2},
       {"offset":"00 04","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Chorus Parameter 1","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
       {"offset":"00 08","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Chorus Parameter 2","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
@@ -514,7 +513,7 @@
      ],
      "rows": [
       {"offset":"00 00","bits":["0000 aaaa"],"name":"Reverb Type","display":"OFF, REVERB, SRV-ROOM, SRV-HALL, SRV-PLATE, GM2-REVERB default: ( 3) SRV-HALL","min":0,"max":5},
-      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Reverb Level","display":"default: (100) 100","min":0,"max":127},
+      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Reverb Level","min":0,"max":127,"printedDefault":100},
       {"offset":"00 03","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Reverb Parameter 1","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
       {"offset":"00 07","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Reverb Parameter 2","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
       {"offset":"00 0B","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Reverb Parameter 3","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
@@ -565,7 +564,7 @@
       {"offset":"00 04","bits":["0aaa aaaa"],"name":"Patch Bank Select MSB (CC# 0)","display":"default: PART 1: 80 PART 2: 81 PART 3: 99 PART 10: 105 PART 26: 105 OTHER: 97","min":0,"max":127},
       {"offset":"00 05","bits":["0aaa aaaa"],"name":"Patch Bank Select LSB (CC# 32)","display":"default: 0","min":0,"max":127},
       {"offset":"00 06","bits":["0aaa aaaa"],"name":"Patch Program Number (PC)","display":"default: 0","min":0,"max":127},
-      {"offset":"00 07","bits":["0aaa aaaa"],"name":"Part Level (CC# 7)","display":"default:(100) 100","min":0,"max":127},
+      {"offset":"00 07","bits":["0aaa aaaa"],"name":"Part Level (CC# 7)","min":0,"max":127,"printedDefault":100},
       {"offset":"00 08","bits":["0aaa aaaa"],"name":"Part Pan (CC# 10)","display":"L64 - 63R default:( 0) CENTER","min":0,"max":127},
       {"offset":"00 09","bits":["0aaa aaaa"],"name":"Part Coarse Tune (RPN# 2)","display":"-48 - +48 default:( 64) 0","min":16,"max":112},
       {"offset":"00 0A","bits":["0aaa aaaa"],"name":"Part Fine Tune (RPN# 1)","display":"-50 - +50 default:( 64) 0","min":14,"max":114},
@@ -573,7 +572,7 @@
       {"offset":"00 0C","bits":["0000 00aa"],"name":"Part Legato Switch (CC# 68)","display":"OFF, ON, PATCH default:( 64) 0","min":0,"max":2},
       {"offset":"00 0D","bits":["000a aaaa"],"name":"Part Pitch Bend Range (RPN# 0)","display":"0 - 24, PATCH default:( 25) 25","min":0,"max":25},
       {"offset":"00 0E","bits":["0000 00aa"],"name":"Part Portamento Switch (CC# 65)","display":"OFF, ON, PATCH default:( 64) 0","min":0,"max":2},
-      {"offset":"00 0F","bits":["0000 aaaa","0000 bbbb"],"name":"Part Portamento Time (CC# 5)","display":"0 - 127, PATCH default:(128) PATCH","packets":true,"min":0,"max":128,"nibbles":2},
+      {"offset":"00 0F","bits":["0000 aaaa","0000 bbbb"],"name":"Part Portamento Time (CC# 5)","display":"0 - 127, PATCH","packets":true,"min":0,"max":128,"printedDefault":128,"nibbles":2},
       {"offset":"00 11","bits":["0aaa aaaa"],"name":"Part Cutoff Offset (CC# 74)","display":"-64 - +63 default:( 64) 0","min":0,"max":127},
       {"offset":"00 12","bits":["0aaa aaaa"],"name":"Part Resonance Offset (CC# 71)","display":"-64 - +63 default:( 64) 0","min":0,"max":127},
       {"offset":"00 13","bits":["0aaa aaaa"],"name":"Part Attack Time Offset (CC# 73)","display":"-64 - +63 default:( 64) 0","min":0,"max":127},
@@ -581,11 +580,11 @@
       {"offset":"00 15","bits":["0000 0aaa"],"name":"Part Octave Shift","display":"-3 - +3 default:( 64) 0","min":61,"max":67},
       {"offset":"00 16","bits":["0aaa aaaa"],"name":"Part Velocity Sens Offset","display":"-63 - +63 default:( 64) 0","min":1,"max":127},
       {"offset":"00 17","bits":["0aaa aaaa"],"name":"Keyboard Range Lower","display":"C-1 - UPPER default:( 0) 0","min":0,"max":127},
-      {"offset":"00 18","bits":["0aaa aaaa"],"name":"Keyboard Range Upper","display":"LOWER - G9 default:(127) 127","min":0,"max":127},
+      {"offset":"00 18","bits":["0aaa aaaa"],"name":"Keyboard Range Upper","display":"LOWER - G9","min":0,"max":127,"printedDefault":127},
       {"offset":"00 19","bits":["0aaa aaaa"],"name":"Keyboard Fade Width Lower","display":"default:( 0) 0","min":0,"max":127},
       {"offset":"00 1A","bits":["0aaa aaaa"],"name":"Keyboard Fade Width Upper","display":"default:( 0) 0","min":0,"max":127},
       {"offset":"00 1B","bits":["0000 000a"],"name":"Mute Switch","display":"OFF, MUTE default:( 0) OFF","min":0,"max":1},
-      {"offset":"00 1C","bits":["0aaa aaaa"],"name":"Part Dry Send Level","display":"default:(127) 127","min":0,"max":127},
+      {"offset":"00 1C","bits":["0aaa aaaa"],"name":"Part Dry Send Level","min":0,"max":127,"printedDefault":127},
       {"offset":"00 1D","bits":["0aaa aaaa"],"name":"Part Chorus Send Level (CC# 93)","display":"default:( 0) 0","min":0,"max":127},
       {"offset":"00 1E","bits":["0aaa aaaa"],"name":"Part Reverb Send Level (CC# 91)","display":"default:( 40) 40","min":0,"max":127},
       {"offset":"00 1F","bits":["0000 aaaa"],"name":"Part Output Assign","display":"MFX, A, PATCH default: PART 1- 3 ( 13) PATCH default: PART 4-32 ( 1) A","min":0,"max":13,"values":[0,1,13]},
@@ -620,7 +619,7 @@
       {"offset":"00 3C","bits":["0aaa aaaa"],"name":"Part Scale Tune for A","display":"-64 - +63 default:( 64) 0","min":0,"max":127},
       {"offset":"00 3D","bits":["0aaa aaaa"],"name":"Part Scale Tune for A#","display":"-64 - +63 default:( 64) 0","min":0,"max":127},
       {"offset":"00 3E","bits":["0aaa aaaa"],"name":"Part Scale Tune for B","display":"-64 - +63 default:( 64) 0","min":0,"max":127},
-      {"offset":"00 3F","bits":["0000 00aa"],"name":"GM2 Instrument Set Select","display":"Classical, Contemporary, Solo, Enhanced default:(1) Contemporary","min":0,"max":3}
+      {"offset":"00 3F","bits":["0000 00aa"],"name":"GM2 Instrument Set Select","display":"Classical, Contemporary, Solo, Enhanced","min":0,"max":3,"printedDefault":1}
      ]
     },
     {"name":"Patch Common","page":11,"kind":"parameters","totalSize":"00 00 00 56",
@@ -794,7 +793,7 @@
      ],
      "rows": [
       {"offset":"00 00","bits":["0000 aaaa"],"name":"Reverb Type","display":"OFF, REVERB, SRV-ROOM, SRV-HALL, SRV-PLATE, GM2-REVERB","min":0,"max":5},
-      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Reverb Level","display":"default: (100) 100","min":0,"max":127},
+      {"offset":"00 01","bits":["0aaa aaaa"],"name":"Reverb Level","min":0,"max":127,"printedDefault":100},
       {"offset":"00 03","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Reverb Parameter 1","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
       {"offset":"00 07","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Reverb Parameter 2","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},
       {"offset":"00 0B","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Reverb Parameter 3","display":"-20000 - +20000","packets":true,"min":12768,"max":52768,"nibbles":4},

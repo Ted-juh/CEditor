@@ -12,7 +12,7 @@
   "sources": [
     {
       "type": "manual",
-      "title": "JUNO-D MIDI Implementation (version 2004.4.1)",
+      "title": "JUNO-D MIDI Implementation (version 1.00, April 1, 2004)",
       "notes": "Parameter Address Map read by tools/profiles/roland/parse-address-map.mjs from JUNO-D_MI.pdf (sha256 9023216b42bfb5f2e0fff5cfdca222335fdfedc609bfdce068c2eb4346fac5d9). Model ID 00 64, DT1 = 12, RQ1 = 11, Roland checksum. Not yet checked against the instrument itself."
     }
   ],

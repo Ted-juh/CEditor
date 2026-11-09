@@ -12,7 +12,7 @@
   "sources": [
     {
       "type": "manual",
-      "title": "Roland JUNO-Di MIDI Implementation (version JUNO-Di, Version:)",
+      "title": "Roland JUNO-Di MIDI Implementation (version 1.00, May 1, 2009)",
       "notes": "Parameter Address Map read by tools/profiles/roland/parse-address-map.mjs from JUNO-Di_MI.pdf (sha256 62cdda94914f80b73867bcfd23cf0ff961a40dcb4f9890cf7095f21915265b3a). Model ID 00 00 3A, DT1 = 12, RQ1 = 11, Roland checksum. Not yet checked against the instrument itself."
     }
   ],

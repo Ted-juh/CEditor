@@ -73,7 +73,23 @@
       {"address":"04 0D 00 00","name":"Temporary SN-A Tone (zone 14)","table":"SN-A Tone","series":true},
       {"address":"04 0E 00 00","name":"Temporary SN-A Tone (zone 15)","table":"SN-A Tone","series":true},
       {"address":"04 0F 00 00","name":"Temporary SN-A Tone (zone 16)","table":"SN-A Tone"},
-      {"address":"04 20 00 00","name":"Temporary V-Piano Tone","table":"V-Piano Tone"}
+      {"address":"04 20 00 00","name":"Temporary V-Piano Tone","table":"V-Piano Tone"},
+      {"address":"05 00 00 00","name":"Temporary EXSN Tone (zone 1)","table":"EXSN Tone"},
+      {"address":"05 01 00 00","name":"Temporary EXSN Tone (zone 2)","table":"EXSN Tone"},
+      {"address":"05 02 00 00","name":"Temporary EXSN Tone (zone 3)","table":"EXSN Tone","series":true},
+      {"address":"05 03 00 00","name":"Temporary EXSN Tone (zone 4)","table":"EXSN Tone","series":true},
+      {"address":"05 04 00 00","name":"Temporary EXSN Tone (zone 5)","table":"EXSN Tone","series":true},
+      {"address":"05 05 00 00","name":"Temporary EXSN Tone (zone 6)","table":"EXSN Tone","series":true},
+      {"address":"05 06 00 00","name":"Temporary EXSN Tone (zone 7)","table":"EXSN Tone","series":true},
+      {"address":"05 07 00 00","name":"Temporary EXSN Tone (zone 8)","table":"EXSN Tone","series":true},
+      {"address":"05 08 00 00","name":"Temporary EXSN Tone (zone 9)","table":"EXSN Tone","series":true},
+      {"address":"05 09 00 00","name":"Temporary EXSN Tone (zone 10)","table":"EXSN Tone","series":true},
+      {"address":"05 0A 00 00","name":"Temporary EXSN Tone (zone 11)","table":"EXSN Tone","series":true},
+      {"address":"05 0B 00 00","name":"Temporary EXSN Tone (zone 12)","table":"EXSN Tone","series":true},
+      {"address":"05 0C 00 00","name":"Temporary EXSN Tone (zone 13)","table":"EXSN Tone","series":true},
+      {"address":"05 0D 00 00","name":"Temporary EXSN Tone (zone 14)","table":"EXSN Tone","series":true},
+      {"address":"05 0E 00 00","name":"Temporary EXSN Tone (zone 15)","table":"EXSN Tone","series":true},
+      {"address":"05 0F 00 00","name":"Temporary EXSN Tone (zone 16)","table":"EXSN Tone"}
      ],
      "rows": [
      ]

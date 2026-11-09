@@ -318,4 +318,7 @@ export default {
 
   // Read on request, not at connect. Part 1 holds a patch, a sample set or a rhythm set; the instrument does not answer for the two it is not playing (p6), and the startup read stops at the first request that is not answered.
   noPull: [/^part1\.(patch|sampleSet|rhythm)(\.|$)/],
+
+  // The manual's own date and version (the MIDI Implementation Charts on p46-47; the cover prints neither).
+  manual: { date: 'Feb. 1, 2008', version: '1.00' },
 };

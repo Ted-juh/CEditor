@@ -110,6 +110,7 @@ export function parseAddressMap(text) {
   let heading = null;
   let titleLine = null;
   let afterTableLine = false;
+  let justClosed = null;
   let table = null;
   let row = null;
 
@@ -139,7 +140,7 @@ export function parseAddressMap(text) {
     // `(ModelID = 00H 00H 00H 0EH)`. Read up to the closing bracket, with the H optional: the
     // AX-Edge and JUPITER-X documents both print `00H 00H 00 65H`, and stopping at the first byte
     // without its H gave a two-byte model id that addresses nothing.
-    const model = /ModelID\s*=\s*((?:[0-9A-F]{2}H?\s*)+)\)/i.exec(line);
+    const model = /Model\s?ID\s*=\s*((?:[0-9A-F]{2}H?\s*)+)\)/i.exec(line); // the MC-909 prints `Model ID =`
     if (model && !modelId) {
       modelId = model[1].trim().split(/\s+/).map((b) => b.replace(/H$/i, '').toUpperCase()).join(' ');
       heading = line.trim().replace(/^\d+\.\s*/, '');
@@ -152,8 +153,10 @@ export function parseAddressMap(text) {
       // already stopped: the open one ended on a separator (the FA-06/07/08 does this), and this
       // border opens the next. A headless one that merely carries a table over a page break is
       // joined back onto it once everything is read (joinContinuations, below).
-      if (table && afterTableLine) closeTable();
-      else {
+      if (table && afterTableLine) {
+        justClosed = table;
+        closeTable();
+      } else {
         closeTable();
         table = { name: heading ?? titleLine ?? '(unnamed)', page, kind: null, entries: [], rows: [], totalSize: null };
       }
@@ -172,8 +175,19 @@ export function parseAddressMap(text) {
 
     const h = headingOf(line);
     if (!table) {
-      if (h) heading = h;
-      continue;
+      // A data row straight after a closing border, with nothing between them, means the border
+      // was a rule inside the table: the V-Synth GT's top table draws one under User Tone (896) and
+      // carries on with Temporary Patch and the User Patches. The table is taken back up.
+      const rowCells = text ? cellsOf(line) : null;
+      if (justClosed && rowCells && !isHeaderRow(rowCells) && !isSeparator(line) && tables.at(-1) === justClosed
+          && HEX_BYTES.test(rowCells[0].replace('#', '').trim())) {
+        table = tables.pop();
+        justClosed = null;
+      } else {
+        if (text) justClosed = null;
+        if (h) heading = h;
+        continue;
+      }
     }
     // A heading while a table is open means the open table has ended without its bottom border —
     // the FA-06/07/08's top table closes on a `|----+----|` separator and the next line is
@@ -247,6 +261,10 @@ export function parseAddressMap(text) {
       }
 
       if (!desc) continue;
+      // The SD-90's tables print each row's default beneath it: `default: (1024) 0` — the wire
+      // value in brackets, then what the screen shows. A default, not more of the display line.
+      const printedDefault = /^default\s*:\s*\((-?\d+)\)/i.exec(desc);
+      if (printedDefault && row.name !== null) { row.printedDefault = Number(printedDefault[1]); continue; }
       const named = splitNameAndRange(desc);
       if (named && row.name === null) {
         row.name = named.name;
@@ -378,13 +396,20 @@ function expandSeries(items, addressOf, withAddress, eligible) {
 function fillBetween(twoBefore, before, after, addressOf, withAddress) {
   const nameOf = (x) => x.name ?? '';
   const n = LAST_NUMBER.exec(nameOf(before));
-  const m = LAST_NUMBER.exec(nameOf(after));
-  if (!n || !m) return null;
+  if (!n) return null;
   const template = (x) => nameOf(x).replace(LAST_NUMBER, '#');
-  if (template(before) !== template(after)) return null;
   const first = Number(n[1]);
-  const last = Number(m[1]);
-  if (last - first < 2) return null;
+  let last;
+  const m = LAST_NUMBER.exec(nameOf(after));
+  if (m && template(before) === template(after)) {
+    last = Number(m[1]);
+  } else {
+    // A run that closes on a lettered slot — the JUNO-D6's `Scene Part (Part 1)`, `(Part 2)`, `:`,
+    // `(Part R)`: the numbers carry on up to the slot before the letter, as many as the stride says.
+    const escaped = template(before).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('#', '[A-Z]+');
+    if (!new RegExp(`^${escaped}$`).test(nameOf(after))) return null;
+    last = null;
+  }
 
   const start = flat(addressOf(before));
   const end = flat(addressOf(after));
@@ -395,7 +420,12 @@ function fillBetween(twoBefore, before, after, addressOf, withAddress) {
   } else {
     stride = before.nibbles ?? 1;
   }
-  if (stride <= 0 || end - start !== (last - first) * stride) return null;
+  if (stride <= 0) return null;
+  if (last === null) {
+    if ((end - start) % stride !== 0) return null;
+    last = first + (end - start) / stride; // the lettered slot sits where number `last` would
+  }
+  if (last - first < 2 || end - start !== (last - first) * stride) return null;
 
   const length = addressOf(before).split(' ').length;
   const width = n[1].length;
