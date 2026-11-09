@@ -150,6 +150,12 @@ export function buildKorgProfile(data, layout) {
   const recipes = new Map();
   const ids = new Set();
   const marks = { ...data.marks, ...(layout.marks ?? {}) };
+  // A footnote corrected where the document's own text shows the slip, with the reason.
+  for (const [mark, fix] of Object.entries(layout.markFixes ?? {})) {
+    if (!marks[mark]?.includes(fix.printed)) throw new Error(`${layout.id}: footnote *${mark} no longer prints "${fix.printed}"`);
+    marks[mark] = marks[mark].replace(fix.printed, fix.read);
+    notes.push(`Footnote *${mark} prints "${fix.printed}"; read as "${fix.read}": ${fix.why}`);
+  }
   const omitFor = (cc, name) => layout.omit?.[cc] ?? PLUMBING.find(([pattern]) => pattern.test(name))?.[1] ?? null;
   const unique = (id, suffix) => {
     const out = ids.has(id) ? `${id}${suffix}` : id;
@@ -198,6 +204,7 @@ export function buildKorgProfile(data, layout) {
   const heard = new Map(data.received.map((row) => [row.cc, row]));
   const omitted = new Map();
   const wideControllers = [];
+  const coarsePairs = [];
   for (const cc of [...new Set([...heard.keys(), ...sent.keys()])].sort((a, b) => a - b)) {
     const rx = heard.get(cc);
     const tx = sent.get(cc);
@@ -208,8 +215,19 @@ export function buildKorgProfile(data, layout) {
       omitted.set(why, [...(omitted.get(why) ?? []), cc]);
       continue;
     }
+    // MSB/LSB pairs named alike (the NTS-1 mkII's EG ATTACK on 16 and 48): the coarse controller is
+    // the parameter, and the fine one is left out, since the document does not say how many of its
+    // bits count.
+    const pairName = layout.coarseOfPairs ? /^(.*?)\s*\((MSB|LSB)\)$/i.exec(printed.name) : null;
+    const partner = pairName ? [...heard.values()].find((r) => r !== rx && splitDescription(r.desc).name.toUpperCase() === `${pairName[1]} (${pairName[2].toUpperCase() === 'MSB' ? 'LSB' : 'MSB'})`.toUpperCase()) : null;
+    if (pairName && partner && pairName[2].toUpperCase() === 'LSB') {
+      const reason = 'the fine half of a pair whose coarse half is the parameter; the document does not say how many of its bits count';
+      omitted.set(reason, [...(omitted.get(reason) ?? []), cc]);
+      continue;
+    }
     const fix = layout.names?.[`cc${cc}`];
-    const name = fix?.name ?? printed.name;
+    const name = fix?.name ?? (pairName && partner ? pairName[1] : printed.name);
+    if (pairName && partner) coarsePairs.push(`${pairName[1]} (CC ${cc}, fine CC ${partner.cc})`);
     const { group, leaf } = groupOf(name, layout.groups);
     const recipeId = `cc${cc}`;
     recipes.set(recipeId, { id: recipeId, kind: 'cc', channel: '$channel', controller: cc, value: '$encodedValue' });
@@ -279,6 +297,7 @@ export function buildKorgProfile(data, layout) {
     push(choices ? choiceParameter(base, choices) : numberParameter(base, min, max, 'u7'));
   }
   for (const [why, list] of omitted) notes.push(`Not a parameter here, ${why}: CC ${list.join(', ')}.`);
+  if (coarsePairs.length) notes.push(`Each of these is the coarse (MSB) controller of a pair, named without "(MSB)"; it sends 0 - 127 on its own: ${coarsePairs.join('; ')}.`);
   if (wideControllers.length) {
     notes.push(`CC ${wideControllers.join(', ')} take a 10-bit value when its low 3 bits come first on CC 63, as the document says; CEditor sends them as 7-bit controllers, 0 - 127, which the instrument also takes.`);
   }

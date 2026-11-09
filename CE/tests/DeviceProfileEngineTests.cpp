@@ -4144,7 +4144,8 @@ int main (int argc, char** argv)
         root.getChildFile ("korg-volca-keys.ceditor-device.json"),
         root.getChildFile ("korg-volca-kick.ceditor-device.json"),
         root.getChildFile ("korg-volca-nubass.ceditor-device.json"),
-        root.getChildFile ("korg-volca-fm2.ceditor-device.json")
+        root.getChildFile ("korg-volca-fm2.ceditor-device.json"),
+        root.getChildFile ("korg-nts-1-mk2.ceditor-device.json")
     };
 
     auto failures = 0;

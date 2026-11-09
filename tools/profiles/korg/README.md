@@ -49,6 +49,7 @@ What the builder takes as settled, and what it does not:
 | `korg-prologue` | prologue MIDI Implementation 1.01 (prologue-8 and -16) | 57 | 19 | 500 | 4BH 01H |
 | `korg-minilogue` | minilogue MIDI Implementation 1.10 | 39 | 13 | 200 | 2CH 01H |
 | `korg-monologue` | monologue MIDI Implementation 1.00 | 24 | 10 | 100 | 44H 01H |
+| `korg-nts-1-mk2` | NTS-1 digital kit mkII MIDI Implementation 1.00 | 62 | 7 | — | 73H 01H |
 | `korg-minikorg-700sm` | miniKORG 700Sm MIDI Implementation 1.00 | 29 | 15 | 14 | 62H 01H |
 | `korg-volca-fm2` | volca fm2 MIDI Implementation 1.00 | 13 | 2 | — | 2FH 01H |
 | `korg-volca-keys` | volca keys MIDI Implementation 0.01 | 16 | 2 | — | — |
@@ -90,6 +91,7 @@ korgProfiles.test.js reads a minilogue dump packed by hand from the document.
 | `korg-minilogue` | 38 of 39 | DELAY OUTPUT ROUTING: the dump names its values PRE FILTER and POST FILTER where the controller has PRE HPF and POST HPF |
 | `korg-monologue` | 23 of 24 | EG TARGET: the dump's list prints `PICTH 2` |
 | `korg-prologue` | 44 of 57 | read from TIMBRE 1, taken to be the main timbre (the document numbers its two timbres and does not name them); RING-SYNC, DELAY/REVERB TYPE, MULTI TYPE and PITCH EG, whose dump names differ (`RING ON`, `OFF`, `USER`, `+`); MOD EFFECT TYPE, still a number; the sub types, which depend on a type |
+| `korg-nts-1-mk2` | 20 of 62 | the type selectors and the arpeggiator, which its dump does not hold; the OSC and FX edit parameters, 14-bit on NRPN and 10-bit in the dump; EG TYPE and FILTER TYPE, whose dump names differ (`ASR`, `Thru`) |
 | `korg-minilogue-xd` | 79 of 101 | the performance controllers, which are not part of a program; SYNC and RING, still numbers; VOICE MODE TYPE, whose dump list prints 2 twice; PORTAMENTO, PROGRAM LEVEL and Program Transpose, whose dump ranges differ from their controllers' (0,1; 0~132; 0~25) |
 
 The request and the dump carry the global MIDI channel (`3g`); the profiles' `deviceId` variable is
@@ -110,6 +112,9 @@ Kept as printed and said where it applies:
 - **volca fm2**: ARP TYPE and ARP DIV print hex and decimal bounds that disagree (`40 (58)`,
   `74 (104)`, `22 (35)`); each value sent is one both readings give the same name.
 - **volca bass**: `EG DECAT/RELEASE`, which the volca keys prints as EG DECAY/RELEASE.
+- **NTS-1 mkII**: DELAY TYPE's footnote prints `TAPE BPM DOUBLING` for two names, thirteen ranges
+  for twelve; the profile reads the comma back in. EG TYPE is `AHR` in the controller footnote and
+  `ASR` in the program dump; FILTER TYPE's last value is OFF in one and Thru in the other.
 - **The program tables**: the minilogue xd's VOICE MODE TYPE list prints `2 : CHORD` and `2 : UNISON`
   for a 1~4 value; its PORTAMENTO row prints the range `0,1` beside a description of `0~127`; its
   PROGRAM LEVEL is 0~132 in the dump and 0~120 on its NRPN, Program Transpose 0~25 and 1~25. The
@@ -118,8 +123,10 @@ Kept as printed and said where it applies:
 ## Not done
 
 - **The prologue's second timbre**: Pull reads TIMBRE 1 only. The volcas send no dump at all.
-- **NTS-1 mkII**: its finer controllers are MSB/LSB pairs (EG ATTACK on 16 and 48), which a CC
-  recipe cannot send as one value yet. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
+- **The NTS-1 mkII's fine controllers.** Its finer settings are pairs named alike, `EG ATTACK (MSB)`
+  on 16 and `(LSB)` on 48, paired by name rather than by 32. The document does not say how many of
+  the LSB's bits count, so the profile offers the coarse controller alone and leaves the fine one
+  out. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
   reviewed.
 - **microKORG, microKORG S, microKORG2, KingKORG, KingKORG NEO**: few controllers; they are edited by
   Korg's SysEx parameter change, which needs its own recipe.

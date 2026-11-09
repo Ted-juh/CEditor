@@ -294,3 +294,15 @@ test('the prologue reads TIMBRE 1, its settings counted from the block\'s start'
   assert.equal(at('MOD EFFECT ON-OFF').offset, 71, 'a program-wide setting keeps its own offset');
   assert.ok(profile.authoringNotes.some((n) => /TIMBRE 1, taken to be the main timbre/.test(n)));
 });
+
+test('the NTS-1 mkII: the coarse half of each pair, a comma put back, its 14-bit NRPNs low bits first on CC 38', { skip: !builtProfile('korg-nts-1-mk2') }, () => {
+  const profile = builtProfile('korg-nts-1-mk2');
+  const by = (name) => profile.parameters.find((p) => p.name === name);
+  const recipe = (p) => profile.messageRecipes.find((r) => r.id === p.messageRecipe);
+  assert.equal(recipe(by('EG ATTACK')).controller, 16);
+  assert.equal(profile.parameters.some((p) => /\((MSB|LSB)\)$/.test(p.name)), false);
+  assert.ok(profile.authoringNotes.some((n) => /fine half of a pair.*CC 39, 48, 49/.test(n)));
+  assert.ok(profile.authoringNotes.some((n) => /an NRPN or RPN selector.*CC 98, 99/.test(n)), 'NRPN (LSB) is plumbing, not a fine half');
+  assert.equal(by('DELAY TYPE').choices.length, 13);
+  assert.deepEqual([recipe(by('OSC EDIT PARAM1')).lowBitsController, recipe(by('OSC EDIT PARAM1')).lowBits], [38, 7]);
+});

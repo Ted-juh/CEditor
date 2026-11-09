@@ -48,7 +48,7 @@ function programChange(table) {
 function nrpnRows(table) {
   const out = [];
   for (const row of table?.rows ?? []) {
-    const m = /^(--|[0-9a-f]{2})\s+([0-9a-f]{2})$/i.exec(row.cells[0] ?? '');
+    const m = /^(--|[0-9a-f]{1,2})\s+([0-9a-f]{1,2})$/i.exec(row.cells[0] ?? '');
     if (!m) continue;
     out.push({ line: row.line, msb: m[1], lsb: m[2], name: row.cells[1] ?? '', value: row.cells[2] ?? '', more: row.more.map((c) => c.slice(1).join(' ').trim()).filter(Boolean) });
   }
@@ -95,7 +95,7 @@ export function importText(file, layout) {
   const titled = (id) => tables.find((t) => t.heading?.id === id && /CHANNEL MESSAGES/i.test(t.heading.title));
   const transmitted = controlChanges(titled(layout.tables?.transmitted ?? '1-1'));
   const received = controlChanges(titled(layout.tables?.received ?? '2-1'));
-  const nrpnTable = tables.find((t) => /\bNRPN\b|Non Registered/i.test(t.heading?.title ?? '') && t.rows.some((r) => /^(--|[0-9a-f]{2})\s+[0-9a-f]{2}$/i.test(r.cells[0] ?? '')));
+  const nrpnTable = tables.find((t) => /\bNRPN\b|Non Registered/i.test(t.heading?.title ?? '') && t.rows.some((r) => /^(--|[0-9a-f]{1,2})\s+[0-9a-f]{1,2}$/i.test(r.cells[0] ?? '')));
   const title = documentTitle(text);
   return {
     source: {
