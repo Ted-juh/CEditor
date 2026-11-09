@@ -33,7 +33,9 @@ function controlChanges(table) {
     if (!/^Bn$/i.test(row.cells[0] ?? '')) continue;
     const cc = ccNumber(row.cells[1] ?? '');
     if (cc === null) continue;
-    out.push({ line: row.line, cc, third: row.cells[2] ?? '', desc: row.cells.at(-1), more: row.more.map((c) => c.at(-1)).filter(Boolean) });
+    // The description is the fourth cell; some documents print a code after it (the microKORG S's
+    // P, C and A for what sends the message).
+    out.push({ line: row.line, cc, third: row.cells[2] ?? '', desc: row.cells[3] ?? row.cells.at(-1), more: row.more.map((c) => c[3] ?? c.at(-1)).filter(Boolean) });
   }
   return out;
 }

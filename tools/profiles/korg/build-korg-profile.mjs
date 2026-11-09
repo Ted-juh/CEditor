@@ -21,6 +21,7 @@
 
 import { camel } from '../roland/build-profile.mjs';
 import { addPull } from './build-korg-dump.mjs';
+import { addParameterChange, parameterChangeVectors } from './build-korg-sysex.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 const slug = (label) => label.toLowerCase().replace(/[^a-z0-9+-]+/g, '').replace(/\+/g, 'plus').replace(/-/g, 'minus') || 'v';
@@ -450,6 +451,12 @@ export function buildKorgProfile(data, layout) {
     ...((layout.presets ?? presetsFrom(data)) ? { presets: layout.presets ?? presetsFrom(data) } : {}),
     tests,
   };
+  const changeNotes = addParameterChange(profile, data, layout);
+  if (changeNotes.length) {
+    profile.variables = { ...profile.variables, deviceId: 0x30 };
+    profile.authoringNotes.push(...changeNotes, 'The exclusive header carries the global MIDI channel as 3g; the profile\'s deviceId variable is that byte, 30H for channel 1.');
+    profile.tests.push(...parameterChangeVectors(profile));
+  }
   const pullNotes = [];
   addPull(profile, data, layout, pullNotes);
   profile.authoringNotes.push(...pullNotes);

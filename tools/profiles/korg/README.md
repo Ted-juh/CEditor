@@ -50,6 +50,7 @@ What the builder takes as settled, and what it does not:
 | `korg-minilogue` | minilogue MIDI Implementation 1.10 | 39 | 13 | 200 | 2CH 01H |
 | `korg-monologue` | monologue MIDI Implementation 1.00 | 24 | 10 | 100 | 44H 01H |
 | `korg-nts-1-mk2` | NTS-1 digital kit mkII MIDI Implementation 1.00 | 62 | 7 | — | 73H 01H |
+| `korg-microkorg-s` | microKORG S MIDI Implementation 1.01 | 205 | 78 | 128 | 40H 01H |
 | `korg-minikorg-700sm` | miniKORG 700Sm MIDI Implementation 1.00 | 29 | 15 | 14 | 62H 01H |
 | `korg-volca-fm2` | volca fm2 MIDI Implementation 1.00 | 13 | 2 | — | 2FH 01H |
 | `korg-volca-keys` | volca keys MIDI Implementation 0.01 | 16 | 2 | — | — |
@@ -60,6 +61,28 @@ What the builder takes as settled, and what it does not:
 
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
 try to recognise them.
+
+## SysEx parameter change (microKORG S)
+
+The microKORG S keeps every setting of its program, its two timbres and its vocoder in SysEx: one
+PARAMETER CHANGE message per setting, `F0 42 3g 00 01 40 41 pp PP vv VV F7` (NOTE 5), the Param ID
+and the value 14 bits each, low seven first. `build-korg-sysex.mjs` reads the tables that give each
+setting its Param ID (TABLE 1 for the program, TABLE 2 for a timbre with one ID column per timbre,
+TABLE 3 for the vocoder), with the section rows that head their parts:
+
+- a VALUE of `0~127` is a number; `0,1,2=Mono,Poly,Unison` and `0~3=24LPF,12LPF,12BPF,12HPF` are
+  choices; `0~7=Saw~Audio In *T-2` is a choice from the list *T-2, which the document prints in
+  columns;
+- a value printed `64+/-50=0+/-50[cent]` is stored as 64 +/- 50, and NOTE 5 calls the message's value
+  "signed", so it is sent as the signed value, -50 as two's complement over 14 bits (`4E 7F`). Both
+  engines learned that encoding (`s14-lsb-msb`) for these profiles. This is a reading of NOTE 5, not
+  something tried on an instrument;
+- left out and said: the program name and the trigger pattern (a run of IDs for the bits of one
+  setting), Vel.Sense (`64=0`), and the vocoder's odd channels, printed `= CH LEVEL [0]` (they follow
+  the even ones).
+
+Its NRPNs reach settings the parameter change reaches in full, in an older notation, and are left
+out. No Pull yet: its program dump is printed differently from the logue family's.
 
 ## Pull
 
@@ -130,8 +153,9 @@ Kept as printed and said where it applies:
   the LSB's bits count, so the profile offers the coarse controller alone and leaves the fine one
   out. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
   reviewed.
-- **microKORG, microKORG S, microKORG2, KingKORG, KingKORG NEO**: few controllers; they are edited by
-  Korg's SysEx parameter change, which needs its own recipe.
+- **microKORG, microKORG2, KingKORG, KingKORG NEO**: few controllers; they are edited by Korg's SysEx
+  parameter change, as the microKORG S is, from tables not yet read. **The microKORG S's Pull**: its
+  program tables print offsets and bits in a form of their own (`+1 B6,7`).
 - **KRONOS, NAUTILUS**: their MIDI Implementations are ZIP archives, not yet read.
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document
   for these, not a parameter table.

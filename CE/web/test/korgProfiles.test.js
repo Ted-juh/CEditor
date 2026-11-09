@@ -174,7 +174,11 @@ for (const { name, profile, text, out, data } of BUILT) {
         const compiled = localCompileParameter(profile, { parameterId: parameter.id, value });
         assert.ok(compiled.ok, `${parameter.id}: ${compiled.error}`);
         let bytes;
-        if (recipe.kind === 'cc') bytes = [0xb0, recipe.controller, wire];
+        if (recipe.kind === 'sysex') {
+          // Korg's parameter change: the value 14 bits, low seven first; a choice one byte and 00.
+          const value = parameter.type === 'choice' ? [wire] : [(wire & 0x3fff) & 0x7f, (wire & 0x3fff) >> 7];
+          bytes = recipe.template.flatMap((t) => (t === '$deviceId' ? [0x30] : t === '$encodedValue' ? value : [Number.parseInt(t, 16)]));
+        } else if (recipe.kind === 'cc') bytes = [0xb0, recipe.controller, wire];
         else if (recipe.lowBits) bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, recipe.lowBitsController, wire & ((1 << recipe.lowBits) - 1), 0xb0, 0x06, wire >> recipe.lowBits];
         else bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, 0x06, wire];
         assert.equal(compiled.hex, hex(bytes), `${parameter.id} = ${value}`);
@@ -188,8 +192,11 @@ for (const { name, profile, text, out, data } of BUILT) {
     for (const vector of vectors) {
       const compiled = localCompileParameter(profile, { parameterId: vector.parameter, value: vector.value });
       assert.ok(compiled.ok, compiled.error);
-      const bytes = compiled.transaction.messages.flatMap((m) => m.bytes);
-      const lines = Array.from({ length: bytes.length / 3 }, (unused, i) => hex(bytes.slice(i * 3, i * 3 + 3)));
+      // One line per message, as the C++ engine's tests compare them.
+      // (A SysEx message is one line; a run of control changes, one line each.)
+      const lines = compiled.transaction.messages.flatMap((m) => (m.bytes[0] === 0xf0
+        ? [hex(m.bytes)]
+        : Array.from({ length: m.bytes.length / 3 }, (unused, i) => hex(m.bytes.slice(i * 3, i * 3 + 3)))));
       assert.equal(lines.join('\n'), vector.expectedHex, vector.name);
     }
   });
@@ -313,4 +320,18 @@ test('the miniKORG 700Sm prints its two-byte values L first, and reads them low 
   assert.equal(reverb.offset, 32);
   assert.deepEqual(reverb.codec.parts, [{ at: 1, from: 0, bits: 8, shift: 8 }, { at: 0, from: 0, bits: 8, shift: 0 }]);
   assert.equal(reverb.codec.shiftRight, 7, '0~16383 read as its top seven bits');
+});
+
+test('the microKORG S: every setting by parameter change, a signed value as two\'s complement', { skip: !builtProfile('korg-microkorg-s') }, () => {
+  // NOTE 5: F0 42 3g 00 01 40 41 pp PP vv VV F7. TABLE 2: Tune `64+/-50=0+/-50[cent]`, Param ID 00:45
+  // for timbre 1; Cutoff 00:55 and 01:65; OSC 2 Wave `0~2=Saw,Squ,Tri` at 00:4D.
+  const profile = builtProfile('korg-microkorg-s');
+  const send = (name, value) => localCompileParameter(profile, { parameterId: profile.parameters.find((p) => p.name === name).id, value });
+  assert.equal(send('Timbre 1: PITCH Tune', -50).hex, 'F0 42 30 00 01 40 41 45 00 4E 7F F7');
+  assert.equal(send('Timbre 1: PITCH Tune', 50).hex, 'F0 42 30 00 01 40 41 45 00 32 00 F7');
+  assert.equal(send('Timbre 2: FILTER Cutoff', 127).hex, 'F0 42 30 00 01 40 41 65 01 7F 00 F7');
+  assert.equal(send('Timbre 1: OSC 2 Wave', 'tri').hex, 'F0 42 30 00 01 40 41 4D 00 02 00 F7');
+  assert.deepEqual(profile.parameters.find((p) => p.name === 'Timbre 1: OSC 1 Wave').choices.map((c) => c.label),
+    ['Saw', 'Pulse', 'Tri', 'Sin(Cross)', 'Vox Wave', 'DWGS', 'Noise', 'Audio In'], '*T-2, printed in two columns');
+  assert.ok(profile.authoringNotes.some((n) => /signed value.*NOTE 5/.test(n)));
 });

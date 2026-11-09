@@ -95,7 +95,7 @@ function recipeNumber(value, variables = {}, fallback = 0) {
  */
 /** 14-bit encoder names, spelled every way the profiles in this repo spell them. */
 const isU14 = (encoding) =>
-  encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb' || encoding === 'u14-lsb-msb';
+  encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb' || encoding === 'u14-lsb-msb' || encoding === 's14-lsb-msb';
 
 /**
  * How many nibbles this parameter's value occupies, or an error.
@@ -220,6 +220,10 @@ export function decodeParameterValue(parameter, bytes) {
     return ((list[0] & 0x7f) << 7) | (list[1] & 0x7f);
   }
   if (encoding === 'u14-lsb-msb') return ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
+  if (encoding === 's14-lsb-msb') {
+    const raw = ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
+    return raw >= 8192 ? raw - 16384 : raw;
+  }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
     if (error) return null;
@@ -272,6 +276,14 @@ export function encodeParameterValue(parameter, value) {
     // through to the u7 line and went out as one byte, clamped to 127.
     const number = clampInt(value, 0, 16383);
     return { bytes: [number & 0x7f, (number >> 7) & 0x7f], number, normalized: number / 16383, displayed: String(number) };
+  }
+  if (encoding === 's14-lsb-msb') {
+    // Signed, two's complement over 14 bits, least significant byte first, as DeviceProfileEngine.cpp
+    // encodes it (Korg's parameter change: -50 goes out 4E 7F).
+    const number = Math.round(Number(value) || 0);
+    if (number < -8192 || number > 8191) return { error: `Encoded s14 value outside -8192-8191 for ${parameter?.id ?? ''}` };
+    const wire = number & 0x3fff;
+    return { bytes: [wire & 0x7f, (wire >> 7) & 0x7f], number, normalized: (number + 8192) / 16383, displayed: String(number) };
   }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
@@ -649,11 +661,12 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     for (let index = 0; index < nibbles; index += 1) {
       numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
     }
-  } else if (encodingType === 'u14-lsb-msb') {
+  } else if (encodingType === 'u14-lsb-msb' || encodingType === 's14-lsb-msb') {
     // Least significant byte first, as DeviceProfileEngine.cpp reads it. It came back as its first
-    // byte alone: 12345 (39 60) as 57.
+    // byte alone: 12345 (39 60) as 57. s14 is the same bits read as two's complement.
     if (offset + 1 >= bytes.length) return { ok: false, error: `14-bit dump value requires two bytes for ${parameter?.id ?? ''}` };
     numeric = ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+    if (encodingType === 's14-lsb-msb' && numeric >= 8192) numeric -= 16384;
   } else if (encodingType === 'u8') {
     numeric = bytes[offset] & 0xff;                // a full byte, as an unpacked payload holds one
   } else if (encodingType === 'bitfields') {

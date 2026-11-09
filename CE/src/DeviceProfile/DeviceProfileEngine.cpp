@@ -2358,12 +2358,15 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
         numeric = ((bytes[offset] & 0x7f) << 7) | (bytes[offset + 1] & 0x7f);
     }
-    else if (encodingType == "u14-lsb-msb")
+    else if (encodingType == "u14-lsb-msb" || encodingType == "s14-lsb-msb")
     {
-        // 14-bit, least-significant byte first (byteOrder lsb-first).
+        // 14-bit, least-significant byte first (byteOrder lsb-first); s14 is the same bits read as
+        // two's complement.
         if (offset + 1 >= bytes.size())
             return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
         numeric = ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+        if (encodingType == "s14-lsb-msb" && numeric >= 8192)
+            numeric -= 16384;
     }
     else if (encodingType == "nibbled")
     {
@@ -2570,6 +2573,19 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             const auto lsb = value & 0x7f;
             encodedBytes.add (encodingType == "u14-lsb-msb" ? lsb : msb);
             encodedBytes.add (encodingType == "u14-lsb-msb" ? msb : lsb);
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "s14-lsb-msb")
+        {
+            // A signed value in 14 bits, two's complement, least significant byte first: Korg's
+            // parameter change ("VVvv = signed value": -50 is 3FCEH, sent 4E 7F).
+            auto value = (int) std::round (numeric);
+            if (value < -8192 || value > 8191)
+                return juce::Result::fail ("Encoded s14 value outside -8192-8191 for " + propString (parameter, "id"));
+            const auto wire = value & 0x3fff;
+            encodedBytes.add (wire & 0x7f);
+            encodedBytes.add ((wire >> 7) & 0x7f);
             return juce::Result::ok();
         }
 

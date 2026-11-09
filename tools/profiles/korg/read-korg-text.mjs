@@ -76,6 +76,7 @@ export function readTables(text) {
 const MARK = /^\s*\*(\d+-\d+|\d+)\s*:\s?(.*)$/;          // *6-01 : text   /  *4 : text
 const LIST = /^\s*\*(\d+-\d+)\s*\((.+)\)\s*$/;            // *3-5 (VOICE MODE)
 const NOTE = /^\s*\*note\s+([A-Z]\d+)\b\s*(?:\((.*)\))?\s*$/i;   // *note P6 (SELECT NOISE)
+const TLIST = /^\s*\*([A-Z]-\d+)\s*:\s*$/;                         // *T-1 :   (entries in columns below)
 
 /**
  * The footnotes: `{ '6-01': { text, line } }` for a mark with text, `{ '3-5': { title, entries } }`
@@ -91,7 +92,13 @@ export function readFootnotes(text) {
   for (let i = 0; i < all.length; i++) {
     const line = all[i];
     if (BORDER.test(line) || ROW.test(line)) { close(); continue; }
-    let m = NOTE.exec(line);
+    let m = TLIST.exec(line);
+    if (m) {
+      open = { kind: 'list', key: m[1], title: '', lines: [], line: i + 1 };
+      notes[open.key] = open;
+      continue;
+    }
+    m = NOTE.exec(line);
     if (m) {
       open = { kind: 'list', key: m[1].toUpperCase(), title: (m[2] ?? '').trim(), lines: [], line: i + 1 };
       notes[open.key] = open;
@@ -133,11 +140,27 @@ export function readFootnotes(text) {
 /** `0 : ARP LATCH`, `0 ~ 255  : Poly`, `48~57 : '0'~'9'` -> { from, to, label }. Other lines are not entries. */
 export function listEntries(listLines) {
   const out = [];
+  const entry = /^(-?\d+)\s*(?:~\s*(-?\d+))?\s*:\s*/;
   for (const line of listLines) {
-    const m = /^(-?\d+)\s*(?:~\s*(-?\d+))?\s*:\s*(.+)$/.exec(line);
-    if (m) out.push({ from: Number(m[1]), to: Number(m[2] ?? m[1]), label: m[3].trim() });
+    if (!entry.test(line)) continue;
+    // Several to a line, in columns (the microKORG S's `0: 1/32       5: 1/8       10: 3/8`, and
+    // `3: Sin(Cross) 7: Audio In` with a single space between). A new entry starts only where the
+    // label so far closes its brackets: `Percent Type (USER PARAMETER : 0~101 : 0 ~ 100%)` is one.
+    let rest = line;
+    while (rest) {
+      const head = entry.exec(rest);
+      if (!head) break;
+      let body = rest.slice(head[0].length);
+      let cut = body.length;
+      for (const m of body.matchAll(/\s+-?\d+\s*(?:~\s*-?\d+)?\s*:/g)) {
+        const before = body.slice(0, m.index);
+        if ((before.match(/\(/g) ?? []).length === (before.match(/\)/g) ?? []).length) { cut = m.index; break; }
+      }
+      out.push({ from: Number(head[1]), to: Number(head[2] ?? head[1]), label: body.slice(0, cut).trim() });
+      rest = body.slice(cut).trim();
+    }
   }
-  return out;
+  return out.sort((a, b) => a.from - b.from);
 }
 
 /** The document's own title line: `KORG minilogue xd Implementation   Revision 1.01 (2020.2.10)`. */
