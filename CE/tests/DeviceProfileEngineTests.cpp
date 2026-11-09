@@ -3998,7 +3998,14 @@ int main (int argc, char** argv)
         root.getChildFile ("roland-jd-xi.ceditor-device.json"),
         root.getChildFile ("roland-jd-xa.ceditor-device.json"),
         root.getChildFile ("roland-gaia-2.ceditor-device.json"),
-        root.getChildFile ("roland-fa-06.ceditor-device.json")
+        root.getChildFile ("roland-fa-06.ceditor-device.json"),
+        root.getChildFile ("roland-juno-x.ceditor-device.json"),
+        root.getChildFile ("roland-jupiter-x.ceditor-device.json"),
+        root.getChildFile ("roland-fantom.ceditor-device.json"),
+        root.getChildFile ("roland-ax-edge.ceditor-device.json"),
+        root.getChildFile ("roland-juno-ds.ceditor-device.json"),
+        root.getChildFile ("roland-xps-30.ceditor-device.json"),
+        root.getChildFile ("roland-xps-10.ceditor-device.json")
     };
 
     auto failures = 0;
