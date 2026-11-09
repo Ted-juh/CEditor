@@ -4160,7 +4160,9 @@ int main (int argc, char** argv)
         root.getChildFile ("novation-circuit-mono-station.ceditor-device.json"),
         root.getChildFile ("novation-circuit-tracks.ceditor-device.json"),
         root.getChildFile ("novation-circuit-rhythm.ceditor-device.json"),
-        root.getChildFile ("novation-mininova.ceditor-device.json")
+        root.getChildFile ("novation-mininova.ceditor-device.json"),
+        root.getChildFile ("novation-k-station.ceditor-device.json"),
+        root.getChildFile ("novation-ks-series.ceditor-device.json")
     };
 
     auto failures = 0;

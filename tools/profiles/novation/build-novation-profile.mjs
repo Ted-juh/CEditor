@@ -24,6 +24,7 @@
 
 import { camel, stringifyProfile } from '../roland/build-profile.mjs';
 import { addPull } from './build-novation-dump.mjs';
+import { readUse } from './read-novation-cclist.mjs';
 
 const DASH = /\s*(?:-|–|to)\s*/;
 const num = (s) => Number(String(s).replace(/[–−]/g, '-').replace(/^\+/, ''));
@@ -104,7 +105,27 @@ export function buildNovationProfile(data, layout) {
     return block ? block.parts : [null];
   };
 
-  for (const { row, part } of data.rows.flatMap((r) => partsOf(r).map((part) => ({ row: r, part })))) {
+  // An older manual's controller and NRPN lists, read in its own key (read-novation-cclist.mjs), as
+  // rows in the guides' form: the range sent, and what it shows.
+  const listed = [];
+  const listedSkips = new Map();
+  if (data.controllerList) {
+    const asRow = (type, number, use) => {
+      const u = readUse(use);
+      if (u.skip) { listedSkips.set(u.skip, [...(listedSkips.get(u.skip) ?? []), `${type} ${number}${u.name ? ` (${u.name})` : ''}`]); return null; }
+      return {
+        doc: data.controllerList.doc, page: 0, section: '', parameter: u.name, type, number,
+        range: `${u.min}-${u.max}${u.shownMin !== undefined ? ` (${u.shownMin} to ${u.shownMax})` : ''}`,
+        default: '',
+        notes: u.choices ? u.choices.map((c) => `${c.value}=${c.label}`).join(', ') : '',
+        // Said, not read: `0=NONE, 127=PRECISE PITCH TRACK` names two points on a scale.
+        aside: [u.choices ? null : u.note, u.unit ? `In ${u.unit}.` : null, u.receiveOnly ? 'Received, not sent.' : null].filter(Boolean).map((x) => x.replace(/([^.])$/, '$1.')).join(' '),
+      };
+    };
+    for (const c of data.controllerList.controllers) listed.push(asRow('CC', String(c.number), c.use));
+    for (const n of data.controllerList.nrpns) listed.push(asRow('NRPN', `0:${n.lsb}`, n.use));
+  }
+  for (const { row, part } of [...data.rows, ...listed.filter(Boolean)].flatMap((r) => partsOf(r).map((part) => ({ row: r, part })))) {
     const type = row.type.trim().toUpperCase().replace(/\s+/g, ' ');
     const name = (layout.names?.[row.parameter] ?? row.parameter).replace(/\s+/g, ' ').trim();
     const section = layout.sectionOf ? layout.sectionOf(row) : row.section;
@@ -175,6 +196,7 @@ export function buildNovationProfile(data, layout) {
       pairs.push(`${fullName} (CC ${pairOf[0]}, fine CC ${pairOf[1]})`);
     }
     if (row.notes && !read.choices && !/^Send on appropriate channel/i.test(row.notes)) describe.push(row.notes.replace(/\s+/g, ' ').replace(/([^.])$/, '$1.'));
+    if (row.aside) describe.push(row.aside);
     if (/[a-z]/i.test(row.range) && !read.choices && !/^\(?-?\d/.test(row.range.replace(/[–−]/g, '-'))) describe.push(`Printed range: ${row.range}.`);
     // A message another row has: a second switch on it, when both are choices whose values differ.
     const values = read.choices ? read.choices.map((c) => c.value) : null;
@@ -223,6 +245,7 @@ export function buildNovationProfile(data, layout) {
   if (shared.size) notes.push(`Messages that carry several switches, each with values of its own, a choice each: ${[...new Set([...shared].map((id) => { const r = recipes.get(id); return r.kind === 'nrpn' ? `NRPN ${r.parameterMsb}:${r.parameterLsb}` : `CC ${r.controller}`; }))].join(', ')}. CEditor does not attribute one of these to a parameter when the instrument sends it.`);
   if (pairs.length) notes.push(`${pairs.length} CC pair(s) are the coarse controller alone, 0 - 127: each pair is a controller and its partner 32 above, MIDI's coarse and fine, and the Circuit Mono Station's guide says the second "is used to create an 8-bit message for a 0-255 value range" without saying which bit it carries. ${pairs.join('; ')}.`);
   for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
+  for (const [why, list] of listedSkips) notes.push(`Not a parameter here, ${why}: ${list.join(', ')}.`);
   if (data.valueTables?.length) notes.push(`${parameters.filter((p) => p.type === 'choice').length} choice(s), their names from the value tables the rows point to (${[...new Set(data.valueTables.map((t) => t.title))].join(', ')}) where a table numbers every value of the range, or from the rows' own notes.`);
   for (const [why, names] of tableMisses) notes.push(`A number, not a choice, where the value table it points to does not number its whole range: ${why}: ${names.join(', ')}.`);
 
@@ -270,7 +293,7 @@ export function buildNovationProfile(data, layout) {
     sources: data.sources.map((s) => ({
       type: 'manual',
       title: s.title,
-      notes: `MIDI parameter table (pages ${Array.isArray(s.pages) ? s.pages.join(', ') : s.pages}) read by tools/profiles/novation/read-novation-pdf.mjs from ${s.file} (sha256 ${s.sha256}), ${s.url}. Not yet checked against the instrument itself.`,
+      notes: `${data.controllerList?.doc === data.sources.indexOf(s) ? `MIDI Controller List and NRPN List (pages ${s.pages}) read by tools/profiles/novation/read-novation-cclist.mjs` : `MIDI parameter table (pages ${Array.isArray(s.pages) ? s.pages.join(', ') : s.pages}) read by tools/profiles/novation/read-novation-pdf.mjs`} from ${s.file} (sha256 ${s.sha256}), ${s.url}. Not yet checked against the instrument itself.`,
     })),
     testedWith: [],
     authoringNotes: [

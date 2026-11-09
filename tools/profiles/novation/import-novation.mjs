@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { readTables } from './read-novation-pdf.mjs';
+import { readControllerList } from './read-novation-cclist.mjs';
 import { pagesText, readMessage, readPatchFormat } from './read-novation-sysex.mjs';
 import { readValueTables } from './read-novation-values.mjs';
 
@@ -33,13 +34,16 @@ export function importDocuments(layout, files) {
   const rows = [];
   const valueTables = [];
   let patch = null;
+  let controllerList = null;
   layout.documents.forEach((doc, index) => {
     const file = files[index];
-    const pages = pageList(doc.pages);
-    sources.push({ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url, pages: doc.pages });
+    const pages = doc.pages ? pageList(doc.pages) : [];
+    sources.push({ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url, pages: doc.pages ?? doc.controllerList });
     for (const row of readTables(file, pages, { columnStarts: doc.columnStarts ?? null })) rows.push({ doc: index, ...row });
     // The value tables the rows point to (`See Osc Waveform Table`), where the layout names their pages.
     if (doc.valuePages) for (const t of readValueTables(file, pageList(doc.valuePages))) valueTables.push({ doc: index, ...t });
+    // An older manual's MIDI Controller List and NRPN List (the K-Station's, the KS series').
+    if (doc.controllerList) controllerList = { doc: index, ...readControllerList(file, pageList(doc.controllerList)) };
     // The patch dump, where the layout names the pages of its messages and its format.
     if (doc.patch) {
       const messages = pagesText(file, pageList(doc.patch.messagePages));
@@ -53,18 +57,20 @@ export function importDocuments(layout, files) {
       };
     }
   });
-  return { sources, rows, ...(valueTables.length ? { valueTables } : {}), ...(patch ? { patch } : {}) };
+  return { sources, rows, ...(valueTables.length ? { valueTables } : {}), ...(patch ? { patch } : {}), ...(controllerList ? { controllerList } : {}) };
 }
 
 /** One row per line, so a re-import that changes one row changes one line. */
 export function stringifyTranscription(data) {
-  return `${['{', '  "sources": [', ...data.sources.map((s, i) => `    ${JSON.stringify(s)}${i < data.sources.length - 1 ? ',' : ''}`), '  ],', '  "rows": [',
-    ...data.rows.map((r, i) => `    ${JSON.stringify(r)}${i < data.rows.length - 1 ? ',' : ''}`),
-    ...(data.valueTables ? ['  ],', '  "valueTables": [', ...data.valueTables.map((t, i) => `    ${JSON.stringify(t)}${i < data.valueTables.length - 1 ? ',' : ''}`)] : []),
-    ...(data.patch ? ['  ],', '  "patch": {',
-      ...['doc', 'requestTitle', 'replyTitle', 'request', 'reply'].map((k) => `    ${JSON.stringify(k)}: ${JSON.stringify(data.patch[k])},`),
-      '    "format": [', ...data.patch.format.map((r, i) => `      ${JSON.stringify(r)}${i < data.patch.format.length - 1 ? ',' : ''}`), '    ]', '  }'] : ['  ]']),
-    '}'].join('\n')}\n`;
+  const list = (items, indent) => (items.length ? `[\n${items.map((x) => `${indent}  ${JSON.stringify(x)}`).join(',\n')}\n${indent}]` : '[]');
+  const sections = [
+    `  "sources": ${list(data.sources, '  ')}`,
+    `  "rows": ${list(data.rows, '  ')}`,
+    ...(data.valueTables ? [`  "valueTables": ${list(data.valueTables, '  ')}`] : []),
+    ...(data.controllerList ? [`  "controllerList": {\n    "doc": ${data.controllerList.doc},\n    "controllers": ${list(data.controllerList.controllers, '    ')},\n    "nrpns": ${list(data.controllerList.nrpns, '    ')}\n  }`] : []),
+    ...(data.patch ? [`  "patch": {\n${['doc', 'requestTitle', 'replyTitle', 'request', 'reply'].map((k) => `    ${JSON.stringify(k)}: ${JSON.stringify(data.patch[k])},\n`).join('')}    "format": ${list(data.patch.format, '    ')}\n  }`] : []),
+  ];
+  return `{\n${sections.join(',\n')}\n}\n`;
 }
 
 async function main() {

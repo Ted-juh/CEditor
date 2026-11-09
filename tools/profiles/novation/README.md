@@ -66,17 +66,60 @@ that it copes with, each found on a real page:
 
 None of these documents prints a Device Inquiry reply, so no profile here checks identity.
 
+## Value tables
+
+Many rows point to a table of what their values mean: the Circuit Tracks' `See Osc Waveform Table`,
+the MiniNova's `See Table 1: Waveforms`, the Circuit Mono Station's `(see table)` beside tables titled
+for each parameter. `read-novation-values.mjs` reads those from the word positions too: a `Value` or
+`… Index` heading with the names' heading beside it, sub-lists under headings in the number column
+(the Filter Table's Drive Type and Type, the Mod Matrix Table's Source and Destination), names wrapped
+onto the next line, a number and its name set a space apart (`0 Sine`), and a table's right-hand half
+(the MiniNova's 126 tweak assignments). A parameter is a choice when the table it points to numbers
+every value of its range, no more and no fewer; a sub-list is chosen by the parameter's name (`drive
+type`, `source`), or all of them taken together (the Tracks' Waveforms then Wavetables). Where a
+table falls short the parameter stays a number and the profile says why.
+
+## Pull (Circuit Tracks)
+
+The Circuit Tracks' reference prints the Current Patch Dump Request (`F0 00 20 29 01 64 40`, a
+location, `F7`), the Replace Current Patch it is answered with (the same location, then 340 bytes
+of plain 7-bit data) and the patch format, address by address with each byte's default, min and
+max, and the flags that share a byte by bit (`LFO1_OneShot (bit 0), …, LFO1_FadeMode (bits 4-5)`).
+`read-novation-sysex.mjs` reads the messages and the format; `build-novation-dump.mjs` makes a
+request and a dump definition per synth (layout `parts[].location`), each matched on its location
+byte, and reads a byte into the synth's parameter of the same name. The format writes
+`Envelope1_Attack` where the MIDI table writes `env 1 attack` under Envelope, so names are compared
+as words, a few spelt alike (envelope/env, equaliser/eq, frequency/freq, pos/position). A byte is read
+only where its range is the parameter's; a flag's bits go into a choice with as many values, in order
+(`LFO1_OneShot` 0/1 into the NRPN's `12=OFF, 13=ON`). 274 parameters a synth are read back. The
+reference says the reply goes to the USB port only.
+
+## Older manuals: the controller list (K-Station, KS series)
+
+The K-Station's and KS series' manuals print a **MIDI Controller List** and a **MIDI NRPN List** in an
+appendix, and their own key above them: values run 0-127 unless noted; `***` is "a signed value where
+64 represents zero", -64..+63 stored as 0..127, or as noted (`-12..+12` stored as 52..76); `—-` is a
+controller not used. `read-novation-cclist.mjs` reads the lists (`pdftotext -layout`; the use starts
+at the first word in capitals, a use wrapped onto the next line while a bracket is open continues)
+and reads a use in that key: `0..5 = up, down, …` and `(0=internal 1=external)` are choices,
+`(64..191 bpm)` is 0-127 shown as 64-191, and `(0=off 64=full vocoder 127=modulator only)`, points
+on a scale, stays a number. The instruments send and read only the NRPN LSB; the manual says to
+assume an MSB of 0, which CEditor sends. The **packed parameters** (several settings in one value's
+bits, `see packed parameter 2`) are left out: sending one means knowing the others' bits.
+
 ## The profiles
 
-| Profile | Read from | Parameters | Choices |
-|---|---|---:|---:|
-| `novation-peak` | Peak User Guide 1.2, pp. 40-43, and the Summit and Peak 2.1 addendum, p. 18 | 246 | 0 |
-| `novation-summit` | Summit User Guide 1.1, pp. 47-49, and the 2.1 addendum | 184 | 0 |
-| `novation-bass-station-ii` | Bass Station II User Guide v5, pp. 71-74 | 27 | 2 |
-| `novation-circuit-mono-station` | Circuit Mono Station MIDI Parameters v1 | 73 | 0 |
-| `novation-circuit-tracks` | Circuit Tracks Programmer's Reference Guide v3, pp. 3-12 | 618 | 31 |
-| `novation-circuit-rhythm` | Circuit Rhythm Programmer's Reference Guide v5.2, pp. 3-5 | 231 | 0 |
-| `novation-mininova` | MiniNova Extended CC & NRPN Map, Version 0002 | 374 | 79 |
+| Profile | Read from | Parameters | Choices | Pull |
+|---|---|---:|---:|---|
+| `novation-peak` | Peak User Guide 1.2, pp. 40-43, and the Summit and Peak 2.1 addendum, p. 18 | 246 | 0 | — |
+| `novation-summit` | Summit User Guide 1.1, pp. 47-49, and the 2.1 addendum | 184 | 0 | — |
+| `novation-bass-station-ii` | Bass Station II User Guide v5, pp. 71-74 | 27 | 2 | — |
+| `novation-circuit-mono-station` | Circuit Mono Station MIDI Parameters v1 | 73 | 11 | — |
+| `novation-circuit-tracks` | Circuit Tracks Programmer's Reference Guide v3, pp. 3-22 | 618 | 67 | 548 read back |
+| `novation-circuit-rhythm` | Circuit Rhythm Programmer's Reference Guide v5.2, pp. 3-5 | 231 | 0 | — |
+| `novation-mininova` | MiniNova Extended CC & NRPN Map, Version 0002 | 374 | 104 | — |
+| `novation-k-station` | K-Station User Manual, pp. 44-47 | 130 | 7 | — |
+| `novation-ks-series` | KS Series User Manual (KS4, KS5, KS Rack), pp. 62-65 | 162 | 4 | — |
 
 ## What the documents leave out
 
@@ -85,8 +128,12 @@ None of these documents prints a Device Inquiry reply, so no profile here checks
 - **Bass Station II**: most of its ranges are printed as the value shown (`-63 to +63*`, `-127 to
   127*`), and several settings name their values without numbering them; `LFO 1 Sync value` and two
   more print an NRPN without its MSB. All left out and said; 27 of its 98 rows remain.
-- **Circuit Tracks**: the audio table (p. 9) prints no channel; left out. The value tables on pp.
-  9-10 (filter types, waveforms, mod matrix sources) are not yet read into choices.
+- **Circuit Tracks**: the audio table (p. 9) prints no channel; left out. Its Mod Matrix Table prints
+  no sources 1 - 3, so the sources stay numbers. Keyboard Octave is 58-69 in the patch and three
+  values on its NRPN, so Pull leaves it out; mod matrix slots 13-20 are in the patch and not in the
+  MIDI table.
+- **Circuit Mono Station**: its Filter Slope Table reprints the shape table's three names for a 0 - 1
+  control, and its glide table numbers 16 values for a 0 - 127 controller; both stay numbers.
 - **Circuit Rhythm**: its effects and global tables print no channel; the profile sends them on its
   global channel, which the guide's note table gives as 16. Its macro knobs repeat the sampler
   parts' controllers and are left out.
@@ -95,9 +142,12 @@ None of these documents prints a Device Inquiry reply, so no profile here checks
 
 ## Not done
 
-- **UltraNova**: its MIDI implementation prints names and numbers but no ranges; the MiniNova shares
-  its engine, but its chart is not the UltraNova's.
-- **Pull**: the Circuit Tracks' reference prints its patch format; not yet read. None of the others
-  prints a program dump.
+- **UltraNova**: its MIDI implementation prints names and numbers but no ranges, and the user guide
+  on its download page is the German one; the MiniNova shares its engine, but its chart is not the
+  UltraNova's.
+- **The original Circuit**: its download page offers a 7-page 1.8 addendum, no MIDI table.
+- **X-Station, A-Station, Supernova, Nova, Bass Station (1993)**: no manual with a MIDI list on their
+  download pages (the Supernova II's manual has none).
+- **The K-Station's and KS series' packed parameters**, as above.
+- **Pull** for the others: none of their documents prints a program dump.
 - **Launchkey, Launchpad, SL**: controllers, not synths.
-- **Legacy synths** (Supernova, Nova, K-Station, X-Station, Bass Station): not yet surveyed.

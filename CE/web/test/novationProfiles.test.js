@@ -236,3 +236,19 @@ test('the Circuit Tracks\' patch dump, placed by hand from its patch format, rea
   assert.equal(parsed.values[by('Synth 1 Portamento Rate').id], undefined, 'location 01 is Synth 2\'s');
   assert.equal(localCompileDeviceRequest(profile, { request: 'requestPatchSynth2' }).hex ?? localCompileDeviceRequest(profile, { request: 'requestPatchSynth2' }).transaction?.encodedValueHex, 'F0 00 20 29 01 64 40 01 F7');
 });
+
+test('an older manual\'s controller list, in its own key: `***` centred on 64, values named in order, packed ones left out', async () => {
+  const { readUse } = await import('../../../tools/profiles/novation/read-novation-cclist.mjs');
+  assert.deepEqual(readUse('OSC1 SEMITONE *** -12..+12'), { name: 'OSC1 SEMITONE', min: 52, max: 76, shownMin: -12, shownMax: 12 }, '"-12..0..+12 stored as 52..64..76"');
+  assert.deepEqual(readUse('PAN POSITION ***'), { name: 'PAN POSITION', min: 0, max: 127, shownMin: -64, shownMax: 63 }, '"-64..0..+63 stored as 0..64..127"');
+  assert.deepEqual(readUse('ARP PATTERN (0..5 = up, down, ud1, ud2, order, random)').choices.map((c) => c.label), ['up', 'down', 'ud1', 'ud2', 'order', 'random']);
+  assert.deepEqual(readUse('ARP RATE (64..191 bpm)'), { name: 'ARP RATE', min: 0, max: 127, shownMin: 64, shownMax: 191, unit: 'bpm' });
+  assert.equal(readUse('VOCODER BALANCE (0=off 64=full vocoder 127=modulator only)').choices, undefined, 'points on a scale, not a list');
+  assert.match(readUse('GLOBAL SYNC TYPE (0,1,2 = note when all notes off, first note after prog change, midi song start)').choices[0].label, /^note when all notes off$/);
+  assert.match(readUse('UNISON / VOICE TYPE / FILTER TYPE (see packed parameter 2)').skip, /packed/);
+  assert.match(readUse('—-').skip, /not used/);
+  const profile = builtProfile('novation-k-station');
+  const by = (name) => profile.parameters.find((p) => p.name === name);
+  assert.equal(localCompileParameter(profile, { parameterId: by('OSC1 SEMITONE').id, value: 76 }).hex, 'B0 28 4C', '+12 on CC 40');
+  assert.equal(localCompileParameter(profile, { parameterId: by('FM ENVELOPE DEPTH').id, value: 64 }).hex, 'B0 63 00 B0 62 01 B0 06 40', 'an NRPN by its LSB, the MSB 0 as the manual says to assume');
+});
