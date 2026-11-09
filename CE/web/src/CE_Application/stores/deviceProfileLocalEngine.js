@@ -341,7 +341,23 @@ export function localCompileParameter(profile, request = {}) {
       status, selectLsb, clampInt(recipe.parameterLsb, 0, 127),
     ];
 
-    if (resolution === 14) {
+    // Korg's data entry, as DeviceProfileEngine.cpp builds it: the low `lowBits` bits FIRST, on a
+    // controller of their own (CC 63 on the minilogue family), then the rest on CC 6.
+    const lowBitsController = recipe.lowBitsController;
+    const lowBits = recipe.lowBits;
+    if (lowBitsController !== undefined || lowBits !== undefined) {
+      if (!Number.isInteger(lowBitsController) || lowBitsController < 0 || lowBitsController > 127
+        || !Number.isInteger(lowBits) || lowBits < 1 || lowBits > 7) {
+        return { ok: false, error: `${kind.toUpperCase()} lowBitsController must be 0-127 and lowBits 1-7` };
+      }
+      const value = Math.round(Number(encoded.number));
+      const high = value >> lowBits;
+      if (!Number.isInteger(value) || value < 0 || high > 127) {
+        return { ok: false, error: `${kind.toUpperCase()} value ${value} does not fit ${7 + lowBits} bits` };
+      }
+      bytes.push(status, lowBitsController, value & ((1 << lowBits) - 1));
+      bytes.push(status, 6, high);
+    } else if (resolution === 14) {
       // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps its
       // two bytes in elsewhere.
       const lsbFirst = String(parameter?.encoding?.type ?? '') === 'u14-lsb-msb';

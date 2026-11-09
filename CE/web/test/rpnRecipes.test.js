@@ -138,3 +138,28 @@ test('a choice on a 14-bit recipe goes out as MSB 0 and its value as LSB, as the
   };
   assert.deepEqual(ccPairs(compile(profile, 'triangle')), [[99, 2], [98, 17], [6, 0], [38, 2]]);
 });
+
+test('Korg\'s data entry: the low bits first on their own controller, then the rest on CC 6', () => {
+  // The minilogue family sends a value wider than 7 bits as its low 3 bits on CC 63, THEN the rest
+  // on CC 6: 10 bits (0~1023) as 3 + 7, 8 bits (0~200) as 3 + 5, 14 bits as 7 + 7. Not CC 38, and not
+  // split at 7 bits, so it is a recipe of its own. test-nrpn-synth's "Osc Shape 1001" vector pins
+  // the same bytes in the C++ engine.
+  const korg = (max, lowBits) => {
+    const profile = profileWith('nrpn', { resolution: 14, lsb: 20 });
+    Object.assign(profile.messageRecipes[0], { lowBitsController: 63, lowBits });
+    delete profile.messageRecipes[0].valueResolution;
+    profile.parameters[0].range = { min: 0, max };
+    return profile;
+  };
+  assert.deepEqual(ccPairs(compile(korg(1023, 3), 1001)), [[99, 0], [98, 20], [63, 1], [6, 125]]);
+  assert.deepEqual(ccPairs(compile(korg(200, 3), 200)), [[99, 0], [98, 20], [63, 0], [6, 25]]);
+  assert.deepEqual(ccPairs(compile(korg(16383, 7), 16383)), [[99, 0], [98, 20], [63, 127], [6, 127]]);
+  assert.deepEqual(ccPairs(compile(korg(1023, 3), 7)), [[99, 0], [98, 20], [63, 7], [6, 0]]);
+
+  // A value that does not fit is refused, as the C++ engine refuses it.
+  const tooWide = compile(korg(16383, 3), 1024);
+  assert.equal(tooWide.ok, false);
+  assert.match(tooWide.error, /does not fit 10 bits/);
+  const broken = korg(1023, 9);
+  assert.equal(compile(broken, 1).ok, false);
+});

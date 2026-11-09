@@ -2777,8 +2777,33 @@ CompileResult DeviceProfileEngine::compileParameterNumber (const juce::String& d
     addCc (transaction.messages, selectMsbController, parameterMsb);
     addCc (transaction.messages, selectLsbController, parameterLsb);
 
+    // Korg's data entry: the low bits of a value wider than 7 bits go FIRST, on a controller of their
+    // own (CC 63 on the minilogue family), then the rest on CC 6. `lowBits` says how many: 3 for the
+    // 10-bit values (0~1023: 3 then 7), 3 for the 8-bit ones (0~200: 3 then 5), 7 for 14 bits.
+    // Unlike CC 38 the split is not at 7 bits, so it is a recipe of its own, not valueResolution.
+    const auto lowBitsController = propInt (recipe, "lowBitsController", -1);
+    const auto lowBits = propInt (recipe, "lowBits", 0);
     auto resolution = propInt (recipe, "valueResolution", 7);
-    if (resolution == 14)
+    if (lowBitsController >= 0 || lowBits != 0)
+    {
+        if (! isMidiDataByte (lowBitsController) || lowBits < 1 || lowBits > 7)
+            return { false, label + " lowBitsController must be 0-127 and lowBits 1-7", {} };
+        if (encodedBytes.isEmpty())
+            return { false, label + " recipe requires an encoded value", {} };
+
+        auto* encoding = asObject (parameter.getProperty ("encoding"));
+        const auto lsbFirst = encoding != nullptr && propString (*encoding, "type") == "u14-lsb-msb";
+        const auto value = encodedBytes.size() == 1
+                               ? encodedBytes[0]
+                               : (encodedBytes[lsbFirst ? 1 : 0] << 7) | encodedBytes[lsbFirst ? 0 : 1];
+        const auto high = value >> lowBits;
+        if (! isMidiDataByte (high))
+            return { false, label + " value " + juce::String (value) + " does not fit " + juce::String (7 + lowBits) + " bits", {} };
+
+        addCc (transaction.messages, lowBitsController, value & ((1 << lowBits) - 1));
+        addCc (transaction.messages, 6, high);
+    }
+    else if (resolution == 14)
     {
         if (encodedBytes.isEmpty())
             return { false, label + " 14-bit recipe requires an encoded value", {} };

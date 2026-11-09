@@ -96,6 +96,44 @@
       }
     },
     {
+      "id": "osc.shape",
+      "name": "Oscillator Shape",
+      "group": "Oscillator",
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 1023
+      },
+      "default": 512,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "Shape"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u14-msb-lsb"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 0,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "shapeNrpnLowBits",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
       "id": "global.bendRange",
       "name": "Pitch Bend Range",
       "group": "Global",
@@ -252,6 +290,17 @@
       "valueResolution": 14,
       "value": "$encodedValue",
       "nullAfterSend": false
+    },
+    {
+      "id": "shapeNrpnLowBits",
+      "kind": "nrpn",
+      "channel": "$channel",
+      "parameterMsb": 0,
+      "parameterLsb": 20,
+      "lowBitsController": 63,
+      "lowBits": 3,
+      "value": "$encodedValue",
+      "nullAfterSend": false
     }
   ],
   "tests": [
@@ -284,6 +333,12 @@
       "parameter": "osc.wave",
       "value": "triangle",
       "expectedHex": "B0 63 02\nB0 62 11\nB0 06 00\nB0 26 02"
+    },
+    {
+      "name": "Osc Shape 1001 on a Korg-style 10-bit NRPN: the low 3 bits on CC 63 first, the high 7 on CC 6",
+      "parameter": "osc.shape",
+      "value": 1001,
+      "expectedHex": "B0 63 00\nB0 62 14\nB0 3F 01\nB0 06 7D"
     }
   ],
   "sources": [
