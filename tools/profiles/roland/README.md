@@ -132,7 +132,8 @@ Every product page on the global, US and UK sites was checked (1,104 of them). P
 | State | Models |
 |---|---|
 | **Profiles** | the twenty-eight above |
-| **Reads with a few issues** | SH-32, the original FANTOM, Fantom-VS, VariOS, MC-09, TB-3, VR-09/730, V-STAGE, and the RD stage pianos (RD-2000, -800, -88, -08, -700NX/GX, -300NX/GX/SX) |
+| **MIDI Implementation reads cleanly; layout to write** | SH-32; the stage pianos RD-2000, RD-2000EX, RD-800, RD-300NX, RD-700NX |
+| **Reads with a few issues** | the original FANTOM (2001), Fantom-VS, VariOS, MC-09, TB-3, VR-09/730, V-STAGE, RD-08, RD-88, RD-300GX/SX, RD-700GX |
 | **Address map inside the owner's manual, with text; reads cleanly since the gutter fix** | XV-5080, XV-3080, XV-5050, XV-2020, XV-88, FANTOM-X6/X7/X8, FANTOM-XR, JUNO-G, JUNO-STAGE, SonicCell, V-Synth, V-Synth XT (its own MIDI Implementation) |
 | **Address map in the owner's manual, still reading with issues** | XP-30, JV-1010 (no ModelID heading, appendix tables), VR-760, RD-700, RD-700SX |
 | **Scanned, no text** — OCR plus an independent transcription to check against | JV-1080, JV-2080, XP-10/50/60/80, JP-8000, MC-303, MC-505, MC-80, MC-50mkII |
