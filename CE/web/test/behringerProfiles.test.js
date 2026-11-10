@@ -17,7 +17,8 @@ import { headerTables, readCcTables } from '../../../tools/profiles/behringer/re
 import { readBands, readRange } from '../../../tools/profiles/behringer/build-behringer-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/behringer/make-profiles.mjs';
 import { localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
-import { cellsOf, readLineTables } from '../../../tools/profiles/behringer/read-behringer-tables.mjs';
+import { cellsOf, readAnchoredRows, readLineTables } from '../../../tools/profiles/behringer/read-behringer-tables.mjs';
+import { enumAfter, readValueList } from '../../../tools/profiles/behringer/build-behringer-nrpn-table-profile.mjs';
 import { readNotes } from '../../../tools/profiles/behringer/build-behringer-nrpn-profile.mjs';
 
 /* ------------------------------------------------------------------ the reader */
@@ -327,4 +328,54 @@ test('the JN-80: its guide\'s values', () => {
   assert.ok(param(jn, 'VCF', 'VCF Resonance Factor'), 'CC 36, in the guide and not the manual');
   assert.ok(param(jn, 'VCF', 'VCF Resonance'), 'printed Resonace');
   assert.equal(jn.parameters.some((p) => /pedal|Wheel$|NRPN/i.test(p.name)), false);
+});
+
+test('anchored rows: two pages to a sheet, a description set around its row, a list under its row', () => {
+  const columns = [{ name: 'nrpn', dx: 58 }, { name: 'hex', dx: 161 }, { name: 'description', dx: 264 }, { name: 'storage', dx: 367 }, { name: 'range', dx: 470 }];
+  const rows = readAnchoredRows([
+    line(18, 70, [638, 'NRPN'], [741, 'HEX'], [844, 'DESCRIPTION']),
+    // The right-hand page: rows 580 points in; a description over two lines above and below its row.
+    line(18, 644, [844, 'Arpeggiator'], [880, 'maximum'], [910, 'range']),
+    line(18, 649, [638, '1807'], [741, '0x070F'], [947, 'PRESET'], [1050, '0–2']),
+    line(18, 654, [844, '(0=3'], [860, 'Oct,'], [873, '1=4'], [886, 'Oct)']),
+    // The next row's description starts 14 points on: a cell of its own.
+    line(18, 668, [844, 'Arpeggiator'], [880, 'step'], [893, 'length']),
+    line(18, 678, [638, '1808'], [741, '0x0710'], [947, 'PRESET'], [1050, '0–11']),
+    // And the left-hand page, at the same height.
+    line(18, 649, [58, '89'], [161, '0x0059'], [264, 'Modulation'], [300, 'matrix'], [367, 'PRESET'], [470, '-32767–']),
+    line(18, 659, [470, '32767']),
+  ], { columns, split: 590, offset: 580, anchor: { column: 1, test: /^0x/ }, top: 60, skip: /^NRPN HEX/ });
+  assert.deepEqual(rows.map((r) => [r.nrpn, r.description, r.range]).sort((a, b) => a[0] - b[0]), [
+    ['89', 'Modulation matrix', '-32767– 32767'],
+    ['1807', 'Arpeggiator maximum range (0=3 Oct, 1=4 Oct)', '0–2'],
+    ['1808', 'Arpeggiator step length', '0–11'],
+  ]);
+  // A table whose rows run from their name down: an enum list under its description.
+  const preset = readAnchoredRows([
+    line(20, 100, [97, '`preVCOOctave`'], [197, 'numeric'], [301, 'VCO'], [320, 'octave'], [350, 'selection']),
+    line(20, 110, [58, '17'], [301, '**Enum'], [330, 'Values:**<br>'], [370, '-'], [376, '`LOW`'], [400, '='], [406, '0']),
+    line(20, 120, [97, '`preVCOWaveform`'], [197, 'numeric'], [301, 'VCO'], [320, 'waveform']),
+  ], { columns: [{ name: 'index', dx: 58 }, { name: 'name', dx: 97 }, { name: 'type', dx: 197 }, { name: 'description', dx: 301 }], first: 1, anchor: { column: 1, test: /^`?pre/ }, below: true });
+  assert.deepEqual(preset.map((r) => r.description), ['VCO octave selection **Enum Values:**<br> - `LOW` = 0', 'VCO waveform']);
+});
+
+test('the PolyEight\'s value lists: in the description, or after it in the preset table', () => {
+  assert.deepEqual(readValueList('0=speed, 1=time'), [{ value: 0, label: 'speed' }, { value: 1, label: 'time' }]);
+  const flow = 'VCO octave selection **Enum Values:**<br> - `LOW` = 0<br> - `MID` = 1<br> - `HIGH` = 2 VCO waveform selection **Enum Values:**<br> - `SAWTOOTH` = 0 Effect mode selection Enum Values: False=0, CHORUS=1 Effect speed/depth parameter';
+  assert.deepEqual(enumAfter(flow, 'VCO octave selection').map((v) => v.label), ['LOW', 'MID', 'HIGH'], 'and not the next list');
+  assert.deepEqual(enumAfter(flow, 'Effect mode selection').map((v) => v.label), ['False', 'CHORUS']);
+  assert.equal(enumAfter(flow, 'Effect speed/depth parameter'), null);
+});
+
+test('the PolyEight: 14-bit NRPNs past 127, the preset table\'s lists, what is not printed', () => {
+  const p8 = builtProfile('behringer-polyeight');
+  const named = (name) => p8.parameters.find((p) => p.name === name);
+  assert.equal(send(p8, named('Arpeggiator step length'), '116'), 'B0 63 0E\nB0 62 10\nB0 06 00\nB0 26 09', 'NRPN 1808: MSB 14, LSB 16');
+  assert.deepEqual(named('VCO octave selection').choices.map((c) => c.label), ['LOW', 'MID', 'HIGH'], 'from the preset table');
+  assert.deepEqual(named('Filter cutoff frequency').range, { min: 0, max: 16383 }, 'printed 0–65535');
+  assert.equal(send(p8, named('Filter cutoff frequency'), 16383), 'B0 63 00\nB0 62 18\nB0 06 7F\nB0 26 7F');
+  assert.match(named('Modulation matrix bus 1 amount').description, /negative value/);
+  assert.equal(named('Arpeggiator mode').type, 'integer', '0–7 printed, three values named');
+  assert.ok(named('Modulation generator frequency (NRPN 2307)'), 'printed twice');
+  assert.equal(p8.requests, undefined, 'no request printed: no Pull');
 });

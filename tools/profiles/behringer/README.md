@@ -23,7 +23,7 @@ guide in its own way:
 | JN-80 | Manual, pp. 13 - 14 | `CC Num  Hex  Parameter  MIDI standard`, every controller 0 - 127, no values; not read, the guide being fuller |
 | CZ-1 Mini | Manual, pp. 57 - 59 | `CC NUM  PARAMETERS  VALUES`, the values column empty |
 | Wave | Manual, pp. 34 - 41 | `Control #  Range  Function  Transmit  Receive  Remarks`, an NRPN table `MSB  LSB  14-bit  Parameter Name  Range  Notes`, and its SysEx: the preset's 121 bytes, a request for the edit buffer and its answer |
-| PolyEight | Manual, pp. 33 - 36 | NRPN mappings (`NRPN  HEX  DESCRIPTION  STORAGE  RANGE`), and its SysEx preset dump |
+| PolyEight | Manual Rev. 3, pp. 33 - 41 (PDF 17 - 21, two pages a sheet) | NRPN mappings (`NRPN  HEX  DESCRIPTION  STORAGE  RANGE`), and its SysEx preset dump's structure and parameters, with their enum lists |
 | DeepMind 12 (and 6, 12D, 12X) | Manual, chapter 17 | NRPN commands; the quick start guides have no table |
 | JN-80 | Quick Start Guide, p. 12 | `CC Num  Hex  Parameter  Value`, four columns across the page under one header, a row's values set under it (`0 = Off` / `64 = On`); and an NRPN table, twenty parameters at 12 bits |
 
@@ -38,10 +38,11 @@ have none at all.
 | Step | File | What it does |
 | --- | --- | --- |
 | 1 | `read-behringer-cc.mjs` | A guide's controller table → its rows as printed: CC, hex, name (or the PRO-800's coarse, fine, stepped and MIDI standard columns), range, value bands. Decides nothing. |
-| 1 | `read-behringer-tables.mjs` | A manual's tables that print a row a line (the Wave's controllers, NRPNs and preset bytes) → their rows as printed. |
+| 1 | `read-behringer-tables.mjs` | A manual's tables that print a row a line (the Wave's controllers, NRPNs and preset bytes; the DeepMind's NRPNs), and tables of rows anchored on a number with their cells set around it (the PolyEight's) → their rows as printed. |
 | 2 | `import-behringer.mjs` | Writes `tables/<name>.json`: those, with the document's name, SHA-256 and address. **This is what is committed.** |
 | 3 | `synths/<name>.mjs` | The layout: the document, the pages the table is on, the rows the guide prints wrongly. |
 | 4 | `build-behringer-profile.mjs`, `make-profiles.mjs` | Transcription + layout → `CE/profiles/test/<id>.ceditor-device.json`. |
+| 4 | `build-behringer-nrpn-profile.mjs`, `build-behringer-nrpn-table-profile.mjs` | The same for an NRPN table: with its program dump (the DeepMind 12's), or without one (the PolyEight's). |
 | 4 | `build-behringer-dump-profile.mjs` | The same for a manual that prints its preset's bytes: every parameter written, and read back. |
 
 ```bash
@@ -181,6 +182,32 @@ line under a row is that row's. A word on a column starts a cell however close i
 the page's running header (`22 JN-80 … 23`) is above where the tables start. Corrected by the layout:
 CC 16's `VCF Resonace`. The hex column misprints CC 36 and 37 as 23 and 24, and the decimal is taken.
 
+## The PolyEight
+
+Its manual is printed two pages to a sheet, and its MIDI chapter has the NRPN mappings (`NRPN  HEX
+DESCRIPTION  STORAGE  RANGE`, 97 rows) and the SysEx preset dump: its structure and a table of the
+preset's parameters, which gives the value lists the NRPN table leaves out (`VCO octave selection
+**Enum Values:** LOW = 0, MID = 1, HIGH = 2`). Both tables set a row's long cells over as many lines
+as they need, the NRPN table around its number and the preset table down from its name, and the
+continuation pages repeat no header. `readAnchoredRows` reads them: the layout gives the columns'
+places and where a sheet splits into its two pages; the NRPN table's cells run into cells of their
+own (a cell's lines 10 points apart, rows' 13 or more), each the row whose number it holds or is
+nearest; the preset table's rows run from their name down. The preset table's descriptions are
+kept as one flow of text, its enum lists each straight after the description it belongs to.
+
+Each NRPN row is its NRPN with a 14-bit value. A list in its description (`Portamento mode (0=speed,
+1=time)`) covering the range is a choice; for a row whose description has none, the list that
+follows the same description in the preset table is. The NRPN table prints `0–65535` where the
+preset table gives the same parameters `0–16383`, and data entry carries 14 bits: they are sent as
+0 - 16383. It prints `-32767–32767` where the preset table gives `-8192–8191` and does not say how a
+negative value is carried: those are the 14 bits as sent, and say so. A row with no range and no
+list (the portamento legato mode, the mod matrix's sources and destinations) is the data byte's 0 -
+127. Two descriptions are given two NRPNs each (the modulation generator's frequency and output
+level, 21 and 2307, 23 and 2309); both are laid out.
+
+There is no Pull: the manual prints the preset dump's structure but no request for it, and gives the
+PolyEight's device ID bytes only as `Device-specific`.
+
 ## The profiles
 
 | Profile | Read from | Rows | Parameters | 14-bit pairs | Choices | Rows corrected |
@@ -193,6 +220,7 @@ CC 16's `VCF Resonace`. The hex column misprints CC 36 and 37 as 23 and 24, and 
 | `behringer-jt-4000-micro` | JT-4000 MICRO Quick Start Guide, p. 27 | 26 | 25 | 0 | 1 | — |
 | `behringer-jt-mini` | JT MINI Quick Start Guide, pp. 58 - 59 | 15 | 14 | 0 | 2 | — |
 | `behringer-pro-800` | PRO-800 Quick Start Guide V 4.0, pp. 54 - 55 | 112 | 98 | 0 | 0 | 49, 52, 53 |
+| `behringer-polyeight` | PolyEight User Manual Rev. 3, NRPN mappings and preset parameters | 97 | 97 | 0 | 18 | — |
 | `behringer-pro-vs-mini` | PRO-VS MINI Quick Start Guide, p. 86 | 34 | 33 | 0 | 1 | 118 |
 | `behringer-spice` | SPICE Quick Start Guide, p. 21 | 17 | 11 | 6 | 5 | — |
 | `behringer-ub-1-micro` | UB-1 MICRO Quick Start Guide, pp. 40 - 41 | 44 | 42 | 0 | 13 | 25, 106 |
@@ -207,7 +235,7 @@ where their MIDI settings send them.
 | Left out | Where | What would read it |
 | --- | --- | --- |
 | The WAVE's arpeggiator speed, its wavetables and sequences | NRPN 0:46 (40 - 240, `MSB/LSB` unexplained); the wavetable and sequencer dumps (`74 0F`, 7-in-8 packed PCM) | the instrument, for the speed; the sequencer dump's byte table, read as the preset's is |
-| The PolyEight | its manual's NRPN mappings (ranges up to 65535) and SysEx preset dump | an NRPN table reader and 14-bit NRPN values; the dump's structure for a Pull |
+| The PolyEight's Pull, signed values, sources and destinations | no dump request and no device ID printed; how a negative value is carried; no source or destination list | the instrument: its own dump, and its answer to 0 and 16383 on a signed parameter |
 | The DeepMind 6, 12D and 12X | quick start guides only; the DeepMind 12's manual is the one with the table | each's own manual, or the instrument: the 12D and 12X are presumably the 12's, the 6 is not |
 | The DeepMind 12's lists | the mod matrix sources and destinations, FX types and routings, clock dividers, program categories: named, not printed | the instrument's screens, or another document of Behringer's |
 | The JN-80's NRPNs | its guide's NRPN table under the controllers: twenty parameters at 12 bits (0 - 4095), with their scales | the guide reader on that table, and a second profile (or the NRPNs in this one) for the instrument's NRPN mode |

@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { documentLines, readCcTables } from './read-behringer-cc.mjs';
-import { readLineTables } from './read-behringer-tables.mjs';
+import { readAnchoredRows, readLineTables } from './read-behringer-tables.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +27,19 @@ export function importDocument(layout, file) {
   const lines = documentLines(file, [Math.min(...pages), Math.max(...pages)]).filter((l) => pages.includes(l.page));
   // A manual whose tables are a row a line (the Wave's controllers, NRPNs and preset bytes), or a
   // guide's controller table.
+  if (layout.anchored) {
+    // Tables of rows anchored on a number, cells set around it (the PolyEight's): the parameters'
+    // table, and a second table kept as the flow of one column (its descriptions, with the value
+    // lists after them).
+    const { rows: spec, flow } = layout.anchored;
+    const rows = readAnchoredRows(lines.filter((l) => spec.pages.includes(l.page)), spec.read);
+    const flowRows = readAnchoredRows(lines.filter((l) => flow.pages.includes(l.page)), flow.read);
+    return {
+      sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
+      rows,
+      flow: flowRows.map((r) => r[flow.column] ?? '').join(' ').replace(/\s+/g, ' ').trim(),
+    };
+  }
   const rows = layout.tables ? readLineTables(lines, layout.tables) : readCcTables(lines, layout.read ?? {});
   return {
     sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
@@ -37,7 +50,7 @@ export function importDocument(layout, file) {
 /** One row per line, so a re-import that changes one row changes one line. */
 export function stringifyTranscription(data) {
   const rows = (items, indent) => (items.length ? `[\n${items.map((x) => `${indent}  ${JSON.stringify(x)}`).join(',\n')}\n${indent}]` : '[]');
-  return `{\n  "sources": ${rows(data.sources, '  ')},\n  "rows": ${rows(data.rows, '  ')}\n}\n`;
+  return `{\n  "sources": ${rows(data.sources, '  ')},\n  "rows": ${rows(data.rows, '  ')}${data.flow !== undefined ? `,\n  "flow": ${JSON.stringify(data.flow)}` : ''}\n}\n`;
 }
 
 async function main() {

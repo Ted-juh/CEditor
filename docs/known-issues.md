@@ -505,6 +505,12 @@ something the program does with every profile, which the larger library makes ea
   `7-bit/14-bit` without printing the fine half's controller; they are sent as 7 bits. Closing it
   means each manual's chapters read for values, a map written by hand as for Elektron, and the
   MatrixBrute tried for its LSBs.
+- **The PolyEight's signed parameters are sent as raw 14 bits.** Its NRPN table prints the filter
+  envelope intensity and the eight mod matrix amounts as -32767–32767, its preset table as
+  -8192–8191, and neither says how a negative value is carried in a 14-bit data entry (offset from
+  8192, or two's complement). The profile lays them out as the 14 bits sent, 0 - 16383, and says
+  so; it also sends `0–65535` parameters as 0 - 16383. Closing it means sending 0, 8192 and 16383 to
+  one and listening.
 - **A Behringer range is sent as printed.** The guides' controller tables print a range for each
   controller (`0 - 99` for most of the UB-1 Micro's and PRO-VS Mini's, `0 - 9`, `50 - 75`) and do not
   say whether it is what the controller carries or what the panel shows for it. The profiles send the

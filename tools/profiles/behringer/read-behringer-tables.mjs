@@ -93,3 +93,76 @@ export function readLineTables(lines, kinds) {
   }
   return rows;
 }
+
+/**
+ * Rows anchored on a number, the other cells set around it (the PolyEight's NRPN and preset tables):
+ * `columns` [{ name, dx }] from each half page's left edge; a row is a line with a number at the
+ * first column (and, where `anchor` says, a cell matching it at another); every other cell goes to
+ * the row on its half page whose number is nearest it. Two pages printed side by side on one sheet
+ * are split at `split`, the right one read `offset` points in. Returns [{ page, side, ...cells }].
+ */
+export function readAnchoredRows(lines, { columns, split = Infinity, offset = 0, anchor = null, top = 0, skip = null, below = false, first = 0 }) {
+  const halves = new Map();
+  for (const l of lines) {
+    if (l.y < top) continue;
+    for (const side of [0, 1]) {
+      const words = l.words.filter((w) => (side === 0 ? w.x0 < split : w.x0 >= split)).map((w) => ({ ...w, x0: w.x0 - side * offset, x1: w.x1 - side * offset }));
+      if (!words.length || (skip && skip.test(text(words)))) continue;
+      const key = `${l.page}/${side}`;
+      if (!halves.has(key)) halves.set(key, { page: l.page, side, lines: [] });
+      halves.get(key).lines.push({ y: l.y, words });
+    }
+  }
+  const out = [];
+  const xs = columns.map((c) => c.dx);
+  const columnOf = (x) => { let k = 0; for (let i = 0; i < xs.length; i++) if (x >= xs[i] - 6) k = i; return k; };
+  for (const { page, side, lines: own } of halves.values()) {
+    const rows = [];
+    const cells = [];
+    for (const l of own) {
+      const cs = cellsOf(l.words, xs).map((c) => ({ ...c, column: columnOf(c.x), y: l.y }));
+      // A row's line: a number in its first column (`first`: another column), and where `anchor` says,
+      // a cell matching it at another.
+      const lead = cs.find((c) => c.column === first);
+      const isRow = lead && (first !== 0 || /^\d+$/.test(lead.text)) && (!anchor || cs.some((c) => c.column === anchor.column && anchor.test.test(c.text)));
+      if (isRow) rows.push({ y: l.y, cells: [] });
+      for (const c of cs) cells.push({ ...c, row: isRow ? rows.at(-1) : null });
+    }
+    if (!rows.length) continue;
+    // (`below`: a row runs from its line down to the next row's, the PolyEight preset table's enum
+    // lists set under their description.)
+    if (below) {
+      for (const c of cells) {
+        if (c.row) { c.row.cells.push(c); continue; }
+        const above = rows.filter((r) => r.y <= c.y + 1).at(-1);
+        if (above) above.cells.push(c);
+      }
+    }
+    // Each column's lines run into cells (a cell's lines are 10 points apart, rows' cells 13 or more):
+    // a run holding a row's own line is that row's, any other the row nearest its middle.
+    for (let k = 0; k < (below ? 0 : columns.length); k++) {
+      const own2 = cells.filter((c) => c.column === k).sort((a, b) => a.y - b.y);
+      const runs = [];
+      for (const c of own2) {
+        const run = runs.at(-1);
+        if (run && c.y - run.at(-1).y <= 11) run.push(c); else runs.push([c]);
+      }
+      for (const run of runs) {
+        const anchored = [...new Set(run.map((c) => c.row).filter(Boolean))];
+        if (anchored.length > 1) { for (const c of run) (c.row ?? anchored.reduce((b, r) => (Math.abs(r.y - c.y) < Math.abs(b.y - c.y) ? r : b))).cells.push(c); continue; }
+        const mid = (run[0].y + run.at(-1).y) / 2;
+        const to = anchored[0] ?? rows.reduce((b, r) => (Math.abs(r.y - mid) < Math.abs(b.y - mid) ? r : b));
+        if (anchored[0] || Math.abs(to.y - mid) <= 30) to.cells.push(...run);
+      }
+    }
+    for (const r of rows) {
+      const row = { page, side };
+      for (const [k, col] of columns.entries()) {
+        const t = r.cells.filter((c) => c.column === k).sort((a, b) => a.y - b.y || a.x - b.x).map((c) => c.text).join(' ').replace(/\s+/g, ' ').trim();
+        if (t) row[col.name] = t;
+      }
+      out.push(row);
+    }
+  }
+  return out;
+}

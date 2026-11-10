@@ -15,6 +15,7 @@ import { readCommitted } from '../../scripts/readCommitted.mjs';
 import { buildBehringerProfile, stringifyProfile } from './build-behringer-profile.mjs';
 import { buildBehringerDumpProfile } from './build-behringer-dump-profile.mjs';
 import { buildBehringerNrpnProfile } from './build-behringer-nrpn-profile.mjs';
+import { buildBehringerNrpnTableProfile } from './build-behringer-nrpn-table-profile.mjs';
 import { loadLayout } from './import-behringer.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -26,7 +27,9 @@ export const SYNTHS = readdirSync(path.join(HERE, 'synths')).filter((f) => f.end
 export async function build(name) {
   const layout = await loadLayout(name);
   const data = JSON.parse(readFileSync(path.join(HERE, 'tables', `${name}.json`), 'utf8'));
-  const profile = layout.build === 'nrpn' ? buildBehringerNrpnProfile(data, layout) : layout.tables ? buildBehringerDumpProfile(data, layout) : buildBehringerProfile(data, layout);
+  const profile = layout.build === 'nrpn' ? buildBehringerNrpnProfile(data, layout)
+    : layout.build === 'nrpn-table' ? buildBehringerNrpnTableProfile(data, layout)
+      : layout.tables ? buildBehringerDumpProfile(data, layout) : buildBehringerProfile(data, layout);
   return { name, layout, data, profile, text: stringifyProfile(profile), out: path.join(PROFILE_DIR, `${layout.id}.ceditor-device.json`) };
 }
 
