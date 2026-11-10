@@ -65,16 +65,26 @@ export function headerTables(words) {
  * The tables on these lines: [{ page, cc, hex?, name?, fine?, stepped?, standard?, range? }], a row a
  * number under a CC column. `reach` is how far above or below its number a cell's line may be.
  */
-export function readCcTables(lines, { reach = 22 } = {}) {
+export function readCcTables(lines, { reach = 22, tables: given = null, below = false, top = 0 } = {}) {
   const rows = [];
   const pages = [...new Set(lines.map((l) => l.page))];
   for (const page of pages) {
-    const own = lines.filter((l) => l.page === page);
+    // (`top`: where a page's table starts, below its running header: the JN-80 guide's page number.)
+    const own = lines.filter((l) => l.page === page && l.y >= top);
     let tables = [];
-    for (const l of own) {
-      const found = headerTables(l.words);
-      if (found.length) { tables = found.map((t) => ({ ...t, y: l.y })); continue; }
-      for (const t of tables) (t.lines ??= []).push(l);
+    if (given) {
+      // Tables the layout places: the JN-80 guide's four columns, one header over the first only.
+      tables = given.map((t) => {
+        // (A table may stop at a heading under it: the JN-80 guide's NRPN table under its fourth column.)
+        const stop = t.until ? own.find((l) => l.words.some((w) => w.x0 >= t.x - 6 && w.x0 < t.x + t.width && w.text === t.until))?.y : undefined;
+        return { from: t.x - 6, to: t.x + t.width, placed: true, cols: t.cols.map((c) => ({ role: c.role, title: c.role, x: t.x + c.dx, x1: t.x + c.dx + 10 })), lines: own.filter((l) => stop === undefined || l.y < stop) };
+      });
+    } else {
+      for (const l of own) {
+        const found = headerTables(l.words);
+        if (found.length) { tables = found.map((t) => ({ ...t, y: l.y })); continue; }
+        for (const t of tables) (t.lines ??= []).push(l);
+      }
     }
     for (const t of tables) {
       // A line splits into cells at its gaps; a cell (often centred, often wider than its title) goes
@@ -86,7 +96,10 @@ export function readCcTables(lines, { reach = 22 } = {}) {
         const cells = [];
         for (const w of l.words.filter((x) => x.x0 >= t.from && x.x0 < t.to)) {
           const prev = cells.at(-1);
-          if (prev && w.x0 - prev.x1 < 9) { prev.words.push(w); prev.x1 = w.x1; } else cells.push({ x: w.x0, x1: w.x1, words: [w] });
+          // (In a table the layout places, a word on a column starts a cell however close it is set:
+          // the JN-80 guide's `ENV Decay / Release mode` runs into its `0 = Exponential`.)
+          const onColumn = t.placed && t.cols.some((c) => Math.abs(c.x - w.x0) <= 3);
+          if (prev && w.x0 - prev.x1 < 9 && !onColumn) { prev.words.push(w); prev.x1 = w.x1; } else cells.push({ x: w.x0, x1: w.x1, words: [w] });
         }
         return cells;
       };
@@ -135,7 +148,7 @@ export function readCcTables(lines, { reach = 22 } = {}) {
       const waiting = anchors.map((a, i) => [a, i]).filter(([a]) => !a.line.length);
       for (const lc of lineCells) {
         const roles = new Set(lc.cells.map((c) => c.role));
-        if (!(roles.has('name') && roles.has('range') && lc.cells.length >= 2)) { rest.push(lc); continue; }
+        if (below || !(roles.has('name') && roles.has('range') && lc.cells.length >= 2)) { rest.push(lc); continue; }
         const near = waiting.filter(([a]) => Math.abs(a.y - lc.y) < 60).sort(([a], [b]) => Math.abs(a.y - lc.y) - Math.abs(b.y - lc.y))[0];
         const above = anchors.map((a, i) => [a, i]).filter(([a]) => a.y < lc.y).at(-1);
         const to = near ?? above;
@@ -157,8 +170,14 @@ export function readCcTables(lines, { reach = 22 } = {}) {
         if (within.length >= 2 && run.y1 - run.y0 > 40) { for (const [, i] of within) (cells[i][run.role] ??= []).push(...run.words); continue; }
         const mid = (run.y0 + run.y1) / 2;
         let best = -1;
-        for (const [i, a] of anchors.entries()) if (best < 0 || Math.abs(a.y - mid) < Math.abs(anchors[best].y - mid)) best = i;
-        if (Math.abs(anchors[best].y - mid) > reach + (run.y1 - run.y0) / 2) continue;
+        if (below) {
+          // (A row's cells set under its number, the JN-80 guide's value lists: the row above.)
+          for (const [i, a] of anchors.entries()) if (a.y <= run.y0 + 1 && (best < 0 || a.y > anchors[best].y)) best = i;
+          if (best < 0) continue;
+        } else {
+          for (const [i, a] of anchors.entries()) if (best < 0 || Math.abs(a.y - mid) < Math.abs(anchors[best].y - mid)) best = i;
+          if (Math.abs(anchors[best].y - mid) > reach + (run.y1 - run.y0) / 2) continue;
+        }
         (cells[best][run.role] ??= []).push(...run.words);
       }
       for (const [i, a] of anchors.entries()) {

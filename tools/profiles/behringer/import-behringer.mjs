@@ -27,7 +27,7 @@ export function importDocument(layout, file) {
   const lines = documentLines(file, [Math.min(...pages), Math.max(...pages)]).filter((l) => pages.includes(l.page));
   // A manual whose tables are a row a line (the Wave's controllers, NRPNs and preset bytes), or a
   // guide's controller table.
-  const rows = layout.tables ? readLineTables(lines, layout.tables) : readCcTables(lines);
+  const rows = layout.tables ? readLineTables(lines, layout.tables) : readCcTables(lines, layout.read ?? {});
   return {
     sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
     rows,

@@ -208,7 +208,7 @@ test('the PRO-800: coarse, fine and stepped columns, misprints, the MIDI standar
   assert.equal(pro.parameters.some((p) => /^(Main volume|Sustain pedal|Mod Wheel)$/.test(p.name)), false);
 });
 
-test('the JT-4000 Micro, PRO-VS Mini, CZ-1 Mini and JN-80: values in a name, a repeated row, a prefix, standard-only rows', () => {
+test('the JT-4000 Micro, PRO-VS Mini and CZ-1 Mini: values in a name, a repeated row, a prefix', () => {
   const jt4 = builtProfile('behringer-jt-4000-micro');
   assert.deepEqual(values(param(jt4, 'Ring', 'Ring Modulation on/off')), [[0, 'off'], [65, 'on']], 'printed in the name: (0-64 = off / 65 – 127 = on)');
   const vs = builtProfile('behringer-pro-vs-mini');
@@ -219,10 +219,6 @@ test('the JT-4000 Micro, PRO-VS Mini, CZ-1 Mini and JN-80: values in a name, a r
   assert.equal(cz.parameters.some((p) => /^Param /.test(p.name)), false);
   assert.equal(send(cz, param(cz, 'DCO 1', 'DCO 1 WF2'), 5), 'B0 0E 05');
   assert.ok(param(cz, 'FILTER', 'FILTER_Cutoff'));
-  const jn = builtProfile('behringer-jn-80');
-  assert.equal(jn.parameters.length, 63);
-  assert.equal(jn.parameters.some((p) => /^(Volume|Expression|Undefined)$/.test(p.name)), false);
-  assert.ok(jn.authoringNotes.some((n) => /only have their MIDI standard meaning here: CC 0 Bank Select/.test(n)));
 });
 
 test('the line tables: cells split at gaps, columns where the rows\' cells line up, a blank cell', () => {
@@ -299,4 +295,36 @@ test('the DeepMind 12: 14-bit NRPNs, its lists, Pull from the edit buffer packed
   assert.equal(parsed.values[param(dm, 'VCF', 'VCF Frequency').id], 130 + 39, 'a value above 127: its top bit from the packed byte');
   assert.ok(dm.dumpDefinitions[0].mappings.every((m) => m.offset < 243));
   assert.equal(dm.parameters.filter((p) => p.access.canWrite).length, 225);
+});
+
+test('rows of tables the layout places: four columns, one header, values under their row', () => {
+  const cols = [{ role: 'cc', dx: 0 }, { role: 'hex', dx: 34 }, { role: 'name', dx: 73 }, { role: 'range', dx: 162 }];
+  const rows = readCcTables([
+    line(12, 19, [48, '22'], [70, 'JN-80']),
+    line(12, 92, [315, '40'], [349, '28'], [388, 'DCO'], [402, 'Pulse'], [477, '0'], [482, '='], [489, 'Off'], [895, '120'], [930, '78'], [968, 'All'], [1058, '0'], [1063, '='], [1070, 'Off']),
+    line(12, 103, [477, '64'], [487, '='], [494, 'On']),
+    line(12, 137, [52, 'CC'], [61, 'Num'], [95, 'Hex'], [147, 'Parameter'], [244, 'Value']),
+    line(12, 153, [52, '8'], [86, '8'], [125, 'LFO'], [140, 'Rate'], [214, '0'], [219, '–'], [225, '127']),
+    // A name run into its value: the column splits it.
+    line(12, 165, [632, '89'], [667, '59'], [705, 'ENV'], [722, 'Decay'], [750, 'mode'], [770, 'x'], [794, '0'], [800, '='], [807, 'Exp']),
+    line(12, 176, [794, '1'], [800, '='], [807, 'Linear']),
+    line(12, 180, [895, '201'], [968, 'MIDI'], [990, 'NRPNS']),
+    line(12, 190, [895, '0'], [930, '8'], [968, 'LFO'], [1058, '0'], [1063, '–'], [1070, '4095']),
+  ], { below: true, top: 85, tables: [52, 315, 632, 895].map((x) => ({ x, width: 258, cols, until: 'NRPNS' })) });
+  assert.deepEqual(rows.map((r) => [r.cc, r.name, r.range]), [
+    [8, 'LFO Rate', '0 – 127'],
+    [40, 'DCO Pulse', '0 = Off 64 = On'],
+    [89, 'ENV Decay mode x', '0 = Exp 1 = Linear'],
+    [120, 'All', '0 = Off'],
+  ]);
+});
+
+test('the JN-80: its guide\'s values', () => {
+  const jn = builtProfile('behringer-jn-80');
+  assert.deepEqual(param(jn, 'ARP', 'Arp Div').choices.map((c) => c.value), [0, 18, 36, 54, 72, 90, 108, 126]);
+  assert.deepEqual(param(jn, 'Transpose', 'Octave Transpose').choices.map((c) => c.label), ['-12', '0', '+12']);
+  assert.equal(send(jn, param(jn, 'Voice', 'Voice Allocation Mode'), 'quad'), 'B0 2F 60');
+  assert.ok(param(jn, 'VCF', 'VCF Resonance Factor'), 'CC 36, in the guide and not the manual');
+  assert.ok(param(jn, 'VCF', 'VCF Resonance'), 'printed Resonace');
+  assert.equal(jn.parameters.some((p) => /pedal|Wheel$|NRPN/i.test(p.name)), false);
 });

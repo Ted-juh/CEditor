@@ -33,7 +33,9 @@ export function readRange(text) {
   if (plain) return { lo: Number(plain[1]), hi: Number(plain[2]) };
   // Named values: `0 = Off 64 = On`.
   // (Not a band's end: `0-64 = off / 65 – 127 = on` is two bands.)
-  const named = [...t.matchAll(/(?<![\d-]\s*)(\d+)\s*=\s*([^=]+?)(?=\s+\d+\s*=|$)/g)].map((m) => ({ value: Number(m[1]), label: clean(m[2]).replace(/[,;/]$/, '').trim() }));
+  // (A number straight after a digit is the rest of one; after a dash, a band's end. After a space it
+  // starts a value, `1/4 36 = 1/8 Triplet`.)
+  const named = [...t.matchAll(/(?<![\d-])(?<!-\s+)(\d+)\s*=\s*([^=]+?)(?=\s+\d+\s*=|$)/g)].map((m) => ({ value: Number(m[1]), label: clean(m[2]).replace(/[,;/]$/, '').trim() }));
   if (named.length >= 2 && named.every((n, k) => k === 0 || n.value > named[k - 1].value) && named.every((n) => n.label)) return { choices: named };
   // Bands: `a-b label` in order, each starting after the last ends.
   const runs = [...t.matchAll(/(\d+)\s*-\s*(\d+)\s*=?/g)];
