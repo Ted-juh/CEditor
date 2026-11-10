@@ -4397,7 +4397,17 @@ int main (int argc, char** argv)
         root.getChildFile ("elektron-octatrack.ceditor-device.json"),
         root.getChildFile ("elektron-octatrack-mkii.ceditor-device.json"),
         root.getChildFile ("elektron-syntakt.ceditor-device.json"),
-        root.getChildFile ("elektron-tonverk.ceditor-device.json")
+        root.getChildFile ("elektron-tonverk.ceditor-device.json"),
+        root.getChildFile ("behringer-aks-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-cz-1-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-d-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-jn-80.ceditor-device.json"),
+        root.getChildFile ("behringer-jt-4000-micro.ceditor-device.json"),
+        root.getChildFile ("behringer-jt-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-pro-800.ceditor-device.json"),
+        root.getChildFile ("behringer-pro-vs-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-spice.ceditor-device.json"),
+        root.getChildFile ("behringer-ub-1-micro.ceditor-device.json")
     };
 
     auto failures = 0;

@@ -1,0 +1,14 @@
+{
+  "sources": [
+    {"title":"AKS MINI Quick Start Guide","file":"QSG_BE_0722-AAY_AKS-MINI.pdf","sha256":"918f5ccb84e7531b391122b45c8e020b8f2441e267eba5bfc4162220a1928b7e","url":"https://cdn-media.empowertribe.com/7a56e137d1af456ea3eef0d00be45dc5/QSG_BE_0722-AAY_AKS-MINI.pdf"}
+  ],
+  "rows": [
+    {"page":56,"cc":1,"range":"0-127","name":"Modulation"},
+    {"page":56,"cc":32,"range":"0-127","name":"Envelope Trapezoid"},
+    {"page":56,"cc":33,"range":"0-127","name":"Square Wave Level"},
+    {"page":56,"cc":34,"range":"0-127","name":"Sawtooth Level"},
+    {"page":56,"cc":35,"range":"0-127","name":"VCO Shape"},
+    {"page":56,"cc":39,"range":"0-127","name":"Envelope Generator Off"},
+    {"page":56,"cc":40,"range":"0-12","name":"Voice Mode – Poly","bands":[{"range":"13-37","name":"Voice Mode – Unison"},{"range":"38-62","name":"Voice Mode – Octave"}]}
+  ]
+}

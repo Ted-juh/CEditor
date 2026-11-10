@@ -1,0 +1,20 @@
+{
+  "sources": [
+    {"title":"D MINI Quick Start Guide","file":"QSG_BE_0722-AAW_D-MINI.pdf","sha256":"cf61b84e8a3e65e0311ccffe88a5d44f248869ea7ff0a52901a6611fdb840e7e","url":"https://cdn-media.empowertribe.com/2383dfeba762497d820d2940fb8ce0c8/QSG_BE_0722-AAW_D-MINI.pdf"}
+  ],
+  "rows": [
+    {"page":47,"cc":1,"range":"0-127","name":"Modulation"},
+    {"page":47,"cc":39,"name":"Release"},
+    {"page":47,"cc":40,"bands":[{"range":"0-12","name":"Voice Mode – Poly"},{"range":"13-37","name":"Voice Mode – Unison"},{"range":"38-62","name":"Voice Mode – Octave"},{"range":"63 -87","name":"Voice Mode – Fifth"},{"range":"88-112","name":"Voice Mode – Unison Ring Modulation"},{"range":"112-127","name":"Voice Mode – Poly Ring Modulation"}]},
+    {"page":47,"cc":41,"bands":[{"range":"0-21","name":"Octave 32’"},{"range":"22-43","name":"Octave 16’"},{"range":"44-65","name":"Octave 8’"},{"range":"66-87","name":"Octave 4’"},{"range":"88-109","name":"Octave 2’"},{"range":"110-127","name":"Octave 1’"}]},
+    {"page":47,"cc":42,"range":"0-127","name":"Detune"},
+    {"page":47,"cc":44,"range":"0-127","name":"VCF Cutoff"},
+    {"page":47,"cc":45,"range":"0-127","name":"VCF EG Modulation"},
+    {"page":47,"cc":46,"range":"0-127","name":"LFO Rate"},
+    {"page":47,"cc":47,"range":"0-127","name":"LFO Pitch Modulation"},
+    {"page":47,"cc":48,"range":"0-127","name":"LFO VCF Modulation"},
+    {"page":47,"cc":49,"range":"0-127","name":"EG Attack Time"},
+    {"page":47,"cc":50,"range":"0-127","name":"EG Decay/Time"},
+    {"page":47,"cc":51,"range":"0-127","name":"EG Sustain Level"}
+  ]
+}

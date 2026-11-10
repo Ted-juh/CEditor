@@ -489,6 +489,13 @@ something the program does with every profile, which the larger library makes ea
   means a map from each appendix row to its chapter heading, a layout's worth for each manual, and a
   reader for the bracketed ranges and the bulleted value lists there. Matching them automatically
   was tried and gets about half the Digitone's and Digitakt's rows, some wrongly; the README says more.
+- **A Behringer range is sent as printed.** The guides' controller tables print a range for each
+  controller (`0 - 99` for most of the UB-1 Micro's and PRO-VS Mini's, `0 - 9`, `50 - 75`) and do not
+  say whether it is what the controller carries or what the panel shows for it. The profiles send the
+  printed range; if the instrument scales 0 - 127 to its display instead, the top of a knob stops
+  short. A range wider than a controller (the UB-1 Micro's arpeggiator `20-240` BPM) is 0 - 127 with
+  the printed range in its description. Closing it means trying one instrument of each guide's kind
+  and writing the answer into its layout.
 - **A value that shows a note name is shown as a number.** The Wave's key centres are printed `0-127,
   represents C-2...G9`; a profile's display has a number range or a choice, so they show 0 - 127,
   the printed text in the description. Closing it means a note display mode (the number as a note

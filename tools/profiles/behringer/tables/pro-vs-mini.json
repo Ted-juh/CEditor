@@ -1,0 +1,41 @@
+{
+  "sources": [
+    {"title":"PRO-VS MINI Quick Start Guide","file":"QSG_BE_0722-ABF_PRO-VS-MINI_WW.pdf","sha256":"4e57304cfece2dbb17c1312c4a57ebf302b2e2ad6df4ded05ced9adf2f8f2a91","url":"https://cdn-media.empowertribe.com/07c681beb5724cb797eff24a67095bc7/QSG_BE_0722-ABF_PRO-VS-MINI_WW.pdf"}
+  ],
+  "rows": [
+    {"page":86,"cc":1,"name":"Modulation","range":"0 – 127"},
+    {"page":86,"cc":5,"name":"Portamento time","range":"0 – 31"},
+    {"page":86,"cc":9,"name":"FX Engine","range":"0 – 127","bands":[{"name":"Chorus","range":"0 – 42"},{"name":"Ensemble","range":"43 – 84"},{"name":"Reverb","range":"85 – 127"}]},
+    {"page":86,"cc":24,"name":"Voice A Wave","range":"0 – 127"},
+    {"page":86,"cc":25,"name":"Voice B Wave","range":"0 – 127"},
+    {"page":86,"cc":26,"name":"Voice C Wave","range":"0 – 127"},
+    {"page":86,"cc":27,"name":"Voice D Wave","range":"0 – 127"},
+    {"page":86,"cc":28,"name":"LFO 2 Amount","range":"0 – 99"},
+    {"page":86,"cc":47,"name":"Filter Env Amount","range":"0 – 127"},
+    {"page":86,"cc":54,"name":"LFO 1 waveform (triangle, square, saw)","range":"0 – 127"},
+    {"page":86,"cc":55,"name":"LFO 2 waveform (triangle, square, saw)","range":"0 – 127"},
+    {"page":86,"cc":70,"name":"LFO 1 Amount","range":"0 – 99"},
+    {"page":86,"cc":71,"name":"Filter Resonance","range":"0 – 99"},
+    {"page":86,"cc":72,"name":"LFO 1 Rate","range":"0 – 99"},
+    {"page":86,"cc":73,"name":"LFO 2 Rate","range":"0 – 99"},
+    {"page":86,"cc":74,"name":"Filter Cutoff","range":"0 – 99"},
+    {"page":86,"cc":81,"name":"Amplitude Envelope Attack","range":"0 – 99"},
+    {"page":86,"cc":82,"name":"Amplitude Envelope Decay","range":"0 – 99"},
+    {"page":86,"cc":83,"name":"Amplitude Envelope Sustain","range":"0 – 99"},
+    {"page":86,"cc":84,"name":"Amplitude Envelope Release","range":"0 – 99"},
+    {"page":86,"cc":85,"name":"Filter Envelope Attack","range":"0 – 99"},
+    {"page":86,"cc":86,"name":"Filter Envelope Decay","range":"0 – 99"},
+    {"page":86,"cc":87,"name":"Filter Envelope Sustain","range":"0 – 99"},
+    {"page":86,"cc":88,"name":"Filter Envelope Release","range":"0 – 99"},
+    {"page":86,"cc":91,"name":"Chorus Depth","range":"0 – 99"},
+    {"page":86,"cc":92,"name":"Chorus Rate","range":"0 – 99"},
+    {"page":86,"cc":111,"name":"Voice A Fine Tuning","range":"0 – 99"},
+    {"page":86,"cc":112,"name":"Voice B Fine Tuning","range":"0 – 99"},
+    {"page":86,"cc":113,"name":"Voice C Fine Tuning","range":"0 – 99"},
+    {"page":86,"cc":114,"name":"Voice D Fine Tuning","range":"0 – 99"},
+    {"page":86,"cc":115,"name":"Voice A Coarse Tuning","range":"0 – 99"},
+    {"page":86,"cc":116,"name":"Voice B Coarse Tuning","range":"0 – 99"},
+    {"page":86,"cc":117,"name":"Voice C Coarse Tuning","range":"0 – 99"},
+    {"page":86,"cc":118,"name":"Voice C Coarse Tuning","range":"0 – 99"}
+  ]
+}
