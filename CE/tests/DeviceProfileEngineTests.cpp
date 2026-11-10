@@ -4372,7 +4372,10 @@ int main (int argc, char** argv)
         root.getChildFile ("yamaha-yc61.ceditor-device.json"),
         root.getChildFile ("yamaha-yc88-yc73.ceditor-device.json"),
         root.getChildFile ("waldorf-blofeld.ceditor-device.json"),
-        root.getChildFile ("waldorf-microwave-2.ceditor-device.json")
+        root.getChildFile ("waldorf-microwave-2.ceditor-device.json"),
+        root.getChildFile ("waldorf-microq.ceditor-device.json"),
+        root.getChildFile ("waldorf-rocket.ceditor-device.json"),
+        root.getChildFile ("waldorf-streichfett.ceditor-device.json")
     };
 
     auto failures = 0;

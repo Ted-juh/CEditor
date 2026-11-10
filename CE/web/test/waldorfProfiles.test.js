@@ -82,7 +82,23 @@ for (const { name, profile, text, out, data } of BUILT) {
     assert.deepEqual(errors, []);
   });
 
-  test(`${profile.id}: every parameter is a sound parameter change at its index, at both ends of its range`, () => {
+  test(`${profile.id}: every parameter is its control change, at both ends of its range`, { skip: !data.controllers }, () => {
+    const ids = new Set();
+    for (const p of profile.parameters) {
+      assert.ok(!ids.has(p.id), `${p.id} twice`);
+      ids.add(p.id);
+      const cc = profile.messageRecipes.find((r) => r.id === p.messageRecipe).controller;
+      const values = p.type === 'choice' ? [p.choices[0], p.choices.at(-1)].map((c) => [c.id, c.value]) : [[p.range.min, p.range.min], [p.range.max, p.range.max]];
+      for (const [value, wire] of values) {
+        const compiled = localCompileParameter(profile, { parameterId: p.id, value });
+        assert.ok(compiled.ok, `${p.id}: ${compiled.error}`);
+        assert.equal(compiled.hex, `B0 ${hex([cc])} ${hex([wire])}`, `${p.id} = ${value}`);
+      }
+    }
+    for (const t of profile.tests) assert.equal(localCompileParameter(profile, { parameterId: t.parameter, value: t.value }).hex, t.expectedHex, t.name);
+  });
+
+  test(`${profile.id}: every parameter is a sound parameter change at its index, at both ends of its range`, { skip: !!data.controllers }, () => {
     const equipment = data.format.equipmentId;
     const ids = new Set();
     for (const p of profile.parameters) {
@@ -98,7 +114,7 @@ for (const { name, profile, text, out, data } of BUILT) {
     }
   });
 
-  test(`${profile.id}: its test vectors, its request, and its sound dump read back, with the checksum or 7F`, () => {
+  test(`${profile.id}: its test vectors, its request, and its sound dump read back, with the checksum or 7F`, { skip: !!data.controllers }, () => {
     for (const t of profile.tests) {
       if (t.parameter) {
         const compiled = localCompileParameter(profile, { parameterId: t.parameter, value: t.value });
@@ -172,4 +188,29 @@ test('the Microwave II/XT: the Blofeld\'s ancestor, its checksum over the locati
   assert.deepEqual([dump.checksum.fromOffset, dump.checksum.byteOffset], [5, 263], '`(BB+NN+SDATA)&7Fh`: from the location');
   assert.equal(profile.requests[0].template.join(' '), 'F0 3E 0E $deviceId 00 20 00 20 F7', 'the request\'s checksum, (BB+NN) & 7F');
   assert.equal(profile.identity, undefined, 'a member code for each hardware combination: no identity check');
+});
+
+test('the micro Q: its controller chart, the sound\'s settings alone, footages and bands', { skip: !builtProfile('waldorf-microq') }, () => {
+  const profile = builtProfile('waldorf-microq');
+  const at = (name) => profile.parameters.find((p) => p.name === name);
+  const send = (name, value) => localCompileParameter(profile, { parameterId: at(name).id, value }).hex;
+  assert.equal(send('Filter 1 Cutoff', 100), 'B0 45 64', 'CC 69');
+  assert.equal(send('Osc 2 Octave', "8'"), 'B0 23 40', "CC 35, 8' is 64");
+  assert.equal(send('Routing', 'parallel'), 'B0 43 40', '`serial/parallel` over 0 - 127: a band each, its first value sent');
+  assert.deepEqual([at('Arp Range').display.min, at('Arp Range').display.max], [1, 10], '`1…10 octaves` over 0 - 9');
+  assert.deepEqual([at('Filter 1 Pan').display.min, at('Filter 1 Pan').display.max], [-64, 63], '`L64…center…R63`');
+  for (const name of ['Modulation Wheel*', 'Sustain Pedal*', 'Local Control', 'Bank Select MSB']) assert.equal(profile.parameters.some((p) => p.name === name || p.name === name.replace('*', '')), false, `${name}: no setting of the sound`);
+  assert.equal(profile.requests, undefined, 'no SysEx format published: no Pull');
+});
+
+test('the Streichfett and Rocket: two-column charts, values printed beside their names, the standard controllers', { skip: !builtProfile('waldorf-rocket') }, () => {
+  const streichfett = builtProfile('waldorf-streichfett');
+  const rocket = builtProfile('waldorf-rocket');
+  const at = (profile, name) => profile.parameters.find((p) => p.name === name);
+  assert.deepEqual(at(streichfett, 'String Registration').choices.map((c) => [c.value, c.label]), [[0, 'Base'], [1, 'Both'], [2, '8va']], '`0 = Base, 1 = Both, 2 = 8va`, the superscript put back');
+  assert.ok(at(streichfett, 'FX Reverb amount'), 'the right-hand column, under the left\'s headings');
+  assert.equal(localCompileParameter(rocket, { parameterId: at(rocket, 'Cutoff').id, value: 100 }).hex, 'B0 4A 64', 'CC 74, the standard assignment (69 is the alternative)');
+  assert.equal(localCompileParameter(rocket, { parameterId: at(rocket, 'LFO Target').id, value: 'pitch' }).hex, 'B0 12 02', '`0: Arp, 1: Cutoff, 2: Pitch` on CC 18');
+  assert.ok(at(rocket, 'Vibrato Mod LFO'), '`0...127` is a range too');
+  for (const p of [streichfett, rocket]) assert.equal(p.parameters.some((x) => /Sustain Pedal|Modulation Wheel|All Notes Off|Local Control/.test(x.name)), false, `${p.id}: no performance or channel mode controllers`);
 });

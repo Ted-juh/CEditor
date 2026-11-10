@@ -97,6 +97,9 @@ sound dump's data indices and what its checksum covers, the edit buffer's locati
 | --- | --- | ---: | ---: | --- |
 | `waldorf-blofeld` | Blofeld System Exclusive Specifications 1.04 | 258 | 97 | the Sound mode edit buffer, every parameter read back |
 | `waldorf-microwave-2` | Microwave 2 System Exclusive Specifications 2.16 (Microwave II, XT, XTk) | 203 | 84 | the Sound mode edit buffer, every parameter read back |
+| `waldorf-microq` | microQ Omega/lite/Keyboard User's Manual, controller chart pp. 151 - 155 | 103 | 16 | none: no SysEx format published |
+| `waldorf-rocket` | Rocket User's Manual, controller chart p. 34 | 19 | 7 | none |
+| `waldorf-streichfett` | Streichfett Reference Manual, controller chart p. 21 | 17 | 5 | none |
 
 Left out of the Blofeld's: the arpeggiator's 16 steps (32 bytes of bit fields with no lists), the
 global parameters (a dump, with no parameter change), and the other Multi instruments' sounds (the
@@ -112,3 +115,24 @@ modifier's rows (188 - 191) `Modifier 3` a second time; the layout corrects them
 its member code is a bitmask of the hardware fitted (a Microwave 2, one with the XT mainboard, an XT,
 the expansions), and a profile takes one. Left out: the sound format version (index 0), and, as on
 the Blofeld, the other Multi instruments and the global, multi and wave messages.
+
+## The controller charts
+
+The micro Q, Rocket and Streichfett are edited by control change, and their manuals print a chart of
+the controllers (`read-waldorf-cc.mjs`): the micro Q's `Ctrl #`, `Controller Range`, `Controller Name
+or Sound Parameter`, `Value Range`; the Streichfett's with no range column (each controller 0 - 127);
+the Rocket's with an `Alt Ctrl #` column beside the standard one. The Streichfett and Rocket set the
+chart in two columns with headings over the left only: the right is read under the same headings,
+moved across by as far as its controller numbers stand from the left's (medians, since a value cell
+can start with a number). A controller that sets no part of the sound is left out: the micro Q marks
+them `*`, the other two leave them unmarked, so the wheels, pedals and channel mode messages are known
+by name. A value column naming every value is a choice, at the values printed beside the names where
+it prints them (`0 = Off, 64 = On`, `0: Saw, 1: Pulse`), otherwise a band each over 0 - 127, the
+first value of it sent (`serial/parallel`: 0, 64), as the Moog profiles do.
+
+Not laid out: the micro Q's Glide Mode and filter types (numbers here; the manual lists their values
+in its chapters, not the chart), and the Rocket's alternative assignment. The Iridium, Iridium Core
+and Quantum have no fixed controller map (the user assigns each controller, and they ignore incoming
+NRPN), and the STVC's manual is German only: none of them has a profile. Still to read: the Pulse
+(a program dump byte by byte and a controller table, partly in German), the Wave and the Microwave of
+1989 (their SysEx descriptions), and the Zarenbourg, whose manual prints no chart.

@@ -302,3 +302,127 @@ export function buildWaldorfProfile(data, layout) {
 }
 
 export { stringifyProfile };
+
+/**
+ * A manual's controller chart (tables/<name>.json with `controllers`) and a layout -> a profile of
+ * control changes. Every row with a range is a parameter on its controller. A value column naming
+ * every value is a choice; names fewer than a 0 - 127 controller's values take a band each, the
+ * first value of it sent (`off, on`: 0 and 64); a range of numbers as wide as the controller's what
+ * its values show; anything else a number, the column said. A controller the manual marks `*`
+ * changes no setting of the sound (the wheels, pedals, volume, the channel mode messages), and one
+ * printed `- not used -` is none: neither is laid out.
+ */
+export function buildWaldorfCcProfile(data, layout) {
+  const notes = [];
+  const skipped = new Map();
+  const skip = (why, what) => { const list = skipped.get(why) ?? []; if (!list.includes(what)) skipped.set(why, [...list, what]); };
+  const ids = new Set();
+  const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
+  const groupOf = (name) => {
+    for (const [re, group] of layout.groups ?? []) { const m = re.exec(name); if (m) return group.replace(/\$(\d)/g, (s, k) => m[Number(k)]); }
+    return 'Sound';
+  };
+  const parameters = [];
+  const recipes = [];
+  // `0…127`, and the Streichfett's and Rocket's `0...127`, alike.
+  const dots = (s) => String(s).replace(/…|\.{3}/g, '..').replace(/’/g, "'").trim();
+  // The performance and channel mode controllers, which change no setting of the sound: the micro Q
+  // marks them `*`, the Streichfett and Rocket print them unmarked.
+  const PERFORMANCE = /^(Modulation Wheel|Breath Control|Foot Control|Channel Volume|Sustain Pedal|Sostenuto|All Sound Off|Reset All Control|Local Control|All Notes Off|Omni Mode|Poly Mode|Mono Mode)/;
+  // A cell the reader takes apart wrongly, given by the layout (the Streichfett's `8va`).
+  const fixed = data.controllers.filter((r) => layout.fix?.[r.controller]);
+  if (fixed.length) notes.push(`Cells the reader could not read as printed, given by the layout: ${fixed.map((r) => `CC ${r.controller} ${r.name}`).join(', ')}.`);
+  for (const printed of data.controllers) {
+    const row = { ...printed, ...(layout.fix?.[printed.controller] ?? {}) };
+    const label = `CC ${row.controller} ${row.name}`;
+    // The chart may print no range (the Streichfett's): a controller's, 0 - 127.
+    row.range ??= '0…127';
+    if (/not used/.test(row.range)) { skip('controllers the manual prints `- not used -`', label); continue; }
+    if (/\*$/.test(row.name)) { skip('controllers the manual marks `*`, which change no setting of the sound', label); continue; }
+    if (PERFORMANCE.test(row.name)) { skip('performance and channel mode controllers, which change no setting of the sound', label); continue; }
+    if (layout.leaveOut?.[row.controller]) { skip(layout.leaveOut[row.controller], label); continue; }
+    const name = layout.names?.[row.controller] ?? row.name;
+    const group = groupOf(name);
+    const range = /^(\d+)\.\.(\d+)$/.exec(dots(row.range));
+    let choices = layout.choices?.[row.controller] ?? null;
+    if (!range && !choices) { skip('a controller range the reader does not take', `${label} (${row.range})`); continue; }
+    const [lo, hi] = range ? [Number(range[1]), Number(range[2])] : [Math.min(...choices.map((c) => c.value)), Math.max(...choices.map((c) => c.value))];
+    const value = dots(row.value);
+    const describe = [];
+    let shown = null;
+    // `0 = Off, 64 = On`, `0: Saw, 1: Pulse`: the values printed beside the names.
+    const numbered = value.split(/\s*,\s*/).map((x) => /^(\d+)\s*[:=]\s*(.+)$/.exec(x));
+    if (!choices && numbered.length >= 2 && numbered.every(Boolean)) choices = numbered.map((m) => ({ value: Number(m[1]), label: m[2] }));
+    if (!choices) {
+      const items = listed(value.replace(/,\s+/g, ','), lo, hi);
+      const names = value.includes(',') || value.includes('/') ? value.split(/\s*[,/]\s*/) : null;
+      const m = /^([+-]?\d+)\.\.([+-]?\d+)(?:\s+(\w+))?$/.exec(value);
+      // `L64..R63`, `L64..center..R63`, `F1 64..mid..F2 63`: -64 to +63.
+      const ends = /^(L|F1 )64\.\.(?:\w+\.\.)?(R|F2 )63$/.exec(value);
+      if (items && items.length <= 32) choices = items;
+      else if (names && names.length >= 2 && names.length < hi - lo + 1 && lo === 0 && hi === 127 && names.every((n) => n && !/\d\.\./.test(n))) {
+        const band = 128 / names.length;
+        choices = names.map((n, k) => ({ value: Math.round(k * band), label: n }));
+        describe.push('Each name takes a band of values; the first value of it is sent.');
+      } else if (m && Number(m[2]) - Number(m[1]) === hi - lo) { if (Number(m[1]) !== lo) shown = { min: Number(m[1]), max: Number(m[2]), ...(m[3] ? { unit: m[3] } : {}) }; }
+      else if (ends && hi - lo === 127) shown = { min: -64, max: 63 };
+      else if (value && value !== `${lo}..${hi}`) describe.push(`Printed: ${row.value}.`);
+    }
+    const recipe = { id: `cc${row.controller}`, kind: 'cc', channel: '$channel', controller: row.controller, value: '$encodedValue' };
+    if (!recipes.some((r) => r.id === recipe.id)) recipes.push(recipe);
+    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+    if (choices) {
+      const seen = new Set();
+      const list = choices.map(({ value: v, label: l }) => { const s = slug(l); const id = seen.has(s) ? `${s}_${v}` : s; seen.add(id); return { id, label: l, value: v }; });
+      parameters.push({ ...base, type: 'choice', default: list[0].id, choices: list, display: { mode: 'choice', shortLabel: camel(name) }, normalization: { mode: 'choiceIndex' }, encoding: { type: 'enum' }, sendPolicy: { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: list.length === 2 ? 'ToggleButton' : list.length <= 5 ? 'RadioButtonGroup' : 'Combobox' } });
+    } else {
+      const bipolar = shown && shown.min < 0 && shown.max > 0;
+      parameters.push({ ...base, type: bipolar ? 'bipolar' : 'integer', range: { min: lo, max: hi }, default: bipolar ? lo - shown.min : lo, display: { mode: 'number', unit: '', shortLabel: camel(name), ...(shown ? { min: shown.min, max: shown.max } : {}) }, normalization: { mode: 'linear' }, encoding: { type: 'u7' }, sendPolicy: hi - lo > 8 ? { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true } : { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: /Level|Attack|Decay|Sustain|Release|Rate|Amount|Volume|Cutoff|Resonance/i.test(name) ? 'Slider' : 'Knob' } });
+    }
+  }
+  for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
+  const variables = { channel: 1, ...(layout.variables ?? {}) };
+  const tests = [];
+  for (const p of [parameters.find((x) => x.type === 'choice'), parameters.find((x) => x.type === 'bipolar'), parameters.find((x) => x.type === 'integer' && x.range.max > 1)].filter(Boolean)) {
+    const choice = p.type === 'choice' ? p.choices.at(-1) : null;
+    const v = choice ? choice.value : Math.min(p.range.max, Math.max(p.range.min, 100));
+    const cc = recipes.find((r) => r.id === p.messageRecipe).controller;
+    tests.push({ name: `${p.name} = ${choice ? choice.label : v} (CC ${cc})`, parameter: p.id, value: choice ? choice.id : v, expectedHex: ['B0', hex(cc), hex(v)].join(' ') });
+  }
+  const doc = data.sources[0];
+  return {
+    schemaVersion: 1,
+    profileVersion: layout.profileVersion ?? '0.1.0',
+    minCEditorVersion: '0.9.0',
+    id: layout.id,
+    name: layout.name,
+    manufacturer: 'Waldorf',
+    family: layout.family,
+    status: 'experimental',
+    trust: 'local',
+    description: layout.description,
+    sources: [{ type: 'manual', title: doc.title, notes: `Controller chart (pages ${layout.read.chart.join(', ')}) read by tools/profiles/waldorf/read-waldorf-cc.mjs from ${doc.file} (sha256 ${doc.sha256}), ${doc.url}. Not yet checked against the instrument itself.` }],
+    testedWith: [],
+    authoringNotes: [
+      'Generated by tools/profiles/waldorf/make-profiles.mjs; edit the layout in tools/profiles/waldorf/synths/, not this file.',
+      'Every parameter is a row of the manual\'s controller chart, with its printed name, sent as a control change on the channel variable. Nothing here has been sent to a real instrument yet.',
+      ...(layout.notes ?? []),
+      ...notes,
+    ],
+    variables,
+    coverage: {
+      singleParameterWrite: 'complete-for-the-manual\'s-controller-chart',
+      realtimeEditing: 'complete-for-the-manual\'s-controller-chart',
+      editBufferDumpRequest: 'notImplemented',
+      editBufferDumpParse: 'notImplemented',
+      bankDump: 'notImplemented',
+      inboundControllers: 'the instrument sends these same controllers when its MIDI settings allow',
+      verifiedOnHardware: false,
+      ...(layout.coverage ?? {}),
+    },
+    timing: { minDelayBetweenMessagesMs: layout.delayMs ?? 0 },
+    messageRecipes: recipes,
+    parameters,
+    tests,
+  };
+}
