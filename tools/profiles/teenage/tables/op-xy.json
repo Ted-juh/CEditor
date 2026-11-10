@@ -1,0 +1,19 @@
+{
+  "sources": [
+    {"title":"OP–XY guide: midi reference","file":"op-xy-midi-references.html","saved":"2026-11-10","sha256":"58d5447e76fa3d8d3fe253ff72040d28e1d9ad768fa12b62f3c70c106821591f","url":"https://teenage.engineering/guides/op-xy/midi-references"}
+  ],
+  "rows": [
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"track volume","cc":"7","channel":"1–16","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"track mute","cc":"9","channel":"1–16","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"track pan","cc":"10","channel":"1–16","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"track parameters","cc":"46","channel":"1–16","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"tempo","cc":"80","channel":"any","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"groove","cc":"81","channel":"any","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"scene (delayed switch)","cc":"82","channel":"any","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"previous scene","cc":"83","channel":"any","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"next scene","cc":"84","channel":"any","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"scene","cc":"85","channel":"any","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"project","cc":"86","channel":"any","range":"0–127"},
+    {"table":"sometimes you want to control OP–XY with an external controller. OP–XY has almost all of its controls pre-mapped as midi CCs. you can use this section to reference which CCs control which parameter.","name":"eq","cc":"90","channel":"1–4","range":"0–127"}
+  ]
+}

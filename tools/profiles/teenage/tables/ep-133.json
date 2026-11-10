@@ -1,0 +1,11 @@
+{
+  "sources": [
+    {"title":"EP-133 K.O. II guide: system","file":"ep-133-system.html","saved":"2026-11-10","sha256":"c938778be19aa36b86d93a7deff3da8f18ec982dc8112f393eac2e088629fb25","url":"https://teenage.engineering/guides/ep-133/system"}
+  ],
+  "rows": [
+    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","cc":"1","range":"1-127","name":"vibrato"},
+    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","cc":"12","range":"1-127","name":"fx parameter (knobx)"},
+    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","cc":"13","range":"1-127","name":"fx parameter (knoby)"},
+    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","cc":"64","range":"1-127","name":"sustain pedal for key and legato voices"}
+  ]
+}

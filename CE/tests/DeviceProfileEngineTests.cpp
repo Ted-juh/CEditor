@@ -4471,7 +4471,13 @@ int main (int argc, char** argv)
         root.getChildFile ("udo-super-6.ceditor-device.json"),
         root.getChildFile ("udo-super-8.ceditor-device.json"),
         root.getChildFile ("udo-super-gemini.ceditor-device.json"),
-        root.getChildFile ("groove-synthesis-3rd-wave.ceditor-device.json")
+        root.getChildFile ("groove-synthesis-3rd-wave.ceditor-device.json"),
+        root.getChildFile ("te-ep-133.ceditor-device.json"),
+        root.getChildFile ("te-ep-40.ceditor-device.json"),
+        root.getChildFile ("te-op-1-field.ceditor-device.json"),
+        root.getChildFile ("te-op-xy.ceditor-device.json"),
+        root.getChildFile ("te-op-z.ceditor-device.json"),
+        root.getChildFile ("te-tx-6.ceditor-device.json")
     };
 
     auto failures = 0;
