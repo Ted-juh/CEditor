@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { readText } from './support/readText.mjs';
-import { readCell, readMidiAppendix } from '../../../tools/profiles/elektron/read-elektron-midi.mjs';
+import { readCell, readCtrlChangeTables, readMidiAppendix, readTrackColumnTables } from '../../../tools/profiles/elektron/read-elektron-midi.mjs';
 import { readValueNames } from '../../../tools/profiles/elektron/build-elektron-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/elektron/make-profiles.mjs';
 import { localCompileParameter, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
@@ -84,6 +84,47 @@ test('a table carried onto a facing page moves with the page\'s margin', () => {
     line(2, 40, [80, 'Level'], [230, '78']),
   ]);
   assert.deepEqual(rows.map((r) => [r.name, r.cc]), [['Pitch', 17], ['Level', 78]]);
+});
+
+test('the Octatrack\'s tables: hex and decimal, the name and its values apart, X under TRN and REC wherever the page sets them', () => {
+  const rows = readCtrlChangeTables([
+    line(1, 10, [60, 'C.7'], [80, 'CTRL'], [105, 'CHANGE'], [140, 'MAPPINGS']),
+    line(1, 20, [64, 'HEX'], [86, 'DEC'], [115, 'CTRL'], [141, 'PARAMETER'], [301, 'TRN'], [337, 'REC']),
+    line(1, 30, [64, '$07'], [86, '07'], [115, 'Track'], [140, 'level'], [344, 'X']),
+    // The next page sets the table 28 points further in.
+    line(2, 30, [92, '$31'], [114, '49'], [143, 'Track'], [166, 'Mute'], [187, '[0]=Unmuted,'], [240, '[1-127]=Muted'], [336, 'X'], [372, 'X']),
+    line(2, 40, [60, 'C.3'], [80, 'MIDI'], [100, 'MODE'], [125, 'CTRL'], [150, 'CHANGE'], [185, 'MAPPINGS']),
+  ]);
+  assert.deepEqual(rows.map((r) => [r.section, r.cc, r.name, r.trn, r.rec, r.values]), [
+    ['C.7 CTRL CHANGE MAPPINGS', 7, 'Track level', false, true, undefined],
+    ['C.7 CTRL CHANGE MAPPINGS', 49, 'Track Mute', true, true, '[0]=Unmuted, [1-127]=Muted'],
+  ]);
+  assert.deepEqual(readValueNames('[0]=Unmuted, [1-127]=Muted'), [{ value: 0, label: 'Unmuted' }, { value: 1, label: 'Muted' }], 'bands, the first value of each');
+  assert.equal(readValueNames('[0]=C-1, 127=G9)'), null, 'the ends of a range, not bands that cover it');
+});
+
+test('the Tonverk\'s tables: a column for each kind of track, names run on, NRPN runs', () => {
+  const rows = readTrackColumnTables([
+    line(1, 10, [40, 'D.1'], [60, 'CC'], [75, 'VALUES']),
+    // The titles are set in from their cells.
+    line(1, 20, [40, 'CC'], [100, 'Audio'], [125, 'tracks*'], [230, 'Bus'], [250, 'tracks'], [380, 'Mix'], [400, 'track']),
+    line(1, 30, [40, '3'], [70, 'TRIG'], [95, 'note'], [200, 'TRIG'], [225, 'note'], [350, 'TRIG'], [375, 'note']),
+    line(1, 40, [40, '48'], [70, 'FX'], [82, '1'], [90, 'Data'], [200, 'FX'], [212, '1'], [220, 'Data']),
+    line(1, 50, [70, '(machine'], [110, 'dependent)'], [200, '(machine'], [240, 'dependent)']),
+    line(1, 60, [40, 'D.3'], [60, 'NRPN'], [90, 'VALUES']),
+    line(1, 70, [40, 'NRPN'], [70, 'MSB'], [100, 'NRPN'], [130, 'LSB'], [170, 'Audio'], [200, 'tracks'], [230, 'using'], [260, 'the']),
+    line(1, 80, [170, 'Subtracks'], [215, 'SRC'], [235, 'machine']),
+    line(1, 90, [40, '1–8'], [100, '107'], [170, 'VOICE'], [200, 'LFO1'], [225, 'start'], [250, 'phase'], [280, '/']),
+    line(1, 100, [170, 'VOICE'], [200, 'LFO1'], [225, 'slew']),
+  ]);
+  assert.deepEqual(rows.map((r) => [r.table, r.name, r.cc ?? r.nrpn, r.msbRun]), [
+    ['Audio tracks', 'TRIG note', 3, undefined],
+    ['Bus tracks', 'TRIG note', 3, undefined],
+    ['Mix track', 'TRIG note', 3, undefined],
+    ['Audio tracks', 'FX 1 Data (machine dependent)', 48, undefined],
+    ['Bus tracks', 'FX 1 Data (machine dependent)', 48, undefined],
+    ['Audio tracks using the Subtracks SRC machine', 'VOICE LFO1 start phase / VOICE LFO1 slew', [1, 107], '1–8'],
+  ]);
 });
 
 /* ------------------------------------------------------------------ every profile */
@@ -182,4 +223,26 @@ test('the Analog Heat: the values it names are choices, its effect blocks on MID
   const fx = builtProfile('elektron-analog-heat-fx');
   assert.equal(send(fx, param(fx, 'Bits', 'BITS SRR'), 10), 'BF 58 0A', 'CC 88 on MIDI CH FX, 16 here');
   assert.equal(send(fx, param(fx, 'LFO3', 'LFO3 Multiplier'), 10), 'B0 58 0A', 'the same controller on MIDI CH MAIN');
+});
+
+test('the Octatrack: its audio tracks on a track channel, its MIDI mode on the auto channel, bands as choices', { skip: !builtProfile('elektron-octatrack-mkii') }, () => {
+  for (const id of ['elektron-octatrack-mkii', 'elektron-octatrack']) {
+    const ot = builtProfile(id);
+    assert.equal(send(ot, param(ot, 'Track', 'Track Mute'), 'muted'), 'B0 31 01', `${id}: [1-127]=Muted, its first value`);
+    assert.equal(send(ot, param(ot, 'MIDI Mode Track', 'MIDI Trk 1 Mute'), 'mute'), 'BF 70 01', `${id}: the MIDI mode on the auto channel, 16 here`);
+    assert.equal(param(ot, 'Track', 'Note on').type, 'integer', `${id}: [0]=C-1, 127=G9 is a range`);
+    assert.ok(param(ot, 'MIDI Mode Playback', 'Playback param #1 (Note)'), `${id}: the MIDI mode's table (C.3 in the MKI's manual, C.8 in the MKII's)`);
+    assert.equal(ot.parameters.some((p) => /^(Pitch bend|Aftertouch)$/.test(p.name)), false);
+  }
+});
+
+test('the Tonverk: each kind of track on its channel, its NRPN-only parameters, subtrack 1, a misprint', { skip: !builtProfile('elektron-tonverk') }, () => {
+  const tv = builtProfile('elektron-tonverk');
+  assert.equal(send(tv, param(tv, 'Bus TRIG', 'TRIG note'), 60), 'BC 03 3C', 'the bus channel, 13 here');
+  assert.equal(send(tv, param(tv, 'Mix Input A', 'In A level'), 100), 'BF 10 64', 'CC 16 on the mix channel is an input level, not SRC 1\'s knob A');
+  assert.equal(send(tv, param(tv, 'Audio SRC 1', 'SRC 1 Data entry knob A (machine dependent)'), 100), 'B0 10 64');
+  assert.equal(send(tv, param(tv, 'Audio VOICE LFO1', 'VOICE LFO1 waveform'), 3), 'B0 63 00\nB0 62 05\nB0 06 03', 'no CC printed: NRPN 0:5');
+  assert.equal(send(tv, param(tv, 'Audio VOICE LFO1', 'VOICE LFO1 speed'), 64), 'B0 66 40', 'a CC and an NRPN printed: the CC');
+  assert.equal(send(tv, param(tv, 'Subtrack 1 FLTR', 'FLTR frequency'), 64), 'B0 63 01\nB0 62 4A\nB0 06 40', 'subtrack 1, NRPN MSB 1');
+  assert.ok(param(tv, 'Audio SRC 2', 'SRC 2 Data entry knob H (machine dependent)'), 'CC 31, printed as SRC 1\'s');
 });

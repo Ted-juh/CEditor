@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { appendixLines, readMidiAppendix } from './read-elektron-midi.mjs';
+import { appendixLines, readCtrlChangeTables, readMidiAppendix, readTrackColumnTables } from './read-elektron-midi.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,10 +22,13 @@ export async function loadLayout(name) {
 
 export function importDocument(layout, file) {
   const doc = layout.document;
-  const rows = readMidiAppendix(appendixLines(file, layout.appendix ? new RegExp(layout.appendix, 'i') : undefined))
+  // Most manuals' tables (`Parameter CC MSB CC LSB NRPN MSB NRPN LSB`); the Octatrack's (`HEX DEC CTRL
+  // PARAMETER TRN REC`); the Tonverk's, a column for each kind of track.
+  const read = { ctrl: readCtrlChangeTables, columns: readTrackColumnTables }[layout.read] ?? readMidiAppendix;
+  const rows = read(appendixLines(file, layout.appendix ? new RegExp(layout.appendix, 'i') : undefined))
     // What the builder uses; the cells as printed stay out of the transcription, but for what the
     // reader could not place (`more`).
-    .map(({ cells, ...row }) => row);
+    .map(({ cells, page, ...row }) => ({ page, ...row }));
   return {
     sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
     rows,

@@ -25,8 +25,8 @@ modes), under the front panel's abbreviation (`11.3.1 ALGO`) rather than the app
 | Analog Rytm MKII, Analog Rytm | User Manuals, OS 1.74 | C | CC and NRPN; each machine's table of what Synth Parameter 1 - 8 set |
 | Analog Heat MKII, Analog Heat, Analog Heat +FX | User Manuals | A | CC and NRPN, and a `Specific values info` column naming a setting's values |
 | Model:Cycles, Model:Samples | User Manuals, OS 1.13 | A | CC only, two tables side by side |
-| Octatrack MKII, Octatrack | User Manuals, OS 1.40 | C | a different table: `HEX DEC CTRL PARAMETER TRN REC`, playback, amp and LFO parameters numbered (`Playback param #1`) |
-| Tonverk | User Manual, OS 1.4.1 | D | a different table: a CC, then the parameter for each kind of track |
+| Octatrack MKII, Octatrack | User Manuals, OS 1.40C and 1.40A | C | a table of its own: `HEX DEC CTRL PARAMETER TRN REC`, playback, amp, LFO and effect parameters numbered (`Playback param #1`), the audio tracks' (C.7) and the MIDI mode's (C.8; numbered C.3 in the MKI's manual) |
+| Tonverk | User Manual, OS 1.4.1 | D | a table of its own: a CC, then what it sets on each kind of track (audio, bus, FX send, mix); NRPN tables for audio tracks and the Subtracks machine's eight subtracks |
 
 Not read yet: the Machinedrum and Monomachine (manuals for OS 1.63 and 1.32 are on their pages) and
 the Analog Drive.
@@ -35,7 +35,7 @@ the Analog Drive.
 
 | Step | File | What it does |
 | --- | --- | --- |
-| 1 | `read-elektron-midi.mjs` | A manual's MIDI appendix → its rows as printed: section, table, name, encoder, CC MSB/LSB, NRPN MSB/LSB, values info. Decides nothing. |
+| 1 | `read-elektron-midi.mjs` | A manual's MIDI appendix → its rows as printed: section, table, name, encoder, CC MSB/LSB, NRPN MSB/LSB, values info; the Octatrack's (`readCtrlChangeTables`) and Tonverk's (`readTrackColumnTables`) in their own shapes. Decides nothing. |
 | 2 | `import-elektron.mjs` | Writes `tables/<name>.json`: those, with the manual's name, SHA-256 and address. **This is what is committed.** |
 | 3 | `synths/<name>.mjs` | The layout: the manual, which tables go on which channel, the rows the manual misprints, the tables it mistitles. |
 | 4 | `build-elektron-profile.mjs`, `make-profiles.mjs` | Transcription + layout → `CE/profiles/test/<id>.ceditor-device.json`. |
@@ -57,6 +57,18 @@ A line with no name runs the row above on (the Heats' values over two lines) or 
 it (the Analog Four's `B - - 1`), kept as `more`. Running headers and footers, page numbers and the
 prose between tables are not rows.
 
+The Octatrack's tables are a controller in hex and decimal, the parameter, and an X under TRN where
+the Octatrack sends it and under REC where it takes it. A page sets the table at its own indent (its
+margins are the same, so the reader measures the X columns from each row's hex number). A value note
+printed in the name (`Track Mute [0]=Unmuted, [1-127]=Muted`) is kept apart.
+
+The Tonverk's CC table puts what a controller sets on each kind of track in a column of its own. Its
+column titles are set in from their cells, so a line is split into cells at its wide gaps and each
+cell goes to the nearest title; a line with no number runs its cells' names on (`(machine
+dependent)`). Its NRPN tables are a number, the parameter and, for the Subtracks machine, a run of
+MSBs (`1–8`), a subtrack each; a second name on the next line (`VOICE LFO1 slew` under `VOICE LFO1
+start phase /`) is the same row's.
+
 ## What the builder takes as settled
 
 - **A row with a CC is that controller**, a 14-bit pair (0 - 16383, MSB first) where it prints a CC
@@ -71,9 +83,17 @@ prose between tables are not rows.
   another channel to its variable: `fxChannel` (the Digitone's FX CHANNEL; FX CONTROL CH; the Rytm's
   and Analog Four's FX track; the Model:Cycles' FX IN; the Heat +FX's MIDI CH FX), `perfChannel` (PERF
   CHANNEL), `cvChannel` (the Analog Four's CV track) and `midiChannel` (a MIDI track's, for its CC VAL
-  parameters). The manuals print the tracks' default channels (1 - N) but none of these; each is a
-  placeholder (16, 15, 14, 9), named in the profile's notes as a setting to match.
-- **The Analog Keys' split tables** (`OSC 1 CC`, `OSC 1 NRPN`) are one table, merged by name.
+  parameters); the Octatrack's MIDI mode on `autoChannel`; the Tonverk's bus, FX send and mix tracks on
+  `busChannel`, `sendChannel` and `mixChannel`. The manuals print the tracks' default channels (1 - N)
+  but none of these; each is a placeholder, named in the profile's notes as a setting to match.
+- **A parameter printed in a CC table and an NRPN table** (the Analog Keys' `OSC 1 CC` and `OSC 1
+  NRPN`, the Tonverk's CC table and its audio tracks' NRPN table) is one parameter, where the second
+  row brings what the first lacks and contradicts nothing; a dash in one table is the other's row.
+- **The Octatrack's bands** (`[0]=Unmuted, [1-127]=Muted`) are a choice, a band's first value sent,
+  where they cover 0 - 127; `[0]=C-1, 127=G9` names the ends of a range and stays a number. A
+  controller it marks TRN alone (it sends it and does not take it) would be left out; none is.
+- **The Tonverk's Subtracks machine** is laid out for subtrack 1, NRPN MSB 1; subtracks 2 - 8 are the
+  same at MSB 2 - 8.
 - **A machine's table** (the Rytm's `BD PLASTIC`, `SD NATURAL` …) says what the general Synth
   Parameter 1 - 8 set for that machine: each parameter's description lists them.
 - **A row on the same message as one before it** (`Chorus Send L/R` and `Chorus Send L`, CC 26/58
@@ -89,7 +109,8 @@ prose between tables are not rows.
 Corrected by the layouts, each named in the profile: the Digitone II's Amp Sustain Level, printed on
 CC 86 (Decay Time's) between 86 and 88, its NRPN between theirs, laid out on 87; the Digitakt II's and
 Digitone II's Euclidean and FX tables, titled `AMP` in the manual; the Analog Four MKI's track table,
-titled `PERFORMANCE`.
+titled `PERFORMANCE`; the Tonverk's CC 31, printed `SRC 1 Data entry knob H` as CC 23 is, between
+SRC 2's knob G (30) and nothing, laid out as SRC 2's.
 
 ## The profiles
 
@@ -110,7 +131,10 @@ titled `PERFORMANCE`.
 | `elektron-digitone` | Digitone User Manual, OS 1.44 | 124 | 118 | 40 | 5 | 0 | FX, MIDI track |
 | `elektron-model-cycles` | Model:Cycles User Manual, OS 1.13 | 24 | 24 | 1 | 0 | 0 | FX |
 | `elektron-model-samples` | Model:Samples User Manual, OS 1.13 | 24 | 24 | 1 | 0 | 0 | FX |
+| `elektron-octatrack-mkii` | Octatrack MKII User Manual, OS 1.40C | 115 | 113 | 0 | 0 | 41 | auto |
+| `elektron-octatrack` | Octatrack User Manual, OS 1.40A | 115 | 113 | 0 | 0 | 41 | auto |
 | `elektron-syntakt` | Syntakt User Manual, OS 1.42 | 107 | 105 | 4 | 0 | 0 | FX, MIDI track |
+| `elektron-tonverk` | Tonverk User Manual, OS 1.4.1 | 242 | 229 | 0 | 79 | 0 | bus, FX send, mix |
 
 None reads anything back: Elektron publishes no SysEx format for a sound, so there is no Pull. A
 panel follows the instrument through the controllers (or NRPNs, as its PARAM OUTPUT setting says) it
@@ -120,8 +144,16 @@ sends when its knobs are turned.
 
 | Left out | Where | What would read it |
 | --- | --- | --- |
-| What a value shows, and a list setting's values | every profile but the Heats' list settings | the parameter's chapter: a heading-to-row map for each manual (the abbreviations and the appendix's names differ, `ATK A` and `A Env Attack`), and its range in brackets or its bulleted list read as the values |
-| What a machine-dependent knob sets | Digitone II (`Data entry knob A (machine dependent)`), Syntakt (`Data entry knob A` - `H`), Digitakt II | each manual's machines appendix (Digitone II's appendix A), read the way the Rytm's machine tables are: a description on the knob, or a parameter set chosen by the machine |
+| What a value shows, and a list setting's values | every profile but the Heats' and the Octatrack's bands | the parameter's chapter: a heading-to-row map for each manual, written by hand, and its range in brackets or its bulleted list read as the values (see below) |
+| What a machine-dependent knob sets | Digitone II (`Data entry knob A (machine dependent)`), Syntakt (`Data entry knob A` - `H`), Digitakt II, Tonverk; the Octatrack's numbered parameters (`Playback param #1`) | each manual's machines appendix (Digitone II's appendix A), read the way the Rytm's machine tables are: a description on the knob, or a parameter set chosen by the machine |
 | Which of two parameters on one controller the instrument means | Digitone, Digitone Keys (CC 13, 14, 16) | nothing in the format: the appendix prints them so |
-| The Octatrack's and Tonverk's tables | Octatrack MKII, Octatrack, Tonverk | a reader for their own layout (a CC, then a column for each kind of track or a TRN/REC mark) |
 | The other tracks | every multi-track instrument | the channel variables: one track at a time, set to the track's channel (or AUTO for the active one) |
+
+**Why the chapters are not read.** Matching the appendix's names to the chapters' parameter headings
+was tried, by the abbreviation (`ATK` for `Attack`) and by the subject of the paragraph's first
+sentence (`Algorithm selects …`), within the chapter whose title names the table. On the Digitone and
+Digitakt it matched about half the rows, some of them wrongly (`Mute` to the pattern's Mute Mode,
+`Track level` to a filter's sustain), and left a quarter ambiguous; the Syntakt's chapters print 3
+ranges in all, the Rytm's none and the Analog Four's one. A value range taken from a wrong paragraph
+would be sent as a wrong value, so the profiles keep the controller's own range until each manual has
+a map written for it.

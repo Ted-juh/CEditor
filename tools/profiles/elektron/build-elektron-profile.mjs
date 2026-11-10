@@ -24,10 +24,20 @@ const slug = (label) => String(label).toLowerCase().replace(/[^a-z0-9+-]+/g, '')
 const titleCase = (s) => String(s).toLowerCase().replace(/(^|[\s/(&-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bLfo(\d*)\b/g, 'LFO$1').replace(/\bFx\b/g, 'FX').replace(/\bCv\b/g, 'CV').replace(/\bEnvf\b/g, 'EnvF').replace(/\bCc\b/g, 'CC').replace(/\bOsc\b/g, 'Osc').replace(/\bVal\b/g, 'Val').replace(/\b(Eq|Vcf|Pst)\b/g, (m) => m.toUpperCase());
 const PERFORMANCE = /^(Mod ?wheel|Modulation Wheel|Breath Control(?:ler)?|Sustain(?: Pedal)?|Sostenuto|Pitch ?Bend|Aftertouch)$/i;
 
-/** `0=CB, 1=SA, …`, `0=TRI, 1=SIN 2=SQR` -> [{ value, label }] or null. */
+/**
+ * `0=CB, 1=SA, …`, `0=TRI, 1=SIN 2=SQR`, and the Octatrack's bands (`[0]=Unmuted, [1-127]=Muted`, a
+ * band's first value sent) -> [{ value, label }] or null. Bands are a choice only where they cover 0 -
+ * 127 (`[0]=C-1, 127=G9` names the ends of a range, not its values).
+ */
 export function readValueNames(text) {
-  const out = [...String(text ?? '').matchAll(/(\d+)\s*=\s*([^,=]+?)\s*(?=,|\s+\d+\s*=|$)/g)].map((m) => ({ value: Number(m[1]), label: m[2].trim() }));
-  return out.length >= 2 && new Set(out.map((o) => o.value)).size === out.length ? out : null;
+  const items = [...String(text ?? '').matchAll(/(\[)?(\d+)(?:-(\d+))?\]?\s*=\s*([^,=[\]]+?)\s*(?=,|\s+\[?\d+\]?\s*=|$)/g)]
+    .map((m) => ({ value: Number(m[2]), to: Number(m[3] ?? m[2]), band: !!m[1], label: m[4].trim().replace(/\)$/, '') }));
+  if (items.length < 2 || new Set(items.map((o) => o.value)).size !== items.length) return null;
+  if (items.some((i) => i.band)) {
+    const sorted = [...items].sort((a, b) => a.value - b.value);
+    if (sorted[0].value !== 0 || sorted.at(-1).to !== 127 || sorted.some((x, k) => k && x.value !== sorted[k - 1].to + 1)) return null;
+  }
+  return items.map(({ value, label }) => ({ value, label }));
 }
 
 export function buildElektronProfile(data, layout) {
@@ -44,11 +54,16 @@ export function buildElektronProfile(data, layout) {
   const corrected = [];
   for (const printed of data.rows) {
     // A row the appendix prints wrongly, corrected by the layout (and named in the notes).
-    const fix = layout.fix?.[`${printed.table} ${printed.name}`];
+    const fix = typeof layout.fix === 'function' ? layout.fix(printed) : layout.fix?.[`${printed.table} ${printed.name}`];
     const r = fix ? { ...printed, ...fix } : printed;
     if (fix) corrected.push(`${printed.table} ${printed.name} (${Object.entries(fix).map(([k, v]) => `${k} ${v}, printed ${printed[k] ?? 'none'}`).join('; ')})`);
-    const key = `${r.section}\u0000${base(r.table)}\u0000${r.name}`;
-    const into = /\s(?:CC|NRPN|NPRN)$/.test(r.table) ? merged.find((m) => m.key === key) : null;
+    // A parameter's CC and its NRPN in separate tables (the Analog Keys' `OSC 1 CC` and `OSC 1 NRPN`,
+    // the Tonverk's CC table and its NRPN table for audio tracks): one parameter, where the second
+    // row brings what the first lacks and contradicts nothing.
+    const key = `${base(r.table)}\u0000${r.name}`;
+    // (A row that prints neither, a dash in the CC table for a parameter the NRPN table has, is part of it.)
+    const empty = (x) => x.cc === undefined && x.nrpn === undefined;
+    const into = merged.find((m) => m.key === key && (r.cc === undefined || m.cc === undefined) && (r.nrpn === undefined || m.nrpn === undefined) && (empty(r) ? !empty(m) : empty(m) || (r.cc !== undefined ? m.nrpn !== undefined : m.cc !== undefined)));
     if (into) { for (const k of ['cc', 'ccLsb', 'nrpn', 'values']) if (r[k] !== undefined && into[k] === undefined) into[k] = r[k]; continue; }
     merged.push({ ...r, table: base(r.table), key });
   }
@@ -59,6 +74,7 @@ export function buildElektronProfile(data, layout) {
   const sectionsOf = new Map();
   for (const r of merged) sectionsOf.set(r.table, new Set([...(sectionsOf.get(r.table) ?? []), r.section]));
   const groupOf = (r) => {
+    if (typeof layout.groupOf === 'function') { const g = layout.groupOf(r); if (g) return g; }
     const named = layout.groups?.[`${r.section} / ${r.table}`];
     if (named) return named;
     // No title (the Analog Heat's one table): the block its name begins with (`VCF Mode`, `DELAY Time`).
@@ -89,6 +105,7 @@ export function buildElektronProfile(data, layout) {
     const label = `${r.table ? `${r.table} ` : ''}${r.name}`;
     if (isMeaning(r)) continue;
     if (PERFORMANCE.test(r.name)) { skip('the wheels, pedals and breath controller, which set nothing of the sound', label); continue; }
+    if (r.rec === false) { skip('controllers the instrument sends and does not receive', label); continue; }
     if (layout.leaveOut) { const why = layout.leaveOut(r); if (why) { skip(why, label); continue; } }
     const channel = channelOf(r);
     let recipe;
@@ -107,9 +124,11 @@ export function buildElektronProfile(data, layout) {
     const pair = recipe.kind === 'cc' && recipe.lsbController !== undefined;
     if (pair) describe.push(`14 bits: the MSB on CC ${recipe.controller}, then the LSB on CC ${recipe.lsbController}.`);
     if (recipe.kind === 'nrpn') describe.push(`NRPN ${r.nrpn[0]}:${r.nrpn[1]} (MSB:LSB); the appendix prints no CC for it.`);
+    if (r.msbRun) describe.push(`The first of NRPN MSB ${r.msbRun}, one each: the others are the same parameter at MSB ${r.nrpn[0] + 1} on.`);
     const meaning = recipe.kind === 'cc' ? meanings.get(`${channel} ${r.cc}`) : null;
     if (meaning) describe.push(`What it sets depends on the machine: ${meaning.join('; ')}.`);
     const values = readValueNames(r.values);
+    if (r.values && !values) describe.push(`Printed: ${r.values}.`);
     const p = {
       id: unique(`${camel(group)}.${camel(name)}`),
       name,

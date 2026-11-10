@@ -4394,7 +4394,10 @@ int main (int argc, char** argv)
         root.getChildFile ("elektron-digitone-keys.ceditor-device.json"),
         root.getChildFile ("elektron-model-cycles.ceditor-device.json"),
         root.getChildFile ("elektron-model-samples.ceditor-device.json"),
-        root.getChildFile ("elektron-syntakt.ceditor-device.json")
+        root.getChildFile ("elektron-octatrack.ceditor-device.json"),
+        root.getChildFile ("elektron-octatrack-mkii.ceditor-device.json"),
+        root.getChildFile ("elektron-syntakt.ceditor-device.json"),
+        root.getChildFile ("elektron-tonverk.ceditor-device.json")
     };
 
     auto failures = 0;

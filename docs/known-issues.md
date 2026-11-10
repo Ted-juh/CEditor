@@ -481,13 +481,14 @@ something the program does with every profile, which the larger library makes ea
   on connect. Closing it means a response of controllers (complete after a count of them, or a
   quiet interval) in the format and both engines; the inbound path already maps each one.
 - **An Elektron parameter takes its controller's whole range.** The manuals' MIDI appendices print
-  each parameter's CC and NRPN numbers and nothing about its values, so every parameter of the 16
+  each parameter's CC and NRPN numbers and nothing about its values, so every parameter of the 19
   Elektron profiles is 0 - 127 (0 - 16383 for a 14-bit pair), and a setting chosen from a list (a
   filter type, an LFO waveform, an algorithm) is a number rather than a choice; only the Analog
-  Heat's appendix names values. The chapters say what each value shows, in prose and under the front
+  Heat's appendix names values (and the Octatrack's its mutes' bands). The chapters say what each value shows, in prose and under the front
   panel's abbreviations (`11.3.1 ALGO … (1–8)`), not the appendix's names (`Algorithm`). Closing it
   means a map from each appendix row to its chapter heading, a layout's worth for each manual, and a
-  reader for the bracketed ranges and the bulleted value lists there.
+  reader for the bracketed ranges and the bulleted value lists there. Matching them automatically
+  was tried and gets about half the Digitone's and Digitakt's rows, some wrongly; the README says more.
 - **A value that shows a note name is shown as a number.** The Wave's key centres are printed `0-127,
   represents C-2...G9`; a profile's display has a number range or a choice, so they show 0 - 127,
   the printed text in the description. Closing it means a note display mode (the number as a note

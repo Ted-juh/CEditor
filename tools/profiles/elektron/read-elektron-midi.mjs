@@ -166,3 +166,97 @@ export function readMidiAppendix(lines) {
   }
   return rows;
 }
+
+/**
+ * The Octatrack's tables (`HEX DEC CTRL PARAMETER TRN REC`): a row a controller, its number in hex
+ * and decimal, the parameter, and an X under TRN where the Octatrack sends it and under REC where it
+ * takes it. A value note printed in the name (`Track Mute [0]=Unmuted, [1-127]=Muted`) is kept apart:
+ * [{ page, section, table: '', name, cc, trn, rec, values? }].
+ */
+export function readCtrlChangeTables(lines) {
+  const rows = [];
+  let section = '';
+  let cols = null;     // TRN's and REC's distance from the HEX column: a page sets the table at its own indent
+  for (const l of lines) {
+    const t = text(l.words);
+    if (/^C\.\d+\s+[A-Z]/.test(t)) { section = t; cols = null; continue; }
+    const at = (w) => l.words.find((x) => x.text === w);
+    if (at('HEX') && at('DEC') && at('TRN') && at('REC')) { cols = { trn: at('TRN').x0 - at('HEX').x0, rec: at('REC').x0 - at('HEX').x0 }; continue; }
+    if (!cols) continue;
+    const [hexWord, dec, ...rest] = l.words;
+    if (!/^\$[0-9A-F]{2}$/.test(hexWord?.text ?? '') || !/^\d+$/.test(dec?.text ?? '')) continue;
+    const mark = (x) => rest.some((w) => w.text === 'X' && Math.abs(w.x0 - hexWord.x0 - x) < 18);
+    const named = rest.filter((w) => !(w.text === 'X' && w.x0 - hexWord.x0 > cols.trn - 18));
+    const full = text(named);
+    const cut = full.search(/\s\[|,\s*\d+\s*=/);
+    rows.push({
+      page: l.page, section, table: '', name: (cut > 0 ? full.slice(0, cut) : full).trim(), cc: Number(dec.text),
+      trn: mark(cols.trn), rec: mark(cols.rec),
+      ...(cut > 0 ? { values: full.slice(cut).replace(/^,\s*/, '').trim() } : {}),
+    });
+  }
+  return rows;
+}
+
+/**
+ * The Tonverk's tables: a CC, then the parameter it sets on each kind of track, a column each
+ * (`CC  Audio tracks*  Bus tracks  FX send tracks  Mix track`); and its NRPN tables, `NRPN MSB  NRPN
+ * LSB  <tracks>`, the Subtracks machine's MSB printed as a run (`1–8`, a subtrack each). A line with
+ * no number runs the names above it on (`(machine dependent)`, `VOICE LFO1 slew`). [{ page, section,
+ * table: the kind of track, name, cc } or { …, nrpn: [msb, lsb], msbRun? }].
+ */
+export function readTrackColumnTables(lines) {
+  const rows = [];
+  let section = '';
+  let table = null;   // { kind: 'cc' | 'nrpn', cols: [{ x, title }], first, last: [rows] }
+  const titled = (words, from) => {
+    // Titles: runs of words set close together.
+    const out = [];
+    for (const w of words.filter((x) => x.x0 >= from)) {
+      const prev = out.at(-1);
+      if (prev && w.x0 - prev.x1 < 14) { prev.title += ` ${w.text}`; prev.x1 = w.x1; } else out.push({ x: w.x0, x1: w.x1, title: w.text });
+    }
+    return out.map((c) => ({ x: c.x, title: c.title.replace(/\*$/, '') }));
+  };
+  for (const l of lines) {
+    const t = text(l.words);
+    if (/^(?:[A-Z]-\d+\s+)?APPENDIX [A-Z]:/i.test(t) || /^\d+$/.test(t)) continue;
+    if (/^[A-Z]\.\d+\s+[A-Z]/.test(t)) { section = t; table = null; continue; }
+    if (/^(?:CC MSB|NRPN)$/.test(t)) continue;   // the tables' running titles
+    const w = l.words;
+    if (w[0]?.text === 'CC' && w.length > 2 && !/^\d/.test(w[1].text)) { table = { kind: 'cc', cols: titled(w, w[1].x0), last: [] }; continue; }
+    if (w[0]?.text === 'NRPN' && w[1]?.text === 'MSB' && w[2]?.text === 'NRPN' && w[3]?.text === 'LSB') { table = { kind: 'nrpn', lsbX: w[2].x0, cols: titled(w, w[4].x0), last: [] }; continue; }
+    if (!table) continue;
+    // The titles are set in from their cells: a cell (words close together) belongs to the nearest.
+    const cellsOf = (words) => {
+      const out = [];
+      for (const x of words) { const prev = out.at(-1); if (prev && x.x0 - prev.x1 < 12) { prev.text += ` ${x.text}`; prev.x1 = x.x1; } else out.push({ x0: x.x0, x1: x.x1, text: x.text }); }
+      return out.map((c) => ({ ...c, title: table.cols.reduce((a, b) => (Math.abs(b.x - c.x0) < Math.abs(a.x - c.x0) ? b : a)).title }));
+    };
+    if (table.kind === 'cc' && /^\d+$/.test(w[0]?.text ?? '')) {
+      table.last = cellsOf(w.slice(1)).map((c) => ({ page: l.page, section, table: c.title, name: c.text, cc: Number(w[0].text) }));
+      rows.push(...table.last);
+    } else if (table.kind === 'nrpn' && /^\d+(?:[–-]\d+)?$/.test(w[0]?.text ?? '') && /^\d+$/.test(w[1]?.text ?? '')) {
+      const run = /^(\d+)[–-](\d+)$/.exec(w[0].text);
+      const name = text(w.slice(2));
+      const row = { page: l.page, section, table: table.cols.map((c) => c.title).join(' '), name, nrpn: [Number(run ? run[1] : w[0].text), Number(w[1].text)], ...(run ? { msbRun: w[0].text } : {}) };
+      table.last = [row];
+      rows.push(row);
+    } else if (table.last.length && !/^\d/.test(w[0]?.text ?? '')) {
+      // Names run on, column by column (`(machine dependent)`), or an NRPN's second name
+      // (`VOICE LFO1 start phase /` `VOICE LFO1 slew`).
+      if (table.kind === 'nrpn') {
+        table.last[0].name = `${table.last[0].name.replace(/\s*\/$/, '')} / ${t}`;
+        continue;
+      }
+      for (const c of cellsOf(w)) {
+        const row = table.last.find((r) => r.table === c.title);
+        if (row) row.name = `${row.name} ${c.text}`;
+      }
+    } else if (table.kind === 'nrpn' && !table.last.length && !/^\d/.test(w[0]?.text ?? '')) {
+      // The title's second line (`Subtracks SRC machine`), before the first row.
+      table.cols = [{ x: table.cols[0].x, title: `${table.cols[0].title} ${t}` }];
+    }
+  }
+  return rows;
+}
