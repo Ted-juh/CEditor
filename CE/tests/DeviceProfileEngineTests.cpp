@@ -4449,7 +4449,22 @@ int main (int argc, char** argv)
         root.getChildFile ("nord-stage-3.ceditor-device.json"),
         root.getChildFile ("nord-stage-4.ceditor-device.json"),
         root.getChildFile ("nord-wave.ceditor-device.json"),
-        root.getChildFile ("nord-wave-2.ceditor-device.json")
+        root.getChildFile ("nord-wave-2.ceditor-device.json"),
+        root.getChildFile ("modal-002.ceditor-device.json"),
+        root.getChildFile ("modal-008.ceditor-device.json"),
+        root.getChildFile ("modal-argon8.ceditor-device.json"),
+        root.getChildFile ("modal-argon8m.ceditor-device.json"),
+        root.getChildFile ("modal-argon8x.ceditor-device.json"),
+        root.getChildFile ("modal-carbon8.ceditor-device.json"),
+        root.getChildFile ("modal-carbon8m.ceditor-device.json"),
+        root.getChildFile ("modal-carbon8x.ceditor-device.json"),
+        root.getChildFile ("modal-cobalt5s.ceditor-device.json"),
+        root.getChildFile ("modal-cobalt8.ceditor-device.json"),
+        root.getChildFile ("modal-cobalt8m.ceditor-device.json"),
+        root.getChildFile ("modal-cobalt8x.ceditor-device.json"),
+        root.getChildFile ("modal-craftsynth-2.ceditor-device.json"),
+        root.getChildFile ("modal-element-one.ceditor-device.json"),
+        root.getChildFile ("modal-skulptsynth-se.ceditor-device.json")
     };
 
     auto failures = 0;
