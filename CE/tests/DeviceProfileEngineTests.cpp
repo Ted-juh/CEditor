@@ -4467,7 +4467,10 @@ int main (int argc, char** argv)
         root.getChildFile ("modal-skulptsynth-se.ceditor-device.json"),
         root.getChildFile ("dreadbox-artemis.ceditor-device.json"),
         root.getChildFile ("dreadbox-murmux-adept.ceditor-device.json"),
-        root.getChildFile ("dreadbox-nymphes.ceditor-device.json")
+        root.getChildFile ("dreadbox-nymphes.ceditor-device.json"),
+        root.getChildFile ("udo-super-6.ceditor-device.json"),
+        root.getChildFile ("udo-super-8.ceditor-device.json"),
+        root.getChildFile ("udo-super-gemini.ceditor-device.json")
     };
 
     auto failures = 0;
