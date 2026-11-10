@@ -44,6 +44,24 @@ export function bitFieldChoices(pattern, list) {
   return out.map((o) => ({ value: o.value, label: o.labels.join(', ') })).sort((a, b) => a.value - b.value);
 }
 
+/**
+ * A value column that names every value in order: `off,on`, `Poly/Mono`, `normal/dual/unisono`, and
+ * numbers among the names counted out (`off,1-5`, `off,user,1..15`) -> [{ value, label }], or null
+ * where it does not count out the range.
+ */
+export function listed(value, lo, hi) {
+  const sep = value.includes(',') ? ',' : value.includes('/') && !/\d\/\d/.test(value) ? '/' : null;
+  if (!sep) return null;
+  const out = [];
+  for (const item of value.split(sep).map((x) => x.trim())) {
+    const run = /^(\d+)\s*(?:-|\.\.)\s*(\d+)$/.exec(item);
+    if (run) for (let n = Number(run[1]); n <= Number(run[2]); n++) out.push(String(n));
+    else if (item) out.push(item);
+    else return null;
+  }
+  return out.length === hi - lo + 1 ? out.map((label, k) => ({ value: lo + k, label })) : null;
+}
+
 export function buildWaldorfProfile(data, layout) {
   const notes = [];
   const skipped = new Map();
@@ -73,7 +91,8 @@ export function buildWaldorfProfile(data, layout) {
   const rows = data.sound.map((r) => ({ ...r, ...(layout.rows?.[r.index] ?? {}), ...(layout.rows?.[r.index] ? { unsure: false, corrected: true } : {}) }));
   const corrected = rows.filter((r) => r.corrected).map((r) => `${r.index} ${r.name}`);
 
-  const nameRows = rows.filter((r) => /^Name Char$/i.test(r.name) && r.range);
+  // The name, a character a row: the Blofeld's `Name Char`, the Microwave 2's `Name 1` … `Name 16`.
+  const nameRows = rows.filter((r) => r.range && String(r.value ?? '').trim() === 'ASCII' && /^Name( Char| \d+)$/i.test(r.name));
   // A row printing a byte's bit fields (`0sssgaaa Arp Pattern Step/Glide/Accent 1`) heads a run of
   // the same byte numbered on, whose value column goes on to say what the fields mean (`sss=0:
   // normal`); the run is all of a kind.
@@ -105,7 +124,7 @@ export function buildWaldorfProfile(data, layout) {
     const describe = [];
     let choices = layout.choices?.[row.index] ?? null;
     let shown = null;
-    const list = /^see (\d+\.\d+)$/.exec(value);
+    const list = /^see (?:List )?(\d+\.\d+)$/.exec(value);
     if (!choices && list) {
       const l = data.lists[list[1]];
       if (!l) { skip('a value list the specification does not print', `${label} (see ${list[1]})`); continue; }
@@ -114,7 +133,8 @@ export function buildWaldorfProfile(data, layout) {
         if (!choices) { skip('a byte of bit fields whose fields have no lists to enumerate', label); continue; }
         describe.push(`One byte, ${l.notes}: ${l.title}, every combination.`);
       } else if (l.items.every((i) => i.from === i.to)) {
-        choices = l.items.filter((i) => i.from >= lo && i.from <= hi).map((i) => ({ value: i.from, label: i.label }));
+        const labelOf = layout.listLabels?.[list[1]] ?? ((x) => x);
+        choices = l.items.filter((i) => i.from >= lo && i.from <= hi).map((i) => ({ value: i.from, label: labelOf(i.label) }));
       } else {
         // A list of runs (`0..1 1280 bars`): what a value shows only under another setting (an LFO's
         // speed, when it is clocked). A number, the list said.
@@ -133,12 +153,15 @@ export function buildWaldorfProfile(data, layout) {
     } else if (!choices && /^0[a-z0]{7}$/.test(value)) {
       skip('a byte of bit fields whose fields have no lists to enumerate', label);
       continue;
-    } else if (!choices && value.includes(',') && value.split(',').length === hi - lo + 1) {
-      choices = value.split(',').map((l, k) => ({ value: lo + k, label: l.trim() }));
+    } else if (!choices && listed(value, lo, hi)) {
+      const items = listed(value, lo, hi);
+      if (items.length <= 32) choices = items;
+      else describe.push(`Printed: ${value}.`);
     } else if (!choices) {
       const m = SHOWN.exec(value);
-      // `F1 64..F2 63` (a balance), `left 64..right 63` (a pan): -64 to +63, named at the ends.
-      const ends = /^(\S+) 64\.\.(\S+) 63$/.exec(value);
+      // `F1 64..F2 63` (a balance), `left 64..right 63` (a pan; the Microwave 2's `left
+      // 64-center-right 63`): -64 to +63, named at the ends.
+      const ends = /^(\S+) 64(?:\.\.|-center-)(\S+) 63$/.exec(value);
       if (m && Number(m[2]) - Number(m[1]) === hi - lo) shown = { min: Number(m[1]), max: Number(m[2]) };
       else if (ends && hi - lo === 127) { shown = { min: -64, max: 63 }; describe.push(`${ends[1]} 64 at the low end, ${ends[2]} 63 at the high.`); }
       else if (value && value !== `${lo}..${hi}`) describe.push(`Printed: ${value}.`);
@@ -232,7 +255,8 @@ export function buildWaldorfProfile(data, layout) {
   }
 
   const id = data.format.identity;
-  const identity = id?.member ? { requestDeviceId: '7F', manufacturerId: ['3E'], familyCode: id.family, modelNumber: id.member, timeoutMs: 1000, retries: 0 } : null;
+  // (The layout may decline it: the Microwave 2's member code is a bitmask of the hardware fitted.)
+  const identity = id?.member && !layout.noIdentity ? { requestDeviceId: '7F', manufacturerId: ['3E'], familyCode: id.family, modelNumber: id.member, timeoutMs: 1000, retries: 0 } : null;
   const doc = data.sources[0];
   return {
     schemaVersion: 1,
@@ -251,7 +275,7 @@ export function buildWaldorfProfile(data, layout) {
       'Generated by tools/profiles/waldorf/make-profiles.mjs; edit the layout in tools/profiles/waldorf/synths/, not this file.',
       'Every parameter is a row of the specification\'s sound data table, with its printed name. Nothing here has been sent to a real instrument yet.',
       `Sound parameter change: F0 3E ${equipment} <dev> 20 00 <HH> <PP> <value> F7, HH PP the parameter's index (its offset in the sound dump) in two 7-bit bytes, to the Sound mode edit buffer. <dev> is the deviceId variable, the instrument's Device ID (0 unless set otherwise); its dumps are matched by it too.`,
-      identity ? `Identity: the reply the specification prints, family ${id.family.join(' ')}, member ${id.member.join(' ')} (${id.memberName}).` : 'No identity check: the specification prints no identity reply.',
+      identity ? `Identity: the reply the specification prints, family ${id.family.join(' ')}, member ${id.member.join(' ')} (${id.memberName}).` : `No identity check: ${layout.noIdentity ?? 'the specification prints no identity reply'}.`,
       ...(layout.notes ?? []),
       ...notes,
     ],

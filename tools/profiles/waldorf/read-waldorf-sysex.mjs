@@ -79,7 +79,17 @@ export function readSoundTable(lines, heading = /^3\.1\s+SDATA/) {
     if (second?.text === 'reserved') { rows.push({ index, range: null, value: '', name: 'reserved' }); continue; }
     const r = second && RANGE.exec(second.text);
     if (!r) continue;
-    const split = splitValueAndName(second, rest);
+    let split = splitValueAndName(second, rest);
+    // A list of names whose tab collapsed into the name (the Microwave 2's `sin,tri,sqr,saw,rnd,S&H
+    // LFO 1 Shape`, 0 - 5): where its commas count out the range and no name has a space in it, the
+    // value is its first word.
+    if (split.unsure) {
+      const words = split.name.split(' ');
+      const k = words.findIndex((w, i) => i > 0 && !words[i - 1].endsWith(',') && !w.startsWith(',') && words.slice(0, i).join(' ').split(',').length === Number(r[2]) - Number(r[1]) + 1);
+      // Only where every name is one word: `Up,Down,Alt Up,Alt Down` (the Blofeld's) cannot be told
+      // from its name this way.
+      if (k > 0 && k === 1 && !words.slice(k).join(' ').includes(',')) split = { value: words[0], name: words.slice(1).join(' '), unsure: false };
+    }
     // `!!`, `!!!`: the Microwave 2 marks what changed in a release.
     const name = split.name.replace(/\s*!{2,3}$/, '');
     rows.push({ index, range: [Number(r[1]), Number(r[2])], value: split.value, name, ...(split.unsure ? { unsure: true } : {}) });
@@ -146,7 +156,8 @@ export function readFormat(layoutText) {
   const t = String(layoutText);
   const equipment = /IDE\s*:?\s*Equipment ID\s*=\s*([0-9A-F]{2})h/i.exec(t)?.[1] ?? /\bIDE\s+([0-9A-F]{2})h\b/.exec(t)?.[1];
   const sdata = /\b(\d+)-(\d+)\s+SDATA\s/.exec(t);
-  const sum = /\b(\d+)\s+(?:CHK|XSUM)\s+(\(?[A-Z+ ]+\)?)\s*&\s*7Fh/i.exec(t);
+  // The dump's checksum, printed under its data (not the request's, `7 XSUM (BB+NN)&7Fh`).
+  const sum = sdata && /\b(\d+)\s+(?:CHK|XSUM)\s+(\(?[A-Z+ ]+\)?)\s*&\s*7Fh/i.exec(t.slice(sdata.index));
   const editBuffer = /\b([0-9A-F]{2}) ([0-9A-F]{2})\s+Sound Mode Edit Buffer/.exec(t);
   const family = /([0-9A-F]{2}),\s*([0-9A-F]{2}),\s+Device family code/i.exec(t);
   const member = /Device family member codes[^\n]*\n\s*([0-9A-F]{2}),\s*([0-9A-F]{2})\s+(.+)/i.exec(t);

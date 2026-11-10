@@ -96,7 +96,19 @@ sound dump's data indices and what its checksum covers, the edit buffer's locati
 | Profile | Read from | Parameters | Choices | Pull |
 | --- | --- | ---: | ---: | --- |
 | `waldorf-blofeld` | Blofeld System Exclusive Specifications 1.04 | 258 | 97 | the Sound mode edit buffer, every parameter read back |
+| `waldorf-microwave-2` | Microwave 2 System Exclusive Specifications 2.16 (Microwave II, XT, XTk) | 203 | 84 | the Sound mode edit buffer, every parameter read back |
 
 Left out of the Blofeld's: the arpeggiator's 16 steps (32 bytes of bit fields with no lists), the
 global parameters (a dump, with no parameter change), and the other Multi instruments' sounds (the
 same parameters at locations 01 - 0F).
+
+The Microwave II/XT's specification is the Blofeld's ancestor and reads the same way, with its own
+habits: ranges printed `0-127`, lists referred to as `see List 3.11` and printed after the sound data
+table, lists separated by `/` (`normal/dual/unisono`) or mixing numbers among the names (`off,1-5`),
+and seven lists whose tab collapsed into the name (`sin,tri,sqr,saw,rnd,S&H LFO 1 Shape`), split where
+their commas count out the range and every name is one word. Its checksum covers the location as
+well as the data (`(BB+NN+SDATA)&7Fh`), and its request carries `(BB+NN)&7Fh`. It names the fourth
+modifier's rows (188 - 191) `Modifier 3` a second time; the layout corrects them. No identity check:
+its member code is a bitmask of the hardware fitted (a Microwave 2, one with the XT mainboard, an XT,
+the expansions), and a profile takes one. Left out: the sound format version (index 0), and, as on
+the Blofeld, the other Multi instruments and the global, multi and wave messages.

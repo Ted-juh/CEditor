@@ -155,3 +155,21 @@ test('the Blofeld: an index in two 7-bit bytes, the edit buffer\'s dump, and the
   assert.equal(profile.requests[0].template.join(' '), 'F0 3E 13 $deviceId 00 7F 00 7F F7');
   assert.deepEqual([profile.identity.manufacturerId, profile.identity.familyCode, profile.identity.modelNumber], [['3E'], ['13', '00'], ['00', '00']]);
 });
+
+test('the Microwave II/XT: the Blofeld\'s ancestor, its checksum over the location as well, no identity', { skip: !builtProfile('waldorf-microwave-2') }, () => {
+  const profile = builtProfile('waldorf-microwave-2');
+  const at = (name) => profile.parameters.find((p) => p.name === name);
+  const send = (name, value) => localCompileParameter(profile, { parameterId: at(name).id, value }).hex;
+  assert.equal(send('Filter 1 Cutoff', 100), 'F0 3E 0E 00 20 00 00 3E 64 F7', 'equipment 0E, index 62: 00 3E');
+  assert.equal(send('Osc 2 Octave', '+1'), 'F0 3E 0E 00 20 00 00 0C 4C F7', '+1 is 76, 16 + 5 x 12');
+  assert.deepEqual(at('LFO 1 Shape').choices.map((c) => c.label), ['sin', 'tri', 'sqr', 'saw', 'rnd', 'S&H'], 'a list whose tab collapsed, split where its commas count out the range');
+  assert.deepEqual(at('Assignment').choices.map((c) => c.label), ['normal', 'dual', 'unisono'], '`normal/dual/unisono`');
+  assert.deepEqual(at('Aliasing').choices.map((c) => c.label), ['off', '1', '2', '3', '4', '5'], '`off,1-5`, counted out');
+  assert.equal(at('Play Parameter #1').choices[0].label, 'Osc 1 Octave', 'the list\'s index column left off');
+  assert.equal(at('Modifier 4 Type').address, '01 3E', 'printed `Modifier 3 Type` a second time');
+  const [dump] = profile.dumpDefinitions;
+  assert.deepEqual([dump.payload.offset, dump.payload.size, dump.completion.expectedBytes], [7, 256, 265]);
+  assert.deepEqual([dump.checksum.fromOffset, dump.checksum.byteOffset], [5, 263], '`(BB+NN+SDATA)&7Fh`: from the location');
+  assert.equal(profile.requests[0].template.join(' '), 'F0 3E 0E $deviceId 00 20 00 20 F7', 'the request\'s checksum, (BB+NN) & 7F');
+  assert.equal(profile.identity, undefined, 'a member code for each hardware combination: no identity check');
+});
