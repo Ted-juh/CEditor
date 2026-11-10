@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { documentLines, readCcTables } from './read-behringer-cc.mjs';
+import { readLineTables } from './read-behringer-tables.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,7 +24,10 @@ export async function loadLayout(name) {
 export function importDocument(layout, file) {
   const doc = layout.document;
   const pages = layout.pages;
-  const rows = readCcTables(documentLines(file, [Math.min(...pages), Math.max(...pages)]).filter((l) => pages.includes(l.page)));
+  const lines = documentLines(file, [Math.min(...pages), Math.max(...pages)]).filter((l) => pages.includes(l.page));
+  // A manual whose tables are a row a line (the Wave's controllers, NRPNs and preset bytes), or a
+  // guide's controller table.
+  const rows = layout.tables ? readLineTables(lines, layout.tables) : readCcTables(lines);
   return {
     sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
     rows,

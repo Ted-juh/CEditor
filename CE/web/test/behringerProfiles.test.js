@@ -16,7 +16,8 @@ import { readText } from './support/readText.mjs';
 import { headerTables, readCcTables } from '../../../tools/profiles/behringer/read-behringer-cc.mjs';
 import { readBands, readRange } from '../../../tools/profiles/behringer/build-behringer-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/behringer/make-profiles.mjs';
-import { localCompileParameter, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import { localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import { cellsOf, readLineTables } from '../../../tools/profiles/behringer/read-behringer-tables.mjs';
 
 /* ------------------------------------------------------------------ the reader */
 
@@ -119,26 +120,31 @@ for (const { name, profile, text, out, data } of BUILT) {
     assert.deepEqual(errors, []);
   });
 
-  test(`${profile.id}: every parameter is its controller, at both ends of its range`, () => {
+  test(`${profile.id}: every parameter is its controller or NRPN, at both ends of its range`, () => {
     const ids = new Set();
-    const ccs = new Set();
+    const messages = new Map();
     for (const p of profile.parameters) {
       assert.ok(!ids.has(p.id), `${p.id} twice`);
       ids.add(p.id);
+      if (!p.access.canWrite) { assert.ok(profile.dumpDefinitions?.[0].mappings.some((m) => m.parameter === p.id), `${p.id}: read-only and not in the dump`); continue; }
       const r = profile.messageRecipes.find((x) => x.id === p.messageRecipe);
-      assert.ok(!ccs.has(r.controller), `CC ${r.controller} twice`);
-      ccs.add(r.controller);
+      // One parameter a message, but for the Wave's groups A and B, which the instrument tells apart
+      // by Group Select.
+      const other = messages.get(r.id);
+      assert.ok(!other || (/^[AB] /.test(other.group) && other.group.slice(2) === p.group.slice(2) && other.name === p.name), `${r.id}: ${other?.id} and ${p.id}`);
+      messages.set(r.id, p);
       const status = 0xb0 + profile.variables.channel - 1;
       const values = p.type === 'choice' ? [p.choices[0], p.choices.at(-1)].map((c) => [c.id, c.value]) : [[p.range.min, p.range.min], [p.range.max, p.range.max]];
       for (const [value, wire] of values) {
         const compiled = localCompileParameter(profile, { parameterId: p.id, value });
         assert.ok(compiled.ok, `${p.id}: ${compiled.error}`);
-        const expected = r.lsbController !== undefined ? [[r.controller, wire >> 7], [r.lsbController, wire & 127]] : [[r.controller, wire]];
+        const expected = r.kind === 'nrpn' ? [[0x63, r.parameterMsb], [0x62, r.parameterLsb], [0x06, wire]]
+          : r.lsbController !== undefined ? [[r.controller, wire >> 7], [r.lsbController, wire & 127]] : [[r.controller, wire]];
         assert.equal(lines(compiled), expected.map(([cc, v]) => hex([status, cc, v])).join('\n'), `${p.id} = ${value}`);
       }
     }
     assert.ok(profile.tests.length > 0);
-    for (const t of profile.tests) assert.equal(lines(localCompileParameter(profile, { parameterId: t.parameter, value: t.value })), t.expectedHex, t.name);
+    for (const t of profile.tests.filter((x) => x.parameter)) assert.equal(lines(localCompileParameter(profile, { parameterId: t.parameter, value: t.value })), t.expectedHex, t.name);
   });
 
   test(`${profile.id}: the source is Behringer's guide, and nobody has tried it on an instrument`, () => {
@@ -216,4 +222,47 @@ test('the JT-4000 Micro, PRO-VS Mini, CZ-1 Mini and JN-80: values in a name, a r
   assert.equal(jn.parameters.length, 63);
   assert.equal(jn.parameters.some((p) => /^(Volume|Expression|Undefined)$/.test(p.name)), false);
   assert.ok(jn.authoringNotes.some((n) => /only have their MIDI standard meaning here: CC 0 Bank Select/.test(n)));
+});
+
+test('the line tables: cells split at gaps, columns where the rows\' cells line up, a blank cell', () => {
+  assert.deepEqual(cellsOf(line(1, 10, [56, '0'], [125, '13'], [202, 'SW'], [299, '0-6'], [344, 'Sub'], [361, 'Osc'], [380, 'Mode']).words).map((c) => c.text), ['0', '13', 'SW', '0-6', 'Sub Osc Mode']);
+  const rows = readLineTables([
+    line(36, 470, [67, 'Byte'], [123, 'Group'], [172, 'Menu'], [242, 'Parameter'], [274, 'Name'], [331, 'Range'], [448, 'Notes']),
+    line(36, 487, [66, '16'], [183, 'PROGRAM'], [243, 'WAVETB'], [350, '0-127'], [391, 'Wavetable']),
+    line(36, 533, [66, '19'], [141, 'A'], [186, 'TUNING'], [243, 'DETU'], [350, '0-9'], [391, 'Sub'], [408, 'Osc'], [427, 'Detuning']),
+    line(36, 548, [66, '20'], [141, 'A'], [186, 'TUNING'], [243, 'MO'], [350, '0-1'], [391, 'Mod']),
+    line(36, 600, [48, 'Notes:']),
+  ], [{ kind: 'preset', header: ['Byte', 'Group', 'Menu'], columns: ['byte', 'group', 'menu', 'name', 'range', 'notes'] }]);
+  assert.deepEqual(rows.map((r) => [r.byte, r.group, r.menu, r.name, r.range, r.notes]), [
+    ['16', undefined, 'PROGRAM', 'WAVETB', '0-127', 'Wavetable'],
+    ['19', 'A', 'TUNING', 'DETU', '0-9', 'Sub Osc Detuning'],
+    ['20', 'A', 'TUNING', 'MO', '0-1', 'Mod'],
+  ]);
+});
+
+test('the WAVE: Pull from the edit buffer, both groups on one set of controllers, misprints corrected', () => {
+  const wave = builtProfile('behringer-wave');
+  assert.equal(localCompileDeviceRequest(wave, { request: 'requestEditBuffer' }).transaction?.encodedValueHex ?? localCompileDeviceRequest(wave, { request: 'requestEditBuffer' }).hex, 'F0 00 20 32 00 01 39 00 74 07 F7');
+  const t = wave.tests.find((x) => x.kind === 'dumpParse');
+  assert.equal(t.inputHex.split(' ').length, 134, '10 bytes of header, the version, 121 bytes, the checksum, F7');
+  const parsed = localParseDumpMessage(wave, t.inputHex);
+  assert.ok(parsed.ok, parsed.error);
+  for (const [id, value] of Object.entries(t.expectedValues)) assert.equal(parsed.values[id], value, id);
+  const bytes = t.inputHex.split(' ');
+  bytes[132] = bytes[132] === '7E' ? '7D' : '7E';
+  assert.equal(localParseDumpMessage(wave, bytes.join(' ')).ok, false, 'a wrong checksum');
+  const a = param(wave, 'A Analog', 'Filter Frequency');
+  const b = param(wave, 'B Analog', 'Filter Frequency');
+  assert.equal(send(wave, a, 64), 'B0 4A 40');
+  assert.equal(send(wave, b, 64), 'B0 4A 40', 'the same controller: Group Select chooses');
+  assert.deepEqual(wave.dumpDefinitions[0].mappings.filter((m) => [a.id, b.id].includes(m.parameter)).map((m) => m.offset), [39, 90]);
+  assert.equal(send(wave, param(wave, 'A Digital', 'Sub Osc Mode'), 6), 'B0 63 00\nB0 62 0D\nB0 06 06', 'NRPN 0:13, its value on CC 6');
+  assert.deepEqual(param(wave, 'A Tuning', 'Env3 -> Main Osc Pitch').range, { min: 0, max: 9 }, 'printed 0-1');
+  assert.equal(param(wave, 'B Digital', 'Sub Osc Mode').range.max, 6, 'printed 0-3');
+  assert.equal(wave.dumpDefinitions[0].mappings.find((m) => m.parameter === param(wave, 'A Tuning', 'Voice 8 - Semi Offset').id).offset, 31);
+  assert.equal(send(wave, param(wave, 'A Tuning', 'Voice 8 - Semi Offset'), 10), 'B0 63 00\nB0 62 28\nB0 06 0A', 'NRPN 0:40, printed SEMIT V7');
+  assert.deepEqual(param(wave, 'Global', 'Group Select').choices.map((c) => c.label), ['A', 'B', 'A+B']);
+  assert.equal(param(wave, 'A Analog', 'Mod Wheel Position').access.canWrite, false);
+  assert.equal(wave.parameters.some((p) => /Speed/.test(p.name)), false, 'BPM, 40 - 240, left out');
+  assert.deepEqual(wave.startup.sync, [{ request: 'requestEditBuffer' }]);
 });

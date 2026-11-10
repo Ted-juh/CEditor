@@ -38,9 +38,11 @@ have none at all.
 | Step | File | What it does |
 | --- | --- | --- |
 | 1 | `read-behringer-cc.mjs` | A guide's controller table → its rows as printed: CC, hex, name (or the PRO-800's coarse, fine, stepped and MIDI standard columns), range, value bands. Decides nothing. |
+| 1 | `read-behringer-tables.mjs` | A manual's tables that print a row a line (the Wave's controllers, NRPNs and preset bytes) → their rows as printed. |
 | 2 | `import-behringer.mjs` | Writes `tables/<name>.json`: those, with the document's name, SHA-256 and address. **This is what is committed.** |
 | 3 | `synths/<name>.mjs` | The layout: the document, the pages the table is on, the rows the guide prints wrongly. |
 | 4 | `build-behringer-profile.mjs`, `make-profiles.mjs` | Transcription + layout → `CE/profiles/test/<id>.ceditor-device.json`. |
+| 4 | `build-behringer-dump-profile.mjs` | The same for a manual that prints its preset's bytes: every parameter written, and read back. |
 
 ```bash
 node tools/profiles/behringer/import-behringer.mjs ub-1-micro QSG_BE_0722-ABS_UB-1-MICRO_2025-04-02_Rev.0.pdf
@@ -109,6 +111,34 @@ printed `OSC A Saw` as CC 48 is, between Saw and Square (`OSC A Tri`), and CC 52
 B …`; the PRO-VS Mini's CC 118, printed `Voice C Coarse Tuning` as CC 117 is (Voice D's: the fine
 tunings are A - D); the CZ-1 Mini's CC 14, printed `DCO WF2` between `DCO 1 WF1` and `DCO 1 DCW`.
 
+## The WAVE
+
+The WAVE's manual is the one Behringer document here that says how to read a sound back. Its MIDI
+chapter has three tables, each a row a line: the controllers (`Control #  Range  Function  Transmit
+Receive  Remarks`), the NRPNs (`MSB  LSB  14-bit  Parameter Name  Range  Notes`) and the preset's
+bytes (`Byte  Group  Menu  Parameter Name  Range  Notes`), and a SysEx section with a request for the
+edit buffer (`F0 00 20 32 00 01 39 00 74 07 F7`) answered by its 121 bytes, a version byte before
+them and a checksum after (`(D0 + … + Dn) & 7F`). `read-behringer-tables.mjs` reads the tables: the
+headers are repeated on each page, the titles are not over their columns (`Notes` stands 90 points
+right of the notes), so the columns are where the rows' cells line up.
+
+Every preset byte is a parameter, named by its notes (`Filter Frequency`), grouped by its group and
+menu (`A Analog`), and sent as the controller whose function is its printed name (`VCF-CUTOFF`, CC
+74), or else the NRPN of that name (`UW`, NRPN 0:12, its value on CC 6 as the manual's data change
+commands show). The name and the mod wheel's position have neither and are read back only. The NRPNs
+that are not preset bytes are the instrument's settings and the arpeggiator's. Pull asks for the
+edit buffer on connect and reads all 106 bytes.
+
+Group A and group B are sent on the same controllers: the WAVE applies one to the group its Group
+Select (CC 31: A, B, A+B) chooses, so a panel editing B's sound sets Group Select to B first. Pull
+reads both groups as they are. The WAVE takes sound parameters only when PAR-COM, in its MIDI
+settings, is 2 or 3.
+
+Corrected by the layout, and named in the profile: A's `EO`, printed 0 - 1 where B's and the NRPN's
+are 0 - 9; B's `SW`, printed 0 - 3 where A's and the NRPN's are 0 - 6; the last semitone offset,
+printed `SEMIT V7` in both groups, its notes `Voice 8`. Left out: the arpeggiator's speed (NRPN 0:46,
+40 - 240, `MSB/LSB` with no word on how the value is split).
+
 ## The profiles
 
 | Profile | Read from | Rows | Parameters | 14-bit pairs | Choices | Rows corrected |
@@ -123,16 +153,17 @@ tunings are A - D); the CZ-1 Mini's CC 14, printed `DCO WF2` between `DCO 1 WF1`
 | `behringer-pro-vs-mini` | PRO-VS MINI Quick Start Guide, p. 86 | 34 | 33 | 0 | 1 | 118 |
 | `behringer-spice` | SPICE Quick Start Guide, p. 21 | 17 | 11 | 6 | 5 | — |
 | `behringer-ub-1-micro` | UB-1 MICRO Quick Start Guide, pp. 40 - 41 | 44 | 42 | 0 | 13 | 25, 106 |
+| `behringer-wave` | WAVE User Manual, pp. 34 - 38, and its SysEx section | 189 | 122 | 0 | 2 | bytes 22, 31, 82, 106 |
 
-None reads anything back: the guides publish no SysEx format for a sound, so there is no Pull. A
-panel follows the instrument through the controllers it sends when its knobs are turned, where its
-MIDI settings send them.
+Only the WAVE reads anything back: the guides publish no SysEx format for a sound, so the others
+have no Pull. A panel follows them through the controllers they send when their knobs are turned,
+where their MIDI settings send them.
 
 ## What is left out, and what would read it
 
 | Left out | Where | What would read it |
 | --- | --- | --- |
-| The Wave | its manual's CC and NRPN tables (ranges and a remark on every row) and its preset dump | the reader, with `Control #` as a CC head and `Function`/`Remarks` placed; an NRPN table reader (`MSB  LSB  14-bit`); the preset's byte table and the edit buffer request (`74 07`, answered `74 08`) for a Pull |
+| The WAVE's arpeggiator speed, its wavetables and sequences | NRPN 0:46 (40 - 240, `MSB/LSB` unexplained); the wavetable and sequencer dumps (`74 0F`, 7-in-8 packed PCM) | the instrument, for the speed; the sequencer dump's byte table, read as the preset's is |
 | The PolyEight | its manual's NRPN mappings (ranges up to 65535) and SysEx preset dump | an NRPN table reader and 14-bit NRPN values; the dump's structure for a Pull |
 | The DeepMind 12, 6, 12D, 12X | the DeepMind 12 manual's NRPN chapter (the reader finds no CC header there) | an NRPN table reader for its shape |
 | The JN-80's values | its quick start guide's three tables side by side, with values (`0 = Off  64 = On`); the manual's table, read here, prints none | the reader with one header over three tables |

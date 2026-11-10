@@ -4408,6 +4408,7 @@ int main (int argc, char** argv)
         root.getChildFile ("behringer-pro-vs-mini.ceditor-device.json"),
         root.getChildFile ("behringer-spice.ceditor-device.json"),
         root.getChildFile ("behringer-ub-1-micro.ceditor-device.json"),
+        root.getChildFile ("behringer-wave.ceditor-device.json"),
         root.getChildFile ("arturia-matrixbrute.ceditor-device.json"),
         root.getChildFile ("arturia-microfreak.ceditor-device.json"),
         root.getChildFile ("arturia-minifreak.ceditor-device.json"),
