@@ -139,6 +139,36 @@ are 0 - 9; B's `SW`, printed 0 - 3 where A's and the NRPN's are 0 - 6; the last 
 printed `SEMIT V7` in both groups, its notes `Voice 8`. Left out: the arpeggiator's speed (NRPN 0:46,
 40 - 240, `MSB/LSB` with no word on how the value is split).
 
+## The DeepMind 12
+
+Its manual's chapter 17 is a table of every parameter's NRPN (`MSB  LSB  14-bit  Parameter Name  Range
+Notes`), 242 of them, most 0 - 255, and its chapter 19 an edit buffer request (`F0 00 20 32 20 <dev>
+03 F7`) answered with the program data, `each parameter … in its own byte`, in NRPN order, `packed MS
+bit` seven bytes in eight. The table is read by the same line-table reader as the WAVE's; a note set
+over two lines around its row (`Normal (0), Fingered (1) …`) is the row's, and a long name set close
+to its range (`OSC 1 Aftertouch > Pitch Mod Depth 0-255`) is split where the range column starts.
+
+Each row is its NRPN, the value 14 bits on data entry (CC 6, then CC 38), as the manual's sequence
+`B0 63 aa 62 bb 06 cc 26 dd` shows. A list in the notes that covers the range (`Sine (0), Triangle (1)
+…`, `0 ( OSC1+2), 1 (OSC 1 Only)`) is a choice; a scale (`-128 (0) to +127 (255)`, `20 bpm (0) to 275
+bpm (255)`, `1 to 6 Octaves`) is how the value is shown; the lists printed as a pattern (LFO Mono
+Mode's `SPREAD-1(2) to SPREAD-254(255)`, Arp Pattern's `Preset-1 (1) ... User-32 (64)`) are spelt out
+by the layout. A run (`FX 1 Params`, LSB `39 - 50`) is a parameter each. The program name is read
+back only. Pull asks for the edit buffer on connect; each parameter is the byte its 14-bit number
+gives.
+
+Two things are inferred, and the profile says so. The manual says 242 bytes are packed into 278, and
+278 bytes carry 243: 243 are unpacked and the last, not in the table, is not read. And its diagram of
+the packing does not number the bits: the top bit of the first of seven bytes is read from the
+lowest bit of the eighth, as Korg's identical diagram is.
+
+Corrected by the layout, and named in the profile: each envelope's fourth curve, printed `Attack
+Curve` a second time where its Release Curve belongs (61, 70, 79); FX 2's and 3's output gains,
+printed `—`, 0 - 150 as FX 1's and 4's; LFO 1's Mono Mode, printed 0 - 1, 0 - 255 as its notes and LFO
+2's are. Left as numbers with their reference: the modulation matrix's sources and destinations, the
+FX types and connection modes, the clock dividers and the program categories, whose lists the
+manual names (`See FX Type list`) and does not print.
+
 ## The profiles
 
 | Profile | Read from | Rows | Parameters | 14-bit pairs | Choices | Rows corrected |
@@ -146,6 +176,7 @@ printed `SEMIT V7` in both groups, its notes `Voice 8`. Left out: the arpeggiato
 | `behringer-aks-mini` | AKS MINI Quick Start Guide, p. 56 | 7 | 6 | 0 | 1 | — |
 | `behringer-cz-1-mini` | CZ-1 MINI Manual, pp. 57 - 59 | 94 | 92 | 0 | 0 | 14 |
 | `behringer-d-mini` | D MINI Quick Start Guide, p. 47 | 13 | 12 | 0 | 2 | 40 |
+| `behringer-deepmind-12` | DeepMind 12 User Manual, pp. 136 - 139, and its SysEx chapter | 182 | 226 | 0 | 38 | 5, 61, 70, 79, 219, 220 |
 | `behringer-jn-80` | JN-80 Manual, pp. 13 - 14 | 128 | 63 | 0 | 0 | — |
 | `behringer-jt-4000-micro` | JT-4000 MICRO Quick Start Guide, p. 27 | 26 | 25 | 0 | 1 | — |
 | `behringer-jt-mini` | JT MINI Quick Start Guide, pp. 58 - 59 | 15 | 14 | 0 | 2 | — |
@@ -155,7 +186,7 @@ printed `SEMIT V7` in both groups, its notes `Voice 8`. Left out: the arpeggiato
 | `behringer-ub-1-micro` | UB-1 MICRO Quick Start Guide, pp. 40 - 41 | 44 | 42 | 0 | 13 | 25, 106 |
 | `behringer-wave` | WAVE User Manual, pp. 34 - 38, and its SysEx section | 189 | 122 | 0 | 2 | bytes 22, 31, 82, 106 |
 
-Only the WAVE reads anything back: the guides publish no SysEx format for a sound, so the others
+Only the WAVE and the DeepMind 12 read anything back: the guides publish no SysEx format for a sound, so the others
 have no Pull. A panel follows them through the controllers they send when their knobs are turned,
 where their MIDI settings send them.
 
@@ -165,7 +196,8 @@ where their MIDI settings send them.
 | --- | --- | --- |
 | The WAVE's arpeggiator speed, its wavetables and sequences | NRPN 0:46 (40 - 240, `MSB/LSB` unexplained); the wavetable and sequencer dumps (`74 0F`, 7-in-8 packed PCM) | the instrument, for the speed; the sequencer dump's byte table, read as the preset's is |
 | The PolyEight | its manual's NRPN mappings (ranges up to 65535) and SysEx preset dump | an NRPN table reader and 14-bit NRPN values; the dump's structure for a Pull |
-| The DeepMind 12, 6, 12D, 12X | the DeepMind 12 manual's NRPN chapter (the reader finds no CC header there) | an NRPN table reader for its shape |
+| The DeepMind 6, 12D and 12X | quick start guides only; the DeepMind 12's manual is the one with the table | each's own manual, or the instrument: the 12D and 12X are presumably the 12's, the 6 is not |
+| The DeepMind 12's lists | the mod matrix sources and destinations, FX types and routings, clock dividers, program categories: named, not printed | the instrument's screens, or another document of Behringer's |
 | The JN-80's values | its quick start guide's three tables side by side, with values (`0 = Off  64 = On`); the manual's table, read here, prints none | the reader with one header over three tables |
 | What a range means on the panel | every profile (`0 - 99`: the controller's values, or the display's?) | the instrument: sending 99 and 127 and looking |
 | Settings by SysEx | Model D, Poly D, Odyssey, Wasp Deluxe, Cat, Crave, Grind, MS-1, MonoPoly, VC340, Neutron | nothing to do: they set the instrument's MIDI and calibration, not a sound |

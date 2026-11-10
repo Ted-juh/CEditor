@@ -18,6 +18,7 @@ import { readBands, readRange } from '../../../tools/profiles/behringer/build-be
 import { SYNTHS, build } from '../../../tools/profiles/behringer/make-profiles.mjs';
 import { localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 import { cellsOf, readLineTables } from '../../../tools/profiles/behringer/read-behringer-tables.mjs';
+import { readNotes } from '../../../tools/profiles/behringer/build-behringer-nrpn-profile.mjs';
 
 /* ------------------------------------------------------------------ the reader */
 
@@ -138,7 +139,7 @@ for (const { name, profile, text, out, data } of BUILT) {
       for (const [value, wire] of values) {
         const compiled = localCompileParameter(profile, { parameterId: p.id, value });
         assert.ok(compiled.ok, `${p.id}: ${compiled.error}`);
-        const expected = r.kind === 'nrpn' ? [[0x63, r.parameterMsb], [0x62, r.parameterLsb], [0x06, wire]]
+        const expected = r.kind === 'nrpn' ? [[0x63, r.parameterMsb], [0x62, r.parameterLsb], ...(r.valueResolution === 14 ? [[0x06, wire >> 7], [0x26, wire & 127]] : [[0x06, wire]])]
           : r.lsbController !== undefined ? [[r.controller, wire >> 7], [r.lsbController, wire & 127]] : [[r.controller, wire]];
         assert.equal(lines(compiled), expected.map(([cc, v]) => hex([status, cc, v])).join('\n'), `${p.id} = ${value}`);
       }
@@ -265,4 +266,37 @@ test('the WAVE: Pull from the edit buffer, both groups on one set of controllers
   assert.equal(param(wave, 'A Analog', 'Mod Wheel Position').access.canWrite, false);
   assert.equal(wave.parameters.some((p) => /Speed/.test(p.name)), false, 'BPM, 40 - 240, left out');
   assert.deepEqual(wave.startup.sync, [{ request: 'requestEditBuffer' }]);
+});
+
+test('the DeepMind\'s notes: a list covering the range, a scale, a span', () => {
+  assert.deepEqual(readNotes('Off (0), On (1)', 0, 1).choices.map((c) => c.label), ['Off', 'On']);
+  assert.deepEqual(readNotes('0 ( OSC1+2), 1 (OSC 1 Only)', 0, 1).choices.map((c) => c.label), ['OSC1+2', 'OSC 1 Only'], 'value first');
+  assert.equal(readNotes('Poly (0), Unison 2 (1), Mono 3 (2). Mono 4 (3)', 0, 3).choices.at(-1).label, 'Mono 4', 'a full stop between two');
+  assert.deepEqual(readNotes('-128 (0) to +127 (255)', 0, 255).display, { min: -128, max: 127 });
+  assert.deepEqual(readNotes('Bipolar step value -127 (1) to +127 (255). A value of 0 is "skip step".', 0, 255).display, { min: -128, max: 127 });
+  assert.deepEqual(readNotes('-48 (80) ... 0 ( 128) ... 176 (+48 )', 80, 176).display, { min: -48, max: 48 });
+  assert.deepEqual(readNotes('1 to 6 Octaves', 0, 5).display, { min: 1, max: 6 });
+  assert.deepEqual(readNotes('See FX Type list', 0, 33), {});
+  assert.equal(readNotes('Off (0), On (1)', 0, 2).choices, undefined, 'a list that does not cover the range');
+});
+
+test('the DeepMind 12: 14-bit NRPNs, its lists, Pull from the edit buffer packed seven bytes in eight', () => {
+  const dm = builtProfile('behringer-deepmind-12');
+  assert.equal(send(dm, param(dm, 'VCF', 'VCF Frequency'), 200), 'B0 63 00\nB0 62 27\nB0 06 01\nB0 26 48');
+  assert.equal(send(dm, param(dm, 'Arp', 'Arp Mode'), 'chord'), 'B0 63 01\nB0 62 1C\nB0 06 00\nB0 26 0A', 'NRPN 1:28, the 14-bit number 156');
+  assert.equal(param(dm, 'LFO 2', 'LFO 2 Mono Mode').choices.find((c) => c.value === 255).label, 'Spread-254');
+  assert.deepEqual([param(dm, 'Program', 'Program Transpose').display.min, param(dm, 'Program', 'Program Transpose').display.max], [-48, 48]);
+  assert.ok(param(dm, 'FX', 'FX 4 Param 12'), 'FX 4 Params, NRPN 1:78 - 89');
+  assert.equal(send(dm, param(dm, 'FX', 'FX 4 Param 12'), 1), 'B0 63 01\nB0 62 59\nB0 06 00\nB0 26 01');
+  assert.ok(param(dm, 'Mod Envelope', 'Mod Envelope Release Curve'), 'printed Attack Curve a second time');
+  assert.deepEqual(param(dm, 'FX', 'FX 2 Output Gain').range, { min: 0, max: 150 }, 'printed —');
+  assert.equal(localCompileDeviceRequest({ ...dm, variables: { ...dm.variables, deviceId: 3 } }, { request: 'requestEditBuffer' }).transaction?.encodedValueHex ?? localCompileDeviceRequest({ ...dm, variables: { ...dm.variables, deviceId: 3 } }, { request: 'requestEditBuffer' }).hex, 'F0 00 20 32 20 03 03 F7');
+  const t = dm.tests.find((x) => x.kind === 'dumpParse');
+  assert.equal(t.inputHex.split(' ').length, 287, '8 bytes of header, 278 packed, F7');
+  const parsed = localParseDumpMessage(dm, t.inputHex);
+  assert.ok(parsed.ok, parsed.error);
+  for (const [id, value] of Object.entries(t.expectedValues)) assert.equal(parsed.values[id], value, id);
+  assert.equal(parsed.values[param(dm, 'VCF', 'VCF Frequency').id], 130 + 39, 'a value above 127: its top bit from the packed byte');
+  assert.ok(dm.dumpDefinitions[0].mappings.every((m) => m.offset < 243));
+  assert.equal(dm.parameters.filter((p) => p.access.canWrite).length, 225);
 });
