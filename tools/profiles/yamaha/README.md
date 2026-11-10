@@ -303,6 +303,41 @@ out the span.
 The reface's control changes (MIDI Control on) are not mapped: every setting they reach is a
 parameter change here too, and the panel's CCs would be a second parameter for each.
 
+## What is left out, and what would read it
+
+The 29 profiles hold 84,481 parameters. Each profile's notes name every row it leaves out and why;
+across them, by what would close it (counts from those notes, November 2026):
+
+**The profile format** (recorded in [known issues](../../../docs/known-issues.md#device-profiles)):
+
+| Left out | Rows | Why | Would close it |
+| --- | ---: | --- | --- |
+| Effect types and parameters (`Reverb Parameter 1 MSB/LSB`, `Insertion-A Parameter 1` …) | about 5,500 | each means what the effect type selected says | a parameter set chosen by another's value, filled from the data lists' Effect Parameter lists |
+| Element and part EQ frequencies (`2 Band: 46-182, P.EQ: 83-251`) | about 1,500 | a range for each EQ type | the same |
+| Settings packed a bit each into one byte (receive and transmit switches) | about 1,250 | sending one bit sends the others | a bit-field encoding, written from the byte's last read value |
+| Drum key voice (`Voice Bank Number MSB`, `LSB`, `Voice Number`, one 3-byte change) | about 360 | three values, one message | a parameter of several fields |
+| MODX and MONTAGE parts 2 - 16; MODX M and MONTAGE M elements 9 - 128 | not counted | the same tables repeated, some 85,000 parameters a profile | a repeated group in the format |
+| Plug-in board native parameters (MOTIF ES generation) | 27 | defined by the board installed | nothing in the data list |
+
+**A reading rule here** (each a small change to `build-yamaha-profile.mjs`, checked by re-importing
+every transcription):
+
+| Left out | Rows | As printed | The rule |
+| --- | ---: | --- | --- |
+| Wave Number on the MOTIF ES generation | about 630 | `1st bit 6-0 → bit 13-7`, an arrow for the colon | read `→` as `:` |
+| Detune (part and element) | about 270 | `1st bit 3-0 → bit 7-4`, `2nd bit 3-0 → bit 3-0`: two nibbles | two-nibble values (the engines take 1 - 8 nibbles) |
+| Arpeggio Assign offsets | about 420 | `001C –` over `0164`: one two-byte range over two lines | join a range ending in `–` with the next line, as one ending in `,` is |
+| Arpeggio Assign Types | about 360 | `0000 –` over `3FFF` beside `0 – 1786: Preset, 8192 – 8447: User, 16383: No Type` | the same join; a number, the description said |
+| Scaling offsets and envelope levels (MODX, MONTAGE, MOTIF XF and others) | about 310 | `:` for a description, as the row above (Level Scaling Offset 2 - 4 under Offset 1's `-128 – +127`) | read `:` as the row above's description, as `〃` is (not for the effect parameters, whose first row says `Refer to Effect Parameter List`) |
+
+**Not settings of a sound**, left out by design: the Bulk Control headers and footers, micro tunings,
+user curves, Live Sets and Live Set names, motion and Super Knob sequences.
+
+**Not read back** (385 parameters across the profiles, all named in the notes): Mode Change, Master
+Number Select and Edit Part Select, which no block holds; rows past a block's printed size (the MODX
+M's 117, the S90 ES's 8 element settings); the YC's Live Set Sound Common, printed 1 byte where its
+table runs to `46 00 40` (48 settings each).
+
 ## Survey: what else Yamaha publishes
 
 Every data list found is read. All of them have a text layer; none needed OCR.

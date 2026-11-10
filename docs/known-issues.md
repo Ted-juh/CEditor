@@ -424,6 +424,38 @@ something the program does with every profile, which the larger library makes ea
   `startup.sync` chain. Generated profiles work around it (blocks that may not answer are read on
   request), but one unanswered block still ends the read for every block after it.
 - **The program parses every profile it finds.** `loadInternalTestProfiles` reads every file in
-  `CE/profiles/test` when a profile is first needed: about 234 MB of JSON across 108 files, the
-  largest about 9 MB. Not measured on Windows. If it is slow, load a profile's header first and its
-  parameters when it is chosen.
+  `CE/profiles/test` when a profile is first needed: about 310 MB of JSON across 169 files, the
+  largest about 9 MB (the 29 Yamaha profiles are 63 MB of it). Not measured on Windows. If it is
+  slow, load a profile's header first and its parameters when it is chosen.
+- **A setting whose meaning depends on another is left out.** Yamaha's effect parameters (`Reverb
+  Parameter 1 MSB/LSB` … `Insertion-B Parameter 32`) mean what the effect type selected says, and
+  an element's EQ frequency is printed with a range for each EQ type (`2 Band: 46-182, P.EQ:
+  83-251`). A profile parameter has one range and one meaning, so about 7,000 such rows across the
+  Yamaha profiles are not laid out, and named in each profile's notes; the microKORG's two-meaning
+  knobs above are the same gap. The data lists print the Effect Type and Effect Parameter lists that
+  would fill them. Closing it means a parameter set chosen by another parameter's value, in the
+  format and both engines, and the reader taking those lists.
+- **Several settings packed in one byte are left out.** A row such as `Receive Pitch Bend …
+  Receive Control Change`, a bit each, about 1,250 across the Yamaha profiles (a Master zone's
+  transmit switches, a part's receive switches): sending one bit means sending the others as they
+  are, which the format cannot say. Closing it means a bit-field encoding (a mask within a byte)
+  written read-modify-write from the byte's last read value, so it would need a Pull first.
+- **A setting of several values in one message is left out.** The Motif family's drum key voice is
+  one 3-byte parameter change (`Voice Bank Number MSB`, `LSB`, `Voice Number`), about 360 rows. A
+  profile parameter is one value. Closing it means a parameter of several fields sent as one
+  message, or three parameters the engine sends together.
+- **Yamaha requests and dumps are fixed to device number 1.** The parameter changes take the
+  `deviceId` variable (10H), but the bulk dump requests are written `F0 43 20 …` and the dump
+  matchers expect `F0 43 00 …`. An instrument set to another device number answers parameter
+  changes once the variable is changed, but ignores Pull, and a dump it sends is not recognised.
+  Closing it means request templates that take the variable, and a matcher byte that does
+  (`0n`, n the variable's low nibble), in both engines.
+- **Identity takes one model code.** Several Yamaha data lists print a code for each model of a
+  range (MOXF6 `4C 06`, MOXF8 `4D 06`; MODX M6/M7/M8; MONTAGE6/7/8; MOTIF6/7/8), and a profile
+  covers the range, so those profiles check no identity. Closing it means `identity.modelNumber`
+  accepting a list.
+- **A structure repeated many times is laid out once.** The MODX, MODX+, MONTAGE, MODX M and
+  MONTAGE M lay out the Performance and Part 1: the other 15 parts are the same tables a part apart,
+  some 85,000 parameters a profile in full, and the MODX M's elements 9 to 128 the same again.
+  Closing it means a repeated group in the format (a block of parameters, an address stride, a
+  count) that the engines expand when asked, rather than a profile listing every copy.

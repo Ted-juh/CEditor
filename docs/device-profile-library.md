@@ -275,9 +275,20 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **The startup read stops at the first request that is not answered.** That is why a workstation's
   optional blocks are read on request, and why a synth set to a different device ID will appear to
   answer nothing after the identity request.
-- **The library is large.** The profiles total about 234 MB, the largest workstation profiles about
+- **The library is large.** The profiles total about 310 MB, the largest workstation profiles about
   9 MB each, and the program parses every one when it first needs a profile. How long that takes on
   a typical Windows machine has not been measured.
+- **Yamaha's Pull assumes device number 1.** Parameter changes follow the `deviceId` variable, but
+  the dump requests and the dumps they answer with are written for device number 1. An instrument set
+  to another number ignores Pull whatever the variable says.
+- **Yamaha's effect settings, bit switches and drum key voices are not in the profiles.** About
+  7,000 effect parameters and EQ frequencies (each means what another setting selects), 1,250
+  settings packed a bit each into one byte, and 360 drum key voice selections (three values in one
+  message) are left out, each listed in its profile's notes. The tools' README tallies them, with
+  what would read each.
+- **The MODX and MONTAGE profiles are the Performance and Part 1.** Parts 2 to 16 are the same
+  settings at their own addresses and are not laid out; on the MODX M and MONTAGE M, an AWM2 part's
+  first 8 elements of 128.
 - **A 14-bit knob is followed from its coarse half.** A knob sent as two controllers (the Moog
   profiles' MSB and LSB) moves its control when either arrives: the coarse half on its own, the fine
   half together with the value the control already has. A fine half that arrives before any coarse
