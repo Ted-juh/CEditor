@@ -4464,7 +4464,10 @@ int main (int argc, char** argv)
         root.getChildFile ("modal-cobalt8x.ceditor-device.json"),
         root.getChildFile ("modal-craftsynth-2.ceditor-device.json"),
         root.getChildFile ("modal-element-one.ceditor-device.json"),
-        root.getChildFile ("modal-skulptsynth-se.ceditor-device.json")
+        root.getChildFile ("modal-skulptsynth-se.ceditor-device.json"),
+        root.getChildFile ("dreadbox-artemis.ceditor-device.json"),
+        root.getChildFile ("dreadbox-murmux-adept.ceditor-device.json"),
+        root.getChildFile ("dreadbox-nymphes.ceditor-device.json")
     };
 
     auto failures = 0;
