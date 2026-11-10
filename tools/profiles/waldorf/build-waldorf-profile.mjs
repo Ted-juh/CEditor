@@ -481,3 +481,277 @@ export function buildWaldorfCcProfile(data, layout) {
     ...(requests ? { requests, dumpDefinitions } : {}),
   };
 }
+
+/**
+ * What a typed byte table's brackets say a parameter's values are (the Microwave's and the Wave's):
+ * { lo, hi, choices?, shown?, list?, describe?, unsure? }.
+ *
+ *   - a leading range (`0...127`, `0-127`) is the data range; without one, the values it names;
+ *   - `see Modifier Table` is that list's names, a choice;
+ *   - values named one by one (`0=sin, 1=saw`, `0: off, 1: on`, hex `10h=-1` and `0x10=-1`, a run
+ *     counted out `1-4: random 1-4`) that name every value are a choice; naming only some (`0=off,
+ *     1=retrigger, 2...127=delay&retrig`) a number, the brackets said;
+ *   - `equals -64...+63`, `represents 1-128`, `=> -7...+7` as wide as the data range is what it shows;
+ *     narrower by a whole step (`8...120 equals -7...+7`, `0-112, in steps of 16, => 0-7`), a choice
+ *     at each step; `equals L64...M00...R63` -64 to +63;
+ *   - anything else a number, the brackets said.
+ */
+export function readValues(values, lists = {}) {
+  const v = String(values ?? '').replace(/…/g, '...').replace(/\s+/g, ' ').trim();
+  const num = (t) => (/^0x/i.test(t) ? parseInt(t, 16) : /h$/i.test(t) ? parseInt(t, 16) : Number(t));
+  const lead = /^(\d+)\s*(?:\.\.\.|-)\s*(\d+)(?![\d.]*\s*(?:=|:))/.exec(v);
+  // Values named one by one.
+  const named = [];
+  let partial = false;
+  for (const item of v.split(/\s*,\s*/)) {
+    const m = /^(0x[0-9a-f]+|[0-9a-f]+h|\d+)(?:\s*(?:\.\.\.|-)\s*(\d+))?\s*(?:=|:)\s*(.+)$/i.exec(item);
+    if (!m) continue;
+    const from = num(m[1]);
+    if (m[2] === undefined) { named.push({ value: from, label: m[3].trim() }); continue; }
+    const to = Number(m[2]);
+    const counted = /^(.*?)\s*(\d+)\s*(?:\.\.\.|-)\s*(\d+)$/.exec(m[3].trim());
+    if (counted && Number(counted[3]) - Number(counted[2]) === to - from) {
+      for (let k = 0; k <= to - from; k++) named.push({ value: from + k, label: `${counted[1]} ${Number(counted[2]) + k}`.trim() });
+    } else partial = true;
+  }
+  const values_ = named.map((n) => n.value);
+  const lo = lead ? Number(lead[1]) : values_.length ? Math.min(...values_) : null;
+  let hi = lead ? Number(lead[2]) : values_.length ? Math.max(...values_) : null;
+  // A run named in words (`1...90 equals 2...180 degree`) reaches further than the names.
+  for (const r of v.matchAll(/(\d+)\s*\.\.\.\s*(\d+)\s*(?:=|equals)/g)) if (!lead && hi !== null) { hi = Math.max(hi, Number(r[2])); partial = true; }
+  if (lo === null) return { unsure: true };
+  const out = { lo, hi };
+  const plain = v === `${lo}...${hi}` || v === `${lo}-${hi}`;
+  if (/see modifier table/i.test(v) && lists.modifiers) {
+    out.choices = lists.modifiers.filter((i) => i.value >= lo && i.value <= hi).map(({ value, label }) => ({ value, label }));
+    out.list = 'modifiers';
+    return out;
+  }
+  if (named.length) {
+    if (new Set(values_).size !== values_.length) return { ...out, unsure: true };
+    // Every value of the range named, or, with no range printed, the values named are all there are
+    // (`0=-2, 10h=-1, 20h=0`: the octaves).
+    if (!partial && (named.length === hi - lo + 1 || !lead)) {
+      out.choices = named.sort((a, b) => a.value - b.value);
+      const rest = v.split(/\s*,\s*/).filter((item) => !/^(0x[0-9a-f]+|[0-9a-f]+h|\d+)(?:\s*(?:\.\.\.|-)\s*\d+)?\s*(?:=|:)/i.test(item) && item !== `${lo}...${hi}` && item !== `${lo}-${hi}`);
+      if (rest.length) out.describe = rest.join(', ');
+      return out;
+    }
+    out.describe = `Printed: ${v}.`;
+    return out;
+  }
+  const pan = /L(\d+)\s*\.\.\.\s*(?:M0+\s*\.\.\.\s*)?R(\d+)/.exec(v);
+  const shown = /(?:equals|represents|=>)\s*(?:[A-Za-z]+\s+)*?([+-]?\d+)\s*(?:\.\.\.|-(?=\+?\d))\s*([+-]?\d+)/.exec(v);
+  if (pan && hi - lo === Number(pan[1]) + Number(pan[2])) { out.shown = { min: -Number(pan[1]), max: Number(pan[2]) }; out.describe = `Printed: ${v}.`; return out; }
+  if (shown) {
+    const [a, b] = [Number(shown[1]), Number(shown[2])];
+    const step = b > a ? (hi - lo) / (b - a) : 0;
+    const rest = v.slice(shown.index + shown[0].length).replace(/^[\s,]+/, '');
+    if (step === 1) { out.shown = { min: a, max: b }; if (rest) out.describe = `Printed: ${v}.`; return out; }
+    if (Number.isInteger(step) && step > 1) {
+      out.choices = Array.from({ length: b - a + 1 }, (_, k) => ({ value: lo + step * k, label: a < 0 && a + k > 0 ? `+${a + k}` : String(a + k) }));
+      if (rest) out.describe = rest;
+      return out;
+    }
+  }
+  if (!plain) out.describe = `Printed: ${v}.`;
+  return out;
+}
+
+/**
+ * A sound dump typed byte by byte (tables/<name>.json with `table`: the Microwave's of 1989, the
+ * Wave's) and a layout -> a profile. Every row with values is a parameter, sent as the instrument's
+ * parameter change, `F0 3E <id> <dev> <IDM> <instrument> <parameter, two nibbles> <value> <CHK> F7`, the
+ * checksum the 7-bit sum of everything after the IDM, and read back from the sound dump at its byte. A
+ * row printed without values (`Osc 2 Octave`) has those of the row it repeats: the one named the same
+ * with the number before (`Osc 1 Octave`), or else the one as far into the block before (`Wave 2
+ * startwave` and `Wave 1 wave pos` each begin theirs). `see above` and a ditto mark (`"`) are the row
+ * above's. The name is one text parameter, read back and not written; unused bytes and the valid flag
+ * are not parameters.
+ */
+export function buildWaldorfByteTableProfile(data, layout) {
+  const notes = [];
+  const skipped = new Map();
+  const skip = (why, what) => { const list = skipped.get(why) ?? []; if (!list.includes(what)) skipped.set(why, [...list, what]); };
+  const ids = new Set();
+  const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
+  const groupOf = (name) => {
+    for (const [re, group] of layout.groups ?? []) { const m = re.exec(name); if (m) return group.replace(/\$(\d)/g, (s, k) => m[Number(k)]); }
+    return 'Sound';
+  };
+  const m = layout.messages;
+  const equipment = m.equipment;
+  const recipe = { id: 'soundParameterChange', kind: 'sysex', template: ['F0', '3E', equipment, '$deviceId', m.edit, '$address', '$encodedValue', '$checksum', 'F7'], checksum: { type: 'sum-7bit', from: '$address', to: '$encodedValue' } };
+  const base0 = m.dataFrom;   // the table's number for the first data byte
+  const rows = data.table.map((r) => (layout.rows?.[r.byte] ? { ...r, ...layout.rows[r.byte], corrected: true } : r));
+  const corrected = rows.filter((r) => r.corrected).map((r) => `${r.byte} ${r.name}`);
+  // What an unprinted row repeats.
+  const valuesOf = new Map();
+  for (const [i, r] of rows.entries()) {
+    let v = r.values;
+    if (r.after === 'see above' || (v && v.includes('"'))) v = valuesOf.get(rows[i - 1]?.byte);
+    if (v === undefined && /\d/.test(r.name) && !/unused/i.test(r.name)) {
+      const n = /^(.*?)(\d+)(\b.*)$/.exec(r.name);
+      const before = `${n[1]}${Number(n[2]) - 1}`;
+      const same = rows.find((x) => x.name.toLowerCase() === `${before}${n[3]}`.toLowerCase() && x.values !== undefined);
+      const block = (prefix) => rows.find((x) => x.name.toLowerCase().startsWith(`${prefix.toLowerCase()} `) && !/^\S+ \d+ &/.test(x.name));
+      const [b2, b1] = [block(`${n[1]}${n[2]}`), block(before)];
+      const there = b2 && b1 ? rows.find((x) => x.byte === r.byte - (b2.byte - b1.byte)) : null;
+      v = same ? valuesOf.get(same.byte) : there ? valuesOf.get(there.byte) : undefined;
+    }
+    if (v !== undefined) valuesOf.set(r.byte, v);
+  }
+  const parameters = [];
+  const placed = [];
+  let nameRow = null;
+  for (const row of rows) {
+    const label = `${row.byte} ${row.name}`;
+    if (/unused/i.test(row.name)) continue;
+    if (/^valid flag$/i.test(row.name)) continue;
+    if (row.to !== undefined) { if (/ASCII/.test(row.values ?? '')) nameRow = row; continue; }
+    if (layout.leaveOut?.[row.byte]) { skip(layout.leaveOut[row.byte], label); continue; }
+    const printed = valuesOf.get(row.byte);
+    if (printed === undefined) { skip('rows printed without values, with no row they repeat', label); continue; }
+    const read = readValues(printed, data.lists);
+    if (read.unsure) { skip('rows whose values the document prints twice for one value, not guessed', `${label} (${printed})`); continue; }
+    const name = layout.names?.[row.byte] ?? row.name;
+    const group = groupOf(name);
+    const n = row.byte - base0;
+    const base = {
+      id: unique(`${camel(group)}.${camel(name)}`),
+      name,
+      group,
+      address: `${hex(m.instrument ?? 0)} ${hex(n >> 4)} ${hex(n & 15)}`,
+      access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
+      messageRecipe: recipe.id,
+    };
+    const describe = [read.describe, row.mark && layout.marks?.[row.mark]].filter(Boolean);
+    const choices = layout.choices?.[row.byte] ?? read.choices;
+    const { lo, hi, shown } = read;
+    let p;
+    if (choices) {
+      const seen = new Set();
+      const list = choices.map(({ value: v, label: l }) => { const s = slug(l); const id = seen.has(s) ? `${s}_${v}` : s; seen.add(id); return { id, label: l, value: v }; });
+      p = { ...base, ...(describe.length ? { description: describe.join(' ') } : {}), type: 'choice', default: list[0].id, choices: list, display: { mode: 'choice', shortLabel: camel(name) }, normalization: { mode: 'choiceIndex' }, encoding: { type: 'enum' }, sendPolicy: { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: list.length === 2 ? 'ToggleButton' : list.length <= 5 ? 'RadioButtonGroup' : 'Combobox' } };
+    } else {
+      const bipolar = shown && shown.min < 0 && shown.max > 0;
+      p = {
+        ...base,
+        ...(describe.length ? { description: describe.join(' ') } : {}),
+        type: bipolar ? 'bipolar' : 'integer',
+        range: { min: lo, max: hi },
+        default: bipolar ? lo - shown.min : lo,
+        display: { mode: 'number', unit: '', shortLabel: camel(name), ...(shown ? { min: shown.min, max: shown.max } : {}) },
+        normalization: { mode: 'linear' },
+        encoding: { type: 'u7' },
+        sendPolicy: hi - lo > 8 ? { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true } : { mode: 'onCommit', coalesce: true },
+        ui: { preferredComponent: /Level|Attack|Decay|Sustain|Release|Rate|Amount|Volume|Cutoff|Frequency|Resonance|Time/i.test(name) ? 'Slider' : 'Knob' },
+      };
+    }
+    parameters.push(p);
+    placed.push({ parameter: p, offset: n });
+  }
+  if (nameRow) {
+    const length = nameRow.to - nameRow.byte + 1;
+    const n = nameRow.byte - base0;
+    const p = { id: unique('sound.name'), name: 'Name', group: groupOf('Name'), description: `${length} characters from byte ${nameRow.byte} (${nameRow.values}). Read from the sound dump; not written, since a parameter change carries one character.`, type: 'text', default: '', address: `${hex(m.instrument ?? 0)} ${hex(n >> 4)} ${hex(n & 15)}`, display: { mode: 'text', shortLabel: 'name' }, encoding: { type: 'text-ascii', length, pad: 32 }, access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' }, sendPolicy: { mode: 'onCommit', coalesce: false }, messageRecipe: recipe.id, ui: { preferredComponent: 'TextInput' } };
+    parameters.push(p);
+    placed.push({ parameter: p, offset: n });
+  }
+
+  // Pull: the dump of the sound playing, `F0 3E <id> <dev> <IDM> <location> <data> <CHK> F7`, the
+  // checksum over the location and the data.
+  const d = m.dump;
+  const from = 5 + d.location;
+  const dump = {
+    id: 'soundDump',
+    name: d.name,
+    kind: 'sysex',
+    matcher: { prefix: ['F0', '3E', equipment, '$deviceId', d.idm], suffix: ['F7'] },
+    payload: { offset: from, size: d.size },
+    checksum: { type: 'sum-7bit', fromOffset: 5, toOffset: from + d.size - 1, byteOffset: from + d.size },
+    completion: { expectedMessages: 1, expectedBytes: from + d.size + 2 },
+    mappings: placed.map((x) => ({ parameter: x.parameter.id, offset: x.offset })),
+  };
+  for (const x of placed) x.parameter.access.canRead = true;
+  // A request carries its location, then the checksum of it (00 for none).
+  const sum = (bytes) => hex(bytes.reduce((t, b) => t + parseInt(b, 16), 0) & 0x7f);
+  const requests = [{ id: 'requestSound', name: m.request.name, kind: 'sysex', template: ['F0', '3E', equipment, '$deviceId', m.request.idm, ...m.request.location, sum(m.request.location), 'F7'], response: { dump: dump.id }, timeoutMs: 3000, retries: 1 }];
+
+  if (corrected.length) notes.push(`Rows the document prints wrongly, given by the layout: ${corrected.join(', ')}.`);
+  for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
+  notes.push(`Pull: ${requests[0].name}. ${placed.length} of ${parameters.length} parameters are read back.`);
+
+  const variables = { deviceId: 0, ...(layout.variables ?? {}) };
+  const tests = [];
+  const pick = [...new Set([parameters.find((p) => p.type === 'choice'), parameters.find((p) => p.type === 'bipolar'), parameters.find((p) => p.type === 'integer' && p.range.max > 1)].filter(Boolean))];
+  for (const p of pick) {
+    const choice = p.type === 'choice' ? p.choices.at(-1) : null;
+    const v = choice ? choice.value : Math.min(p.range.max, Math.max(p.range.min, 100));
+    const body = [...p.address.split(' '), hex(v)];
+    tests.push({ name: `${p.group}: ${p.name} = ${choice ? choice.label : v}`, parameter: p.id, value: choice ? choice.id : v, expectedHex: ['F0', '3E', equipment, hex(variables.deviceId), m.edit, ...body, sum(body), 'F7'].join(' ') });
+  }
+  tests.push({ name: requests[0].name, kind: 'request', request: requests[0].id, expectedHex: requests[0].template.map((b) => (b === '$deviceId' ? hex(variables.deviceId) : b)).join(' ') });
+  {
+    // A dump made by hand: every value at its lowest, but one choice at its last and one number at its
+    // highest, the name `INIT`, the valid flag where the document puts one, the checksum worked out.
+    const bytes = new Array(d.size).fill(0);
+    const expected = {};
+    for (const x of placed) {
+      const p = x.parameter;
+      if (p.type === 'text') { 'INIT'.padEnd(p.encoding.length, ' ').split('').forEach((c, k) => { bytes[x.offset + k] = c.charCodeAt(0); }); expected[p.id] = 'INIT'; continue; }
+      bytes[x.offset] = p.type === 'choice' ? p.choices[0].value : p.range.min;
+    }
+    const valid = rows.find((r) => /^valid flag$/i.test(r.name));
+    if (valid) bytes[valid.byte - base0] = 0x55;
+    const c = placed.find((x) => x.parameter.type === 'choice' && x.parameter.choices.length > 2);
+    const n = placed.find((x) => x.parameter.type === 'integer' && x.parameter.range.max > 1);
+    if (c) { bytes[c.offset] = c.parameter.choices.at(-1).value; expected[c.parameter.id] = c.parameter.choices.at(-1).id; }
+    if (n) { bytes[n.offset] = n.parameter.range.max; expected[n.parameter.id] = n.parameter.range.max; }
+    const location = new Array(d.location).fill(0);
+    const total = [...location, ...bytes].reduce((t, b) => t + b, 0) & 0x7f;
+    tests.push({ name: `${dump.name}, read back`, kind: 'dumpParse', inputHex: ['F0', '3E', equipment, hex(variables.deviceId), d.idm, ...[...location, ...bytes, total].map(hex), 'F7'].join(' '), expectedValues: expected });
+  }
+
+  const doc = data.sources[0];
+  return {
+    schemaVersion: 1,
+    profileVersion: layout.profileVersion ?? '0.1.0',
+    minCEditorVersion: '0.9.0',
+    id: layout.id,
+    name: layout.name,
+    manufacturer: 'Waldorf',
+    family: layout.family,
+    status: 'experimental',
+    trust: 'local',
+    description: layout.description,
+    sources: [{ type: 'manual', title: doc.title, notes: `The sound dump's byte table and its lists read by tools/profiles/waldorf/read-waldorf-text.mjs from ${doc.file} (sha256 ${doc.sha256}), ${doc.url}. Not yet checked against the instrument itself.` }],
+    testedWith: [],
+    authoringNotes: [
+      'Generated by tools/profiles/waldorf/make-profiles.mjs; edit the layout in tools/profiles/waldorf/synths/, not this file.',
+      'Every parameter is a byte of the document\'s sound dump, with its printed name. Nothing here has been sent to a real instrument yet.',
+      `Parameter change: F0 3E ${equipment} <dev> ${m.edit} <instrument> <parameter, two nibbles> <value> <CHK> F7, the parameter its byte in the sound dump (0 - ${d.size - 1}), CHK the 7-bit sum of the bytes after ${m.edit}. <dev> is the deviceId variable, the instrument's Device Number (0 unless set otherwise); its dumps are matched by it too.`,
+      'No identity check: the document prints no identity reply.',
+      ...(layout.notes ?? []),
+      ...notes,
+    ],
+    variables,
+    coverage: {
+      singleParameterWrite: 'complete-for-the-document\'s-sound-dump',
+      realtimeEditing: 'complete-for-the-document\'s-sound-dump',
+      editBufferDumpRequest: 'complete: the sound playing',
+      editBufferDumpParse: `complete: ${placed.length} of ${parameters.length} parameters`,
+      bankDump: 'notImplemented',
+      inboundControllers: 'parameter changes the instrument sends are read by byte; its control changes are not mapped',
+      verifiedOnHardware: false,
+      ...(layout.coverage ?? {}),
+    },
+    timing: { minDelayBetweenMessagesMs: layout.delayMs ?? 0 },
+    messageRecipes: [recipe],
+    parameters,
+    tests,
+    requests,
+    dumpDefinitions: [dump],
+    startup: { policy: 'pull', syncDirection: 'pull', sync: requests.map((r) => ({ request: r.id })) },
+  };
+}

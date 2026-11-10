@@ -16,8 +16,8 @@ instruments edited by control change. Every document below has a text layer; non
 | --- | --- | --- | --- |
 | Blofeld (desktop and keyboard) | Blofeld System Exclusive Specifications, software release 1.04 (35 pages) | the Blofeld pages, `s/ybExJgT4TzqT8ir` | every sound parameter by index (0 - 382), its range and value list; a parameter change a parameter (SNDP); the sound dump (SNDD, 383 bytes) and its request (SNDR); the global dump; identity |
 | Microwave II, XT, XTk | Microwave 2 System Exclusive Specifications, software release 2.16 (26 pages) | Legacy, Microwave II/XT/XTk, Documentation zip | the same form as the Blofeld's, its ancestor: sound, multi, wave, wavetable, global and display messages |
-| Microwave (1989) | MicrowaveSysex 1.0 and 2.0, and their 1.25 and 2.00 addenda (plain text) | Legacy, Microwave, Documentation zip | the Microwave's dumps and parameter changes by operating system |
-| Wave | Waldorf Wave System Exclusive Description, OS 1.400 (19 pages), and a MIDI implementation chart | Legacy, Wave, Documentation zip | the Wave's dumps and parameters |
+| Microwave (1989) | MicrowaveSysex 1.0 and 2.0, and their 1.25 and 2.00 addenda (plain text) | Legacy, Microwave, Documentation zip, `s/weTqE3SkZzocxYe` | the sound dump (BPRD) byte by byte, its request (BPRR), the real-time sound edit (RTBP); the arrangement, wave, table and global messages |
+| Wave | Waldorf Wave System Exclusive Description, OS 1.400 (19 pages), and a MIDI implementation chart | Legacy, Wave, Documentation zip, `s/ytFDr27HtKRYBia` | the Soundprogram dump (SBPR) byte by byte, its request (RQBPR), the sound parameter dump (SBPRPAR); performance, wave, table and global dumps |
 | Pulse, Pulse+ | User's Manual Pulse • PulsePlus, version 2.0 (68 pages): controller assignments (appendix B, pp. 58 - 60), SysEx (appendix C, pp. 61 - 67); also a System Exclusive Format 1.1 sheet | Legacy, Pulse series, Documentation zip (`Documentation EN/Manual_v2_0_eng.pdf`) | every sound parameter's controller and its byte in the program dump; the program dump's request by number |
 | micro Q (Omega, lite, keyboard) | User's Manual (158 pages): MIDI Controller list p. 152, implementation chart p. 156 | Legacy, micro Q series, Documentation zip | controllers only; its SysEx format is not in the zip |
 | Iridium, Iridium Core, Iridium MK2, STVC, Rocket, Streichfett, Zarenbourg | each instrument's manual | its product or Legacy page | to be read for their controller charts |
@@ -46,6 +46,7 @@ which for the Blofeld's edit buffer is `7F`, the value always accepted.
 | --- | --- | --- |
 | 1 | `read-waldorf-sysex.mjs` | A specification's pages → its sound data table, value lists, effect parameters and messages, as printed. Decides nothing. |
 | 1 | `read-waldorf-cc.mjs` | A manual's controller chart, or the Pulse's numbered tables and lists, → their rows as printed. Decides nothing. |
+| 1 | `read-waldorf-text.mjs` | A sound dump typed byte by byte (the Microwave's text file, the Wave's PDF) and its modifier table → the rows as printed. Decides nothing. |
 | 2 | `import-waldorf.mjs` | Writes `tables/<name>.json`: those, with the document's name, SHA-256 and address. **This is what is committed.** |
 | 3 | `synths/<name>.mjs` | The layout: the document, the rows the reader cannot split, the choices the specification describes in words, the groups. |
 | 4 | `build-waldorf-profile.mjs`, `make-profiles.mjs` | Transcription + layout → `CE/profiles/test/<id>.ceditor-device.json`. |
@@ -99,9 +100,11 @@ sound dump's data indices and what its checksum covers, the edit buffer's locati
 | `waldorf-blofeld` | Blofeld System Exclusive Specifications 1.04 | 258 | 97 | the Sound mode edit buffer, every parameter read back |
 | `waldorf-microwave-2` | Microwave 2 System Exclusive Specifications 2.16 (Microwave II, XT, XTk) | 203 | 84 | the Sound mode edit buffer, every parameter read back |
 | `waldorf-microq` | microQ Omega/lite/Keyboard User's Manual, controller chart pp. 151 - 155 | 103 | 16 | none: no SysEx format published |
+| `waldorf-microwave` | Microwave System Exclusive Documentation, system software 2.00 | 151 | 57 | the sound playing, every parameter read back |
 | `waldorf-pulse` | User's Manual Pulse • PulsePlus 2.0, appendices B and C | 68 | 22 | a stored program by number, every parameter read back |
 | `waldorf-rocket` | Rocket User's Manual, controller chart p. 34 | 19 | 7 | none |
 | `waldorf-streichfett` | Streichfett Reference Manual, controller chart p. 21 | 17 | 5 | none |
+| `waldorf-wave` | Wave System Exclusive Description, OS 1.400 | 225 | 88 | instrument 1's sound, every parameter read back |
 
 Left out of the Blofeld's: the arpeggiator's 16 steps (32 bytes of bit fields with no lists), the
 global parameters (a dump, with no parameter change), and the other Multi instruments' sounds (the
@@ -135,8 +138,8 @@ first value of it sent (`serial/parallel`: 0, 64), as the Moog profiles do.
 Not laid out: the micro Q's Glide Mode and filter types (numbers here; the manual lists their values
 in its chapters, not the chart), and the Rocket's alternative assignment. The Iridium, Iridium Core
 and Quantum have no fixed controller map (the user assigns each controller, and they ignore incoming
-NRPN), and the STVC's manual is German only: none of them has a profile. Still to read: the Wave and
-the Microwave of 1989 (their SysEx descriptions), and the Zarenbourg, whose manual prints no chart.
+NRPN), and the STVC's manual is German only: none of them has a profile. The Zarenbourg's manual
+prints no chart, and has none either.
 
 ## The Pulse
 
@@ -165,3 +168,54 @@ mode messages are left out by name, as on the other charts.
 
 The manual's System Exclusive Format 1.1 sheet, the older document, prints the same program dump;
 the manual is read because it has the controllers too.
+
+## The Microwave (1989) and the Wave
+
+Their System Exclusive documents predate the Blofeld's tables: the sound dump is typed out byte by
+byte, a byte number (or a run, `153-168`), the parameter's name and its values in brackets
+(`read-waldorf-text.mjs`). The Microwave's is a plain-text file; the Wave's a PDF of the same kind,
+read through `pdftotext -layout`. Brackets run onto the lines below while they are open, even onto
+one that starts with a number (the Wave's `12 means global. )`); brackets with no number in them are
+the name's (`Filter Resonance (Q)`). The Microwave marks the rows its system software 2.0 changed:
+`*` new, `+` a wider range; each such parameter says so.
+
+What the brackets say (`readValues`):
+
+- values named one by one (`0=sin, 1=saw`, `0: off, 1: on`) naming every value of the range are a
+  choice, and so are those named with no range printed, which are all there are (the octaves, `0=-2,
+  10h=-1, 20h=0, 30h=+1, 40h=+2`, in hex); a run counted out (`1-4: random 1-4`) is a name each; a run
+  named in words (`2...127=delay&retrig`) leaves the parameter a number, the brackets said;
+- `see Modifier Table` is that table, as far as the range goes (the Microwave's 24 sources, the
+  Wave's 39);
+- `equals -64...+63`, `represents 1-128`, `=> -7...+7`, as wide as the data range, is what the values
+  show; narrower by a whole step (`0...112, in steps of 16, => 0...7`, `8...120 equals -7...+7`), a
+  choice at each step; `equals L64...M00...R63` is -64 to +63;
+- a row printed without values (`Osc 2 Octave`) has those of the row it repeats: the one named the
+  same with the number before (`Osc 1 Octave`), or else the one as far into the block before (`Wave 2
+  startwave` and `Wave 1 wave pos` each begin theirs); `see above` and a ditto mark are the row
+  above's;
+- the name (`Sound Name`, `Name`, ASCII) is one text parameter, read back and not written; unused
+  bytes and the valid flag (always 55h) are not parameters.
+
+Both edit a sound one parameter at a time with the same message, `F0 3E <id> <dev> <IDM> <instrument>
+<parameter> <value> <CHK> F7`: the parameter its byte in the dump in two nibbles (the documents'
+`BYTE` format, high nibble first), the checksum the 7-bit sum of instrument, nibbles and value. The
+Microwave's is the Real Time BPR Edit (`00`, IDM `60`), its parameter the byte less 5; the Wave's the
+Sound Parameter dump (`03`, IDM `09`), its parameter the byte itself. Both are sent to instrument 1.
+The recipe is the shape the engine reads back as well as sends (header, address, value, checksum), so
+what the instruments send when a parameter is edited on their panels is read by byte.
+
+Pull: the Microwave answers its Sound Dump Request (`F0 3E 00 <dev> 02 00 F7`, the checksum of no data
+being 00) with the sound playing, edits and all; in Multi mode that is the last instrument selected,
+so its document says to switch to Single mode first. The Wave answers its Soundprogram Dump Request
+(`F0 3E 03 <dev> 40 00 00 F7`, instrument 1) with that instrument's sound, its location (instrument,
+bank, sound number) ahead of the data and inside the checksum. Neither document says a checksum of 7F
+is always accepted, so neither profile takes one. Neither prints an identity reply.
+
+Corrected by the layouts, each noted in the profile: the Microwave's Osc 1 Modifier 2 Source (printed
+`0...15`, without the `+` its Osc 2 row carries) and Osc 1 Modifier 2 Amount (`equals 64...+63`, the
+minus lost); the Wave's Dual mode highpass envelope select (`1: Free` for 3) and its third control
+mixer input, printed as `source 2` and `amount 2` a second time.
+
+The Microwave's profile follows the document for system software 2.00 (its 2.00 addendum is folded
+into it). An earlier Microwave has the same sound dump with narrower ranges where the rows are marked.

@@ -4374,9 +4374,11 @@ int main (int argc, char** argv)
         root.getChildFile ("waldorf-blofeld.ceditor-device.json"),
         root.getChildFile ("waldorf-microwave-2.ceditor-device.json"),
         root.getChildFile ("waldorf-microq.ceditor-device.json"),
+        root.getChildFile ("waldorf-microwave.ceditor-device.json"),
         root.getChildFile ("waldorf-pulse.ceditor-device.json"),
         root.getChildFile ("waldorf-rocket.ceditor-device.json"),
-        root.getChildFile ("waldorf-streichfett.ceditor-device.json")
+        root.getChildFile ("waldorf-streichfett.ceditor-device.json"),
+        root.getChildFile ("waldorf-wave.ceditor-device.json")
     };
 
     auto failures = 0;

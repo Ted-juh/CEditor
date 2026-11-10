@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 
 import { readText } from './support/readText.mjs';
 import { pageLines, readLists, readSoundTable, splitValueAndName } from '../../../tools/profiles/waldorf/read-waldorf-sysex.mjs';
-import { bitFieldChoices } from '../../../tools/profiles/waldorf/build-waldorf-profile.mjs';
+import { bitFieldChoices, readValues } from '../../../tools/profiles/waldorf/build-waldorf-profile.mjs';
+import { readByteTable, readIndexList } from '../../../tools/profiles/waldorf/read-waldorf-text.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/waldorf/make-profiles.mjs';
 import { localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
@@ -69,6 +70,47 @@ test('a value list, its runs, and a bit-field byte\'s parts', () => {
 
 /* ------------------------------------------------------------------ the profiles */
 
+test('a typed byte table: a row\'s brackets run on while open, a name\'s own brackets, a run of bytes', () => {
+  const lines = [
+    'BPRD', '', '            Data:',
+    '      5     Osc 1 Octave (0=-2, 10h=-1, 20h=0, 30h=+1, 40h=+2)',
+    '+    11     Osc 1 Modifier 1 Control (0...23,  "      "      " )',
+    '     16     Osc 2 Octave',
+    '     54     Wave 2 Volume (0...112), see above',
+    '     66     Filter Resonance (Q)      (0...127)',
+    '      3     Oscillator 1 bend range (16-112 in steps of 4, represents -12...+12,',
+    '                                12 means global. )',
+    '    153-168 Sound Name (16 Digits ASCII from 20h to 7fh,',
+    '                        7bit, no terminator)',
+    '    185     CHKSUM over Bytes 5...184',
+    '            Modifier Table:   0= LFO 1',
+    '*                            23= MIDI Clock Rate',
+  ];
+  const rows = readByteTable(lines, /^\s*Data:/, /CHKSUM/);
+  assert.deepEqual(rows.map((r) => r.byte), [5, 11, 16, 54, 66, 3, 153]);
+  assert.equal(rows[1].mark, '+');
+  assert.equal(rows[2].values, undefined, 'printed without values');
+  assert.deepEqual([rows[3].values, rows[3].after], ['0...112', 'see above']);
+  assert.deepEqual([rows[4].name, rows[4].values], ['Filter Resonance (Q)', '0...127']);
+  assert.equal(rows[5].values, '16-112 in steps of 4, represents -12...+12, 12 means global.', 'a line starting with a number, inside the brackets');
+  assert.deepEqual([rows[6].to, rows[6].name], [168, 'Sound Name']);
+  assert.deepEqual(readIndexList(lines, /Modifier Table:/, /^ARPR/), [{ value: 0, label: 'LFO 1' }, { value: 23, label: 'MIDI Clock Rate', marked: true }]);
+});
+
+test('what a typed table\'s brackets say a parameter\'s values are', () => {
+  assert.deepEqual(readValues('0=-2, 10h=-1, 20h=0, 30h=+1, 40h=+2').choices.map((c) => c.value), [0, 16, 32, 48, 64], 'named, no range printed: all there are');
+  assert.deepEqual(readValues('0...127, equals -64...+63').shown, { min: -64, max: 63 });
+  assert.deepEqual(readValues('0...127, equals L64...M00...R63').shown, { min: -64, max: 63 });
+  assert.deepEqual(readValues('8...120 equals -7...+7').choices.map((c) => [c.value, c.label]).filter((_, k) => k % 7 === 0), [[8, '-7'], [64, '0'], [120, '+7']], 'a step of 8, implied');
+  assert.deepEqual(readValues('0-112, in steps of 16, => 0-7').choices.at(-1), { value: 112, label: '7' });
+  assert.deepEqual(readValues('0: norm, 1-4: random 1-4,5: fixed').choices.map((c) => c.label), ['norm', 'random 1', 'random 2', 'random 3', 'random 4', 'fixed']);
+  assert.equal(readValues('0...127, 0=off, 1=retrigger, 2...127=delay&retrig').choices, undefined, 'a run named in words: a number');
+  assert.deepEqual([readValues('0=independent, 1...90 equals 2...180 degree').hi, readValues('0=independent, 1...90 equals 2...180 degree').choices], [90, undefined]);
+  assert.equal(readValues('0: Amp, 1:Filter, 2: Wave, 1: Free').unsure, true, 'a value printed twice');
+  assert.deepEqual(readValues('0-23, see modifier table', { modifiers: [{ value: 0, label: 'LFO 1' }, { value: 30, label: 'Out' }] }).choices, [{ value: 0, label: 'LFO 1' }]);
+  assert.equal(readValues('0-127, represents C-2...G9').shown, undefined, 'note names are not numbers');
+});
+
 const BUILT = await Promise.all(SYNTHS.map((name) => build(name)));
 const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
@@ -99,7 +141,15 @@ for (const { name, profile, text, out, data } of BUILT) {
   });
 
   test(`${profile.id}: every parameter is a sound parameter change at its index, at both ends of its range`, { skip: !!data.controllers }, () => {
-    const equipment = data.format.equipmentId;
+    // The Blofeld's `20 00 <HH> <PP> <value>`, or the Microwave's and Wave's `<IDM> <instrument>
+    // <nibble> <nibble> <value> <CHK>`, the checksum over the four.
+    const recipe = profile.messageRecipes[0];
+    const equipment = recipe.template[2];
+    const expected = (p, wire) => {
+      if (!data.table) return `F0 3E ${equipment} 00 20 00 ${p.address} ${hex([wire])} F7`;
+      const body = [...p.address.split(' ').map((b) => parseInt(b, 16)), wire];
+      return `F0 3E ${equipment} 00 ${recipe.template[4]} ${hex(body)} ${hex([body.reduce((t, b) => t + b, 0) & 0x7f])} F7`;
+    };
     const ids = new Set();
     for (const p of profile.parameters) {
       assert.ok(!ids.has(p.id), `${p.id} twice`);
@@ -109,7 +159,7 @@ for (const { name, profile, text, out, data } of BUILT) {
       for (const [value, wire] of values) {
         const compiled = localCompileParameter(profile, { parameterId: p.id, value });
         assert.ok(compiled.ok, `${p.id}: ${compiled.error}`);
-        assert.equal(compiled.hex, `F0 3E ${equipment} 00 20 00 ${p.address} ${hex([wire])} F7`, `${p.id} = ${value}`);
+        assert.equal(compiled.hex, expected(p, wire), `${p.id} = ${value}`);
       }
     }
   });
@@ -128,11 +178,14 @@ for (const { name, profile, text, out, data } of BUILT) {
         const parsed = localParseDumpMessage(profile, t.inputHex);
         assert.ok(parsed.ok, parsed.error);
         for (const [id, value] of Object.entries(t.expectedValues)) assert.equal(parsed.values[id], value, `${t.name}: ${id}`);
-        // The same dump with 7F for its checksum, which the specification says is always accepted.
+        // The same dump with 7F for its checksum, which the Blofeld's and Pulse's documents say is
+        // always accepted (the Microwave's and Wave's say nothing of it).
         const bytes = t.inputHex.split(' ');
+        const right = bytes[bytes.length - 2];
+        const alsoAccept = profile.dumpDefinitions.some((d) => d.checksum.alsoAccept?.includes('7F'));
         bytes[bytes.length - 2] = '7F';
-        assert.ok(localParseDumpMessage(profile, bytes.join(' ')).ok, 'a checksum of 7F is taken');
-        bytes[bytes.length - 2] = '7E';
+        if (right !== '7F') assert.equal(localParseDumpMessage(profile, bytes.join(' ')).ok, alsoAccept, alsoAccept ? 'a checksum of 7F is taken' : 'a checksum of 7F is not');
+        bytes[bytes.length - 2] = right === '7E' ? '7D' : '7E';
         assert.equal(localParseDumpMessage(profile, bytes.join(' ')).ok, false, 'another wrong one is not');
       }
     }
@@ -232,4 +285,40 @@ test('the Pulse: its controller assignments and program dump, tables by number, 
   dump[5] = '2A';
   assert.ok(localParseDumpMessage(pulse, dump.join(' ')).ok, 'any program number: the checksum starts at byte 6');
   assert.equal(pulse.parameters.some((p) => /Mod Wheel|Main Volume|Sustain Switch|Breath Control/.test(p.name)), false, 'no performance controllers');
+});
+
+test('the Microwave (1989): a real-time edit by nibbles with its checksum, rows that repeat others, the sound playing', { skip: !builtProfile('waldorf-microwave') }, () => {
+  const mw = builtProfile('waldorf-microwave');
+  const at = (name) => mw.parameters.find((p) => p.name === name);
+  // LFO 1 Shape is byte 130, parameter 125 (7Dh): 07 0D, and the checksum over instrument, nibbles and value.
+  assert.equal(localCompileParameter(mw, { parameterId: at('LFO 1 Shape').id, value: 'random' }).hex, 'F0 3E 00 00 60 00 07 0D 03 17 F7');
+  assert.equal(localCompileParameter({ ...mw, variables: { ...mw.variables, deviceId: 5 } }, { parameterId: at('Osc 1 Octave').id, value: 'plus2' }).hex, 'F0 3E 00 05 60 00 00 00 40 40 F7');
+  assert.deepEqual(at('Osc 2 Octave').choices.map((c) => c.value), [0, 16, 32, 48, 64], 'printed without values: Osc 1 Octave\'s');
+  assert.deepEqual(at('Wave 2 Volume').choices.map((c) => c.value), [0, 16, 32, 48, 64, 80, 96, 112], '`(0...112), see above`');
+  assert.equal(at('Osc 1 Modifier 1 Control').choices.length, 24, 'a ditto mark: the row above\'s');
+  assert.equal(at('Osc 2 Modifier 2 Source').choices.length, 24, 'Osc 1\'s, as the layout corrects it');
+  assert.equal(at('Osc 2 Modifier 2 Amount').type, 'bipolar', '`equals 64...+63`, corrected');
+  assert.match(at('LFO 2 Phase Shift').description, /New in system software 2\.0/);
+  assert.equal(mw.parameters.some((p) => /unused|Valid/i.test(p.name)), false);
+  assert.equal(mw.startup.sync[0].request, 'requestSound', 'the sound playing, read on connect');
+  assert.equal(mw.tests.find((t) => t.kind === 'dumpParse').inputHex.split(' ').length, 187, 'bytes 0 - 186');
+});
+
+test('the Wave: a sound parameter dump by nibbles, its location in the dump, two misprints corrected', { skip: !builtProfile('waldorf-wave') }, () => {
+  const wave = builtProfile('waldorf-wave');
+  const at = (name) => wave.parameters.find((p) => p.name === name);
+  // Glide mode is byte 233 (E9h): 0E 09.
+  assert.equal(localCompileParameter(wave, { parameterId: at('Glide mode').id, value: 'fingeredglissando' }).hex, 'F0 3E 03 00 09 00 0E 09 06 1D F7');
+  assert.deepEqual(at('Dual mode highpass envelope select').choices.map((c) => [c.value, c.label]), [[0, 'Amp'], [1, 'Filter'], [2, 'Wave'], [3, 'Free']]);
+  assert.ok(at('Control mixer source 3') && at('Control mixer amount 3'), 'the second `source 2`');
+  assert.deepEqual(at('Wave 2 startwave').range, { min: 0, max: 63 }, 'Wave 1 wave pos\'s, as far into its block');
+  assert.equal(at('Lfo 2 shape').choices.length, 6);
+  assert.deepEqual(at('Oscillator 1 bend range').choices.at(-1), { id: 'plus12', label: '+12', value: 112 });
+  // Any instrument, bank and sound: the location is the dump's, and inside its checksum.
+  const dump = wave.tests.find((t) => t.kind === 'dumpParse').inputHex.split(' ');
+  assert.equal(dump.length, 266);
+  dump[6] = '01';
+  dump[7] = '05';
+  dump[264] = (parseInt(dump[264], 16) + 6 & 0x7f).toString(16).toUpperCase().padStart(2, '0');
+  assert.ok(localParseDumpMessage(wave, dump.join(' ')).ok, 'bank B, sound 6');
 });

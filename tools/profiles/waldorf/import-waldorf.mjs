@@ -1,6 +1,6 @@
-// import-waldorf.mjs — a Waldorf SysEx specification -> tools/profiles/waldorf/tables/<name>.json
+// import-waldorf.mjs — a Waldorf SysEx specification or manual -> tools/profiles/waldorf/tables/<name>.json
 //
-//   node tools/profiles/waldorf/import-waldorf.mjs <name> <spec.pdf>
+//   node tools/profiles/waldorf/import-waldorf.mjs <name> <spec.pdf|spec.txt>
 //
 // The layout (synths/<name>.mjs) names the document and where it is downloaded from.
 // read-waldorf-sysex.mjs reads its sound data table, value lists, effect parameters and messages.
@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { readControllerChart, readNumberedList, readNumberedTable } from './read-waldorf-cc.mjs';
+import { readByteTable, readIndexList, textLines } from './read-waldorf-text.mjs';
 import { documentLines, readEffects, readFormat, readLists, readSoundTable } from './read-waldorf-sysex.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -24,6 +25,20 @@ export async function loadLayout(name) {
 
 export function importDocument(layout, file) {
   const doc = layout.document;
+  // A sound dump typed byte by byte (the Microwave's and the Wave's) and the lists it refers to. The
+  // layout says where the table starts (after `from`, the dump's own heading) and ends.
+  if (layout.read?.text) {
+    const r = layout.read.text;
+    const all = textLines(file);
+    const at = r.from ? all.findIndex((l) => new RegExp(r.from).test(l)) : 0;
+    if (at < 0) throw new Error(`${file}: no line matches ${r.from}`);
+    const lines = all.slice(at);
+    return {
+      sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
+      table: readByteTable(lines, new RegExp(r.table.start), new RegExp(r.table.end)),
+      lists: Object.fromEntries(Object.entries(r.lists ?? {}).map(([k, l]) => [k, readIndexList(lines, new RegExp(l.start), new RegExp(l.end))])),
+    };
+  }
   // A manual's controller assignments and program dump, read without headings, and the lists they
   // refer to (the Pulse's appendices B and C, Tables 1 and 3).
   if (layout.read?.numbered) {
@@ -61,6 +76,9 @@ export function importDocument(layout, file) {
 /** One row per line, so a re-import that changes one row changes one line. */
 export function stringifyTranscription(data) {
   const rows = (items, indent) => (items.length ? `[\n${items.map((x) => `${indent}  ${JSON.stringify(x)}`).join(',\n')}\n${indent}]` : '[]');
+  if (data.table) {
+    return `{\n  "sources": ${rows(data.sources, '  ')},\n  "table": ${rows(data.table, '  ')},\n  "lists": {\n${Object.entries(data.lists).map(([k, v]) => `    ${JSON.stringify(k)}: ${rows(v, '    ')}`).join(',\n')}\n  }\n}\n`;
+  }
   if (data.controllers) {
     const more = data.dump ? `,\n  "dump": ${rows(data.dump, '  ')},\n  "lists": {\n${Object.entries(data.lists).map(([k, v]) => `    ${JSON.stringify(k)}: ${rows(v, '    ')}`).join(',\n')}\n  }` : '';
     return `{\n  "sources": ${rows(data.sources, '  ')},\n  "controllers": ${rows(data.controllers, '  ')}${more}\n}\n`;
@@ -86,7 +104,7 @@ async function main() {
   const data = importDocument(layout, file);
   const out = path.join(HERE, 'tables', `${name}.json`);
   writeFileSync(out, stringifyTranscription(data));
-  console.log(data.controllers ? `Wrote ${path.relative(process.cwd(), out)}: ${data.controllers.length} controllers` : `Wrote ${path.relative(process.cwd(), out)}: ${data.sound.length} sound rows, ${Object.keys(data.lists).length} value lists, ${data.effects.length} effect types`);
+  console.log(data.table ? `Wrote ${path.relative(process.cwd(), out)}: ${data.table.length} rows, ${Object.values(data.lists).map((l) => l.length).join(' + ')} list items` : data.controllers ? `Wrote ${path.relative(process.cwd(), out)}: ${data.controllers.length} controllers` : `Wrote ${path.relative(process.cwd(), out)}: ${data.sound.length} sound rows, ${Object.keys(data.lists).length} value lists, ${data.effects.length} effect types`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
