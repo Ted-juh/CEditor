@@ -2230,7 +2230,16 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         if (byteOffset + byteCount > bytes.size())
             return failForMatchedDump ("partial", "Dump checksum range is outside message", "error");
 
-        for (int i = 0; i < byteCount; ++i)
+        // A value the device takes in place of the sum (Waldorf: `A checksum of 7Fh is always
+        // accepted as valid`), one byte each, for a one-byte checksum.
+        bool accepted = false;
+        if (byteCount == 1)
+            if (const auto* also = checksum->getProperty ("alsoAccept").getArray())
+                for (const auto& value : *also)
+                    if (value.toString().getHexValue32() == bytes[byteOffset])
+                        accepted = true;
+
+        for (int i = 0; i < byteCount && ! accepted; ++i)
             if (bytes[byteOffset + i] != expected[i])
                 return failForMatchedDump ("checksumFailed",
                                            "Dump checksum failed; expected " + byteToHex (expected[i])

@@ -867,7 +867,11 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
       return failMatched('partial', 'Dump checksum range is outside message', 'error');
     }
     const got = bytes.slice(byteOffset, byteOffset + byteCount);
-    if (got.join(',') !== expected.join(',')) {
+    // A value the device takes in place of the sum (Waldorf: `A checksum of 7Fh is always accepted as
+    // valid`), one byte each, for a one-byte checksum.
+    const alsoAccept = (Array.isArray(checksum.alsoAccept) ? checksum.alsoAccept : []).map((b) => parseInt(String(b), 16));
+    const accepted = byteCount === 1 && alsoAccept.includes(got[0]);
+    if (!accepted && got.join(',') !== expected.join(',')) {
       return failMatched(
         'checksumFailed',
         `Dump checksum failed; expected ${bytesToHex(expected)} but got ${bytesToHex(got)}`,

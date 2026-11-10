@@ -1392,6 +1392,59 @@ int runCollectionEndsWithTests()
     return failures;
 }
 
+int runChecksumAlsoAcceptTests()
+{
+    // Waldorf's checksum is the data's sum masked to 7 bits, and `A checksum of 7Fh is always
+    // accepted as valid`: a dump may carry 7F instead, where the profile says so (alsoAccept). The
+    // JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const auto profile = [] (bool alsoAccept)
+    {
+        return juce::String (R"JSON({
+          "schemaVersion": 1, "id": "probe-also-accept", "name": "Probe", "manufacturer": "Probe",
+          "parameters": [
+            { "id": "level", "name": "Level", "messageRecipe": "cc7", "type": "integer",
+              "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } }
+          ],
+          "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+          "dumpDefinitions": [
+            { "id": "sound", "kind": "sysex", "matcher": { "prefix": ["F0", "3E", "13"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 2 },
+              "checksum": { "type": "sum-7bit", "fromOffset": 3, "toOffset": 4, "byteOffset": 5)JSON")
+             + (alsoAccept ? ", \"alsoAccept\": [\"7F\"]" : "")
+             + R"JSON( },
+              "completion": { "expectedBytes": 7 }, "mappings": [ { "parameter": "level", "offset": 1 } ] }
+          ]
+        })JSON";
+    };
+    auto failures = 0;
+    const auto read = [] (const juce::String& json, const juce::String& hex)
+    {
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromJson (json, error))
+            return juce::String ("load: " + error);
+        const auto parsed = engine.parseDumpMessage (hex);
+        return parsed.ok ? juce::String ((int) parsed.values.getProperty ("level", -1)) : juce::String ("refused");
+    };
+    const struct { bool alsoAccept; const char* hex; const char* expected; const char* why; } cases[] = {
+        { false, "F0 3E 13 01 40 41 F7", "64", "01 + 40 = 41: the sum" },
+        { false, "F0 3E 13 01 40 7F F7", "refused", "without alsoAccept, 7F is a wrong checksum" },
+        { true, "F0 3E 13 01 40 7F F7", "64", "with it, 7F is taken" },
+        { true, "F0 3E 13 01 40 42 F7", "refused", "and any other wrong value is still refused" },
+    };
+    for (const auto& c : cases)
+    {
+        const auto got = read (profile (c.alsoAccept), c.hex);
+        if (got != c.expected)
+        {
+            std::cerr << "[FAIL] Checksum alsoAccept: " << c.why << ": expected " << c.expected << ", got " << got << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] Checksum alsoAccept :: a value the device always accepts, and nothing else\n";
+    return failures;
+}
+
 int runCcPairTests()
 {
     const char* json = R"JSON({
@@ -4317,7 +4370,8 @@ int main (int argc, char** argv)
         root.getChildFile ("yamaha-cp40-stage.ceditor-device.json"),
         root.getChildFile ("yamaha-cp88-cp73.ceditor-device.json"),
         root.getChildFile ("yamaha-yc61.ceditor-device.json"),
-        root.getChildFile ("yamaha-yc88-yc73.ceditor-device.json")
+        root.getChildFile ("yamaha-yc88-yc73.ceditor-device.json"),
+        root.getChildFile ("waldorf-blofeld.ceditor-device.json")
     };
 
     auto failures = 0;
@@ -4329,6 +4383,7 @@ int main (int argc, char** argv)
     failures += runLsbFirstEncodingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runCcPairTests();
     failures += runCollectionEndsWithTests();
+    failures += runChecksumAlsoAcceptTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runCatalogSummaryTests (root);
