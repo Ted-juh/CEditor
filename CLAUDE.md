@@ -396,6 +396,7 @@ node tools/profiles/nord/make-profiles.mjs --check
 node tools/profiles/modal/make-profiles.mjs --check
 node tools/profiles/dreadbox/make-profiles.mjs --check
 node tools/profiles/udo/make-profiles.mjs --check
+node tools/profiles/groove/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
 ```
 

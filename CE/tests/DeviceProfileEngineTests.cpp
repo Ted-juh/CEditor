@@ -4470,7 +4470,8 @@ int main (int argc, char** argv)
         root.getChildFile ("dreadbox-nymphes.ceditor-device.json"),
         root.getChildFile ("udo-super-6.ceditor-device.json"),
         root.getChildFile ("udo-super-8.ceditor-device.json"),
-        root.getChildFile ("udo-super-gemini.ceditor-device.json")
+        root.getChildFile ("udo-super-gemini.ceditor-device.json"),
+        root.getChildFile ("groove-synthesis-3rd-wave.ceditor-device.json")
     };
 
     auto failures = 0;
