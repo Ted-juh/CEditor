@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readCommitted } from '../../scripts/readCommitted.mjs';
 import { buildAsmProfile, stringifyProfile } from './build-asm-profile.mjs';
+import { buildAsmCcProfile } from './build-asm-cc-profile.mjs';
 import { loadLayout } from './import-asm.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +25,7 @@ export const SYNTHS = readdirSync(path.join(HERE, 'synths')).filter((f) => f.end
 export async function build(name) {
   const layout = await loadLayout(name);
   const data = JSON.parse(readFileSync(path.join(HERE, 'tables', `${name}.json`), 'utf8'));
-  const profile = buildAsmProfile(data, layout);
+  const profile = layout.read === 'cc' ? buildAsmCcProfile(data, layout) : buildAsmProfile(data, layout);
   return { name, layout, data, profile, text: stringifyProfile(profile), out: path.join(PROFILE_DIR, `${layout.id}.ceditor-device.json`) };
 }
 

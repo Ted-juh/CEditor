@@ -24,10 +24,12 @@ themselves and ASM's manager.
 
 | Step | File | What it does |
 | --- | --- | --- |
+| 1 | `read-asm-cc.mjs` | An owner's manual's MIDI CC chart (`Module  Parameter  CC`, two tables side by side) → its rows as printed. |
 | 1 | `read-asm-nrpn.mjs` | The spec's table → its rows as printed: category, name, CC, NRPN MSB and LSB, comment; and the rhythm lists. Decides nothing. |
 | 2 | `import-asm.mjs` | Writes `tables/<name>.json`: those, with the document's name, SHA-256 and address. **This is what is committed.** |
 | 3 | `synths/<name>.mjs` | The layout: the document, its pages, the first row of each group, the rows the spec prints wrongly, the names a line break split. |
 | 4 | `build-asm-profile.mjs`, `make-profiles.mjs` | Transcription + layout → `CE/profiles/test/<id>.ceditor-device.json`. |
+| 4 | `build-asm-cc-profile.mjs` | The same for a CC chart: each row its controller, 0 - 127. |
 
 ```bash
 node tools/profiles/asm/import-asm.mjs hydrasynth Hydrasynth_KB_DR_MIDI_Spec_1.5.0.pdf
@@ -77,13 +79,29 @@ is, and LFO5's Smooth and Steps, both printed `VV=08H`, are 06H and 07H as on LF
 (LFOs 1 - 5) and `marco1 panel value` (the eight macros) are spelt; `BP M` and `One- Shot`, split
 by line breaks, are joined.
 
-## The profile
+## The CC charts
 
-| Profile | Read from | Rows | Parameters | Choices | NRPNs |
+The Explorer's, Deluxe's and Leviasynth's manuals print a CC chart and no NRPNs, so their profiles are
+the chart: `Module  Parameter  CC`, sorted by module, two tables side by side with the header over
+the left one only and the right one's first row beside it. Every number on a line ends a row, the two
+cells before it its module and parameter, and the left table is read before the right. The
+Explorer's chart runs onto a page whose right-hand table is the same chart sorted by number; the
+layout takes that page's left table only. Each row is its controller, 0 - 127, grouped by its module;
+bank select, the wheel, the pedals, master volume and all notes off are left out. The instrument
+takes them when its Param RX is CC. The Explorer's and the Deluxe's charts are the Keyboard's; the
+NRPN specification, written for the Keyboard and Desktop at firmware 1.5, is not taken to be theirs.
+
+## The profiles
+
+| Profile | Read from | Rows | Parameters | Choices | Messages |
 | --- | --- | ---: | ---: | ---: | ---: |
-| `asm-hydrasynth` | Hydrasynth MIDI NRPN & CC Communication Spec, firmware 1.5 | 464 | 888 | 100 | 773 |
+| `asm-hydrasynth` | Hydrasynth MIDI NRPN & CC Communication Spec, firmware 1.5 | 464 | 888 | 100 | 773 NRPNs |
+| `asm-hydrasynth-explorer` | Hydrasynth Explorer Owner's Manual 2.2.0, CC chart | 117 | 110 | 0 | 110 CCs |
+| `asm-hydrasynth-deluxe` | Hydrasynth Deluxe Owner's Manual 2.2.0, CC chart | 117 | 110 | 0 | 110 CCs |
+| `asm-leviasynth` | Leviasynth Keyboard Owner's Manual 1.2.1, CC chart | 110 | 103 | 0 | 103 CCs |
+| `asm-leviasynth-desktop` | Leviasynth Desktop Owner's Manual 1.2.1, CC chart | 110 | 103 | 0 | 103 CCs |
 
-It reads nothing back: there is no published SysEx format to Pull with.
+None reads anything back: there is no published SysEx format to Pull with.
 
 ## What is left out, and what would read it
 
@@ -93,5 +111,5 @@ It reads nothing back: there is no published SysEx format to Pull with.
 | PRE-FX and POST-FX preset, Param3 - 5, sidechain type | `depends on PRE-FX type`: the values per effect are not listed | the manual's effect chapters, a list for each type |
 | The macro targets and the mod matrix's sources and targets | a number above 127 moves to another VV (`WW+128` on VV=03H), and the spec lists no sources or targets | the lists, from the manual's mod matrix chapter, and a choice of VV-and-WW pairs |
 | Following a VV-selected parameter when the instrument sends it | an incoming NRPN is matched by its number alone, and these share one | the inbound index keyed by NRPN and data MSB |
-| The Explorer, Deluxe and Leviasynth | no NRPN spec published for them; their manuals' CC charts | a reader for the manuals' `Module  Parameter  CC` charts |
+| The Explorer's, Deluxe's and Leviasynth's values | their manuals print a CC chart only | an NRPN specification for them, if ASM publishes one, read as the Keyboard's is |
 | Parameters after firmware 1.5 | not in the spec | a later spec, if ASM publishes one |

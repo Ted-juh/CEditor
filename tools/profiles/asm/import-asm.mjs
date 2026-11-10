@@ -12,6 +12,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { readCcChart } from './read-asm-cc.mjs';
 import { documentLines, readNrpnSpec, readRhythmLists } from './read-asm-nrpn.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,11 @@ export async function loadLayout(name) {
 export function importDocument(layout, file) {
   const doc = layout.document;
   const pages = layout.pages;
+  if (layout.read === 'cc') {
+    // An owner's manual's CC chart.
+    const rows = readCcChart(documentLines(file, [Math.min(...pages), Math.max(...pages)]).filter((l) => pages.includes(l.page)), { leftOnly: layout.leftOnly ?? [] });
+    return { sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }], lists: {}, rows };
+  }
   const lines = documentLines(file, [Math.min(...pages, ...layout.listPages), Math.max(...pages, ...layout.listPages)]);
   const rows = readNrpnSpec(lines.filter((l) => pages.includes(l.page)));
   const lists = readRhythmLists(lines.filter((l) => layout.listPages.includes(l.page)));

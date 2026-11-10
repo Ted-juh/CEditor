@@ -4415,7 +4415,11 @@ int main (int argc, char** argv)
         root.getChildFile ("arturia-minifreak.ceditor-device.json"),
         root.getChildFile ("arturia-polybrute.ceditor-device.json"),
         root.getChildFile ("arturia-polybrute-12.ceditor-device.json"),
-        root.getChildFile ("asm-hydrasynth.ceditor-device.json")
+        root.getChildFile ("asm-hydrasynth.ceditor-device.json"),
+        root.getChildFile ("asm-hydrasynth-deluxe.ceditor-device.json"),
+        root.getChildFile ("asm-hydrasynth-explorer.ceditor-device.json"),
+        root.getChildFile ("asm-leviasynth.ceditor-device.json"),
+        root.getChildFile ("asm-leviasynth-desktop.ceditor-device.json")
     };
 
     auto failures = 0;

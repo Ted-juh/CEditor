@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 
 import { readText } from './support/readText.mjs';
 import { readNrpnSpec, readRhythmLists } from '../../../tools/profiles/asm/read-asm-nrpn.mjs';
+import { readCcChart } from '../../../tools/profiles/asm/read-asm-cc.mjs';
 import { lsbRange, readNote } from '../../../tools/profiles/asm/build-asm-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/asm/make-profiles.mjs';
 import { localCompileParameter, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
@@ -117,7 +118,7 @@ for (const { name, profile, text, out, data } of BUILT) {
     assert.deepEqual(errors, []);
   });
 
-  test(`${profile.id}: every parameter is its NRPN, VV * 128 + WW on CC 6 and 38, at both ends`, () => {
+  test(`${profile.id}: every parameter is its NRPN (VV * 128 + WW on CC 6 and 38) or controller, at both ends`, () => {
     const ids = new Set();
     const messages = new Set();
     for (const p of profile.parameters) {
@@ -128,7 +129,7 @@ for (const { name, profile, text, out, data } of BUILT) {
       for (const [value, wire] of ends) {
         const compiled = localCompileParameter(profile, { parameterId: p.id, value });
         assert.ok(compiled.ok, `${p.id}: ${compiled.error}`);
-        assert.equal(lines(compiled), nrpn(r, wire), `${p.id} = ${value}`);
+        assert.equal(lines(compiled), r.kind === 'cc' ? hex([0xb0, r.controller, wire]) : nrpn(r, wire), `${p.id} = ${value}`);
       }
       // No two parameters on one NRPN with the same VV.
       const key = `${r.id}/${(p.type === 'choice' ? p.choices[0].value : p.range.min) >> 7}`;
@@ -178,4 +179,26 @@ test('the Hydrasynth: misprints corrected, a conflict left out, effect-dependent
   assert.ok(param('Macros', 'Macro1 panel value'), 'printed `marco1 panel value`');
   assert.ok(param('LFO 2', 'LFO2 BPM Sync'), 'printed `BMP Sync`');
   assert.equal(hydra.parameters.some((p) => p.group === 'Sound'), false, 'every row has a group from the layout');
+});
+
+test('a CC chart: two tables side by side, the header over the left one, the left read first', () => {
+  const rows = readCcChart([
+    line(116, 50, [50, 'Module'], [110, 'Parameter'], [200, 'CC'], [260, 'Filter'], [282, '1'], [320, 'Filter'], [342, '1'], [350, 'Res'], [420, '71']),
+    line(116, 62, [50, 'Amp'], [110, 'Amp'], [130, 'LFO2amt'], [200, '62'], [260, 'Filter'], [282, '1'], [320, 'Filter'], [342, '1'], [350, 'Cutoff'], [420, '74']),
+    line(116, 74, [50, 'ARP'], [110, 'ARP'], [130, 'Division'], [200, '106']),
+    line(116, 700, [300, '116']),
+  ]);
+  assert.deepEqual(rows.map((r) => [r.module, r.name, r.cc]), [['Amp', 'Amp LFO2amt', 62], ['ARP', 'ARP Division', 106], ['Filter 1', 'Filter 1 Res', 71], ['Filter 1', 'Filter 1 Cutoff', 74]]);
+});
+
+test('the Explorer, Deluxe and Leviasynth: their charts, the wheel and pedals left out', () => {
+  const deluxe = BUILT.find((b) => b.profile.id === 'asm-hydrasynth-deluxe').profile;
+  const levia = BUILT.find((b) => b.profile.id === 'asm-leviasynth').profile;
+  const cc = (p, group, name) => p.messageRecipes.find((r) => r.id === p.parameters.find((x) => x.group === group && x.name === name).messageRecipe).controller;
+  assert.equal(cc(deluxe, 'Filter 1', 'Filter 1 Cutoff'), 74);
+  assert.equal(cc(levia, 'Analog Filter', 'Cutoff'), 74);
+  assert.equal(cc(levia, 'Digital Filter', 'Cutoff'), 55);
+  for (const p of [deluxe, levia]) assert.equal(p.parameters.some((x) => /^(Sustain pedal|Master Volume|Bank select (MSB|LSB)|All notes off)$/i.test(x.name)), false);
+  const desk = BUILT.find((b) => b.profile.id === 'asm-leviasynth-desktop').profile;
+  assert.deepEqual(desk.parameters.map((x) => [x.name, x.messageRecipe]), levia.parameters.map((x) => [x.name, x.messageRecipe]), 'the same chart');
 });
