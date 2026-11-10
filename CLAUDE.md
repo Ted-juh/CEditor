@@ -390,6 +390,7 @@ node tools/profiles/yamaha/make-profiles.mjs --check
 node tools/profiles/waldorf/make-profiles.mjs --check
 node tools/profiles/elektron/make-profiles.mjs --check
 node tools/profiles/behringer/make-profiles.mjs --check
+node tools/profiles/arturia/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
 ```
 

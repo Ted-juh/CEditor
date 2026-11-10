@@ -489,6 +489,13 @@ something the program does with every profile, which the larger library makes ea
   means a map from each appendix row to its chapter heading, a layout's worth for each manual, and a
   reader for the bracketed ranges and the bulleted value lists there. Matching them automatically
   was tried and gets about half the Digitone's and Digitakt's rows, some wrongly; the README says more.
+- **An Arturia parameter takes its controller's whole range.** The manuals' CC charts print a
+  controller number for each knob and nothing about its values, so every parameter of the five
+  Arturia profiles is 0 - 127, and a setting chosen from a list (an oscillator type, a waveform, a
+  filter mode) is a number rather than a choice. The MatrixBrute's chart marks 29 controllers
+  `7-bit/14-bit` without printing the fine half's controller; they are sent as 7 bits. Closing it
+  means each manual's chapters read for values, a map written by hand as for Elektron, and the
+  MatrixBrute tried for its LSBs.
 - **A Behringer range is sent as printed.** The guides' controller tables print a range for each
   controller (`0 - 99` for most of the UB-1 Micro's and PRO-VS Mini's, `0 - 9`, `50 - 75`) and do not
   say whether it is what the controller carries or what the panel shows for it. The profiles send the

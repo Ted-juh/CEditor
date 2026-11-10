@@ -1,0 +1,28 @@
+{
+  "sources": [
+    {"title":"MicroFreak User Manual 5.0.1","file":"microfreak_Manual_5_0_1_EN.pdf","sha256":"e2d41791cc32f2e4425fb82cdcd3a42f08b9b5f1a54aeed7eb0cb4805760724f","url":"https://dl.arturia.net/products/microfreak/manual/microfreak_Manual_5_0_1_EN.pdf"}
+  ],
+  "rows": [
+    {"page":146,"title":"","cc":2,"name":"Spice"},
+    {"page":146,"title":"","cc":5,"name":"Glide"},
+    {"page":146,"title":"","cc":9,"name":"Oscillator Type"},
+    {"page":146,"title":"","cc":10,"name":"Oscillator Wave"},
+    {"page":146,"title":"","cc":12,"name":"Oscillator Timbre"},
+    {"page":146,"title":"","cc":13,"name":"Oscillator Shape"},
+    {"page":146,"title":"","cc":23,"name":"Filter Cutoff"},
+    {"page":146,"title":"","cc":24,"name":"Cycling Env Amount"},
+    {"page":146,"title":"","cc":26,"name":"Filter Amount"},
+    {"page":146,"title":"","cc":28,"name":"Cycling Env Hold"},
+    {"page":146,"title":"","cc":29,"name":"Envelope Sustain"},
+    {"page":146,"title":"","cc":64,"name":"Keyboard Hold (toggle)"},
+    {"page":146,"title":"","cc":83,"name":"Filter Resonance"},
+    {"page":146,"title":"","cc":91,"name":"ARP/SEQ rate (free)"},
+    {"page":146,"title":"","cc":92,"name":"ARP/SEQ rate (sync)"},
+    {"page":147,"title":"","cc":93,"name":"LFO rate (free)"},
+    {"page":147,"title":"","cc":94,"name":"LFO rate (sync)"},
+    {"page":147,"title":"","cc":102,"name":"Cycling env rise"},
+    {"page":147,"title":"","cc":103,"name":"Cycling env fall"},
+    {"page":147,"title":"","cc":105,"name":"Envelope Attack"},
+    {"page":147,"title":"","cc":106,"name":"Envelope Decay"}
+  ]
+}

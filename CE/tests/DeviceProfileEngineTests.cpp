@@ -4407,7 +4407,12 @@ int main (int argc, char** argv)
         root.getChildFile ("behringer-pro-800.ceditor-device.json"),
         root.getChildFile ("behringer-pro-vs-mini.ceditor-device.json"),
         root.getChildFile ("behringer-spice.ceditor-device.json"),
-        root.getChildFile ("behringer-ub-1-micro.ceditor-device.json")
+        root.getChildFile ("behringer-ub-1-micro.ceditor-device.json"),
+        root.getChildFile ("arturia-matrixbrute.ceditor-device.json"),
+        root.getChildFile ("arturia-microfreak.ceditor-device.json"),
+        root.getChildFile ("arturia-minifreak.ceditor-device.json"),
+        root.getChildFile ("arturia-polybrute.ceditor-device.json"),
+        root.getChildFile ("arturia-polybrute-12.ceditor-device.json")
     };
 
     auto failures = 0;
