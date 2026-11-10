@@ -113,13 +113,16 @@
         {"page":130,"address":["00","20","03"],"size":1,"range":["00 – 01"],"name":"EQ Shape 1","description":"shelv, peak","notes":":"},
         {"page":130,"address":["00","20","04"],"size":1,"range":["34 – 4C"],"name":"EQ Gain 2","description":"-12 – +12 [dB]","notes":":"},
         {"page":130,"address":["00","20","05"],"size":1,"range":["0E – 36"],"name":"EQ Frequency 2","description":"100 – 10.0 [kHz]","notes":":"},
-        {"page":130,"address":["00","20","06"],"size":1,"range":["01 – 78","01"],"name":"EQ Q2 reserved","description":"0.1 – 12.0","notes":": :"},
+        {"page":130,"address":["00","20","06"],"size":1,"range":["01 – 78"],"name":"EQ Q2","description":"0.1 – 12.0","notes":":"},
+        {"page":130,"address":["00","20","07"],"size":1,"range":["01"],"name":"reserved","description":"","notes":":","unprinted":true},
         {"page":130,"address":["00","20","08"],"size":1,"range":["34 – 4C"],"name":"EQ Gain 3","description":"-12 – +12 [dB]","notes":":"},
         {"page":130,"address":["00","20","09"],"size":1,"range":["0E – 36"],"name":"EQ Frequency 3","description":"100 – 10.0 [kHz]","notes":":"},
-        {"page":130,"address":["00","20","0A"],"size":1,"range":["01 – 78"],"name":"EQ Q3 reserved","description":"0.1 – 12.0","notes":": :"},
+        {"page":130,"address":["00","20","0A"],"size":1,"range":["01 – 78"],"name":"EQ Q3","description":"0.1 – 12.0","notes":":"},
+        {"page":130,"address":["00","20","0B"],"size":1,"range":[],"name":"reserved","description":"","notes":":","unprinted":true},
         {"page":130,"address":["00","20","0C"],"size":1,"range":["34 – 4C"],"name":"EQ Gain 4","description":"-12 – +12 [dB]","notes":":"},
         {"page":130,"address":["00","20","0D"],"size":1,"range":["0E – 36"],"name":"EQ Frequency 4","description":"100 – 10.0 [kHz]","notes":":"},
-        {"page":130,"address":["00","20","0E"],"size":1,"range":["01 – 78"],"name":"EQ Q4 reserved","description":"0.1 – 12.0","notes":": :"},
+        {"page":130,"address":["00","20","0E"],"size":1,"range":["01 – 78"],"name":"EQ Q4","description":"0.1 – 12.0","notes":":"},
+        {"page":130,"address":["00","20","0F"],"size":1,"range":[],"name":"reserved","description":"","notes":":","unprinted":true},
         {"page":130,"address":["00","20","10"],"size":1,"range":["34 – 4C"],"name":"EQ Gain 5","description":"-12 – +12 [dB]","notes":":"},
         {"page":130,"address":["00","20","11"],"size":1,"range":["1C – 3A"],"name":"EQ Frequency 5","description":"0.5 – 16.0 [kHz]","notes":":"},
         {"page":130,"address":["00","20","12"],"size":1,"range":["01 – 78"],"name":"EQ Q5","description":"0.1 – 12.0","notes":":"},
@@ -569,7 +572,7 @@
         {"page":135,"address":["35","pp","04"],"size":1,"range":["00 – 7F"],"name":"Audio Input Part Chorus Send","description":"0 – 127","notes":""},
         {"page":135,"address":["35","pp","05"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
         {"page":135,"address":["35","pp","06"],"size":1,"range":["00 – 7F"],"name":"Audio Input Part Dry Level","description":"0 – 127","notes":""},
-        {"page":135,"address":["35","pp","07"],"size":1,"range":["00 – 70","08 (HEX)","Audio In Part"],"name":"Audio Input Part Output Select (A/D, FW)","description":"0: L&R, 8: asnL&R, 9-15: FW1&2 ... FW13&14, 64- 79: asnL, asnR, FW1 ... FW14, 112: insL","notes":"The FW input Part Output Select cannot be set to “112: insL”."}
+        {"page":135,"address":["35","pp","07"],"size":1,"range":["00 – 70"],"name":"Audio Input Part Output Select","description":"0: L&R, 8: asnL&R, 9-15: FW1&2 ... FW13&14, 64- 79: asnL, asnR, FW1 ... FW14, 112: insL","notes":"The FW input Part Output Select cannot be set to “112: insL”."}
       ]
     },
     {

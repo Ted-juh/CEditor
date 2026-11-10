@@ -122,6 +122,77 @@ test('the MODX M: an address of four bytes, the leading ones carried, and a valu
   ], 'the second row prints its low byte alone');
 });
 
+test('a column with no headings over it borrows the other\'s, a row printed without its address follows the one before', () => {
+  // The MOTIF ES heads its left column alone (p. 77), prints `1 01 reserved` with no address between
+  // EQ Q2 at 06 and EQ Gain3 at 08, and once `TOTAL = 30` for `TOTAL SIZE = 30`.
+  const xml = page(
+    say(40, 40, 'MIDI PARAMETER CHANGE TABLE (SYSTEM)'),
+    say(45, 60, 'Address'), say(90, 60, 'Size'), say(105, 60, 'Data'), say(105, 68, 'Range'), say(150, 60, 'Parameter Name'), say(230, 60, 'Description'),
+    say(42, 84, '00 20 05'), say(92, 84, '1'), say(103, 84, '0E – 36'), say(150, 84, 'EQ Frequency2'), say(230, 84, '100 – 10.0[kHz]'),
+    say(77, 94, '06'), say(92, 94, '1'), say(103, 94, '01 – 78'), say(150, 94, 'EQ Q2'), say(230, 94, '0.1 – 12.0'),
+    say(92, 104, '1'), say(108, 104, '01'), say(150, 104, 'reserved'),
+    say(77, 114, '08'), say(92, 114, '1'), say(103, 114, '34 – 4C'), say(150, 114, 'EQ Gain3'), say(230, 114, '-12 – +12[dB]'),
+    say(40, 124, 'TOTAL = 30'), say(100, 124, '1E (HEX)'),
+    // The right column: the same columns 270 points across, and no headings.
+    say(312, 84, '00 21 00'), say(362, 84, '1'), say(373, 84, '00 – 7F'), say(420, 84, 'Effect Type'), say(500, 84, '0 – 127'),
+    say(347, 94, '01'), say(362, 94, '1'), say(373, 94, '00 – 7F'), say(420, 94, 'Effect Depth'), say(500, 94, '0 – 127'),
+    say(347, 104, '02'), say(362, 104, '1'), say(373, 104, '00 – 01'), say(420, 104, 'Effect Switch'), say(500, 104, 'off, on'),
+  );
+  const tables = pageParameterTables(xml);
+  assert.deepEqual(tables.map((t) => t.title), ['MIDI PARAMETER CHANGE TABLE (SYSTEM)', null], 'the right column runs the table on');
+  assert.deepEqual(tables[0].rows.map((r) => [r.address.join(' '), r.name, r.range.join('; '), r.unprinted ?? false]), [
+    ['00 20 05', 'EQ Frequency2', '0E – 36', false],
+    ['06', 'EQ Q2', '01 – 78', false],
+    ['07', 'reserved', '01', true],
+    ['08', 'EQ Gain3', '34 – 4C', false],
+  ], 'nothing under `TOTAL = 30` is a row');
+  assert.deepEqual(tables[1].rows.map((r) => [r.address.join(' '), r.name, r.description]), [
+    ['00 21 00', 'Effect Type', '0 – 127'],
+    ['01', 'Effect Depth', '0 – 127'],
+    ['02', 'Effect Switch', 'off, on'],
+  ]);
+});
+
+test('the bulk dump block table: a series over a column\'s foot, and the CP5/CP50\'s order, its address first', () => {
+  // The MOTIF's drum keys: `KEY C 0` and `: 73 Blocks` at the foot of the left column (the page's
+  // number under it), `KEY C 6` at the head of the right.
+  const motif = page(
+    say(68, 40, 'Parameter Block'), say(130, 40, 'Description'), say(217, 40, 'Byte Count'), say(251, 40, 'Top Address'),
+    say(40, 60, 'KEY C 0'), say(132, 60, 'Oscillator'), say(222, 60, '19'), say(236, 60, '13'), say(250, 60, '47'), say(262, 60, '00'), say(276, 60, '00'),
+    say(132, 70, 'Pitch'), say(225, 70, '3'), say(236, 70, '03'), say(250, 70, '48'), say(262, 70, '00'), say(276, 70, '00'),
+    say(135, 80, ':'), say(200, 80, '73 Blocks'), say(264, 80, ':'),
+    say(280, 760, '47'),
+    say(334, 40, 'Parameter Block'), say(399, 40, 'Description'), say(484, 40, 'Byte Count'), say(518, 40, 'Top Address'),
+    say(334, 60, 'KEY C 6'), say(399, 60, 'Oscillator'), say(490, 60, '19'), say(503, 60, '13'), say(517, 60, '47'), say(529, 60, '48'), say(543, 60, '00'),
+    say(399, 70, 'Pitch'), say(493, 70, '3'), say(503, 70, '03'), say(517, 70, '48'), say(529, 70, '48'), say(543, 70, '00'),
+  );
+  const state = { blocks: [], series: false };
+  for (const span of [{ right: 300 }, { left: 300 }]) state.blocks.push(...pageBulkBlocks(motif, span, 3, state));
+  assert.deepEqual(state.blocks, [
+    { name: 'KEY C 0 Oscillator', bytes: 19, address: ['47', '00', '00'], last: { name: 'KEY C 6 Oscillator', mid: '48' } },
+    { name: 'Pitch', bytes: 3, address: ['48', '00', '00'], last: { name: 'Pitch', mid: '48' } },
+  ]);
+  // The CP5/CP50: block, address, byte count in decimal and hex, description; and another table's
+  // headings under it.
+  const cp5 = page(
+    say(40, 40, 'Parameter Block'), say(110, 40, 'Top Address'), say(170, 40, 'Byte Count'), say(230, 40, 'Description'),
+    say(40, 60, 'SYSTEM'), say(110, 60, '00'), say(125, 60, '00'), say(140, 60, '00'), say(170, 60, '40'), say(190, 60, '28'), say(230, 60, 'Utility'),
+    say(40, 70, 'PART'), say(110, 70, '31'), say(125, 70, 'pp'), say(140, 70, '00'), say(170, 70, '56'), say(190, 70, '38'), say(230, 70, 'Part (pp = 00 – 03)'),
+    say(110, 80, '36'), say(125, 80, '01'), say(140, 80, '00'), say(170, 80, '40'), say(190, 80, '28'), say(230, 80, 'AD Insertion (CP5 only)'),
+    say(40, 100, 'Bulk Header / Footer'), say(130, 100, 'Address'), say(230, 100, 'Description'),
+    say(110, 110, '0F'), say(125, 110, '00'), say(140, 110, 'nn'), say(170, 110, '10'), say(190, 110, '10'), say(230, 110, 'MULTIPLE'),
+  );
+  assert.deepEqual(pageBulkBlocks(cp5), [
+    { name: 'SYSTEM Utility', bytes: 40, address: ['00', '00', '00'] },
+    { name: 'PART Part (pp = 00 – 03)', bytes: 56, address: ['31', 'pp', '00'] },
+    { name: 'AD Insertion (CP5 only)', bytes: 40, address: ['36', '01', '00'] },
+  ]);
+  // Series named from their first and last block.
+  assert.deepEqual(seriesNames('PLUG-IN PART Plug-in 1 Part', 'Plug-in 3 Part', 3), ['Plug-in 1 Part', 'Plug-in 2 Part', 'Plug-in 3 Part'], 'the first still under its label');
+  assert.equal(seriesNames('Seq Remote Tr1 Message', 'Seq Remote Tr16 Message', 16)[9], 'Seq Remote Tr10 Message', 'a number set against a word inside the name');
+  assert.deepEqual(seriesNames('Part1', 'Part4', 4), ['Part 1', 'Part 2', 'Part 3', 'Part 4'], 'at its end, set apart');
+});
+
 /* ------------------------------------------------------------------ the builder's rules */
 
 test('the description says what each value shows: a list of names, a range of numbers, a range in parts', () => {
@@ -356,4 +427,59 @@ test('the MODX M and MONTAGE M: four-byte addresses, two-byte values and choices
     // footer is no request of its own (the MONTAGE M prints that header `04 ll m nn`).
     assert.equal(profile.requests.length, 5, `${id}: ${profile.requests.map((r) => r.name).join('; ')}`);
   }
+});
+
+test('the MOTIF ES, S90 ES and MOTIF-RACK ES: Plug-in Parts beside the parts, A/D Parts, four elements, and the Plug-in Voice\'s edit buffer', { skip: !builtProfile('yamaha-motif-es') }, () => {
+  const profile = builtProfile('yamaha-motif-es');
+  const at = (p, group, name) => p.parameters.find((x) => x.group === group && x.name === name);
+  assert.equal(at(profile, 'Mix Plug-in 3 Part', 'Bank Select MSB').address, '37 62 00', '`pp = 60 – 62 Part Plug-in 1 – 3`');
+  assert.equal(at(profile, 'Performance AD Part 5', 'A/D Part Volume').address, '34 44 01');
+  assert.equal(at(profile, 'Voice Element 4', 'ELEMENT ASSIGN').address, '41 03 00');
+  assert.equal(at(profile, 'Drum Key C6', 'Element Assign').address, '47 48 00');
+  assert.equal(localCompileParameter(profile, { parameterId: at(profile, 'System', 'Basic Receive Channel').id, value: 'omni' }).hex, 'F0 43 10 7F 00 00 00 0A 10 F7', 'the native parameter change, not the XG one the data list prints first');
+  const request = (p, id) => p.requests.find((r) => r.id === id).template.join(' ');
+  assert.equal(request(profile, 'requestPluginVoice'), 'F0 43 20 7F 00 0E 1F 00 F7');
+  // The data list prints the Mix's last Plug-in Part `37 44 00`; the series is 37 60 … 37 62.
+  const plugin3 = profile.dumpDefinitions.find((d) => d.matcher.prefix.slice(-3).join(' ') === '37 62 00');
+  assert.equal(plugin3.completion.collectionId, 'multi');
+  assert.ok(profile.authoringNotes.some((n) => n.includes('Plug-in 3 Part printed 37 44 00')));
+  const s90 = builtProfile('yamaha-s90-es');
+  assert.equal(at(s90, 'Multi Plug-in 3 Part', 'Bank Select MSB').address, '37 62 00');
+  assert.ok(at(s90, 'Performance Audio Input Part 1', 'A/D Part Volume'));
+  // The MOTIF-RACK ES: its format from the owner's manual, two Plug-in Parts, no Master, and the
+  // Plug-in Voice's Audition at 4C 06, where the data list heads it 46 06.
+  const rack = builtProfile('yamaha-motif-rack-es');
+  assert.deepEqual(rack.identity.modelNumber, ['19', '06']);
+  assert.equal(at(rack, 'Plug-in Voice Audition', 'Audition Note Shift').address, '4C 06 02');
+  assert.ok(at(rack, 'Multi Plug-in 2 Part', 'Bank Select MSB') && !at(rack, 'Multi Plug-in 3 Part', 'Bank Select MSB'));
+  assert.equal(rack.requests.some((r) => r.id === 'requestMaster'), false);
+});
+
+test('the MOTIF (2001): the model ID 6B alone, and its ranges and descriptions printed with hyphens', { skip: !builtProfile('yamaha-motif') }, () => {
+  const profile = builtProfile('yamaha-motif');
+  const at = (group, name) => profile.parameters.find((p) => p.group === group && p.name === name);
+  assert.equal(localCompileParameter(profile, { parameterId: at('System', 'Master Volume').id, value: 127 }).hex, 'F0 43 10 6B 00 00 00 7F F7');
+  assert.equal(profile.requests.find((r) => r.id === 'requestNormalVoice').template.join(' '), 'F0 43 20 6B 0E 0F 00 F7');
+  // `00 - 10,` over `7F` beside `1 - 16, omni, off`: one range, counted out.
+  assert.deepEqual(at('System', 'Basic Receive Channel').choices.slice(-2).map((c) => [c.value, c.label]), [[16, 'omni'], [127, 'off']]);
+  assert.equal(at('Seq Remote Tr3 Message', 'Seq Remote Mode Track Select Switch Channel').address, '02 02 01', '`02 tt 01`, tt the track');
+  // The drum keys' series runs over the bulk table's column break.
+  assert.equal(profile.dumpDefinitions.filter((d) => d.completion.collectionId === 'drumVoice' && d.matcher.prefix.at(-3) === '47').length, 146);
+});
+
+test('the CP1, CP5 and CP50: a model ID byte and an identity each, and the CP50 without what the data list marks CP5 only', { skip: !builtProfile('yamaha-cp5') }, () => {
+  const cp1 = builtProfile('yamaha-cp1');
+  assert.deepEqual(cp1.identity.modelNumber, ['3B', '06']);
+  assert.equal(cp1.parameters.find((p) => p.group === 'Pre-Amp Part 2' && p.name === 'Pre-Amp On/Off').address, '31 11 24', '`1p`, p the layer');
+  for (const [id, model, family, parts] of [['yamaha-cp5', '10', '3F', 4], ['yamaha-cp50', '11', '40', 2]]) {
+    const profile = builtProfile(id);
+    assert.equal(profile.messageRecipes[0].template.slice(3, 5).join(' '), `7F ${model}`);
+    assert.deepEqual(profile.identity.modelNumber, [family, '06']);
+    assert.equal(profile.dumpDefinitions.filter((d) => d.matcher.prefix.at(-3) === '31').length, parts, `${id}: a Part block each part`);
+    assert.equal(profile.requests.find((r) => r.id === 'requestPerformance').template.join(' '), `F0 43 20 7F ${model} 0E 4F 00 F7`);
+  }
+  const cp50 = builtProfile('yamaha-cp50');
+  assert.equal(cp50.parameters.filter((p) => /^3[46] /.test(p.address)).length, 0, 'no Power-Amp/Insertion 2, no A/D input');
+  assert.equal(cp50.dumpDefinitions.filter((d) => /^3[46]$/.test(d.matcher.prefix.at(-3))).length, 0);
+  assert.ok(builtProfile('yamaha-cp5').parameters.some((p) => /^36 /.test(p.address)));
 });

@@ -18,9 +18,10 @@ const under = (prefix) => (at, row, block) => {
 };
 
 /**
- * o: { id, name, family, description, document, read, zones, perfParts, multiParts, elements,
- * audio: { [first two address bytes or first byte]: placeholders }, multi: the Multi's bulk label
- * and group name, tables: more per-table settings, pull: which edit buffers, notes, identity }.
+ * o: { id, name, family, description, document (or documents), read, zones, perfParts, multiParts, elements,
+ * audio: { [first two address bytes or first byte]: placeholders }, placeholdersAt: any others by
+ * address, multi: the Multi's bulk label and group name, tables: more per-table settings, noPull and
+ * pull: edit buffers left out and added, notes, identity, blockName }.
  */
 export function motifLayout(o) {
   const multi = o.multi ?? { label: 'MULTI', group: 'Multi' };
@@ -32,12 +33,13 @@ export function motifLayout(o) {
     'VOICE (DRUM)': { id: 'drumVoice', name: 'Drum Voice Edit Buffer', header: ['0E', '2F', '00'] },
   };
   for (const k of o.noPull ?? []) delete pull[k];
+  Object.assign(pull, o.pull ?? {});
   return {
     id: o.id,
     name: o.name,
     family: o.family ?? 'MOTIF',
     description: o.description,
-    documents: [o.document],
+    documents: o.documents ?? [o.document],
     read: o.read,
     ...(o.noIdentity ? { noIdentity: o.noIdentity } : {}),
     // The Parameter Base Address table: `32 nn 00 Zone`, `31 pp 00 Part 1 – 4`, `37 pp 00 Part 1 – 16`,
@@ -52,6 +54,7 @@ export function motifLayout(o) {
       47: { ee: KEYS },
       48: { ee: KEYS },
       ...(o.audio ?? {}),
+      ...(o.placeholdersAt ?? {}),
     },
     pull,
     tables: {
@@ -77,6 +80,7 @@ export function motifLayout(o) {
       ...(o.tables ?? {}),
     },
     ...(o.bulkCorrections ? { bulkCorrections: o.bulkCorrections } : {}),
+    ...(o.blockName ? { blockName: o.blockName } : {}),
     // `The Edit Buffer data … will be transmitted/received only in the corresponding Mode`: the requests
     // for the other modes go unanswered, so each is asked once.
     ...(o.inModeOnly ? { collectionRetries: 0 } : {}),

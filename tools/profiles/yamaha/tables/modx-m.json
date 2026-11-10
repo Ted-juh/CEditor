@@ -171,7 +171,9 @@
         {"page":227,"address":["00","02","0n","11"],"size":1,"range":["00, 20","– 7E"],"name":"Micro Tuning Table Name 18","description":"0, 32 – 126 (ASCII)","default":"","notes":""},
         {"page":227,"address":["00","02","0n","12"],"size":1,"range":["00, 20","– 7E"],"name":"Micro Tuning Table Name 19","description":"0, 32 – 126 (ASCII)","default":"","notes":""},
         {"page":227,"address":["00","02","0n","13"],"size":1,"range":["00, 20","– 7E"],"name":"Micro Tuning Table Name 20","description":"0, 32 – 126 (ASCII)","default":"","notes":""},
-        {"page":227,"address":["00","00","7F","00"],"size":2,"range":["00 – 7F","00 – 7F","00 – 7F"],"name":"Soundmondo Format Version Major Soundmondo Format Version Minor Soundmondo Format Version Bugfix","description":"","default":"01 02 00","notes":""}
+        {"page":227,"address":["00","00","7F","00"],"size":2,"range":["00 – 7F"],"name":"Soundmondo Format Version Major","description":"","default":"01","notes":""},
+        {"page":227,"address":["00","00","7F","02"],"size":2,"range":["00 – 7F"],"name":"Soundmondo Format Version Minor","description":"","default":"02","notes":"","unprinted":true},
+        {"page":227,"address":["00","00","7F","04"],"size":2,"range":["00 – 7F"],"name":"Soundmondo Format Version Bugfix","description":"","default":"00","notes":"","unprinted":true}
       ]
     },
     {
@@ -1221,7 +1223,8 @@
         {"page":243,"address":["1p","00","07","3E"],"size":2,"range":["00 00 –","00 7F"],"name":"User LFO Step Value 15","description":"−64 – +63","default":"00 40","notes":""},
         {"page":243,"address":["1p","00","07","40"],"size":2,"range":["00 00 –","00 7F"],"name":"User LFO Step Value 16","description":"−64 – +63","default":"00 40","notes":""},
         {"page":243,"address":["1p","00","07","42"],"size":2,"range":["00 00 –","00 7F"],"name":"Part LFO Random Speed Depth","description":"0 – 127","default":"00 00","notes":"This is available only when Tempo Sync is set to Off."},
-        {"page":243,"address":["1p","00","08","00"],"size":2,"range":["00 00 –","00 0F","00 00 –","00 0F,","00 7F"],"name":"MIDI Transmit Channel MIDI Tx/Rx Channel","description":"Ch1 – 16 Ch1 – 16, Off","default":"00 0p 00 0p","notes":"This is available only when Part Mode is set to External. This is available only when Part Mode is set to Internal and Keyboard Control Switch is set to Off."},
+        {"page":243,"address":["1p","00","08","00"],"size":2,"range":["00 00 –","00 0F"],"name":"MIDI Transmit Channel","description":"Ch1 – 16","default":"00 0p","notes":"This is available only when Part Mode is set to External."},
+        {"page":243,"address":["1p","00","08","02"],"size":2,"range":["00 00 –","00 0F,","00 7F"],"name":"MIDI Tx/Rx Channel","description":"Ch1 – 16, Off","default":"00 0p","notes":"This is available only when Part Mode is set to Internal and Keyboard Control Switch is set to Off.","unprinted":true},
         {"page":243,"address":["1p","00","08","04"],"size":2,"range":["00 3D –","00 43"],"name":"Zone Octave Shift","description":"−3 – +3","default":"00 40","notes":""},
         {"page":244,"address":["1p","00","08","06"],"size":2,"range":["00 35 –","00 4B"],"name":"Zone Transpose","description":"−11 – +11 (semitones)","default":"00 40","notes":""},
         {"page":244,"address":["1p","00","08","08"],"size":2,"range":["00 01 –","00 7F"],"name":"Zone Velocity Limit Low","description":"1 – 127","default":"00 01","notes":""},
@@ -1788,7 +1791,8 @@
         {"page":253,"address":["4p","00","00","0E"],"size":2,"range":["00 00 –","00 0F"],"name":"Unison Detune","description":"0 – 15","default":"00 00","notes":""},
         {"page":253,"address":["4p","00","00","10"],"size":2,"range":["00 00 –","00 0F"],"name":"Unison Spread","description":"0 – 15","default":"00 00","notes":""},
         {"page":253,"address":["4p","00","00","12"],"size":2,"range":["00 01"],"name":"reserved","description":"","default":"00 01","notes":""},
-        {"page":253,"address":["4p","00","00","14"],"size":2,"range":["00 00 –","00 03","00 00 –","00 7F"],"name":"OSC Reset Voltage Drift","description":"Off, Phase, Tune, Full 0 – 127","default":"00 00 00 40","notes":""},
+        {"page":253,"address":["4p","00","00","14"],"size":2,"range":["00 00 –","00 03"],"name":"OSC Reset","description":"Off, Phase, Tune, Full","default":"00 00","notes":""},
+        {"page":253,"address":["4p","00","00","16"],"size":2,"range":["00 00 –","00 7F"],"name":"Voltage Drift","description":"0 – 127","default":"00 40","notes":"","unprinted":true},
         {"page":253,"address":["4p","00","00","18"],"size":2,"range":["00 00 –","01 48"],"name":"Ageing","description":"−100 – 0 – +100","default":"00 64","notes":""},
         {"page":253,"address":["4p","00","00","1A"],"size":2,"range":["00 00 –","01 7F"],"name":"Pitch EG Attack Time","description":"0 – 255","default":"00 00","notes":""},
         {"page":253,"address":["4p","00","00","1C"],"size":2,"range":["00 00 –","01 7F"],"name":"Pitch EG Decay Time","description":"0 – 255","default":"01 20","notes":""},

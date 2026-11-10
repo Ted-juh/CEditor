@@ -10,7 +10,8 @@
       "page": 104,
       "rows": [
         {"page":104,"address":["0A","00","00"],"size":1,"range":["00 – 7F"],"name":"Master Number Select","description":"0 – 127","default":"–","notes":""},
-        {"page":104,"address":["0A","00","01"],"size":1,"range":["00 – 06","–"],"name":"Mode Change reserved","description":"0: Voice, 1: Performance, 4: Master, 5: Multi, 6: Demo","default":"–","notes":""},
+        {"page":104,"address":["0A","00","01"],"size":1,"range":["00 – 06"],"name":"Mode Change","description":"0: Voice, 1: Performance, 4: Master, 5: Multi, 6: Demo","default":"–","notes":""},
+        {"page":104,"address":["0A","00","02"],"size":1,"range":["–"],"name":"reserved","description":"","default":"","notes":"","unprinted":true},
         {"page":104,"address":["0A","00","03"],"size":1,"range":["–"],"name":"reserved","description":"","default":"","notes":""}
       ]
     },

@@ -5,7 +5,7 @@
 //
 //   - every row of a MIDI PARAMETER CHANGE TABLE that prints a data range is a parameter, sent as
 //     the parameter change the data format prints (F0 43 1n 7F 1C <model> <address> <data> F7; the
-//     MX's F0 43 1n 7F 17 <address> <data> F7) at the row's address; `reserved` rows are not;
+//     MX's F0 43 1n 7F 17 <address> <data> F7) at the row's address; `reserved` and `NOT USED` rows are not;
 //   - the description column says what each value shows, in order. A list of names exactly as long
 //     as the range (`00 – 04` beside `OFF, AMP, FILTER, PITCH, OSC`) is a choice; a range of numbers
 //     as long as the data range (`28 – 58` beside `-24 – +24 (semitones)`) is the values shown; a
@@ -194,11 +194,18 @@ export function seriesNames(first, last, count) {
   const [a, b] = [/^(.*?)(\S+)$/.exec(first), /^(.*?)(\S+)$/.exec(last)];
   const prefix = b[1];
   if (/^\d+$/.test(a[2]) && /^\d+$/.test(b[2]) && Number(b[2]) - Number(a[2]) + 1 === count) return Array.from({ length: count }, (u, i) => `${prefix}${Number(a[2]) + i}`);
-  // The number inside the name (the CP4 STAGE's `Part 1 Insertion A` … `Part 3 Insertion A`).
-  const [ta, tb] = [first.split(' '), last.split(' ')];
+  // The number inside the name (the CP4 STAGE's `Part 1 Insertion A` … `Part 3 Insertion A`). The
+  // first may still carry its block's label (the MOTIF ES's `PLUG-IN PART Plug-in 1 Part` … `Plug-in 3
+  // Part`): the series is its words as many as the last's.
+  const tb = last.split(' ');
+  const ta = first.split(' ').slice(-tb.length);
+  // The number may be set against a word inside the name (the MOTIF's `Seq Remote Tr1 Message` …
+  // `Tr16 Message`); at its end, it is set apart below (`Part1` … `Part4`: `Part 1` … `Part 4`).
   const differ = ta.length === tb.length ? ta.map((t, i) => (t === tb[i] ? -1 : i)).filter((i) => i >= 0) : [];
-  if (differ.length === 1 && /^\d+$/.test(ta[differ[0]]) && /^\d+$/.test(tb[differ[0]]) && Number(tb[differ[0]]) - Number(ta[differ[0]]) + 1 === count) {
-    return Array.from({ length: count }, (u, i) => ta.map((t, k) => (k === differ[0] ? String(Number(t) + i) : t)).join(' '));
+  const inside = differ.length === 1 && differ[0] < ta.length - 1 ? /^(\D*)(\d+)$/ : /^()(\d+)$/;
+  const [da, db] = differ.length === 1 ? [inside.exec(ta[differ[0]]), inside.exec(tb[differ[0]])] : [];
+  if (da && db && da[1] === db[1] && Number(db[2]) - Number(da[2]) + 1 === count) {
+    return Array.from({ length: count }, (u, i) => ta.map((t, k) => (k === differ[0] ? `${da[1]}${Number(da[2]) + i}` : t)).join(' '));
   }
   // The number set against the name (the S90 XS's `Part1` … `Part4`): `Part 1` … `Part 4`.
   const [ga, gb] = [/^(.*?[A-Za-z])(\d+)$/.exec(first), /^(.*?[A-Za-z])(\d+)$/.exec(last)];
@@ -250,12 +257,16 @@ export function readPlaceholders(notes) {
   return out;
 }
 
+// A row that holds no setting: `reserved`, and the MOTIF ES's and CP4 STAGE's `NOT USED`.
+const UNUSED = /^(reserved|not used)$/i;
+
 export function buildYamahaProfile(data, layout) {
   const notes = [];
   const parameters = [];
   const ids = new Set();
   const skipped = new Map();
   const corrected = [];
+  const unprinted = [];
   const skip = (why, what) => { const list = skipped.get(why) ?? []; if (!list.includes(what)) skipped.set(why, [...list, what]); };
   const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
   // The bytes between the device number and the address, as the data format prints them: the group
@@ -282,6 +293,8 @@ export function buildYamahaProfile(data, layout) {
   // more) or the data alone (the MOXF).
   const overhead = data.format.byteCount === 'data' ? 0 : 4;
   const expandBlock = (b) => {
+    // What the data list prints for another model it shares (the CP5/CP50's `(CP5 only)` blocks).
+    if (layout.absent?.[b.address[0]]) return [];
     const [H, M, L] = b.address.map((x) => parseInt(x, 16));
     // A series printed first and last (`Part 1` … `Part 4 03`, `Key C0` … `Key C6 48`): a block for
     // each middle byte between.
@@ -317,13 +330,23 @@ export function buildYamahaProfile(data, layout) {
   // row is called: the reface YC's data list prints its footer `Bulk`.
   const frameOf = (b) => (/Bulk Header/i.test(b.name) || (addressBytes === 3 && b.address[0] === '0E') ? 'header' : /Bulk Footer/i.test(b.name) || (addressBytes === 3 && b.address[0] === '0F') ? 'footer' : null);
   // A block address the data list misprints, corrected by the layout from where the data list prints
-  // it elsewhere (`name address` -> address).
-  const fixedBulk = data.bulk.map((b) => {
+  // it elsewhere (`name address` -> address). Or the last block of a series printed with a wrong
+  // middle byte, so read as a block of its own (the MOTIF ES's Mix `Plug-in 1 Part 37 60 00` … `Plug-in
+  // 3 Part 37 44 00`, which its Performance prints 31 60 … 31 62): `{ seriesLast: '62' }` ends the
+  // series begun by the block before it there.
+  const fixedBulk = [];
+  for (const b of data.bulk) {
     const fix = layout.bulkCorrections?.[`${clean(b.name)} ${b.address.join(' ')}`];
-    if (!fix) return b;
-    corrected.push(`bulk dump block ${clean(b.name)} printed ${b.address.join(' ')}, taken as ${fix.join(' ')}`);
-    return { ...b, address: fix };
-  });
+    if (!fix) { fixedBulk.push(b); continue; }
+    if (Array.isArray(fix)) {
+      corrected.push(`bulk dump block ${clean(b.name)} printed ${b.address.join(' ')}, taken as ${fix.join(' ')}`);
+      fixedBulk.push({ ...b, address: fix });
+      continue;
+    }
+    const first = fixedBulk.pop();
+    corrected.push(`bulk dump block ${clean(b.name)} printed ${b.address.join(' ')}, taken as the last of the series from ${clean(first.name)} (${first.address.join(' ')}), at ${[first.address[0], fix.seriesLast, ...first.address.slice(2)].join(' ')}`);
+    fixedBulk.push({ ...first, last: { name: b.name, mid: fix.seriesLast } });
+  }
   const blocks = fixedBulk.map((b) => ({ ...b, frame: frameOf(b), label: clean(b.name).replace(/\s*Bulk (Header|Footer)?$/i, ''), name: frameOf(b) === 'footer' ? 'Bulk Footer' : blockName(b.name), size: Math.max(0, b.bytes - overhead) }))
     .flatMap(expandBlock)
     .map((b) => ({ ...b, name: layout.blockName?.(b.name, b.at) ?? b.name }));
@@ -347,7 +370,10 @@ export function buildYamahaProfile(data, layout) {
     // A name printed once beside the rows that share it (`MTC strat offset` beside Hour, Minute, Second
     // and Frame): each takes it, with the word its description ends on.
     // A row whose range is a dash is no parameter (the Bulk Control table's headers and footers).
-    const tableRows = table.rows.filter((r) => !(r.range.length && r.range.every((x) => /^[-–]$/.test(clean(x))))).map((r) => ({ ...r }));
+    // A one-byte range printed over two lines, the first ending on its comma (the MOTIF's `00 - 10,`
+    // over `7F`), is one range.
+    const oneRange = (r) => (r.size !== 1 ? r.range : r.range.reduce((out, x) => (out.length && /,$/.test(clean(out.at(-1))) ? [...out.slice(0, -1), `${out.at(-1)} ${x}`] : [...out, x]), []));
+    const tableRows = table.rows.filter((r) => !(r.range.length && r.range.every((x) => /^[-–]$/.test(clean(x))))).map((r) => ({ ...r, range: oneRange(r) }));
     // A low byte misprinted, that the rows either side pin down: the MODX M prints Key Controller
     // Set 2 Switch `00` between Set 1 Ratio at 0E (two bytes) and Set 2 Destination at 12; it is 10.
     for (let i = 1; i + 1 < tableRows.length; i++) {
@@ -382,9 +408,12 @@ export function buildYamahaProfile(data, layout) {
       tableRows[i].name = `${base} ${endWord(tableRows[i])}`;
       if (tableRows[j].name === table.rows[j].name && endWord(tableRows[j])) tableRows[j].name = `${base} ${endWord(tableRows[j])}`;
     }
+    // A row printed without its address, read as the row's before it past its size (read-yamaha-pdf.mjs).
+    for (const r of tableRows) if (r.unprinted && !UNUSED.test(clean(r.name))) unprinted.push(`${title}: ${clean(r.name)} (${r.address.join(' ')})`);
     const runs = [];
     for (const row of tableRows) {
       if (row.address.some((x) => x == null)) { skip('an address not printed in full', `${title}: ${clean(row.name)}`); continue; }
+      if (layout.absent?.[row.address[0]]) { skip(`not on this model, ${layout.absent[row.address[0]]}`, `${title} at ${row.address[0]}`); continue; }
       const rowHolders = holdersOf(row);
       const vars = [...new Set(row.address.flatMap((b) => placeholderVars(b, rowHolders)))];
       // `00 5n 00` and `00 6n 00` are different things numbered alike (a Quick Setup, an audio config).
@@ -408,11 +437,12 @@ export function buildYamahaProfile(data, layout) {
         const groupName = own.groupOf?.(at, row, blockAt(address.map((b) => parseInt(b, 16)))) ?? (inst ? (own.group ? `${own.group} ${inst.label}` : inst.label) : own.group ?? titleCase(title));
         let name = clean(row.name);
         const label = `${groupName}: ${name} (${address.join(' ')})`;
-        if (/^reserved$/i.test(name) || !row.range.length) { continue; }
+        if (UNUSED.test(name) || !row.range.length) { continue; }
         if (inst && rowVars.length && !own.groupOf && !own.group) name = /^OP\b/.test(name) && /^OP\d/.test(inst.label) ? name.replace(/^OP\b/, inst.label) : `${inst.label} ${name}`;
-        // `1..16`, `0 .. 59 (Minute)`, `5 ... 300`, `-120 … +120`: a range printed with dots.
+        // `1..16`, `0 .. 59 (Minute)`, `5 ... 300`, `-120 … +120`: a range printed with dots; the MOTIF's
+        // `1 - 16`, `L63 - C - R63`, `-64 - +63`: with a hyphen set between spaces.
         const asPrinted = clean(row.description);
-        const description = asPrinted.replace(/(\d)\s*(?:\.{2,3}|…)\s*(?=[+-]?\d)/g, '$1 – ');
+        const description = asPrinted.replace(/(\d)\s*(?:\.{2,3}|…)\s*(?=[+-]?\d)/g, '$1 – ').replace(/(\S) - (?=\S)/g, '$1 – ');
         const describe = [];
         // Several switches in one byte (`bit 6: Off, On Assignable Knob 8 bit 5: …`): sending one means
         // knowing the others.
@@ -620,6 +650,7 @@ export function buildYamahaProfile(data, layout) {
   const unread = parameters.filter((p) => !read.has(p));
 
   if (corrected.length) notes.push(`Addresses misprinted in the data list, taken from where it prints them otherwise (a row's from the rows either side, a block's from another list): ${corrected.join(', ')}.`);
+  if (unprinted.length) notes.push(`Rows the data list prints without an address, taken as the row's before them past its size: ${unprinted.join(', ')}.`);
   for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
   const unreadGroups = [...new Set(unread.map((p) => p.group))];
   if (requests.length) notes.push(`Pull: ${requests.map((r) => r.name).join('; ')}. ${read.size} of ${parameters.length} parameters are read back${unread.length ? `; not in any block: ${unread.length > 12 ? `${unread.length} parameters, in ${unreadGroups.join(', ')}` : unread.map((p) => p.name).join(', ')}` : ''}.`);

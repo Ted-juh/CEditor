@@ -27,6 +27,8 @@ const middle = (box) => (box.y0 + box.y1) / 2;
 /** A byte of an address as printed: hex, or a placeholder for a part, element, operator (`op`, `ep`, `5p`, `kk`). */
 const ADDRESS_BYTE = /^([0-9A-F]{2}|[0-9a-zA-Z]{2})$/;   // a placeholder may be capital: the MODX M's `L0`, `Lm`
 const HEX_BYTE = /^[0-9A-F]{2}$/;
+// `Total Size = 32`, and the MOTIF ES's `TOTAL = 30` once.
+const TOTAL = /^Total(?: Size\b|\s*=)/i;
 
 /** Words of one line from x0 to x1. */
 const wordsIn = (line, x0, x1) => line.words.filter((w) => w.x0 >= x0 - 0.5 && w.x0 < x1 - 0.5);
@@ -60,7 +62,8 @@ function findHeads(lines, width) {
       const next = line.words[i + 1];
       const beside = next?.text === 'Name' && next.x0 - w.x1 <= 8;
       const under = words.some((x) => x.text === 'Name' && x.y0 > w.y0 && x.y0 - w.y1 < 6 && x.x0 < w.x1 && x.x1 > w.x0);
-      if (w.text !== 'Parameter' || !(beside || under)) return;
+      // (The MOTIF-RACK XS heads its Micro Tuning Table Name `Prameter Name`, p. 65.)
+      if (!/^P(a)?rameter$/.test(w.text) || !(beside || under)) return;
       const band = (x) => Math.abs(middle(x) - middle(w)) <= 13;
       const left = words.filter((x) => band(x) && x.x1 <= w.x0 + 1).sort((a, b) => b.x0 - a.x0);
       const size = left.find((x) => x.text === 'Size');
@@ -71,10 +74,49 @@ function findHeads(lines, width) {
       heads.push({ y0: Math.min(w.y0, size.y0, address.y0), name: w, size, address, range });
     });
   }
+  // A table across the whole page: its `Description` or `Notes` heading past the middle, and no other
+  // table's `Address` on its band (the MOTIF ES's MIX PART, under two columns of the table before).
+  for (const h of heads) {
+    const band = (x) => Math.abs(middle(x) - middle(h.name)) <= 13;
+    h.full = h.address.x0 < width / 2 && words.some((x) => band(x) && x.x0 >= width / 2 && /^(Description|Settings|Notes|Default)$/.test(x.text))
+      && !words.some((x) => band(x) && /^Address/.test(x.text) && x.x0 > h.address.x0 + 20);
+  }
+  // A column of the page with rows and no headings over them: the MOTIF ES heads its left column alone
+  // on some pages (p. 77), and the rows beside it are set under the same headings, moved across; the
+  // S90 ES runs its System table on at the top of the right column, above the Master table's heading
+  // (p. 62). How far is where its sizes stand from where the headed column's do. It runs down to its
+  // own first table's title, or to a table across the page.
+  const sizeXs = (lo, hi, top, until) => lines.filter((l) => l.y0 > top && l.y0 < until).flatMap((l) => {
+    const ws = l.words.filter((w) => w.x0 >= lo && w.x0 < hi);
+    const i = ws.findIndex((w) => !ADDRESS_BYTE.test(w.text));
+    return i >= 1 && i <= 4 && HEX_BYTE.test(ws[i - 1].text) && /^\d$/.test(ws[i].text) ? [ws[i].x0] : [];
+  }).sort((a, b) => a - b);
+  const median = (xs) => xs[Math.floor(xs.length / 2)];
+  // Where a table starts: its title, within the lines above its heading.
+  const startOf = (h) => Math.min(h.y0, ...lines.filter((l) => l.y1 <= h.y0 + 1 && l.y0 > h.y0 - 70 && /PARAMETER CHANGE TABLE/i.test(l.words.filter((w) => w.x0 >= h.address.x0 - 15 && w.x0 < h.address.x0 - 15 + width / 2).map((w) => w.text).join(' '))).map((l) => l.y0));
+  const across = Math.min(...heads.filter((h) => h.full).map((h) => h.y0));
+  for (const [lo, hi] of [[0, width / 2], [width / 2, width]]) {
+    const own = heads.filter((h) => !h.full && h.address.x0 >= lo && h.address.x0 < hi);
+    const until = Math.min(across, ...own.map(startOf));
+    const source = heads.filter((h) => !h.full && h.y0 < across && !(h.address.x0 >= lo && h.address.x0 < hi)).sort((a, b) => a.y0 - b.y0)[0];
+    if (!source) continue;
+    const here = sizeXs(lo, hi, 0, until);
+    const there = sizeXs(source.address.x0 - 15, source.address.x0 - 15 + width / 2, source.y0, across);
+    if (here.length < 3 || !there.length) continue;
+    const dx = median(here) - median(there);
+    const shift = (w) => w && { ...w, x0: w.x0 + dx, x1: w.x1 + dx };
+    // Its other headings (`Description`, `Notes`) are found from the headed column's, moved the same.
+    const band = (x) => Math.abs(middle(x) - middle(source.name)) <= 13 && x.x0 > source.name.x1 && x.x0 < source.address.x0 - 15 + width / 2;
+    const find = (text) => shift(words.find((x) => band(x) && text.includes(x.text)));
+    // Its rows can start level with the other column's headings (the MOTIF-RACK XS's p. 74): it is
+    // headed from the top of the page.
+    heads.push({ y0: 0, until, name: shift(source.name), size: shift(source.size), address: shift(source.address), range: shift(source.range), borrowed: { description: find(['Description', 'Settings']), defaultHead: find(['Default']), notes: find(['Notes']) } });
+  }
   // A head's right-hand headings run to the next head on its band; its span ends there.
   for (const h of heads) {
     // The page's columns are where its tables' `Address` headings stand, whatever their heights.
-    const next = heads.filter((o) => o !== h && o.address.x0 > h.name.x0).sort((a, b) => a.address.x0 - b.address.x0)[0];
+    // (A column that ends above this table is not beside it.)
+    const next = heads.filter((o) => o !== h && o.address.x0 > h.name.x0 && !(o.until <= h.y0)).sort((a, b) => a.address.x0 - b.address.x0)[0];
     h.x1 = next ? next.address.x0 - 15 : width;
     h.x0 = h.address.x0 - 8;
   }
@@ -82,10 +124,14 @@ function findHeads(lines, width) {
   // MODX's titles do, by ten points, the MODX M's by thirteen and a half), but not into the table
   // beside it.
   for (const h of heads) {
-    const prev = heads.filter((o) => o !== h && o.name.x1 < h.address.x0).sort((a, b) => b.address.x0 - a.address.x0)[0];
+    const prev = heads.filter((o) => o !== h && o.name.x1 < h.address.x0 && !(o.until <= h.y0) && !(h.until <= o.y0)).sort((a, b) => b.address.x0 - a.address.x0)[0];
     h.x0 = Math.max(h.address.x0 - 15, prev ? prev.x1 : 0);
   }
   for (const h of heads) {
+    if (h.borrowed) {
+      Object.assign(h, h.borrowed, { bottom: 0 });
+      continue;
+    }
     const band = (x) => Math.abs(middle(x) - middle(h.name)) <= 13 && x.x0 > h.name.x1 && x.x0 < h.x1;
     // The MX heads it `Settings` on some pages.
     h.description = words.find((x) => band(x) && (x.text === 'Description' || x.text === 'Settings'));
@@ -109,8 +155,13 @@ export function pageParameterTables(xml, addressBytes = 3) {
   const { words, width, height } = pageWords(xml);
   const lines = visualLines(words);
   // In reading order: the page's left column top to bottom, then its right. By left edge alone, a
-  // table set a few points left of the one above it would be read first (the S90 XS's page 108).
-  const heads = findHeads(lines, width).sort((a, b) => (a.x0 >= width / 2) - (b.x0 >= width / 2) || a.y0 - b.y0 || a.x0 - b.x0);
+  // table set a few points left of the one above it would be read first (the S90 XS's page 108); the
+  // side is its `Address` heading's, which the MOTIF ES's right column (p. 71) sets 14 points right of
+  // the page's middle, its left edge a point left of it.
+  // A table across the page starts a band of its own: the columns above it are read first.
+  const found = findHeads(lines, width);
+  const bandOf = (h) => found.filter((o) => o.full && o.y0 <= h.y0).length;
+  const heads = found.sort((a, b) => bandOf(a) - bandOf(b) || (a.address.x0 >= width / 2) - (b.address.x0 >= width / 2) || a.y0 - b.y0 || a.x0 - b.x0);
   const out = [];
   for (const h of heads) {
     const inSpan = (l) => l.words.some((w) => w.x0 >= h.x0 && w.x0 < h.x1);
@@ -130,12 +181,14 @@ export function pageParameterTables(xml, addressBytes = 3) {
       title = text(above[titleAt]);
       const rest = above.slice(titleAt + 1);
       if (rest[0] && /^\(/.test(text(rest[0])) && !/PARAMETER CHANGE TABLE \(/i.test(title)) title += ` ${text(rest.shift())}`;
+      // A title broken inside its brackets (the S90 ES's `(NORMAL` over `VOICE COMMON)`).
+      else if (rest[0] && /\([^)]*$/.test(title) && /\)$/.test(text(rest[0]))) title += ` ${text(rest.shift())}`;
       // The MODX M sets `Group Number =7F 1C, Model ID = 0D` beside its title.
       title = title.replace(/\s*Group Number\s*=.*$/i, '');
       for (const l of rest) if (text(l)) notes.push(text(l));
     }
     // It also ends at its `Total Size`: the notes printed under it are not its columns.
-    const total = lines.filter((l) => l.y0 > h.bottom && /^Total Size/i.test(wordsIn(l, h.x0, h.x1).map((w) => w.text).join(' '))).map((l) => l.y0).sort((a, b) => a - b)[0] ?? Infinity;
+    const total = lines.filter((l) => l.y0 > h.bottom && TOTAL.test(wordsIn(l, h.x0, h.x1).map((w) => w.text).join(' '))).map((l) => l.y0).sort((a, b) => a - b)[0] ?? Infinity;
     // A row set close under a tall heading (the YC's `50 00 00 … Voice Number` beside `(HEX)`) is still a
     // row: below the heading's name, an address and a size.
     const rowLike = (l) => l.y0 > middle(h.name) && /^([0-9A-Fa-zA-Z]{2} ){1,4}\d+ /.test(`${wordsIn(l, h.x0, h.x1).map((w) => w.text).join(' ')} `);
@@ -148,7 +201,11 @@ export function pageParameterTables(xml, addressBytes = 3) {
     // The columns. A heading is often centred over cells that start left of it (`Description`), so
     // each column starts in the widest gap the body's words leave between the heading before it and
     // its own: the x that the fewest words cover.
-    const bodyWords = body.flatMap((l) => l.words).filter((w) => w.x0 >= h.x0 && w.x0 < h.x1);
+    // Past the first Total Size, the lines that are rows count too (the S90 ES's Master Effect Slider
+    // Setting, under its System's Native System, sets its names a point and a half further left); the
+    // notes under a Total Size do not.
+    const rowish = (l) => /^([0-9A-Fa-zA-Z]{2} ){1,4}\d+ /.test(`${wordsIn(l, h.x0, h.x1).map((w) => w.text).join(' ')} `);
+    const bodyWords = [...new Set([...body, ...rowLines.filter(rowish)])].flatMap((l) => l.words).filter((w) => w.x0 >= h.x0 && w.x0 < h.x1);
     const gapAt = (a, b) => {
       if (!(b > a)) return b;
       let best = null;
@@ -162,11 +219,18 @@ export function pageParameterTables(xml, addressBytes = 3) {
     };
     const headings = [['size', h.size], ['range', h.range], ['name', h.name], ['description', h.description], ['default', h.defaultHead], ['notes', h.notes]].filter(([, w]) => w);
     const cols = [['address', h.x0]];
+    // How far left of `Parameter Name` the names start, where that is further than a heading is
+    // centred: the MOTIF ES sets its MIX PART's headings 42 points right of their cells, and the
+    // headings after it are as far right of theirs.
+    let lag = 0;
     headings.forEach(([kind, w], i) => {
       const previous = i === 0 ? h.address : headings[i - 1][1];
       // Up to 35 points left of the heading: the Motif XF centres `Parameter Name` 28 points right of
-      // where its arpeggio tables' names start.
-      const start = gapAt(Math.max(Math.min(previous.x1, w.x0 - 1) - (i === 0 ? 0 : 4), w.x0 - 35), w.x0 + 1);
+      // where its arpeggio tables' names start. Names up to 45; the headings after them as far as the
+      // names lag, and a few points more.
+      const reach = kind === 'name' ? 45 : Math.max(35, lag + 6);
+      const start = gapAt(Math.max(Math.min(previous.x1, w.x0 - 1) - (i === 0 ? 0 : 4), w.x0 - reach), w.x0 + 1);
+      if (kind === 'name' && w.x0 - start > 35) lag = w.x0 - start;
       // A size is one digit set under its heading. Where every row of a table prints its address's
       // low byte alone, set under the right of `Address` (a table run on from the page before), the
       // widest gap is left of those bytes: the size column does not start that far left.
@@ -185,13 +249,19 @@ export function pageParameterTables(xml, addressBytes = 3) {
       }
       const text = (k) => (cells[k] ?? []).join(' ');
       // A Total Size ends a table: what follows it is notes until the next row printed in full.
-      if (/^Total Size/i.test(text('address') || text('size'))) { current = null; afterTotal = true; continue; }
+      if (TOTAL.test(`${text('address')} ${text('size')}`.trim())) { current = null; afterTotal = true; continue; }
       const addressWords = cells.address ?? [];
       const isRow = addressWords.length >= 1 && addressWords.length <= addressBytes && addressWords.every((t) => ADDRESS_BYTE.test(t)) && HEX_BYTE.test(addressWords.at(-1)) && /^\d+$/.test(text('size'));
       if (isRow && afterTotal && addressWords.length < addressBytes) continue;
       if (isRow) {
         afterTotal = false;
         current = { address: addressWords, size: Number(text('size')), range: text('range') ? [text('range')] : [], name: text('name'), description: text('description'), ...(h.defaultHead ? { default: text('default') } : {}), notes: text('notes') };
+        rows.push(current);
+      } else if (current && !addressWords.length && /^\d+$/.test(text('size')) && text('name') && HEX_BYTE.test(current.address.at(-1))) {
+        // A row printed without its address (the MOTIF ES's `1 01 reserved` between EQ Q2 at 06 and
+        // EQ Gain3 at 08): the row's before it, past its size.
+        const at = (parseInt(current.address.at(-1), 16) + current.size).toString(16).toUpperCase().padStart(2, '0');
+        current = { address: [at], size: Number(text('size')), range: text('range') ? [text('range')] : [], name: text('name'), description: text('description'), ...(h.defaultHead ? { default: text('default') } : {}), notes: text('notes'), unprinted: true };
         rows.push(current);
       } else if (current) {
         if (text('range')) current.range.push(text('range'));
@@ -224,7 +294,7 @@ export function readParameterTables(pdf, pages, addressBytes = 3) {
       for (const r of t.rows) {
         const address = [...carried.slice(0, addressBytes - r.address.length), ...r.address];
         carried = address;
-        table.rows.push({ page, address, size: r.size, range: r.range.map(join), name: join(r.name), description: join(r.description), ...(r.default !== undefined ? { default: join(r.default) } : {}), notes: join(r.notes) });
+        table.rows.push({ page, address, size: r.size, range: r.range.map(join), name: join(r.name), description: join(r.description), ...(r.default !== undefined ? { default: join(r.default) } : {}), notes: join(r.notes), ...(r.unprinted ? { unprinted: true } : {}) });
       }
     }
   }
@@ -238,7 +308,12 @@ export function readParameterTables(pdf, pages, addressBytes = 3) {
  * number line's high nibble: 0001 for a parameter change, 0000 for a bulk dump.
  */
 function readHeader(lines, status) {
-  const start = lines.findIndex((l) => new RegExp(`\\b${status}nnnn\\s+\\w{2}H?\\s+Device Number`, 'i').test(l));
+  // The native message where the data list also prints an XG one (the MOTIF ES's `4C Model ID` first,
+  // then under `NATIVE PARAMETER CHANGE` its own `7F 00`).
+  const native = status === '0001' ? lines.findIndex((l) => /NATIVE PARAMETER CHANGE/i.test(l)) : -1;
+  const isStart = (l) => new RegExp(`\\b${status}nnnn\\s+\\w{2}H?\\s+Device Number`, 'i').test(l);
+  const afterNative = native >= 0 ? lines.findIndex((l, i) => i > native && isStart(l)) : -1;
+  const start = afterNative >= 0 ? afterNative : lines.findIndex(isStart);
   if (start < 0) return null;
   const out = [];
   for (const l of lines.slice(start + 1, start + 16)) {
@@ -306,18 +381,24 @@ export function readByteCount(text) {
  * block with `last`: the last one's name and middle address byte. Lines between `Byte Count` and the
  * next heading, within the span the layout gives.
  */
-export function readBulkBlocks(pdf, page, span = {}, addressBytes = 3) {
-  return pageBulkBlocks(pageXml(pdf, page), span, addressBytes);
+export function readBulkBlocks(pdf, page, span = {}, addressBytes = 3, before = null) {
+  return pageBulkBlocks(pageXml(pdf, page), span, addressBytes, before);
 }
 
-/** readBulkBlocks on one page's `pdftotext -bbox-layout` XML. */
-export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}, addressBytes = 3) {
+/**
+ * readBulkBlocks on one page's `pdftotext -bbox-layout` XML. `before`, the blocks of the spans read
+ * before this one: a series can run on over a column's foot (the MOTIF's drum keys, `KEY C 0` and
+ * `: 73 Blocks` at the foot of the left column, `KEY C 6` at the head of the right), and is finished
+ * here. Only this span's blocks are returned.
+ */
+export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}, addressBytes = 3, before = null) {
   const lines = visualLines(pageWords(xml).words);
   const inSide = (w) => w.x0 >= left && w.x0 < right;
   const head = lines.find((l) => l.words.some((w) => inSide(w) && w.text === 'Byte') && l.words.some((w) => inSide(w) && w.text === 'Count'));
   if (!head) return [];
-  const out = [];
-  let series = false;
+  const out = [...(before?.blocks ?? [])];
+  const carried = out.length;
+  let series = before?.series ?? false;
   let inSeries = -1;
   const midX = new Map();   // where each block's middle byte stands
   // A placeholder byte may be misprinted a letter short (the MONTAGE M's whole Performance header,
@@ -329,7 +410,16 @@ export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}, address
     const text = words.join(' ');
     // `:` between the ends of a series, alone or with its count (the MODX's `: 8 Blocks : : :`).
     if (/^:(\s+(:|\d+|Blocks,?|Max|Parts))*$/.test(text)) { series = out.length > 0; continue; }
-    const m = new RegExp(`^(.*?)\\s*(\\d+)\\s+([0-9A-F]{2,5})${`\\s+${BYTE}`.repeat(addressBytes)}$`).exec(text);
+    // The page's number, under a column whose series runs on into the next (the MOTIF's p. 47).
+    if (/^\d+$/.test(text)) continue;
+    // Another table's headings under it (the CP5/CP50's `Bulk Header / Footer Address Description`).
+    if (out.length > carried && /\bAddress\b/.test(text) && /\bDescription\b/.test(text)) break;
+    // `Common 101 0065 30 00 00`: the description, the byte count in decimal and hex, the address; or
+    // the CP5/CP50's order, `SYSTEM 00 00 00 40 28 Utility`: the address, the byte count, the description.
+    const printed = new RegExp(`^(.*?)\\s*(\\d+)\\s+([0-9A-F]{2,5})${`\\s+${BYTE}`.repeat(addressBytes)}$`).exec(text);
+    const addressFirst = !printed && new RegExp(`^(?:(.*?)\\s+)??${`${BYTE}\\s+`.repeat(addressBytes)}(\\d+)\\s+([0-9A-F]{2,5})(?:\\s+(.*))?$`).exec(text);
+    if (addressFirst) addressFirst[1] ??= '';
+    const m = printed || (addressFirst && [null, `${addressFirst[1]} ${addressFirst.at(-1) ?? ''}`.trim(), addressFirst[addressBytes + 2], addressFirst[addressBytes + 3], ...addressFirst.slice(2, 2 + addressBytes)]);
     const last = series && /^(.*?)\s+([0-9A-F]{2})$/.exec(text);
     const seriesBefore = series;
     series = false;
@@ -371,5 +461,6 @@ export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}, address
     }
     else if (/^(MIDI|Program|Control|Parameter)\b/.test(text) && out.length) break;
   }
-  return out;
+  if (before) before.series = series;
+  return out.slice(carried);
 }
