@@ -95,7 +95,7 @@ for (const { name, profile, text, out, data } of BUILT) {
         assert.equal(compiled.hex, `B0 ${hex([cc])} ${hex([wire])}`, `${p.id} = ${value}`);
       }
     }
-    for (const t of profile.tests) assert.equal(localCompileParameter(profile, { parameterId: t.parameter, value: t.value }).hex, t.expectedHex, t.name);
+    for (const t of profile.tests.filter((x) => x.parameter)) assert.equal(localCompileParameter(profile, { parameterId: t.parameter, value: t.value }).hex, t.expectedHex, t.name);
   });
 
   test(`${profile.id}: every parameter is a sound parameter change at its index, at both ends of its range`, { skip: !!data.controllers }, () => {
@@ -114,7 +114,7 @@ for (const { name, profile, text, out, data } of BUILT) {
     }
   });
 
-  test(`${profile.id}: its test vectors, its request, and its sound dump read back, with the checksum or 7F`, { skip: !!data.controllers }, () => {
+  test(`${profile.id}: its test vectors, its request, and its dump read back, with the checksum or 7F`, { skip: !profile.requests }, () => {
     for (const t of profile.tests) {
       if (t.parameter) {
         const compiled = localCompileParameter(profile, { parameterId: t.parameter, value: t.value });
@@ -136,7 +136,7 @@ for (const { name, profile, text, out, data } of BUILT) {
         assert.equal(localParseDumpMessage(profile, bytes.join(' ')).ok, false, 'another wrong one is not');
       }
     }
-    assert.ok(profile.parameters.every((p) => p.access.canRead), 'every parameter is in the sound dump');
+    assert.ok(profile.parameters.every((p) => p.access.canRead), 'every parameter is in the dump');
   });
 
   test(`${profile.id}: the source is Waldorf's specification, and nobody has tried it on an instrument`, () => {
@@ -213,4 +213,23 @@ test('the Streichfett and Rocket: two-column charts, values printed beside their
   assert.equal(localCompileParameter(rocket, { parameterId: at(rocket, 'LFO Target').id, value: 'pitch' }).hex, 'B0 12 02', '`0: Arp, 1: Cutoff, 2: Pitch` on CC 18');
   assert.ok(at(rocket, 'Vibrato Mod LFO'), '`0...127` is a range too');
   for (const p of [streichfett, rocket]) assert.equal(p.parameters.some((x) => /Sustain Pedal|Modulation Wheel|All Notes Off|Local Control/.test(x.name)), false, `${p.id}: no performance or channel mode controllers`);
+});
+
+test('the Pulse: its controller assignments and program dump, tables by number, Pull by program', { skip: !builtProfile('waldorf-pulse') }, () => {
+  const pulse = builtProfile('waldorf-pulse');
+  const at = (name) => pulse.parameters.find((p) => p.name === name);
+  assert.equal(localCompileParameter(pulse, { parameterId: at('Cutoff Frequency').id, value: 100 }).hex, 'B0 32 64', 'CC 50');
+  assert.deepEqual(at('Osc2 Shape').choices.map((c) => c.label), ['Pulse', 'Sawtooth', 'Triangle', 'Cross Modulation'], '`0: Pulse` and the lines under it');
+  assert.equal(at('Mod Unit 1 Source').choices.length, 16, 'Table 1, the modulation sources');
+  assert.equal(at('Mod Unit 1 Destination').choices[0].label, 'Pitch', 'Table 3, the destinations');
+  assert.deepEqual([at('Osc1 Semitone').range, at('Osc1 Semitone').display.min], [{ min: 16, max: 112 }, -48], '`16...112`, shown -48 to +48');
+  // Pull asks for a stored program by number, so nothing is read on connect.
+  assert.equal(pulse.startup, undefined);
+  const request = localCompileDeviceRequest({ ...pulse, variables: { ...pulse.variables, program: 98, deviceId: 5 } }, { request: 'requestProgram' });
+  assert.equal(request.transaction?.encodedValueHex ?? request.hex, 'F0 3E 0B 05 40 62 F7', 'P.99, device 5');
+  const dump = pulse.tests.find((t) => t.kind === 'dumpParse').inputHex.split(' ');
+  assert.equal(dump.length, 77, '$F0 to $F7, bytes 0 - 76');
+  dump[5] = '2A';
+  assert.ok(localParseDumpMessage(pulse, dump.join(' ')).ok, 'any program number: the checksum starts at byte 6');
+  assert.equal(pulse.parameters.some((p) => /Mod Wheel|Main Volume|Sustain Switch|Breath Control/.test(p.name)), false, 'no performance controllers');
 });

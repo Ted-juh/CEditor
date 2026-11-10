@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { readControllerChart } from './read-waldorf-cc.mjs';
+import { readControllerChart, readNumberedList, readNumberedTable } from './read-waldorf-cc.mjs';
 import { documentLines, readEffects, readFormat, readLists, readSoundTable } from './read-waldorf-sysex.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -24,6 +24,17 @@ export async function loadLayout(name) {
 
 export function importDocument(layout, file) {
   const doc = layout.document;
+  // A manual's controller assignments and program dump, read without headings, and the lists they
+  // refer to (the Pulse's appendices B and C, Tables 1 and 3).
+  if (layout.read?.numbered) {
+    const r = layout.read.numbered;
+    return {
+      sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
+      controllers: readNumberedTable(file, r.controllers.pages, new RegExp(r.controllers.stop)).map(({ number, ...row }) => ({ controller: number, ...row })),
+      dump: readNumberedTable(file, r.dump.pages, new RegExp(r.dump.stop)),
+      lists: Object.fromEntries(Object.entries(r.lists ?? {}).map(([k, l]) => [k, readNumberedList(file, l.page, new RegExp(l.start), new RegExp(l.end))])),
+    };
+  }
   // A manual's controller chart (the micro Q's), not a SysEx specification.
   if (layout.read?.chart) {
     return {
@@ -50,7 +61,10 @@ export function importDocument(layout, file) {
 /** One row per line, so a re-import that changes one row changes one line. */
 export function stringifyTranscription(data) {
   const rows = (items, indent) => (items.length ? `[\n${items.map((x) => `${indent}  ${JSON.stringify(x)}`).join(',\n')}\n${indent}]` : '[]');
-  if (data.controllers) return `{\n  "sources": ${rows(data.sources, '  ')},\n  "controllers": ${rows(data.controllers, '  ')}\n}\n`;
+  if (data.controllers) {
+    const more = data.dump ? `,\n  "dump": ${rows(data.dump, '  ')},\n  "lists": {\n${Object.entries(data.lists).map(([k, v]) => `    ${JSON.stringify(k)}: ${rows(v, '    ')}`).join(',\n')}\n  }` : '';
+    return `{\n  "sources": ${rows(data.sources, '  ')},\n  "controllers": ${rows(data.controllers, '  ')}${more}\n}\n`;
+  }
   const lists = Object.entries(data.lists).map(([k, v]) => `    ${JSON.stringify(k)}: { "title": ${JSON.stringify(v.title)}, ${v.notes ? `"notes": ${JSON.stringify(v.notes)}, ` : ''}"items": ${rows(v.items, '    ')} }`).join(',\n');
   const effects = data.effects.map((e) => `    { "type": ${JSON.stringify(e.type)}, "rows": ${rows(e.rows, '    ')} }`).join(',\n');
   return `{\n  "sources": ${rows(data.sources, '  ')},\n  "format": ${JSON.stringify(data.format)},\n  "sound": ${rows(data.sound, '  ')},\n  "lists": {\n${lists}\n  },\n  "effects": [\n${effects}\n  ]\n}\n`;

@@ -328,7 +328,7 @@ export function buildWaldorfCcProfile(data, layout) {
   const dots = (s) => String(s).replace(/…|\.{3}/g, '..').replace(/’/g, "'").trim();
   // The performance and channel mode controllers, which change no setting of the sound: the micro Q
   // marks them `*`, the Streichfett and Rocket print them unmarked.
-  const PERFORMANCE = /^(Modulation Wheel|Breath Control|Foot Control|Channel Volume|Sustain Pedal|Sostenuto|All Sound Off|Reset All Control|Local Control|All Notes Off|Omni Mode|Poly Mode|Mono Mode)/;
+  const PERFORMANCE = /^(Modulation Wheel|Mod Wheel|Breath Control|Foot Control|Channel Volume|Main Volume|Sustain Pedal|Sustain Switch|Sostenuto|All Sound Off|Reset All Control|Local Control|All Notes Off|Omni Mode|Poly Mode|Mono Mode)/;
   // A cell the reader takes apart wrongly, given by the layout (the Streichfett's `8va`).
   const fixed = data.controllers.filter((r) => layout.fix?.[r.controller]);
   if (fixed.length) notes.push(`Cells the reader could not read as printed, given by the layout: ${fixed.map((r) => `CC ${r.controller} ${r.name}`).join(', ')}.`);
@@ -350,9 +350,13 @@ export function buildWaldorfCcProfile(data, layout) {
     const value = dots(row.value);
     const describe = [];
     let shown = null;
-    // `0 = Off, 64 = On`, `0: Saw, 1: Pulse`: the values printed beside the names.
-    const numbered = value.split(/\s*,\s*/).map((x) => /^(\d+)\s*[:=]\s*(.+)$/.exec(x));
+    // `0 = Off, 64 = On`, `0: Saw, 1: Pulse`, and the Pulse's a line each (`0: Sine 1: Triangle …`):
+    // the values printed beside the names.
+    const numbered = value.split(/\s*,\s*|\s+(?=\d+:\s)/).map((x) => /^(\d+)\s*[:=]\s*(.+)$/.exec(x));
     if (!choices && numbered.length >= 2 && numbered.every(Boolean)) choices = numbered.map((m) => ({ value: Number(m[1]), label: m[2] }));
+    // `see Table`: the list the layout names for it (the Pulse's modulation sources and destinations).
+    const table = /^see Table$/i.test(value) && layout.listOf?.(name);
+    if (!choices && table && data.lists?.[table]) choices = data.lists[table].filter((i) => i.value >= lo && i.value <= hi);
     if (!choices) {
       const items = listed(value.replace(/,\s+/g, ','), lo, hi);
       const names = value.includes(',') || value.includes('/') ? value.split(/\s*[,/]\s*/) : null;
@@ -380,14 +384,62 @@ export function buildWaldorfCcProfile(data, layout) {
       parameters.push({ ...base, type: bipolar ? 'bipolar' : 'integer', range: { min: lo, max: hi }, default: bipolar ? lo - shown.min : lo, display: { mode: 'number', unit: '', shortLabel: camel(name), ...(shown ? { min: shown.min, max: shown.max } : {}) }, normalization: { mode: 'linear' }, encoding: { type: 'u7' }, sendPolicy: hi - lo > 8 ? { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true } : { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: /Level|Attack|Decay|Sustain|Release|Rate|Amount|Volume|Cutoff|Resonance/i.test(name) ? 'Slider' : 'Knob' } });
     }
   }
+  // The program dump (the Pulse's): each parameter at the byte its name has there, and Pull by
+  // program number.
+  const pd = layout.programDump;
+  let dumpDefinitions = null;
+  let requests = null;
+  if (data.dump && pd) {
+    const at = new Map(data.dump.filter((r) => r.number >= pd.from && r.number <= pd.to).map((r) => [r.name, r.number]));
+    const mappings = [];
+    const unmatched = [];
+    for (const p of parameters) {
+      const byte = at.get(p.name);
+      if (byte === undefined) { unmatched.push(p.name); continue; }
+      mappings.push({ parameter: p.id, offset: byte - pd.from });
+      p.access.canRead = true;
+    }
+    const size = pd.to - pd.from + 1;
+    dumpDefinitions = [{
+      id: 'programDump',
+      name: 'Program Dump',
+      kind: 'sysex',
+      // F0 3E <model> <dev> 00, then the program number (any) and the data.
+      matcher: { prefix: ['F0', '3E', pd.model, '$deviceId', '00'], suffix: ['F7'] },
+      payload: { offset: pd.from, size },
+      checksum: { type: 'sum-7bit', fromOffset: pd.from, toOffset: pd.to, byteOffset: pd.to + 1, alsoAccept: ['7F'] },
+      completion: { expectedMessages: 1, expectedBytes: pd.to + 3 },
+      mappings,
+    }];
+    requests = [{ id: 'requestProgram', name: 'Program dump request (the program variable)', kind: 'sysex', template: ['F0', '3E', pd.model, '$deviceId', '40', '$program', 'F7'], response: { dump: 'programDump' }, timeoutMs: 3000, retries: 1 }];
+    notes.push(`Pull: ${requests[0].name}. ${mappings.length} of ${parameters.length} parameters are read back${unmatched.length ? `; the program dump names no byte for ${unmatched.join(', ')}` : ''}. Nothing is read on connect: the program asked for is not necessarily the one playing.`);
+  }
   for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
-  const variables = { channel: 1, ...(layout.variables ?? {}) };
+  const variables = { channel: 1, ...(dumpDefinitions ? { deviceId: 0 } : {}), ...(layout.variables ?? {}) };
   const tests = [];
   for (const p of [parameters.find((x) => x.type === 'choice'), parameters.find((x) => x.type === 'bipolar'), parameters.find((x) => x.type === 'integer' && x.range.max > 1)].filter(Boolean)) {
     const choice = p.type === 'choice' ? p.choices.at(-1) : null;
     const v = choice ? choice.value : Math.min(p.range.max, Math.max(p.range.min, 100));
     const cc = recipes.find((r) => r.id === p.messageRecipe).controller;
     tests.push({ name: `${p.name} = ${choice ? choice.label : v} (CC ${cc})`, parameter: p.id, value: choice ? choice.id : v, expectedHex: ['B0', hex(cc), hex(v)].join(' ') });
+  }
+  if (requests) {
+    const fill = (b) => (b.startsWith('$') ? hex(variables[b.slice(1)]) : b);
+    tests.push({ name: requests[0].name, kind: 'request', request: requests[0].id, expectedHex: requests[0].template.map(fill).join(' ') });
+    // A program dump made by hand: every value at its lowest, but one choice at its last and one
+    // number at its highest, the checksum worked out.
+    const dump = dumpDefinitions[0];
+    const bytes = new Array(dump.payload.size).fill(0);
+    const expected = {};
+    const placed = dump.mappings.map((m) => ({ p: parameters.find((x) => x.id === m.parameter), at: m.offset }));
+    for (const { p, at } of placed) bytes[at] = p.type === 'choice' ? p.choices[0].value : p.range.min;
+    const c = placed.find((x) => x.p.type === 'choice' && x.p.choices.length > 2);
+    const n = placed.find((x) => x.p.type === 'integer' && x.p.range.max > 1);
+    if (c) { bytes[c.at] = c.p.choices.at(-1).value; expected[c.p.id] = c.p.choices.at(-1).id; }
+    if (n) { bytes[n.at] = n.p.range.max; expected[n.p.id] = n.p.range.max; }
+    const head = [...dump.matcher.prefix.map(fill), hex(variables.program ?? 0)];
+    const sum = bytes.reduce((t, b) => t + b, 0) & 0x7f;
+    tests.push({ name: `${dump.name}, read back`, kind: 'dumpParse', inputHex: [...head, ...bytes.map(hex), hex(sum), 'F7'].join(' '), expectedValues: expected });
   }
   const doc = data.sources[0];
   return {
@@ -401,7 +453,7 @@ export function buildWaldorfCcProfile(data, layout) {
     status: 'experimental',
     trust: 'local',
     description: layout.description,
-    sources: [{ type: 'manual', title: doc.title, notes: `Controller chart (pages ${layout.read.chart.join(', ')}) read by tools/profiles/waldorf/read-waldorf-cc.mjs from ${doc.file} (sha256 ${doc.sha256}), ${doc.url}. Not yet checked against the instrument itself.` }],
+    sources: [{ type: 'manual', title: doc.title, notes: `${layout.read.chart ? `Controller chart (pages ${layout.read.chart.join(', ')})` : `Controller assignments (pages ${layout.read.numbered.controllers.pages.join(', ')}), program dump (pages ${layout.read.numbered.dump.pages.join(', ')}) and value lists`} read by tools/profiles/waldorf/read-waldorf-cc.mjs from ${doc.file} (sha256 ${doc.sha256}), ${doc.url}. Not yet checked against the instrument itself.` }],
     testedWith: [],
     authoringNotes: [
       'Generated by tools/profiles/waldorf/make-profiles.mjs; edit the layout in tools/profiles/waldorf/synths/, not this file.',
@@ -413,8 +465,8 @@ export function buildWaldorfCcProfile(data, layout) {
     coverage: {
       singleParameterWrite: 'complete-for-the-manual\'s-controller-chart',
       realtimeEditing: 'complete-for-the-manual\'s-controller-chart',
-      editBufferDumpRequest: 'notImplemented',
-      editBufferDumpParse: 'notImplemented',
+      editBufferDumpRequest: requests ? 'partial: a stored program by number; the instrument has no edit buffer request' : 'notImplemented',
+      editBufferDumpParse: requests ? `complete: ${dumpDefinitions[0].mappings.length} of ${parameters.length} parameters` : 'notImplemented',
       bankDump: 'notImplemented',
       inboundControllers: 'the instrument sends these same controllers when its MIDI settings allow',
       verifiedOnHardware: false,
@@ -424,5 +476,8 @@ export function buildWaldorfCcProfile(data, layout) {
     messageRecipes: recipes,
     parameters,
     tests,
+    // No startup chain: the request reads a stored program, not what is playing, and a read on
+    // connect would put P.1 on the panel whatever the instrument has. Pull asks for it.
+    ...(requests ? { requests, dumpDefinitions } : {}),
   };
 }

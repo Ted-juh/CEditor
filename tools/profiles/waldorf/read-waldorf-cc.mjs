@@ -8,7 +8,8 @@
 // a line whose first word, under `Ctrl`, is a number; a line without one runs its row's text on. The
 // Streichfett and the Rocket set the chart in two columns with headings over the left only: the right
 // is read under the same headings moved across, by as far as its controller numbers stand from the
-// left's.
+// left's. The Pulse's manual prints its tables with no headings over most pages, and its value lists
+// in its text: readNumberedTable and readNumberedList read those.
 
 import { execFileSync } from 'node:child_process';
 
@@ -91,4 +92,65 @@ export function chartRows(lines, first = 1) {
     }
   }
   return rows;
+}
+
+/**
+ * A numbered table read without its headings, which the Pulse's manual prints once and then sets
+ * each page at its own indent: a row is a number, a range (`0...127`, `16...112`, or one value), the
+ * parameter's name and its values, the name and values apart at the widest gap after the range; the
+ * lines under it run its values on (`0: Pulse`, `1: Sawtooth` …). The Pulse's controller assignments
+ * (appendix B) and its program dump (appendix C): [{ page, number, range, name, value }]. A row whose
+ * range is a byte in hex (`$F0`) is a message's framing, not read; the table ends at `stop`.
+ */
+export function readNumberedTable(pdf, pages, stop = null) {
+  const xml = execFileSync('pdftotext', ['-f', String(pages[0]), '-l', String(pages.at(-1)), '-bbox', pdf, '-'], { maxBuffer: 1e9, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+  const rows = [];
+  let current = null;
+  let at0 = null;   // where the current row's values start
+  for (const l of pageLines(xml)) {
+    const t = text(l.words);
+    if (stop && rows.length && stop.test(t)) break;
+    if (/User.s Manual|^\d+$/.test(t)) continue;
+    const [n, range, ...rest] = l.words;
+    if (n && /^\d+$/.test(n.text) && range && /^\d+(?:\.{2,3}|…)\d+$|^\d+$/.test(range.text) && rest.length) {
+      let at = 0;
+      let widest = -1;
+      for (let i = 0; i + 1 < rest.length; i++) { const gap = rest[i + 1].x0 - rest[i].x1; if (gap > widest) { widest = gap; at = i; } }
+      const split = widest >= 8 ? at + 1 : rest.length;
+      current = { page: pages[0] + l.page - 1, number: Number(n.text), range: range.text, name: text(rest.slice(0, split)), value: text(rest.slice(split)) };
+      rows.push(current);
+      at0 = rest[split]?.x0 ?? null;
+    } else if (current && at0 !== null && Math.abs(l.words[0].x0 - at0) <= 6) {
+      // Values run on under their row's values (`1: Sawtooth` under `0: Pulse`).
+      current.value = `${current.value} ${t}`.trim();
+    } else current = null;
+  }
+  return rows;
+}
+
+/**
+ * A numbered list set in a manual's text (the Pulse's `Table 1: Modulation sources`, `0 Off
+ * Modulation off`, `1 LFO1 LFO 1 signal` …): from the line `start` matches to the one `end` does,
+ * each line's number and its name, the words before the widest gap (the description after it is not
+ * kept). [{ value, label }].
+ */
+export function readNumberedList(pdf, page, start, end) {
+  const xml = execFileSync('pdftotext', ['-f', String(page), '-l', String(page), '-bbox', pdf, '-'], { maxBuffer: 1e9, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+  const out = [];
+  let on = false;
+  for (const l of pageLines(xml)) {
+    const t = text(l.words);
+    if (!on && start.test(t)) on = true;
+    if (!on) continue;
+    if (end.test(t)) break;
+    // The list's own words: a number, then its name, then (set apart) what it means.
+    const at = l.words.findIndex((w) => /^\d+$/.test(w.text));
+    if (at < 0) continue;
+    const rest = l.words.slice(at + 1);
+    if (!rest.length) continue;
+    let cut = rest.length;
+    for (let i = 0; i + 1 < rest.length; i++) if (rest[i + 1].x0 - rest[i].x1 >= 8) { cut = i + 1; break; }
+    out.push({ value: Number(l.words[at].text), label: text(rest.slice(0, cut)) });
+  }
+  return out;
 }

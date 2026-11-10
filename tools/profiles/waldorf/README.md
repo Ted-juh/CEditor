@@ -18,7 +18,7 @@ instruments edited by control change. Every document below has a text layer; non
 | Microwave II, XT, XTk | Microwave 2 System Exclusive Specifications, software release 2.16 (26 pages) | Legacy, Microwave II/XT/XTk, Documentation zip | the same form as the Blofeld's, its ancestor: sound, multi, wave, wavetable, global and display messages |
 | Microwave (1989) | MicrowaveSysex 1.0 and 2.0, and their 1.25 and 2.00 addenda (plain text) | Legacy, Microwave, Documentation zip | the Microwave's dumps and parameter changes by operating system |
 | Wave | Waldorf Wave System Exclusive Description, OS 1.400 (19 pages), and a MIDI implementation chart | Legacy, Wave, Documentation zip | the Wave's dumps and parameters |
-| Pulse, Pulse+ | Waldorf Pulse System Exclusive Format 1.1 (7 pages) | Legacy, Pulse series, Documentation zip | the program dump, byte by byte |
+| Pulse, Pulse+ | User's Manual Pulse • PulsePlus, version 2.0 (68 pages): controller assignments (appendix B, pp. 58 - 60), SysEx (appendix C, pp. 61 - 67); also a System Exclusive Format 1.1 sheet | Legacy, Pulse series, Documentation zip (`Documentation EN/Manual_v2_0_eng.pdf`) | every sound parameter's controller and its byte in the program dump; the program dump's request by number |
 | micro Q (Omega, lite, keyboard) | User's Manual (158 pages): MIDI Controller list p. 152, implementation chart p. 156 | Legacy, micro Q series, Documentation zip | controllers only; its SysEx format is not in the zip |
 | Iridium, Iridium Core, Iridium MK2, STVC, Rocket, Streichfett, Zarenbourg | each instrument's manual | its product or Legacy page | to be read for their controller charts |
 
@@ -45,6 +45,7 @@ which for the Blofeld's edit buffer is `7F`, the value always accepted.
 | Step | File | What it does |
 | --- | --- | --- |
 | 1 | `read-waldorf-sysex.mjs` | A specification's pages → its sound data table, value lists, effect parameters and messages, as printed. Decides nothing. |
+| 1 | `read-waldorf-cc.mjs` | A manual's controller chart, or the Pulse's numbered tables and lists, → their rows as printed. Decides nothing. |
 | 2 | `import-waldorf.mjs` | Writes `tables/<name>.json`: those, with the document's name, SHA-256 and address. **This is what is committed.** |
 | 3 | `synths/<name>.mjs` | The layout: the document, the rows the reader cannot split, the choices the specification describes in words, the groups. |
 | 4 | `build-waldorf-profile.mjs`, `make-profiles.mjs` | Transcription + layout → `CE/profiles/test/<id>.ceditor-device.json`. |
@@ -98,6 +99,7 @@ sound dump's data indices and what its checksum covers, the edit buffer's locati
 | `waldorf-blofeld` | Blofeld System Exclusive Specifications 1.04 | 258 | 97 | the Sound mode edit buffer, every parameter read back |
 | `waldorf-microwave-2` | Microwave 2 System Exclusive Specifications 2.16 (Microwave II, XT, XTk) | 203 | 84 | the Sound mode edit buffer, every parameter read back |
 | `waldorf-microq` | microQ Omega/lite/Keyboard User's Manual, controller chart pp. 151 - 155 | 103 | 16 | none: no SysEx format published |
+| `waldorf-pulse` | User's Manual Pulse • PulsePlus 2.0, appendices B and C | 68 | 22 | a stored program by number, every parameter read back |
 | `waldorf-rocket` | Rocket User's Manual, controller chart p. 34 | 19 | 7 | none |
 | `waldorf-streichfett` | Streichfett Reference Manual, controller chart p. 21 | 17 | 5 | none |
 
@@ -133,6 +135,33 @@ first value of it sent (`serial/parallel`: 0, 64), as the Moog profiles do.
 Not laid out: the micro Q's Glide Mode and filter types (numbers here; the manual lists their values
 in its chapters, not the chart), and the Rocket's alternative assignment. The Iridium, Iridium Core
 and Quantum have no fixed controller map (the user assigns each controller, and they ignore incoming
-NRPN), and the STVC's manual is German only: none of them has a profile. Still to read: the Pulse
-(a program dump byte by byte and a controller table, partly in German), the Wave and the Microwave of
-1989 (their SysEx descriptions), and the Zarenbourg, whose manual prints no chart.
+NRPN), and the STVC's manual is German only: none of them has a profile. Still to read: the Wave and
+the Microwave of 1989 (their SysEx descriptions), and the Zarenbourg, whose manual prints no chart.
+
+## The Pulse
+
+The Pulse's manual (version 2.0, English) prints its MIDI as tables with their headings once and
+then none, each page at its own indent: appendix B, the controller assignments, and appendix C, the
+program dump byte by byte (`readNumberedTable`). A row is a number, a range (`0...127`, `16...112`,
+or one value), the parameter's name and its values, apart at the widest gap after the range; the
+lines under it run its values on (`0: Pulse`, then `1: Sawtooth` …). A range in hex (`$F0`) is the
+message's framing, not read. The modulation sources and destinations are Tables 1 and 3 in the
+manual's text (`readNumberedList`), a number and a name each; a row whose values say `see Table`
+takes them by its name (`… Source`, `… Destination`).
+
+The two tables name each parameter the same way, so each controller is read back from the program
+dump at the byte its name has there: 68 of 68. The dump is `F0 3E 0B <dev> 00 <program> <data> <CHK>
+F7`, its checksum bytes 6 to 74 with bit 7 cleared, and a checksum of 127 always accepted. The Pulse
+has no request for its edit buffer: the request (`F0 3E 0B <dev> 40 <program> F7`) is for a stored
+program, the `program` variable (0 for P.1 … 98 for P.99, 99 for P.rn). So Pull reads that program
+as stored, and nothing is read on connect, which would put P.1 on the panel whatever the Pulse is
+playing. A program dump sent from the Pulse's panel is the current program, edits and all, and is read
+as it arrives. Its Controller Dump (and the request for it, `$4B`) sends the program as these same
+control changes; a request answered by control changes is not something a profile can wait for, so
+it is not laid out, but CEditor follows the controllers as they come.
+
+The performance controllers (Mod Wheel, Breath Control, Main Volume, Sustain Switch) and the channel
+mode messages are left out by name, as on the other charts.
+
+The manual's System Exclusive Format 1.1 sheet, the older document, prints the same program dump;
+the manual is read because it has the controllers too.
