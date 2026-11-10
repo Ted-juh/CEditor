@@ -20,7 +20,8 @@ instruments edited by control change. Every document below has a text layer; non
 | Wave | Waldorf Wave System Exclusive Description, OS 1.400 (19 pages), and a MIDI implementation chart | Legacy, Wave, Documentation zip, `s/ytFDr27HtKRYBia` | the Soundprogram dump (SBPR) byte by byte, its request (RQBPR), the sound parameter dump (SBPRPAR); performance, wave, table and global dumps |
 | Pulse, Pulse+ | User's Manual Pulse • PulsePlus, version 2.0 (68 pages): controller assignments (appendix B, pp. 58 - 60), SysEx (appendix C, pp. 61 - 67); also a System Exclusive Format 1.1 sheet | Legacy, Pulse series, Documentation zip (`Documentation EN/Manual_v2_0_eng.pdf`) | every sound parameter's controller and its byte in the program dump; the program dump's request by number |
 | micro Q (Omega, lite, keyboard) | User's Manual (158 pages): MIDI Controller list p. 152, implementation chart p. 156 | Legacy, micro Q series, Documentation zip | controllers only; its SysEx format is not in the zip |
-| Iridium, Iridium Core, Iridium MK2, STVC, Rocket, Streichfett, Zarenbourg | each instrument's manual | its product or Legacy page | to be read for their controller charts |
+| Rocket, Streichfett | each instrument's manual | its Legacy page | their controller charts |
+| Iridium, Iridium Core, Iridium MK2, STVC, Zarenbourg | each instrument's manual | its product or Legacy page | no profile: see the end of this README |
 
 Not found on the site: a SysEx format for the Q and micro Q (the Q's Legacy page has system files
 and tools but no documentation), the Quantum MK2 and M (no documents linked on their pages), and the
@@ -219,3 +220,34 @@ mixer input, printed as `source 2` and `amount 2` a second time.
 
 The Microwave's profile follows the document for system software 2.00 (its 2.00 addendum is folded
 into it). An earlier Microwave has the same sound dump with narrower ranges where the rows are marked.
+
+## What is left out, and what would read it
+
+Every profile names what it leaves out in its own notes. Across the eight:
+
+| Left out | Where | Rows | What would read it |
+| --- | --- | ---: | --- |
+| The other instruments of a Multi | Blofeld (2 - 16), Microwave II/XT (2 - 8), Wave and Microwave (2 - 8) | the whole sound again for each | a repeated group in the profile format: a block of parameters, the location or instrument byte as its stride, a count |
+| The arpeggiator pattern's bit fields (`0sssgaaa`, `0lll0ttt`) | Blofeld | 32 bytes | a bit-field encoding written from the byte's last read value; or the fields' values, which the specification describes but does not list |
+| What an effect parameter shows for each effect type | Blofeld (laid out as 0 - 127, each type's meaning described) | 28 | a parameter set chosen by another parameter's value |
+| The program playing, as control changes (Controller Dump, `4B`) | Pulse | — | a request whose response is controllers |
+| The global, multi, wave, wavetable and display messages | Blofeld, Microwave II/XT, Microwave, Wave | — | each a profile block of its own; the global ones have no parameter change, so they would be dump-only |
+| Identity | Microwave II/XT (a bitmask of the hardware fitted), Microwave and Wave (none printed) | — | `identity.modelNumber` taking a list, for the Microwave II/XT |
+| The micro Q's Glide Mode and filter types as choices | micro Q | 3 | reading the lists from the manual's chapters, not the chart |
+| The Rocket's alternative controller assignment (`Alt Ctrl`, 12 of its 19 differ) | Rocket | 19 | a second profile, or a variable choosing the column |
+| Note names (`represents C-2...G9`) | Wave's key centres | 5 | a note display mode |
+
+None of it is a reading problem: every row of every document read here is either laid out or named
+in its profile's notes with the reason. Four rows were misprinted and are corrected in the layouts
+(see above).
+
+Instruments with no profile, and why:
+
+| Instrument | Why |
+| --- | --- |
+| Iridium, Iridium Core, Iridium MK2, Quantum MK2, M | no fixed controller map: each controller is assigned by the user, and incoming NRPN is ignored |
+| STVC | its manual is German only |
+| Zarenbourg | its manual prints no controller chart |
+| Q, micro Q (SysEx) | no SysEx format on Waldorf's site (the micro Q profile is its controller chart) |
+| Kyra | no documents on Waldorf's site |
+| Microwave on system software 1.x | the 1.0 document reads the same way; the profile is for 2.00, and says what differs |

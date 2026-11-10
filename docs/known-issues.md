@@ -434,12 +434,19 @@ something the program does with every profile, which the larger library makes ea
   Yamaha profiles are not laid out, and named in each profile's notes; the microKORG's two-meaning
   knobs above are the same gap. The data lists print the Effect Type and Effect Parameter lists that
   would fill them. Closing it means a parameter set chosen by another parameter's value, in the
-  format and both engines, and the reader taking those lists.
+  format and both engines, and the reader taking those lists. The Blofeld's 28 effect parameters
+  are laid out all the same, as numbers 0 - 127 with each effect type's meaning in the description,
+  since its specification gives every type the same range; what a value shows is not said.
 - **Several settings packed in one byte are left out.** A row such as `Receive Pitch Bend …
   Receive Control Change`, a bit each, about 1,250 across the Yamaha profiles (a Master zone's
   transmit switches, a part's receive switches): sending one bit means sending the others as they
   are, which the format cannot say. Closing it means a bit-field encoding (a mask within a byte)
-  written read-modify-write from the byte's last read value, so it would need a Pull first.
+  written read-modify-write from the byte's last read value, so it would need a Pull first. The
+  Blofeld's arpeggiator pattern is the same gap: 16 steps of two bytes each (`0sssgaaa`, step,
+  glide and accent; `0lll0ttt`, length and timing), whose fields its specification describes but
+  does not list, so they are left out. Where the fields do have lists (its Allocation and Unisono,
+  an envelope's mode and trigger), the byte is laid out as a choice of every combination, which
+  works because the whole byte is sent.
 - **A setting of several values in one message is left out.** The Motif family's drum key voice is
   one 3-byte parameter change (`Voice Bank Number MSB`, `LSB`, `Voice Number`), about 360 rows. A
   profile parameter is one value. Closing it means a parameter of several fields sent as one
@@ -453,9 +460,25 @@ something the program does with every profile, which the larger library makes ea
 - **Identity takes one model code.** Several Yamaha data lists print a code for each model of a
   range (MOXF6 `4C 06`, MOXF8 `4D 06`; MODX M6/M7/M8; MONTAGE6/7/8; MOTIF6/7/8), and a profile
   covers the range, so those profiles check no identity. Closing it means `identity.modelNumber`
-  accepting a list.
+  accepting a list. The Microwave II/XT's is the same gap differently: its member code is a bitmask
+  of the hardware fitted (`00 00` a Microwave 2, `01 00` one with the XT mainboard, `03 00` an XT,
+  more with expansions), so its profile checks none either; a list would serve it too.
 - **A structure repeated many times is laid out once.** The MODX, MODX+, MONTAGE, MODX M and
   MONTAGE M lay out the Performance and Part 1: the other 15 parts are the same tables a part apart,
   some 85,000 parameters a profile in full, and the MODX M's elements 9 to 128 the same again.
   Closing it means a repeated group in the format (a block of parameters, an address stride, a
-  count) that the engines expand when asked, rather than a profile listing every copy.
+  count) that the engines expand when asked, rather than a profile listing every copy. Waldorf's
+  multitimbral instruments are laid out for one instrument the same way: the Blofeld's Multi
+  instruments 2 to 16 (locations 01 - 0F), the Microwave II/XT's 2 to 8, and the Wave's and the
+  1989 Microwave's instruments 2 to 8 (the instrument byte of their parameter edit).
+- **A request answered by control changes is not modelled.** The Pulse's Controller Dump request
+  (`F0 3E 0B <dev> 4B F7`) is answered with the program playing, sent as the same control changes
+  its profile maps. A request's response can only be a dump or an identity reply, so a request
+  answered by controllers would wait for neither and time out; the profile leaves it out and Pulls a
+  stored program by number instead, which is not necessarily the one playing, so nothing is read
+  on connect. Closing it means a response of controllers (complete after a count of them, or a
+  quiet interval) in the format and both engines; the inbound path already maps each one.
+- **A value that shows a note name is shown as a number.** The Wave's key centres are printed `0-127,
+  represents C-2...G9`; a profile's display has a number range or a choice, so they show 0 - 127,
+  the printed text in the description. Closing it means a note display mode (the number as a note
+  name, with the octave the document numbers from).

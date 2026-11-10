@@ -318,6 +318,17 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **The MODX and MONTAGE profiles are the Performance and Part 1.** Parts 2 to 16 are the same
   settings at their own addresses and are not laid out; on the MODX M and MONTAGE M, an AWM2 part's
   first 8 elements of 128.
+- **Waldorf profiles edit one instrument.** In Multi mode, the Blofeld's and Microwave II/XT's
+  parameter changes reach instrument 1's sound; the Wave's and the 1989 Microwave's go to instrument
+  1 too. The other instruments are not laid out.
+- **The 1989 Microwave is read in Single mode.** It answers Pull with the sound playing, which in
+  Multi mode is the last instrument selected; its document says to switch to Single (MIDI-Poly) mode
+  first.
+- **The Pulse is pulled by program number.** It has no request for the sound it is playing, so Pull
+  reads the stored program the `program` variable names (0 for P.1), and nothing is read when it
+  connects. A program dump sent from the Pulse's panel is read as it arrives, edits and all.
+- **The micro Q, Rocket and Streichfett are not read back.** Their manuals print controllers only,
+  so a panel follows them through the controllers they send, not through Pull.
 - **A 14-bit knob is followed from its coarse half.** A knob sent as two controllers (the Moog
   profiles' MSB and LSB) moves its control when either arrives: the coarse half on its own, the fine
   half together with the value the control already has. A fine half that arrives before any coarse
@@ -339,9 +350,10 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 [`tools/profiles/README.md`](../tools/profiles/README.md) has the rules every profile here follows
 and the steps for a new brand. The Roland pipeline and its findings are in
 [`tools/profiles/roland/README.md`](../tools/profiles/roland/README.md) and the Sequential one and its
-findings in [`tools/profiles/sequential/README.md`](../tools/profiles/sequential/README.md). Both list
-what is still to read and why: tables that read with problems, scanned manuals with no text, and
-instruments for which no MIDI list was found.
+findings in [`tools/profiles/sequential/README.md`](../tools/profiles/sequential/README.md); each other
+brand's folder has its own README beside its tools (`korg/`, `novation/`, `moog/`, `yamaha/`,
+`waldorf/`). They list what is still to read and why: tables that read with problems, scanned manuals
+with no text, and instruments for which no MIDI list was found.
 
 ## Catalogue
 
