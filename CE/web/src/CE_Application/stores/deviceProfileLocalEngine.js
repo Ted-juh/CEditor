@@ -258,8 +258,12 @@ export function encodeParameterValue(parameter, value) {
       : null) ?? choices.find(c => String(c.value) === requested);
     if (!choice) return { error: `Unknown choice value '${requested}' for ${parameter.id ?? ''}` };
     const number = Number(choice.value);
-    if (!Number.isInteger(number) || number < 0 || number > 127) return { error: `Choice encoded value outside MIDI data byte range for ${parameter.id ?? ''}` };
-    return { bytes: [number], number, semantic: choice.id,
+    // A choice with a 14-bit encoding carries 0 - 16383, in two bytes as a 14-bit number does (the
+    // Hydrasynth's OSC2 Mode "WaveScan" is 1 * 128 + 1), as DeviceProfileEngine.cpp encodes it.
+    const wide = encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb' || encoding === 'u14-lsb-msb';
+    if (!Number.isInteger(number) || number < 0 || number > (wide ? 16383 : 127)) return { error: `Choice encoded value outside MIDI data byte range for ${parameter.id ?? ''}` };
+    const bytes = !wide ? [number] : encoding === 'u14-lsb-msb' ? [number & 0x7f, (number >> 7) & 0x7f] : [(number >> 7) & 0x7f, number & 0x7f];
+    return { bytes, number, semantic: choice.id,
       normalized: choices.length > 1 ? choices.indexOf(choice) / (choices.length - 1) : 1,
       displayed: choice.label || choice.id };
   }

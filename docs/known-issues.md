@@ -489,6 +489,15 @@ something the program does with every profile, which the larger library makes ea
   means a map from each appendix row to its chapter heading, a layout's worth for each manual, and a
   reader for the bracketed ranges and the bulleted value lists there. Matching them automatically
   was tried and gets about half the Digitone's and Digitakt's rows, some wrongly; the README says more.
+- **An NRPN that is several parameters is not followed inbound.** ASM's Hydrasynth gives one NRPN
+  to several parameters, the data MSB choosing which (`when VV=01H ,set OSC2 Mode`; the
+  arpeggiator's eleven settings on 39H 03H). CEditor sends each correctly, but an incoming NRPN is
+  matched by its number alone, so when the instrument sends one of them CEditor cannot tell which.
+  Closing it means the inbound index keyed by NRPN and data MSB for recipes that declare it.
+- **The Hydrasynth specification gives two pairs of parameters one message.** ENV5 is printed on
+  LFO1's NRPN (3FH 04H), and its Loop and Legato on the same data MSB as LFO1's Smooth and Steps
+  (06H, 07H). Which is right is not printed, so neither pair is in the profile; ENV5's other
+  settings do not collide and are. Closing it means sending each to an instrument and looking.
 - **An Arturia parameter takes its controller's whole range.** The manuals' CC charts print a
   controller number for each knob and nothing about its values, so every parameter of the five
   Arturia profiles is 0 - 127, and a setting chosen from a list (an oscillator type, a waveform, a

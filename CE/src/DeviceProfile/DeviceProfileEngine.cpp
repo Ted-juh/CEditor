@@ -2708,13 +2708,24 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
                                               : requested == juce::String (value);
             if (matched)
             {
-                if (! isMidiDataByte (value))
+                // A choice with a 14-bit encoding carries 0 - 16383, in two bytes as a 14-bit number
+                // does: the Hydrasynth's NRPNs give several parameters one number, the data MSB
+                // choosing which, so OSC2 Mode's "WaveScan" is 1 * 128 + 1. Every other choice is a
+                // single data byte.
+                const auto wide = encodingType == "u14" || encodingType == "14bit"
+                               || encodingType == "u14-msb-lsb" || encodingType == "u14-lsb-msb";
+                if (wide ? (value < 0 || value > 16383) : ! isMidiDataByte (value))
                     return juce::Result::fail ("Choice encoded value outside MIDI data byte range for " + propString (parameter, "id"));
 
                 semanticValue = id;
                 normalizedValue = choices->size() > 1 ? (double) index / (double) (choices->size() - 1) : 1.0;
                 displayedValue = label.isNotEmpty() ? label : id;
-                encodedBytes.add (value);
+                if (! wide)
+                    encodedBytes.add (value);
+                else if (encodingType == "u14-lsb-msb")
+                    encodedBytes.addArray ({ value & 0x7f, (value >> 7) & 0x7f });
+                else
+                    encodedBytes.addArray ({ (value >> 7) & 0x7f, value & 0x7f });
                 return juce::Result::ok();
             }
         }
