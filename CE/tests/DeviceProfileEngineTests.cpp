@@ -4378,7 +4378,23 @@ int main (int argc, char** argv)
         root.getChildFile ("waldorf-pulse.ceditor-device.json"),
         root.getChildFile ("waldorf-rocket.ceditor-device.json"),
         root.getChildFile ("waldorf-streichfett.ceditor-device.json"),
-        root.getChildFile ("waldorf-wave.ceditor-device.json")
+        root.getChildFile ("waldorf-wave.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-four.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-four-mkii.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-heat.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-heat-fx.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-heat-mkii.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-keys.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-rytm.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-rytm-mkii.ceditor-device.json"),
+        root.getChildFile ("elektron-digitakt.ceditor-device.json"),
+        root.getChildFile ("elektron-digitakt-ii.ceditor-device.json"),
+        root.getChildFile ("elektron-digitone.ceditor-device.json"),
+        root.getChildFile ("elektron-digitone-ii.ceditor-device.json"),
+        root.getChildFile ("elektron-digitone-keys.ceditor-device.json"),
+        root.getChildFile ("elektron-model-cycles.ceditor-device.json"),
+        root.getChildFile ("elektron-model-samples.ceditor-device.json"),
+        root.getChildFile ("elektron-syntakt.ceditor-device.json")
     };
 
     auto failures = 0;
