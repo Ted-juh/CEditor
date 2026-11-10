@@ -1,0 +1,42 @@
+{
+  "sources": [
+    {"title":"LIVEN Bass & Beats MIDI implementation chart (r1)","file":"bassandbeats_manual_MIDI_en_r1.pdf","sha256":"2ea2be05330a5eda64eaf3a26ffe7f83329a92a6238f4d8ec16d173e7b059117","url":"https://www.sonicware.co.jp/DL/LIVEN_BB/DOC/bassandbeats_manual_MIDI_en_r1.pdf"}
+  ],
+  "rows": [
+    {"page":1,"cc":5,"name":"VELOCITY * 2","transmitted":"〇","recognized":"〇","block":"Control Change （PATTERN）"},
+    {"page":1,"cc":20,"name":"FX ON/OFF","transmitted":"〇","recognized":"〇","block":"Control Change （PATTERN）"},
+    {"page":1,"cc":21,"name":"FX TYPE","transmitted":"〇","recognized":"〇","block":"Control Change （PATTERN）"},
+    {"page":1,"cc":22,"name":"FX AMOUNT","transmitted":"〇","recognized":"〇","block":"Control Change （PATTERN）"},
+    {"page":1,"cc":23,"name":"PTN LEVEL","transmitted":"〇","recognized":"〇","block":"Control Change （PATTERN）"},
+    {"page":1,"cc":24,"name":"DUCKING","transmitted":"〇","recognized":"〇","block":"Control Change （PATTERN）"},
+    {"page":1,"cc":25,"name":"SEQ MODE","transmitted":"〇","recognized":"〇","block":"Control Change （PATTERN）"},
+    {"page":1,"cc":26,"name":"LINE IN → FX","transmitted":"〇","recognized":"〇","block":"Control Change （PATTERN）"},
+    {"page":1,"cc":30,"name":"MEMORY / LEVEL KICK *","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":31,"name":"ASSIGN1 / LEVEL SNARE","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":32,"name":"ASSIGN2 / LEVEL HAT","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":33,"name":"DIMENSION / LEVEL OTHERS","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":34,"name":"PITCH RATE / TIME KICK1","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":35,"name":"PITCH DEPTH / TIME SNARE1","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":36,"name":"/ TIME HAT1","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":37,"name":"M.GUN / TIME EX1","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":38,"name":"BANK / TUNE KICK1","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":39,"name":"SWEEP SPEED / TUNE SNARE1","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":40,"name":"SWEEP RANGE / TUNE HAT1","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":41,"name":"DICE / TUNE HAT2","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":42,"name":"- / TUNE EX1","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":43,"name":"- / TUNE EX2","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":44,"name":"- / TUNE EX3","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":45,"name":"- / TUNE EX4","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":46,"name":"OCTAVE / -","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":47,"name":"VOICE MODE / -","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":48,"name":"GLIDE / -","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":49,"name":"SWEEP / -","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":50,"name":"TRANSPOSE / -","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":51,"name":"- / KIT","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":2,"cc":52,"name":"SWING","transmitted":"","recognized":"","block":"Control Change （TRACK）"},
+    {"page":2,"cc":53,"name":"RANDOM STEP","transmitted":"","recognized":"","block":"Control Change （TRACK）"},
+    {"page":2,"cc":54,"name":"PRM LOCK","transmitted":"","recognized":"","block":"Control Change （TRACK）"},
+    {"page":2,"cc":55,"name":"LEVEL","transmitted":"","recognized":"","block":"Control Change （TRACK）"},
+    {"page":2,"cc":56,"name":"FX SEND","transmitted":"","recognized":"","block":"Control Change （TRACK）"}
+  ]
+}

@@ -4477,7 +4477,18 @@ int main (int argc, char** argv)
         root.getChildFile ("te-op-1-field.ceditor-device.json"),
         root.getChildFile ("te-op-xy.ceditor-device.json"),
         root.getChildFile ("te-op-z.ceditor-device.json"),
-        root.getChildFile ("te-tx-6.ceditor-device.json")
+        root.getChildFile ("te-tx-6.ceditor-device.json"),
+        root.getChildFile ("sonicware-cydrums.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-8bit-warps.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-ambient-0.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-bass-and-beats.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-lofi-12.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-lofi-6.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-mega-synthesis.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-texture-lab.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-xfm.ceditor-device.json"),
+        root.getChildFile ("sonicware-lofi-12-xt.ceditor-device.json"),
+        root.getChildFile ("sonicware-smpltrek.ceditor-device.json")
     };
 
     auto failures = 0;
