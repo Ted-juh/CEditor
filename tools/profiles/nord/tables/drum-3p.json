@@ -1,0 +1,43 @@
+{
+  "sources": [
+    {"title":"Nord Drum 3P User Manual, OS v1.x, Edition C","file":"Nord Drum 3P English User Manual v1.x Edition C.pdf","sha256":"b861ece3e397658c85a5437d6ffb4a7aa52fda383d0911ab8aac9fbc4aadf138","url":"https://www.nordkeyboards.com/wt/documents/97/Nord%20Drum%203P%20English%20User%20Manual%20v1.x%20Edition%20C.pdf"}
+  ],
+  "rows": [
+    {"page":15,"name":"Bank Select MSB","value":"0"},
+    {"page":15,"name":"Level","value":"7"},
+    {"page":15,"name":"Pan","value":"10"},
+    {"page":15,"name":"Reverb Type","value":"12"},
+    {"page":15,"name":"Reverb Color","value":"13"},
+    {"page":15,"name":"Noise Filter Frequency","value":"14"},
+    {"page":15,"name":"Noise Filter Type","value":"15"},
+    {"page":15,"name":"Noise Dyn Filter","value":"16"},
+    {"page":15,"name":"Noise Filter Resonance","value":"17"},
+    {"page":15,"name":"Noise Level","value":"18"},
+    {"page":15,"name":"Tone Level","value":"19"},
+    {"page":15,"name":"Noise Decay Mode","value":"20"},
+    {"page":15,"name":"Noise Decay","value":"21"},
+    {"page":15,"name":"Dist Amount","value":"23"},
+    {"page":15,"name":"Dist Type","value":"24"},
+    {"page":15,"name":"EQ Frequency","value":"25"},
+    {"page":15,"name":"EQ Gain","value":"26"},
+    {"page":15,"name":"Tone Spectra","value":"30"},
+    {"page":15,"name":"Tone Pitch MSB","value":"31"},
+    {"page":15,"name":"Bank Select LSB","value":"32"},
+    {"page":15,"name":"Delay Rate","value":"44"},
+    {"page":15,"name":"Delay Feedback","value":"45"},
+    {"page":15,"name":"Tone Wave","value":"46"},
+    {"page":15,"name":"Delay Amount","value":"47"},
+    {"page":15,"name":"Reverb Amount","value":"48"},
+    {"page":15,"name":"Tone Decay Mode","value":"49"},
+    {"page":15,"name":"Tone Decay","value":"50"},
+    {"page":15,"name":"Tone Freq","value":"52"},
+    {"page":15,"name":"Tone Dyn Filter","value":"53"},
+    {"page":15,"name":"Tone Bend Amount","value":"54"},
+    {"page":15,"name":"Tone Bend Time","value":"55"},
+    {"page":15,"name":"Click Level","value":"56"},
+    {"page":15,"name":"Click Type","value":"57"},
+    {"page":15,"name":"Mono Group","value":"59"},
+    {"page":15,"name":"Tone Pitch LSB","value":"63"},
+    {"page":15,"name":"Channel Select","value":"70"}
+  ]
+}
