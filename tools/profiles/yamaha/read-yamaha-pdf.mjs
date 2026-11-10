@@ -108,7 +108,9 @@ function findHeads(lines, width) {
 export function pageParameterTables(xml, addressBytes = 3) {
   const { words, width, height } = pageWords(xml);
   const lines = visualLines(words);
-  const heads = findHeads(lines, width).sort((a, b) => a.x0 - b.x0 || a.y0 - b.y0);
+  // In reading order: the page's left column top to bottom, then its right. By left edge alone, a
+  // table set a few points left of the one above it would be read first (the S90 XS's page 108).
+  const heads = findHeads(lines, width).sort((a, b) => (a.x0 >= width / 2) - (b.x0 >= width / 2) || a.y0 - b.y0 || a.x0 - b.x0);
   const out = [];
   for (const h of heads) {
     const inSpan = (l) => l.words.some((w) => w.x0 >= h.x0 && w.x0 < h.x1);
@@ -134,7 +136,15 @@ export function pageParameterTables(xml, addressBytes = 3) {
     }
     // It also ends at its `Total Size`: the notes printed under it are not its columns.
     const total = lines.filter((l) => l.y0 > h.bottom && /^Total Size/i.test(wordsIn(l, h.x0, h.x1).map((w) => w.text).join(' '))).map((l) => l.y0).sort((a, b) => a - b)[0] ?? Infinity;
-    const body = lines.filter((l) => l.y0 > h.bottom + 0.5 && l.y0 < Math.min(below, total) - 1 && inSpan(l) && l.y0 < height - 40).sort((a, b) => a.y0 - b.y0);
+    // A row set close under a tall heading (the YC's `50 00 00 … Voice Number` beside `(HEX)`) is still a
+    // row: below the heading's name, an address and a size.
+    const rowLike = (l) => l.y0 > middle(h.name) && /^([0-9A-Fa-zA-Z]{2} ){1,4}\d+ /.test(`${wordsIn(l, h.x0, h.x1).map((w) => w.text).join(' ')} `);
+    const below0 = (l) => l.y0 > h.bottom + 0.5 || rowLike(l);
+    const body = lines.filter((l) => below0(l) && l.y0 < Math.min(below, total) - 1 && inSpan(l) && l.y0 < height - 40).sort((a, b) => a.y0 - b.y0);
+    // The rows go on past it to the next table's title: under one heading a column can hold several
+    // tables, each with its own Total Size (the MO's Normal Voice Common: Extra, Common 1, Common 2,
+    // Reverb …). The columns are found above the first Total Size alone.
+    const rowLines = lines.filter((l) => below0(l) && l.y0 < below - 1 && inSpan(l) && l.y0 < height - 40).sort((a, b) => a.y0 - b.y0);
     // The columns. A heading is often centred over cells that start left of it (`Description`), so
     // each column starts in the widest gap the body's words leave between the heading before it and
     // its own: the x that the fewest words cover.
@@ -154,7 +164,9 @@ export function pageParameterTables(xml, addressBytes = 3) {
     const cols = [['address', h.x0]];
     headings.forEach(([kind, w], i) => {
       const previous = i === 0 ? h.address : headings[i - 1][1];
-      const start = gapAt(Math.max(Math.min(previous.x1, w.x0 - 1) - (i === 0 ? 0 : 4), w.x0 - 25), w.x0 + 1);
+      // Up to 35 points left of the heading: the Motif XF centres `Parameter Name` 28 points right of
+      // where its arpeggio tables' names start.
+      const start = gapAt(Math.max(Math.min(previous.x1, w.x0 - 1) - (i === 0 ? 0 : 4), w.x0 - 35), w.x0 + 1);
       // A size is one digit set under its heading. Where every row of a table prints its address's
       // low byte alone, set under the right of `Address` (a table run on from the page before), the
       // widest gap is left of those bytes: the size column does not start that far left.
@@ -164,17 +176,21 @@ export function pageParameterTables(xml, addressBytes = 3) {
     const columnOf = (w) => { let k = null; for (const [kind, x] of cols) if (w.x0 >= x - 0.5) k = kind; return w.x0 < h.x1 ? k : null; };
     const rows = [];
     let current = null;
-    for (const l of body) {
+    let afterTotal = false;
+    for (const l of rowLines) {
       const cells = {};
       for (const w of l.words) {
         const k = columnOf(w);
         if (k) (cells[k] ??= []).push(w.text);
       }
       const text = (k) => (cells[k] ?? []).join(' ');
-      if (/^Total Size/i.test(text('address') || text('size'))) break;
+      // A Total Size ends a table: what follows it is notes until the next row printed in full.
+      if (/^Total Size/i.test(text('address') || text('size'))) { current = null; afterTotal = true; continue; }
       const addressWords = cells.address ?? [];
       const isRow = addressWords.length >= 1 && addressWords.length <= addressBytes && addressWords.every((t) => ADDRESS_BYTE.test(t)) && HEX_BYTE.test(addressWords.at(-1)) && /^\d+$/.test(text('size'));
+      if (isRow && afterTotal && addressWords.length < addressBytes) continue;
       if (isRow) {
+        afterTotal = false;
         current = { address: addressWords, size: Number(text('size')), range: text('range') ? [text('range')] : [], name: text('name'), description: text('description'), ...(h.defaultHead ? { default: text('default') } : {}), notes: text('notes') };
         rows.push(current);
       } else if (current) {
@@ -302,19 +318,57 @@ export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}, address
   if (!head) return [];
   const out = [];
   let series = false;
-  const BYTE = '([0-9A-F]{2}|[0-9a-zA-Z]{2})';
+  let inSeries = -1;
+  const midX = new Map();   // where each block's middle byte stands
+  // A placeholder byte may be misprinted a letter short (the MONTAGE M's whole Performance header,
+  // `04 ll m nn`).
+  const BYTE = '([0-9A-F]{2}|[0-9a-zA-Z]{1,2})';
   for (const l of lines.filter((x) => x.y0 > head.y1 + 6).sort((a, b) => a.y0 - b.y0)) {
     const words = l.words.filter(inSide).map((w) => w.text);
     if (!words.length) continue;
     const text = words.join(' ');
-    if (/^:(\s+:)*$/.test(text)) { series = out.length > 0; continue; }
+    // `:` between the ends of a series, alone or with its count (the MODX's `: 8 Blocks : : :`).
+    if (/^:(\s+(:|\d+|Blocks,?|Max|Parts))*$/.test(text)) { series = out.length > 0; continue; }
     const m = new RegExp(`^(.*?)\\s*(\\d+)\\s+([0-9A-F]{2,5})${`\\s+${BYTE}`.repeat(addressBytes)}$`).exec(text);
     const last = series && /^(.*?)\s+([0-9A-F]{2})$/.exec(text);
+    const seriesBefore = series;
     series = false;
     // A side note set beside the rows (the MODX's `Only the Part No. p same as the Part number
     // specified in "nn" is available.`) shares their lines: its lowercase words before the name are not it.
-    if (m) out.push({ name: m[1].trim().replace(/^(?:[a-z“"]\S*\s+)+(?=[A-Z])/, ''), bytes: Number(m[2]), address: m.slice(4, 4 + addressBytes) });
+    const block = m && { name: m[1].trim().replace(/^(?:[a-z“"]\S*\s+)+(?=[A-Z])/, ''), bytes: Number(m[2]), address: m.slice(4, 4 + addressBytes) };
+    // The last of a series printed in full (the Motif XF's `Zone 1 … 32 00 00`, `:`, `Zone 8 … 32 07
+    // 00`): the same block a middle byte on. A series of groups prints each block of the last group
+    // (the MO's drum keys: Oscillator, Amplitude, Pitch and Filter of `KEY C 0`, `:`, then of `KEY C 6`).
+    const same = (a, b) => !a.last && a.bytes === b.bytes && a.address.length === b.address.length
+      && b.address.every((x, i) => (i === 1 ? /^[0-9A-F]{2}$/.test(x) && /^[0-9A-F]{2}$/.test(a.address[1]) && parseInt(x, 16) > parseInt(a.address[1], 16) : x === a.address[i]));
+    // After `:`, the nearest block it repeats; after that, the next block of the same group, in turn.
+    const at = !block ? -1 : seriesBefore ? out.findLastIndex((a, i) => i >= out.length - 8 && same(a, block)) : inSeries >= 0 && out[inSeries + 1] && same(out[inSeries + 1], block) ? inSeries + 1 : -1;
+    inSeries = at;
+    const first = at >= 0 ? out[at] : null;
+    // A block with its byte count and only the address bytes that change, the rest as the block above's
+    // (the YC's `Organ Section Part Upper 20 14 50 10`, `Key B Section 58 3A 01`).
+    const partial = !block && !last && out.length && !out.at(-1).last && new RegExp(`^(.*?[A-Za-z)])\\s+(\\d+)\\s+([0-9A-F]{2,5})((?:\\s+[0-9A-F]{2}){1,${addressBytes - 1}})$`).exec(text);
+    // A block repeated at another middle byte, printed with that byte alone under its own and no `:`
+    // (the CP88's `Piano Common … 50 00 00`, `E.Piano Common … 01`, `Sub Common … 02`).
+    // Its byte stands under the block's middle byte (a page's footer, `reface Data List 17`, does not).
+    const lineWords = l.words.filter(inSide);
+    const sibling = !block && !last && out.length && Math.abs(lineWords.at(-1).x0 - (midX.get(out.at(-1)) ?? -99)) <= 6 && /^([^\d].*?[A-Za-z)])\s+([0-9A-F]{2})$/.exec(text);
+    if (first) first.last = { name: block.name, mid: block.address[1] };
+    else if (block) { out.push(block); midX.set(block, lineWords.at(-addressBytes + 1).x0); }
     else if (last) out.at(-1).last = { name: last[1].trim(), mid: last[2] };
+    else if (partial) {
+      const bytes = partial[4].trim().split(/\s+/);
+      const prevAddress = out.at(-1).address;
+      // The low byte left out; or the high and low (one byte printed, the middle).
+      const address = bytes.length === 1 ? [prevAddress[0], bytes[0], ...prevAddress.slice(2)] : [...bytes, ...prevAddress.slice(bytes.length)];
+      const twin = { name: partial[1].trim(), bytes: Number(partial[2]), address };
+      midX.set(twin, midX.get(out.at(-1)));
+      out.push(twin);
+    } else if (sibling && !out.at(-1).last) {
+      const twin = { ...out.at(-1), name: sibling[1].trim(), address: [out.at(-1).address[0], sibling[2], ...out.at(-1).address.slice(2)] };
+      midX.set(twin, midX.get(out.at(-1)));
+      out.push(twin);
+    }
     else if (/^(MIDI|Program|Control|Parameter)\b/.test(text) && out.length) break;
   }
   return out;

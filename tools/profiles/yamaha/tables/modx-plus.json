@@ -2411,8 +2411,7 @@
   "bulk": [
     {"name":"SYSTEM System","bytes":60,"address":["00","00","00"]},
     {"name":"Sequencer","bytes":22,"address":["00","05","00"]},
-    {"name":"MICRO TUNING Table 1","bytes":24,"address":["00","30","00"]},
-    {"name":"Table 8","bytes":24,"address":["00","37","00"]},
+    {"name":"MICRO TUNING Table 1","bytes":24,"address":["00","30","00"],"last":{"name":"Table 8","mid":"37"}},
     {"name":"MICRO TUNING Table 1","bytes":20,"address":["00","50","00"]},
     {"name":"Table 8","bytes":20,"address":["00","57","00"]},
     {"name":"CURVE Bulk Header","bytes":0,"address":["0E","40","00"]},

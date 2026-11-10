@@ -4298,7 +4298,19 @@ int main (int argc, char** argv)
         root.getChildFile ("yamaha-moxf.ceditor-device.json"),
         root.getChildFile ("yamaha-mx.ceditor-device.json"),
         root.getChildFile ("yamaha-modx-m.ceditor-device.json"),
-        root.getChildFile ("yamaha-montage-m.ceditor-device.json")
+        root.getChildFile ("yamaha-montage-m.ceditor-device.json"),
+        root.getChildFile ("yamaha-montage.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif-xf.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif-xs.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif-rack-xs.ceditor-device.json"),
+        root.getChildFile ("yamaha-mox.ceditor-device.json"),
+        root.getChildFile ("yamaha-s90xs.ceditor-device.json"),
+        root.getChildFile ("yamaha-mo.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp4-stage.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp40-stage.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp88-cp73.ceditor-device.json"),
+        root.getChildFile ("yamaha-yc61.ceditor-device.json"),
+        root.getChildFile ("yamaha-yc88-yc73.ceditor-device.json")
     };
 
     auto failures = 0;

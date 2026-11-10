@@ -48,13 +48,23 @@ lists do that it copes with, each found on a real page:
 - an address of four bytes where the data format prints `Address 1st` … `4th` (the MODX M's `06 00
   02 06`), its leading bytes carried down as a three-byte one's are, a placeholder byte with a capital
   (`L0`, `Lm`), and a title with `Group Number =7F 1C, Model ID = 0D` set beside it;
+- several tables down one column under one heading, each ending at its own `Total Size` (the MO's
+  Normal Voice Common): the rows go on to the next table's title, and the text after a Total Size is
+  notes until a row printed in full; the column's tables read top to bottom before the next column's;
+- names set 28 points left of a centred `Parameter Name` (the Motif XF's arpeggio tables), and a
+  first row set inside a tall heading's band (the YC's `50 00 00` beside `(HEX)`).
 - a table run on from the page before whose every row prints its address's low byte alone, under
   the right of `Address`: the size column, a digit under its heading, does not start left of them;
 - `〃` for a description, as the row above.
 
 The bulk dump block table is read the same way, a column of a page at a time where it is set in two
 (the MOXF's): each line ending in a byte count and an address, and a series printed first and last
-with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C6 48`).
+with `:` between, its last printed with the middle byte alone (`Part 1 62 3E 31 00 00`, `:`, `Part 4
+03`) or in full (the Motif XF's `Zone 8 … 32 07 00`), a group of blocks at a time (the MO's drum key:
+Oscillator, Amplitude, Pitch, Filter, EQ). A block printed with only the bytes that change (the CP88's
+`E.Piano Common … 01` under `Piano Common … 50 00 00`; the YC's `Organ Section Part Upper 20 14 50 10`)
+takes the rest from the block above, and a placeholder printed a letter short (the MONTAGE M's `04 ll
+m nn`) is still one.
 
 ## What the builder takes as settled
 
@@ -79,7 +89,13 @@ with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C
   values (`0: Part 1, 1: Part 2 – 15: Part 16, 16: A/D, 17: Master, 127: Off`).
 - **An address the data list misprints** and the rows either side pin down is taken from them, and the
   profile's notes say so: the MODX M prints Key Controller Set 2 Switch `00` between Set 1 Ratio at
-  `0E` (two bytes) and Set 2 Destination at `12`; it is `10`.
+  `0E` (two bytes) and Set 2 Destination at `12`; it is `10`. A table heading's address or a bulk
+  block's that the data list prints otherwise elsewhere is corrected by the layout, named in the notes:
+  the Motif XF heads the Multi's Insertion B `46 04 00` (its base address table: `36 04 00`).
+- **Two bytes printed as one range** are read as one value: `0005 – 022C` (the Motif XS's, `00 05` to
+  `02 2C`), and a fixed high byte over the low byte's range (the CP4 STAGE's `00` over `00 – 1D`).
+- **A placeholder that stands for two things in one table** is given by the layout by the address's
+  first byte or two (the Motif XF's `31 pp 00`, a part, and `35 pp 00`, an audio input at 40 and 41).
 - **A value over several bytes** is split as its description says: `1st bit 3-0 : bit 15-12` is four
   nibbles, `1st bit 6-0 : bit 13-7` two 7-bit halves (Tempo, 30 - 300). Two bytes printed as a high
   and a low range with no such words are two 7-bit halves when the description counts out exactly
@@ -106,7 +122,12 @@ with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C
   back as 0n, both taken as device number 1.
 - **Identity** is the reply the data list prints (`F0 7E 7F 06 02 43 00 41 51 06 …`), with `dd dd`
   filled in where one code is printed under it (the MX's `47 06`); a code for each model (the MOXF6's
-  and MOXF8's) leaves it unchecked.
+  and MOXF8's) leaves it unchecked. Where the data list prints a byte for each model and the profile
+  is one model's (the CP4 STAGE's and CP40 STAGE's model ID `7F 1A`, `7F 1B`, and identity `49 06`,
+  `4A 06`; the YC61's `5C 06`), the layout gives that model's.
+- **An edit buffer sent only in its own mode** (`The Edit Buffer data … will be transmitted/received
+  only in the corresponding Mode`, the MOXF's, Motif XS's and XF's, Rack XS's and S90 XS's data lists)
+  is asked for once, not retried: the others go unanswered.
 
 ## The profiles
 
@@ -120,8 +141,19 @@ with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C
 | `yamaha-modx-plus` | MODX6+/MODX7+/MODX8+ Data List (A0), pp. 188, 192-222 | 4,527 | 890 | System, Performance Common, Part 1 |
 | `yamaha-modx-m` | MODX M6/M7/M8 Data List (B0), pp. 214-215, 220-256 | 6,773 | 1,916 | System, Performance Common, Part 1 |
 | `yamaha-montage-m` | MONTAGE M6/M7/M8x Data List (H0), pp. 214-215, 220-256 | 6,781 | 1,918 | System, Performance Common, Part 1 |
+| `yamaha-montage` | MONTAGE6/7/8 Data List (J0), pp. 192, 196-226 | 4,530 | 898 | System, the Performance Edit Buffer |
 | `yamaha-moxf` | MOXF6/MOXF8 Data List (A0), pp. 121, 124-146 | 5,317 | 1,216 | the five edit buffers, the System's blocks |
+| `yamaha-mox` | MOX6/MOX8 Data List (C0), pp. 102, 105-126 | 5,227 | 1,107 | the five edit buffers, the System's blocks |
+| `yamaha-motif-xf` | MOTIF XF6/XF7/XF8 Data List (C0), pp. 125, 128-146 | 5,306 | 1,096 | the five edit buffers, the System's blocks |
+| `yamaha-motif-xs` | MOTIF XS6/XS7/XS8 Data List (C0), pp. 54, 57-73 | 5,271 | 980 | the five edit buffers, the System's blocks |
+| `yamaha-motif-rack-xs` | MOTIF-RACK XS Data List (C0), pp. 60, 63-75 | 4,798 | 865 | the Voice and Multi edit buffers, the System's blocks |
+| `yamaha-s90xs` | S90 XS/S70 XS Data List (C0), pp. 100, 103-125 | 4,921 | 1,016 | the five edit buffers, the System's blocks |
+| `yamaha-mo` | MO6/MO8 Data List, pp. 60, 63-77 | 3,104 | 587 | the five edit buffers, the System's blocks |
 | `yamaha-mx` | MX49/MX61/MX88 Data List (C0), pp. 55, 57-66 | 3,880 | 736 | the three edit buffers, the System's blocks |
+| `yamaha-cp4-stage`, `yamaha-cp40-stage` | CP4 STAGE/CP40 STAGE Data List (A0), pp. 36-41 | 277 | 99 | System, the Performance Edit Buffer |
+| `yamaha-cp88-cp73` | CP88/CP73 Supplementary Manual V2.00 (H0), pp. 20-25 | 265 | 102 | System, the Current Sound Buffer |
+| `yamaha-yc61` | YC61 Owner's Manual (C0) pp. 63-64; YC Supplementary Manual V2.00 (E0) pp. 13-17 | 260 | 108 | System, the Current Sound Buffer |
+| `yamaha-yc88-yc73` | YC88/YC73 Owner's Manual (B0) pp. 63-64; YC Supplementary Manual V2.00 (E0) pp. 18-22 | 261 | 108 | System, the Current Sound Buffer |
 
 The MODX's tables repeat for each of its 16 parts, at addresses a part apart, and a part's 8
 elements, 73 drum keys and 8 FM-X operators are laid out the same way (`41 ep 00`, `5p kk 00`, `49 op
@@ -185,10 +217,35 @@ data format. Pull asks for the Performance, Normal Voice and Drum Voice edit buf
 System's blocks: 3,879 of 3,880 parameters are read back. Its identity is checked: the data list
 prints the one code all three keyboards answer with, `47 06`.
 
+The MONTAGE (2016) is the MODX's format and layout, read from its own data list. Its bulk dump table
+does not list the Performance Edit Buffer Common the Bulk Control table names, so its Pull asks for
+the whole Performance Edit Buffer (`0E 25 00`) and reads the Common and Part 1 from it, the other
+parts' blocks let pass; the whole Performance's list prints Motion Seq Part/Lane Settings at `34 1p
+00` where the part's list and the tables put it at `31 1p 00`, corrected.
+
+The Motif family (`motif-family.mjs`): the MOTIF XS and XF, MOTIF-RACK XS, MOX, S90 XS/S70 XS and
+MO6/MO8 data lists set the MOXF's tables at the MOXF's addresses, with a model ID of two bytes as the
+MX's (`7F 03`, `7F 12`, `7F 14`, `7F 0D`, `7F 00`). Each is laid out in full with its own counts:
+zones (8 on the Motif XF and XS, 4 on the others), the Performance's 4 parts, the Multi's 16, 8
+elements a voice (4 on the MO), the 73 drum keys and its audio inputs; the Rack XS has no Master or
+Performance. Left out across them, as on the MOXF: the effect parameters, the bit-packed rows, the
+arpeggio Assign Types and the micro tunings.
+
+The CP4 STAGE and CP40 STAGE share a data list and differ in the model ID's second byte and the
+identity code: two profiles, each with its model's. Every table is laid out: the System, the
+Performance and its three parts and four zones. The CP88/CP73's data list is the V2.00
+supplementary manual's, which supersedes the owner's manual's; it titles only its first table, the
+rest under section headings the reader does not take, so its rows are named by the bulk block they
+fall in. The YC61's and YC88/YC73's data tables are the V2.00 supplement's, the data format their
+owner's manuals': each profile reads both documents. Their bulk dump table prints the Live Set Sound
+Common as 1 byte where its table runs to `46 00 40`, so those 48 settings are not read back; the
+CP88/CP73 Tempo (`01 – 12` over `00 – 7F` beside `42.0 – 240.0`) is left out, its ends not counting
+out the span.
+
 The reface's control changes (MIDI Control on) are not mapped: every setting they reach is a
 parameter change here too, and the panel's CCs would be a second parameter for each.
 
 ## Survey: what else Yamaha publishes
 
-Every data list downloaded so far is read. Not yet looked for: the original MONTAGE (2016), the
-Motif XF/XS, S90XS/S70XS, MO6/8 and CP/YC stage keyboards.
+Every data list found is read. All of them have a text layer; none needed OCR. Not yet looked for:
+the Motif ES, the original Motif and S90/S90 ES, and the CP1/CP5/CP50.

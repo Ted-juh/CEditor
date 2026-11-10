@@ -53,14 +53,16 @@ export function readHexRange(text) {
 }
 
 /**
- * A range printed two 7-bit bytes a value (the MODX M's `Data Range MSB/LSB`): `00 00 – 00 7F` ->
+ * A range printed two 7-bit bytes a value (the MODX M's `Data Range MSB/LSB`, the Motif XS's `0005 –
+ * 022C`): `00 00 – 00 7F` ->
  * [[0, 127]]; `00 00 – 00 11, 00 7F` -> [[0, 17], [127, 127]]; `07 7F` is 1023.
  */
 export function readPairRange(text) {
   const parts = clean(text).split(/\s*,\s*/).filter(Boolean);
   const out = [];
   for (const p of parts) {
-    const m = /^([0-9A-F]{2}) ([0-9A-F]{2})(?:\s*–\s*([0-9A-F]{2}) ([0-9A-F]{2}))?$/.exec(p);
+    // `00 05` or, the Motif XS's, `0005`.
+    const m = /^([0-9A-F]{2}) ?([0-9A-F]{2})(?:\s*–\s*([0-9A-F]{2}) ?([0-9A-F]{2}))?$/.exec(p);
     if (!m || m.slice(1).filter(Boolean).some((b) => parseInt(b, 16) > 127)) return null;
     const from = (parseInt(m[1], 16) << 7) | parseInt(m[2], 16);
     const to = m[3] ? (parseInt(m[3], 16) << 7) | parseInt(m[4], 16) : from;
@@ -192,8 +194,24 @@ export function seriesNames(first, last, count) {
   const [a, b] = [/^(.*?)(\S+)$/.exec(first), /^(.*?)(\S+)$/.exec(last)];
   const prefix = b[1];
   if (/^\d+$/.test(a[2]) && /^\d+$/.test(b[2]) && Number(b[2]) - Number(a[2]) + 1 === count) return Array.from({ length: count }, (u, i) => `${prefix}${Number(a[2]) + i}`);
+  // The number inside the name (the CP4 STAGE's `Part 1 Insertion A` … `Part 3 Insertion A`).
+  const [ta, tb] = [first.split(' '), last.split(' ')];
+  const differ = ta.length === tb.length ? ta.map((t, i) => (t === tb[i] ? -1 : i)).filter((i) => i >= 0) : [];
+  if (differ.length === 1 && /^\d+$/.test(ta[differ[0]]) && /^\d+$/.test(tb[differ[0]]) && Number(tb[differ[0]]) - Number(ta[differ[0]]) + 1 === count) {
+    return Array.from({ length: count }, (u, i) => ta.map((t, k) => (k === differ[0] ? String(Number(t) + i) : t)).join(' '));
+  }
+  // The number set against the name (the S90 XS's `Part1` … `Part4`): `Part 1` … `Part 4`.
+  const [ga, gb] = [/^(.*?[A-Za-z])(\d+)$/.exec(first), /^(.*?[A-Za-z])(\d+)$/.exec(last)];
+  if (ga && gb && Number(gb[2]) - Number(ga[2]) + 1 === count) return Array.from({ length: count }, (u, i) => `${gb[1]} ${Number(ga[2]) + i}`);
   const [na, nb] = [noteNumber(a[2]), noteNumber(b[2])];
   if (na !== null && nb !== null && nb - na + 1 === count) return Array.from({ length: count }, (u, i) => `${prefix}${noteName(na + i)}`);
+  // A note inside the name, its octave set apart (the Motif XF's `KEY C 0 Key` … `KEY C 6 Key`).
+  const NOTE = /\b([A-G]#?) ?(\d)\b/;
+  const [ma, mb] = [NOTE.exec(first), NOTE.exec(last)];
+  if (ma && mb) {
+    const [ka, kb] = [noteNumber(`${ma[1]}${ma[2]}`), noteNumber(`${mb[1]}${mb[2]}`)];
+    if (ka !== null && kb !== null && kb - ka + 1 === count) return Array.from({ length: count }, (u, i) => first.replace(NOTE, noteName(ka + i)));
+  }
   return Array.from({ length: count }, (u, i) => `${prefix}${i + 1}`);
 }
 
@@ -245,8 +263,10 @@ export function buildYamahaProfile(data, layout) {
   // carries its byte count among them (`bb`), before the model ID or after it.
   const model = data.format.modelId;
   const group = data.format.group ?? ['7F', '1C'];
-  const head = data.format.header ?? [...group, model];
-  const bulkHead = data.format.bulkHeader ?? [...group, 'bb', 'bb', model];
+  // Where the data list prints a byte for each model (the CP4 STAGE's and CP40 STAGE's model ID `7F
+  // **`, 1A and 1B), the layout gives this model's.
+  const head = layout.header ?? data.format.header ?? [...group, model];
+  const bulkHead = layout.bulkHeader ?? data.format.bulkHeader ?? [...group, 'bb', 'bb', model];
   const recipe = { id: 'parameterChange', kind: 'sysex', template: ['F0', '43', '$deviceId', ...head, '$address', '$encodedValue', 'F7'] };
   // A choice where every value is two bytes (the MODX M): its high byte 00, then the choice.
   const choiceRecipe = { id: 'parameterChangeChoice', kind: 'sysex', template: ['F0', '43', '$deviceId', ...head, '$address', '00', '$encodedValue', 'F7'] };
@@ -296,24 +316,38 @@ export function buildYamahaProfile(data, layout) {
   // A Bulk Header is at 0E, a Bulk Footer at 0F (the Bulk Control table's addresses), whatever the
   // row is called: the reface YC's data list prints its footer `Bulk`.
   const frameOf = (b) => (/Bulk Header/i.test(b.name) || (addressBytes === 3 && b.address[0] === '0E') ? 'header' : /Bulk Footer/i.test(b.name) || (addressBytes === 3 && b.address[0] === '0F') ? 'footer' : null);
-  const blocks = data.bulk.map((b) => ({ ...b, frame: frameOf(b), label: clean(b.name).replace(/\s*Bulk (Header|Footer)?$/i, ''), name: frameOf(b) === 'footer' ? 'Bulk Footer' : blockName(b.name), size: Math.max(0, b.bytes - overhead) }))
+  // A block address the data list misprints, corrected by the layout from where the data list prints
+  // it elsewhere (`name address` -> address).
+  const fixedBulk = data.bulk.map((b) => {
+    const fix = layout.bulkCorrections?.[`${clean(b.name)} ${b.address.join(' ')}`];
+    if (!fix) return b;
+    corrected.push(`bulk dump block ${clean(b.name)} printed ${b.address.join(' ')}, taken as ${fix.join(' ')}`);
+    return { ...b, address: fix };
+  });
+  const blocks = fixedBulk.map((b) => ({ ...b, frame: frameOf(b), label: clean(b.name).replace(/\s*Bulk (Header|Footer)?$/i, ''), name: frameOf(b) === 'footer' ? 'Bulk Footer' : blockName(b.name), size: Math.max(0, b.bytes - overhead) }))
     .flatMap(expandBlock)
     .map((b) => ({ ...b, name: layout.blockName?.(b.name, b.at) ?? b.name }));
   const blockAt = (address) => blocks.find((b) => inBlock(address, b.at, b.size));
 
   for (const table of data.tables) {
     const title = titleOf(table.title);
-    const holders = { ...readPlaceholders(table.notes), ...(layout.placeholders ?? {}), ...(layout.tables?.[title]?.placeholders ?? {}) };
-    const own = layout.tables?.[title] ?? {};
+    // A layout names a table by its title, whatever its case (the Motif XS prints `(Bulk Control)`).
+    const own = Object.entries(layout.tables ?? {}).find(([k]) => k.toLowerCase() === title.toLowerCase())?.[1] ?? {};
+    const holders = { ...readPlaceholders(table.notes), ...(layout.placeholders ?? {}), ...(own.placeholders ?? {}) };
     if (own.skip) { skip(own.skip, title); continue; }
-    const varsOf = (byte) => placeholderVars(byte, holders);
-    const resolve = (byte, at) => resolveByte(byte, at, holders);
+    // A placeholder can stand for different things in one table, told apart by the address's first
+    // byte (the Motif XF's `31 pp 00`, a part, and `35 pp 00`, an audio input): the layout gives them
+    // by that byte.
+    // (or by its first two, the MOX's `00 4n`, an audio part, beside `00 5n`, a Quick Setup).
+    const atKey = (row) => [row.address.slice(0, 2).join(' '), row.address[0]].find((k) => layout.placeholdersAt?.[k]);
+    const holdersOf = (row) => ({ ...holders, ...(layout.placeholdersAt?.[atKey(row)] ?? {}) });
     // Rows run by the placeholders in their own address: a run of rows with the same ones is laid
     // out once per assignment of them (a Part row once per part, a Scene Part row once per scene and
     // part), and a row with none once.
     // A name printed once beside the rows that share it (`MTC strat offset` beside Hour, Minute, Second
     // and Frame): each takes it, with the word its description ends on.
-    const tableRows = table.rows.map((r) => ({ ...r }));
+    // A row whose range is a dash is no parameter (the Bulk Control table's headers and footers).
+    const tableRows = table.rows.filter((r) => !(r.range.length && r.range.every((x) => /^[-–]$/.test(clean(x))))).map((r) => ({ ...r }));
     // A low byte misprinted, that the rows either side pin down: the MODX M prints Key Controller
     // Set 2 Switch `00` between Set 1 Ratio at 0E (two bytes) and Set 2 Destination at 12; it is 10.
     for (let i = 1; i + 1 < tableRows.length; i++) {
@@ -326,6 +360,15 @@ export function buildYamahaProfile(data, layout) {
         b.address = [...b.address.slice(0, -1), hex(expected)];
         corrected.push(`${title}: ${clean(b.name)} printed ${hex(lb)}, taken as ${hex(expected)}`);
       }
+    }
+    // A table heading's address misprinted, corrected by the layout from the data list's own base
+    // address table (the Motif XF heads the Multi's Insertion B `46 04 00`; it is 36 04 00).
+    for (const r of tableRows) {
+      const fix = own.readdress?.[r.address.slice(0, -1).join(' ')];
+      if (!fix) continue;
+      const printed = r.address.join(' ');
+      r.address = [...fix, r.address.at(-1)];
+      if (!corrected.some((c) => c.startsWith(`${title}: ${printed.slice(0, -3)}`))) corrected.push(`${title}: ${printed.slice(0, -3)} taken as ${fix.join(' ')}`);
     }
     // `〃`: as the row above (the MODX M's effect parameters and arpeggio offsets).
     tableRows.forEach((r, i) => { if (clean(r.description) === '〃' && i > 0) r.description = tableRows[i - 1].description; });
@@ -342,15 +385,17 @@ export function buildYamahaProfile(data, layout) {
     const runs = [];
     for (const row of tableRows) {
       if (row.address.some((x) => x == null)) { skip('an address not printed in full', `${title}: ${clean(row.name)}`); continue; }
-      const vars = [...new Set(row.address.flatMap(varsOf))];
+      const rowHolders = holdersOf(row);
+      const vars = [...new Set(row.address.flatMap((b) => placeholderVars(b, rowHolders)))];
       // `00 5n 00` and `00 6n 00` are different things numbered alike (a Quick Setup, an audio config).
-      const key = row.address.filter((b) => varsOf(b).length).join(' ');
-      if (runs.length && runs.at(-1).key === key) runs.at(-1).rows.push(row); else runs.push({ key, vars, rows: [row] });
+      const key = `${atKey(row) ?? ''} ${row.address.filter((b) => placeholderVars(b, rowHolders).length).join(' ')}`;
+      if (runs.length && runs.at(-1).key === key) runs.at(-1).rows.push(row); else runs.push({ key, vars, holders: rowHolders, rows: [row] });
     }
     for (const run of runs) {
-      const unknown = run.vars.filter((v) => !holders[v]);
+      const unknown = run.vars.filter((v) => !run.holders[v]);
       if (unknown.length) { skip('an address byte printed as a placeholder neither its table nor the layout explains', run.rows.map((r) => `${title}: ${r.name} (${r.address.join(' ')})`).join(', ')); continue; }
-      const instances = assignments(run.vars, holders);
+      const instances = assignments(run.vars, run.holders);
+      const resolve = (byte, at) => resolveByte(byte, at, run.holders);
     for (const at of instances) {
       const labels = run.vars.map((v) => at[`${v}:label`]);
       const inst = labels.length ? { label: labels.join(' ') } : null;
@@ -402,7 +447,10 @@ export function buildYamahaProfile(data, layout) {
         let encoding = { type: 'u7' };
         let width = 1;
         let pairChoice = false;
-        const pairs = row.size === 2 ? readPairRange(row.range.join(' ')) : null;
+        // A high byte printed fixed and the low byte's range under it (the CP4 STAGE's `00` over `00 –
+        // 1D`): the same as `00 00 – 00 1D`.
+        const fixedHigh = row.size === 2 && row.range.length === 2 && !/1st bit/.test(description) && /^[0-9A-F]{2}$/.test(clean(row.range[0])) && /^([0-9A-F]{2})\s*–\s*([0-9A-F]{2})$/.exec(clean(row.range[1]));
+        const pairs = row.size === 2 ? readPairRange(fixedHigh ? `${clean(row.range[0])} ${fixedHigh[1]} – ${clean(row.range[0])} ${fixedHigh[2]}` : row.range.join(' ')) : null;
         if (pairs) {
           // Two 7-bit bytes a value, every value (the MODX M): read as one range.
           const values = readValues(pairs, description);
@@ -524,7 +572,15 @@ export function buildYamahaProfile(data, layout) {
       mappings,
     };
   };
-  const take = (d) => { for (const m of d.mappings) { read.add(m.parameter); m.parameter = m.parameter.id; } dumpDefinitions.push(d); return d; };
+  // A block listed on its own and again in a collection (the CP88's Master EQ, under System and in the
+  // Live Set Sound) is defined once, as the collection's: its own request is answered by it all the same.
+  const take = (d) => {
+    for (const m of d.mappings) { read.add(m.parameter); if (typeof m.parameter !== 'string') m.parameter = m.parameter.id; }
+    const twin = dumpDefinitions.findIndex((x) => x.id === d.id);
+    if (twin < 0) dumpDefinitions.push(d);
+    else if (d.completion.collectionId && !dumpDefinitions[twin].completion.collectionId) dumpDefinitions[twin] = d;
+    return d;
+  };
   const notAsked = [];
   // A Bulk Header begins a collection that runs to its Bulk Footer; a block outside one is asked for
   // alone, when it holds a parameter laid out here.
@@ -549,7 +605,7 @@ export function buildYamahaProfile(data, layout) {
       const dumps = members.map((m) => dumpFor(m, collection));
       if (!dumps.some((d) => d.mappings.length)) { notAsked.push(pull?.name ?? b.label); i = j; continue; }
       dumps.forEach(take);
-      requests.push({ id: `request${id.replace(/^./, (c) => c.toUpperCase())}`, name: `Bulk dump request (${pull?.name ?? members.slice(1, -1).map((m) => m.name).join(', ')})`, kind: 'sysex', template: ['F0', '43', '20', ...head, ...members[0].at.map(hex), 'F7'], response: { kind: 'bulkDump', collectionId: collection.id }, timeoutMs: 3000, retries: 1 });
+      requests.push({ id: `request${id.replace(/^./, (c) => c.toUpperCase())}`, name: `Bulk dump request (${pull?.name ?? members.slice(1, -1).map((m) => m.name).join(', ')})`, kind: 'sysex', template: ['F0', '43', '20', ...head, ...members[0].at.map(hex), 'F7'], response: { kind: 'bulkDump', collectionId: collection.id }, timeoutMs: 3000, retries: layout.collectionRetries ?? 1 });
       i = j;
     } else {
       const d = dumpFor(b, null);
@@ -563,7 +619,7 @@ export function buildYamahaProfile(data, layout) {
   for (const p of read) { p.access.canRead = true; if (p.access.source !== 'bulkDump') p.access.source = 'singleParameter'; }
   const unread = parameters.filter((p) => !read.has(p));
 
-  if (corrected.length) notes.push(`Addresses misprinted in the data list, taken from the rows either side: ${corrected.join(', ')}.`);
+  if (corrected.length) notes.push(`Addresses misprinted in the data list, taken from where it prints them otherwise (a row's from the rows either side, a block's from another list): ${corrected.join(', ')}.`);
   for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
   const unreadGroups = [...new Set(unread.map((p) => p.group))];
   if (requests.length) notes.push(`Pull: ${requests.map((r) => r.name).join('; ')}. ${read.size} of ${parameters.length} parameters are read back${unread.length ? `; not in any block: ${unread.length > 12 ? `${unread.length} parameters, in ${unreadGroups.join(', ')}` : unread.map((p) => p.name).join(', ')}` : ''}.`);
@@ -601,7 +657,7 @@ export function buildYamahaProfile(data, layout) {
     tests.push({ name: `${rich.name}, read back`, kind: 'dumpParse', inputHex: [...prefix, ...data, sum, 0xf7].map(hex).join(' '), expectedValues: expected });
   }
 
-  const reply = data.format.identityReply ?? [];
+  const reply = layout.identityReply ?? data.format.identityReply ?? [];
   const identity = reply.length >= 10 ? { requestDeviceId: '7F', manufacturerId: [reply[5]], familyCode: reply.slice(6, 8), modelNumber: reply.slice(8, 10), timeoutMs: 1000, retries: 0 } : null;
   const profile = {
     schemaVersion: 1,
@@ -614,10 +670,11 @@ export function buildYamahaProfile(data, layout) {
     status: 'experimental',
     trust: 'local',
     description: layout.description,
-    sources: data.sources.map((s) => ({
+    sources: data.sources.map((s, i) => ({
       type: 'manual',
       title: s.title,
-      notes: `MIDI data format (pages ${layout.read.formatPages.join(', ')}) and data tables (pages ${layout.read.tablePages.join(', ')}) read by tools/profiles/yamaha/read-yamaha-pdf.mjs from ${s.file} (sha256 ${s.sha256}), ${s.url}. Not yet checked against the instrument itself.`,
+      // Which pages of which document: the format and the tables may be in two (the YC's).
+      notes: `${[i === (layout.read.formatDoc ?? layout.read.doc ?? 0) ? `MIDI data format (pages ${layout.read.formatPages.join(', ')})` : null, i === (layout.read.doc ?? 0) ? `data tables (pages ${layout.read.tablePages.join(', ')})` : null].filter(Boolean).join(' and ')} read by tools/profiles/yamaha/read-yamaha-pdf.mjs from ${s.file} (sha256 ${s.sha256}), ${s.url}. Not yet checked against the instrument itself.`,
     })),
     testedWith: [],
     authoringNotes: [

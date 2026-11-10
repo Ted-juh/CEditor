@@ -352,5 +352,8 @@ test('the MODX M and MONTAGE M: four-byte addresses, two-byte values and choices
     assert.equal(collected.values[choice.id], choice.choices.at(-1).id);
     assert.equal(collected.values[element3.id], 'on');
     assert.equal(profile.identity, undefined, 'a code for each model: no identity check');
+    // The System's three blocks and the two edit buffers: a Performance block between its header and
+    // footer is no request of its own (the MONTAGE M prints that header `04 ll m nn`).
+    assert.equal(profile.requests.length, 5, `${id}: ${profile.requests.map((r) => r.name).join('; ')}`);
   }
 });

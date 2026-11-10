@@ -29,14 +29,17 @@ export function importDocuments(layout, files) {
   }));
   const r = layout.read;
   const file = files[r.doc ?? 0];
-  const format = readFormat(pagesText(file, r.formatPages));
+  // The data format may be in another document than the tables (the YC's owner's manual, whose data
+  // tables its V2.00 supplementary manual supersedes).
+  const formatFile = files[r.formatDoc ?? r.doc ?? 0];
+  const format = readFormat(pagesText(formatFile, r.formatPages));
   const tables = readParameterTables(file, r.tablePages, format.addressBytes ?? 3);
   // The bulk dump block table, in one or more spans (a column of a page each).
   const spans = [r.bulk ?? []].flat();
   const bulk = spans.flatMap((s) => readBulkBlocks(file, s.page, s, format.addressBytes ?? 3));
   // What a block's byte count counts, as the data list says: the reface's `the size of data in blocks
   // from Model ID onward`, the MODX's and MOXF's `the data size contained in each block`.
-  const counted = readByteCount(pagesText(file, [...new Set([...r.formatPages, ...spans.map((s) => s.page)])]));
+  const counted = readByteCount(pagesText(formatFile, r.formatPages)) ?? readByteCount(pagesText(file, [...new Set(spans.map((s) => s.page))]));
   return { sources, format: { ...format, ...(counted ? { byteCount: counted } : {}) }, tables, bulk };
 }
 

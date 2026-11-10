@@ -49,7 +49,9 @@ export default {
     'DRUM VOICE COMMON': { groupOf: under('Drum', 'Common') },
     'DRUM VOICE KEY': { placeholders: { ee: { values: range(73), labels: range(73).map(noteName) } }, groupOf: (at) => `Drum Key ${noteName(at.ee)}` },
   },
+  // `The Edit Buffer data … will be transmitted/received only in the corresponding Mode`.
+  collectionRetries: 0,
   notes: [
-    'Parameter changes at 40-42 (Normal Voice) and 46-47 (Drum Voice) edit the voice in the Voice mode\'s edit buffer; Pull asks for each edit buffer (Normal Voice, Drum Voice, Performance, Multi, Master), whichever mode the instrument is in.',
+    'Parameter changes at 40-42 (Normal Voice) and 46-47 (Drum Voice) edit the voice in the Voice mode\'s edit buffer; Pull asks for each edit buffer (Normal Voice, Drum Voice, Performance, Multi, Master), whichever mode the instrument is in. The data list says an edit buffer is sent only in its own mode, so the requests for the others go unanswered; each is asked once.',
   ],
 };
