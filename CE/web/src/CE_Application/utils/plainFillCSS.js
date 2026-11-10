@@ -28,7 +28,7 @@
 import { normalizeCorner } from './cornerNormalization.js';
 import { resolveColourValue } from '../models/controlSets.js';
 import { gradientToCSS } from './gradientCSS.js';
-import { buildLayerStyle } from './backgroundCSS.js';
+import { buildLayerStyle, buildLayerStyleParts } from './backgroundCSS.js';
 import { buildFillClipPath } from './cornerPaths.js';
 import { numberOr } from './primitives.js';
 import { hasBackgroundEffects } from './surfaceEffects.js';
@@ -115,12 +115,27 @@ export function fillShapeCSS(corners, width, height) {
  * `bgTextureAlign` — so the translation from a Fill's `imageFit` / `overlayAlign` lives here.
  */
 export function imageLayerStyle(fill, layerId, src, width, height) {
+  const { panel, prefix } = imageLayerPseudoPanel(fill, layerId, src, width, height);
+  return buildLayerStyle(panel, prefix, src);
+}
+
+/**
+ * The same layer as imageLayerStyle, in the pieces backgroundCSS.buildLayerStyleParts names — for
+ * BackgroundRenderer, which draws a rotated, flipped or offset layer as two elements so its clip
+ * stays in the component's frame (see buildLayerStyleParts for why).
+ */
+export function imageLayerStyleParts(fill, layerId, src, width, height) {
+  const { panel, prefix } = imageLayerPseudoPanel(fill, layerId, src, width, height);
+  return buildLayerStyleParts(panel, prefix, src);
+}
+
+function imageLayerPseudoPanel(fill, layerId, src, width, height) {
   const isImage = layerId === 'image';
   const prefix = isImage ? 'Image' : 'Texture';
   const from = isImage ? 'image' : 'overlay';
   const at = (key, fallback) => fill?.[`${from}${key}`] ?? fallback;
 
-  return buildLayerStyle({
+  return { prefix, panel: {
     width,
     height,
     [`bg${prefix}Enabled`]: true,
@@ -141,7 +156,7 @@ export function imageLayerStyle(fill, layerId, src, width, height) {
     [`bg${prefix}Brightness`]: at('Brightness', 100),
     [`bg${prefix}Contrast`]: at('Contrast', 100),
     [`bg${prefix}TileScale`]: at('TileScale', 1.0),
-  }, prefix, src);
+  } };
 }
 
 // The only properties that may ride along to the wrapper. Everything else buildLayerStyle can emit

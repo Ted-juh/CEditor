@@ -6,7 +6,7 @@
   import { plainBorderCSS } from '../../CE_Application/utils/plainBorderCSS.js';
   import { fileCache, loadFile } from '../../CE_Application/stores/fileCache.js';
   import { resolveStroke } from '../../CE_Application/utils/strokeResolver.js';
-  import { fillShapeCSS, imageLayerStyle } from '../../CE_Application/utils/plainFillCSS.js';
+  import { fillShapeCSS, imageLayerStyleParts } from '../../CE_Application/utils/plainFillCSS.js';
   import { outlineBorderDepth, outlineInsetKey } from '../../CE_Application/utils/outlineBorder.js';
   import SegmentedBorder from './SegmentedBorder.svelte';
   import OutlineBorder from './OutlineBorder.svelte';
@@ -82,7 +82,7 @@
 
   // The pseudo-panel translation lives in utils/plainFillCSS.js so the layered path and the
   // absorbed one build the same style from the same fields — see fillShapeCSS for the same reason.
-  const buildImageFillStyle = (layerId, src) => imageLayerStyle(fill, layerId, src, width, height);
+  const buildImageFillParts = (layerId, src) => imageLayerStyleParts(fill, layerId, src, width, height);
 
   function resolvedFillSource(src) {
     if (!src) return null;
@@ -148,27 +148,42 @@
   // drawn as a layer are shaped by the same function instead of by two meant to agree.
   let fillCornerCSS = $derived(fillShapeCSS(corners, width, height));
 
-  let fillLayerStyles = $derived.by(() => {
+  // Each drawn layer's style, keyed by layer. A layer is one element, except an image or overlay
+  // that is rotated, flipped or offset: that is two — this style on the outer one, and its picture
+  // (`fillLayerPaints`) on an inner one that alone carries the transform. CSS transforms an
+  // element after clipping it, so with one element the clip turned with the picture and at 90° its
+  // corners left the component entirely (utils/backgroundCSS.js, buildLayerStyleParts).
+  let fillLayerDraw = $derived.by(() => {
     const styles = {};
-    if (absorbFill) return styles;
+    const paints = {};
+    if (absorbFill) return { styles, paints };
     for (const layerId of fillLayerOrder()) {
       let layerStyle = null;
+      let image = null;
       if (layerId === 'solid' && fillLayerVisible('solid') && fill?.colour) {
         layerStyle = buildSolidFillStyle();
       } else if (layerId === 'gradient' && fillLayerVisible('gradient') && fill?.gradient) {
         layerStyle = `background: ${gradientToCSS(fill.gradient)}; opacity: ${((fill?.gradientOpacity ?? 100) / 100).toFixed(3)}; mix-blend-mode: ${fill?.gradientBlend ?? 'normal'};`;
       } else if (layerId === 'image' && fillLayerVisible('image') && fill?.imageSrc) {
-        layerStyle = buildImageFillStyle('image', resolvedFillSource(fill.imageSrc));
+        image = buildImageFillParts('image', resolvedFillSource(fill.imageSrc));
       } else if (layerId === 'overlay' && fillLayerVisible('overlay') && fill?.overlaySrc) {
-        layerStyle = buildImageFillStyle('overlay', resolvedFillSource(fill.overlaySrc));
+        image = buildImageFillParts('overlay', resolvedFillSource(fill.overlaySrc));
       }
 
-      if (layerStyle) {
-        styles[layerId] = [layerStyle, fillLayerClipCSS(layerId)].filter(Boolean).join(' ');
+      if (image?.transformed) {
+        // The outer element keeps the clip in the component's frame, and `overflow: hidden` holds
+        // the cover-scaled picture to the component's box when the clip mode is "none".
+        styles[layerId] = [image.compositing, fillLayerClipCSS(layerId), 'overflow: hidden;'].filter(Boolean).join(' ');
+        paints[layerId] = image.paint;
+      } else {
+        if (image) layerStyle = `${image.head} ${image.compositing}${image.tail}`;
+        if (layerStyle) styles[layerId] = [layerStyle, fillLayerClipCSS(layerId)].filter(Boolean).join(' ');
       }
     }
-    return styles;
+    return { styles, paints };
   });
+  let fillLayerStyles = $derived(fillLayerDraw.styles);
+  let fillLayerPaints = $derived(fillLayerDraw.paints);
 
   // Only the layers that actually draw something, in paint order.
   //
@@ -193,8 +208,11 @@
 <!-- Fill. Only the layers that draw — see `visibleFillLayers`. -->
 <EffectSurface effects={background?._children?.Effects} {width} {height} target="background">
 {#each visibleFillLayers as layerId (layerId)}
-  <EffectSurface effects={fill?._children?.[`${layerId[0].toUpperCase()}${layerId.slice(1)}Effects`]} {width} {height} target={layerId}>
-    <div class="bg-fill-layer" class:solid={layerId === 'solid'} style={fillLayerStyles[layerId]}></div>
+  <EffectSurface effects={fill?._children?.[`${layerId[0].toUpperCase()}${layerId.slice(1)}Effects`]} {width} {height} target={layerId}
+    blend={fill?.[`${layerId}Blend`] ?? 'normal'}>
+    <div class="bg-fill-layer" class:solid={layerId === 'solid'} style={fillLayerStyles[layerId]}>
+      {#if fillLayerPaints[layerId]}<div class="bg-fill-paint" style={fillLayerPaints[layerId]}></div>{/if}
+    </div>
   </EffectSurface>
 {/each}
 
@@ -236,4 +254,11 @@
      (CE_Application/utils/keyframeAnimation.js). Unset — the player window, any control without
      colour frames — it is none. */
   .bg-fill-layer.solid { animation: var(--ce-kf-paint, none); }
+
+  /* A transformed image layer's picture, inside the element that clips it (see fillLayerDraw). */
+  .bg-fill-paint {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
 </style>

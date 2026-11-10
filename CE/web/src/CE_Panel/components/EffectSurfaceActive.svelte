@@ -4,7 +4,14 @@
   import { buildFilterCSS, buildBlendCSS } from '../../CE_Application/utils/effectsCSS.js';
   import { materialActive } from '../../CE_Application/utils/materialFilter.js';
   import MaterialFilter from './MaterialFilter.svelte';
-  let { effects = null, width = 0, height = 0, shadowsOnly = false, target = '', children } = $props();
+  // `blend` is the blend mode the thing inside was given where it is edited — a fill layer's Blend
+  // in the Background tab. A filter makes this wrapper an isolated group, and inside one a blend
+  // mode has nothing beneath it to blend with: an image layer set to Multiply drew as Normal the
+  // moment it gained a shadow or a filter. So the wrapper carries it instead, where the layers
+  // below are. The surface's own Effects › Blend, when it says anything, wins.
+  let { effects = null, width = 0, height = 0, shadowsOnly = false, target = '', blend = 'normal', children } = $props();
+  let blendStyle = $derived(shadowsOnly ? ''
+    : (buildBlendCSS(effects) || (blend && blend !== 'normal' ? `mix-blend-mode: ${blend};` : '')));
   const uid = $props.id();
   const id = `surface-effects-${uid}`;
   const materialId = `surface-material-${uid}`;
@@ -50,7 +57,7 @@
 <!-- Material first, so the shadows and bevel fall from the lit surface rather than the light
      being painted over them. -->
 <div class="effect-surface" data-effect-surface={target}
-  style={`filter: ${[lit ? `url(#${materialId})` : '', shadows.length ? `url(#${id})` : '', filterStyle].filter(Boolean).join(' ') || 'none'}; ${shadowsOnly ? '' : buildBlendCSS(effects)}`}>
+  style={`filter: ${[lit ? `url(#${materialId})` : '', shadows.length ? `url(#${id})` : '', filterStyle].filter(Boolean).join(' ') || 'none'}; ${blendStyle}`}>
   {@render children()}
 </div>
 

@@ -150,6 +150,30 @@ export function buildGradientStyle(panel) {
  * Returns null when the layer is disabled or the URL isn't loaded yet.
  */
 export function buildLayerStyle(panel, prefix, url) {
+  const parts = buildLayerStyleParts(panel, prefix, url);
+  return parts ? `${parts.head} ${parts.compositing}${parts.tail}` : null;
+}
+
+/**
+ * buildLayerStyle in the pieces it is made of, for a caller that has to put them on two elements.
+ *
+ *   head         the picture: `background-image`, then fitToCSS — size, position, repeat, and the
+ *                `transform` for a rotated, flipped or offset layer
+ *   compositing  `opacity` and `mix-blend-mode`: how the layer meets what is behind it
+ *   tail         `filter` and the tint's `box-shadow`, or ''
+ *   paint        head and tail together: everything that belongs to the picture itself
+ *   transformed  whether head carries a `transform`
+ *
+ * WHY A TRANSFORMED LAYER IS TWO ELEMENTS. A component's fill layer is clipped to the component's
+ * shape (BackgroundRenderer, the layer's clip mode), and CSS applies an element's transform AFTER
+ * its own clip — so the clip turned, flipped and slid with the picture. At 90° on a component
+ * wider than it is tall the cover scale also doubles the layer, and its rounded corners ended up
+ * outside the component altogether: the corners came out square, "not clipped". The clip has to
+ * stay in the component's frame, so it goes on an outer element and the transform on an inner one.
+ * The compositing goes on the OUTER one: a clip-path makes its element a stacking context, and a
+ * blend mode left on the inner element would blend with nothing but that empty element.
+ */
+export function buildLayerStyleParts(panel, prefix, url) {
   if (!panel || !url) return null;
   const enabled = panel[`bg${prefix}Enabled`];
   const src = panel[`bg${prefix}`];
@@ -170,17 +194,18 @@ export function buildLayerStyle(panel, prefix, url) {
   const con = panel[`bg${prefix}Contrast`] ?? 100;
   const tint = tintShadow(panel[`bg${prefix}Tint`] ?? 'FFFFFF');
 
-  let style = `background-image: url('${url}'); ${fit}`;
-  style += ` opacity: ${opacity}; mix-blend-mode: ${blend};`;
+  const head = `background-image: url('${url}'); ${fit}`;
+  const compositing = `opacity: ${opacity}; mix-blend-mode: ${blend};`;
+  let tail = '';
   const filters = [];
   if (blur > 0) filters.push(`blur(${blur}px)`);
   if (panel[`bg${prefix}Grayscale`]) filters.push('grayscale(100%)');
   if (sat !== 100) filters.push(`saturate(${sat}%)`);
   if (bri !== 100) filters.push(`brightness(${bri}%)`);
   if (con !== 100) filters.push(`contrast(${con}%)`);
-  if (filters.length) style += ` filter: ${filters.join(' ')};`;
-  if (tint) style += ` box-shadow: ${tint};`;
-  return style;
+  if (filters.length) tail += ` filter: ${filters.join(' ')};`;
+  if (tint) tail += ` box-shadow: ${tint};`;
+  return { head, compositing, tail, paint: `${head}${tail}`, transformed: /(^|\s)transform:/.test(fit) };
 }
 
 /**
