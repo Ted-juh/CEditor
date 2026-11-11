@@ -1,0 +1,100 @@
+{
+  "source": {
+    "title": "BlastBeats manual (web page)",
+    "file": "te-manual-blastbeats.html",
+    "sha256": "1306f90d906faf0199b6ab90bb11b81e7440a8aa266f6b8342345e4314255fbc",
+    "url": "https://www.twisted-electrons.com/pages/manual-blastbeats",
+    "saved": "2026-11-11"
+  },
+  "routing": [
+    {
+      "target": "Drum",
+      "channel": 10
+    },
+    {
+      "target": "Synth 1",
+      "channel": 1
+    },
+    {
+      "target": "Synth 2",
+      "channel": 2
+    },
+    {
+      "target": "Synth 3",
+      "channel": 3
+    },
+    {
+      "target": "Synth 4",
+      "channel": 4
+    }
+  ],
+  "tables": [
+    {"title":"Drum Voice MIDI CC","columns":["Parameter","MIDI CC#","Range"],"rows":[
+      ["Bass drum carrier volume","20","0-127"],
+      ["Bass drum carrier waveform","21","0-127"],
+      ["Bass drum carrier feedback","22","0-127"],
+      ["Bass drum carrier multiplier","23","0-127"],
+      ["Bass drum carrier tune","24","0-127"],
+      ["Bass drum carrier fall","25","0-127"],
+      ["Bass drum carrier attack","26","0-127"],
+      ["Bass drum carrier decay","27","0-127"],
+      ["Bass drum modulator volume","28","0-127"],
+      ["Bass drum modulator waveform","29","0-127"],
+      ["Bass drum modulator multiplier","30","0-127"],
+      ["Bass drum modulator multiplier fall","31","0-127"],
+      ["Bass drum modulator attack","32","0-127"],
+      ["Bass drum modulator decay","33","0-127"],
+      ["Snare volume","34","0-127"],
+      ["Snare waveform","35","0-127"],
+      ["Snare multiplier","36","0-127"],
+      ["Snare tune","37","0-127"],
+      ["Snare tune fall","38","0-127"],
+      ["Snare attack","39","0-127"],
+      ["Snare decay","40","0-127"],
+      ["Hats Volume","43","0-127"],
+      ["Hats waveform","45","0-127"],
+      ["Hats multiplier","55","0-127"],
+      ["Hats tune","56","0-127"],
+      ["Hats fall","57","0-127"],
+      ["Hats attack","51","0-127"],
+      ["Hats Decay","54","0-127"],
+      ["Tom vol","42","0-127"],
+      ["Tom waveform","44","0-127"],
+      ["Tom multiplier","48","0-127"],
+      ["Tom tune","46","0-127"],
+      ["Tom fall","47","0-127"],
+      ["Tom attack","50","0-127"],
+      ["Tom decay","53","0-127"]
+    ]},
+    {"title":"Synth Voice MIDI CC","columns":["Parameter","MIDI CC#","Range"],"rows":[
+      ["Volume OP1","20","0-127"],
+      ["Waveform OP1","21","0-127"],
+      ["Feedback OP1","22","0-127"],
+      ["Algorithm (all operators)","23","0-127"],
+      ["Multiple OP1","24","0-127"],
+      ["Attack OP1","25","0-127"],
+      ["Decay OP1","26","0-127"],
+      ["Volume OP2","27","0-127"],
+      ["Waveform OP2","28","0-127"],
+      ["Multiplier OP2","29","0-127"],
+      ["Tremolo","30","0-127"],
+      ["Vibrato","31","0-127"],
+      ["Attack OP2","32","0-127"],
+      ["Decay OP2","33","0-127"],
+      ["Volume OP3","34","0-127"],
+      ["Waveform OP3","35","0-127"],
+      ["Feedback OP3","36","0-127"],
+      ["Tune","37","0-127"],
+      ["Multiplier OP3","38","0-127"],
+      ["Attack OP3","39","0-127"],
+      ["Decay OP3","40","0-127"],
+      ["Volume OP4","41","0-127"],
+      ["Waveform OP4","42","0-127"],
+      ["Multiplier OP4","43","0-127"],
+      ["Tremolo","44","0-127"],
+      ["Vibrato","45","0-127"],
+      ["Attack OP4","46","0-127"],
+      ["Decay OP4","47","0-127"]
+    ]}
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "source": {
+    "title": "hapiNES L manual (web page)",
+    "file": "manual-hapines-l-index.html",
+    "sha256": "759279a03cc93104b1b050524c9ce64bfc552c49cd2cd7115b3f06d1a18293cb",
+    "url": "https://www.twisted-electrons.com/cdn/shop/t/11/assets/manual-hapines-l-index.html",
+    "saved": "2026-11-11"
+  },
+  "tables": [
+    {"title":"MIDI CC Reference","columns":["Parameter","CC","Range / Meaning"],"rows":[
+      ["Slide","5","0-63 off, 64-127 on"],
+      ["Tempo","14","Continuous"],
+      ["Swing","17","Continuous"],
+      ["Triangle Bass Decay","23","Continuous"],
+      ["Square 1 Decay","24","Continuous"],
+      ["Square 2 Decay","25","Continuous"],
+      ["Vibrato Rate","20","Continuous"],
+      ["Vibrato Depth Square 1","12","Continuous"],
+      ["Vibrato Depth Square 2","13","Continuous"],
+      ["Arp Type Square 1","15","16 arp choices"],
+      ["Arp Type Square 2","16","16 arp choices"],
+      ["Arp Speed Square 1","28","Continuous"],
+      ["Arp Speed Square 2","31","Continuous"],
+      ["Drum Noise Volume","27","Continuous"],
+      ["Drum Noise Pitch","22","Continuous"],
+      ["Slide Rate Triangle Bass","40","Continuous"],
+      ["Slide Rate Square 1","41","Continuous"],
+      ["Slide Rate Square 2","42","Continuous"],
+      ["Square 1 Pulse Width","29","Continuous"],
+      ["Square 2 Pulse Width","30","Continuous"],
+      ["MIDI Clock Rate","33","0 normal, 1 2x, 2 4x"],
+      ["Pulse Width of Selected Square Voice","1","Mod wheel"],
+      ["Vibrato Square 1 On / Off","82","0 off, 1-127 on"],
+      ["Vibrato Square 2 On / Off","38","0 off, 1-127 on"],
+      ["Arp Square 1 On / Off","113","0 off, 1-127 on"],
+      ["Arp Square 2 On / Off","83","0 off, 1-127 on"],
+      ["Lock Knobs For CC Modulation Only","73","0 unlocked, 1-127 locked"]
+    ]}
+  ]
+}
