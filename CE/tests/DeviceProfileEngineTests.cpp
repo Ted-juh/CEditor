@@ -4786,7 +4786,12 @@ int main (int argc, char** argv)
         root.getChildFile ("twisted-electrons-hapines-l.ceditor-device.json"),
         root.getChildFile ("twisted-electrons-megafm.ceditor-device.json"),
         root.getChildFile ("twisted-electrons-therapsid.ceditor-device.json"),
-        root.getChildFile ("twisted-electrons-twistfm.ceditor-device.json")
+        root.getChildFile ("twisted-electrons-twistfm.ceditor-device.json"),
+        root.getChildFile ("dexibell-j7.ceditor-device.json"),
+        root.getChildFile ("dexibell-s10.ceditor-device.json"),
+        root.getChildFile ("dexibell-s8.ceditor-device.json"),
+        root.getChildFile ("dexibell-s9.ceditor-device.json"),
+        root.getChildFile ("dexibell-sx8.ceditor-device.json")
     };
 
     auto failures = 0;
