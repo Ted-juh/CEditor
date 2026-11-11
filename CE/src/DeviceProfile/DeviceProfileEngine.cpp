@@ -2485,6 +2485,16 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
         if (numeric >= 1048576)
             numeric -= 2097152;
     }
+    else if (encodingType == "s17-msb-lsb")
+    {
+        // 17 bits, most significant byte first, the first byte's low three bits being bits 14 - 16
+        // (the Alesis A6's: the rest of that byte is its mix channel, not the value's).
+        if (offset + 2 >= bytes.size())
+            return juce::Result::fail ("17-bit dump value requires three bytes for " + propString (parameter, "id"));
+        numeric = ((bytes[offset] & 0x07) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset + 2] & 0x7f);
+        if (numeric >= 65536)
+            numeric -= 131072;
+    }
     else if (encodingType == "u14-lsb-msb" || encodingType == "s14-lsb-msb")
     {
         // 14-bit, least-significant byte first (byteOrder lsb-first); s14 is the same bits read as
@@ -2732,6 +2742,21 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
                 return juce::Result::fail ("Encoded s21 value outside -1048576-1048575 for " + propString (parameter, "id"));
             const auto wire = value & 0x1fffff;
             encodedBytes.add ((wire >> 14) & 0x7f);
+            encodedBytes.add ((wire >> 7) & 0x7f);
+            encodedBytes.add (wire & 0x7f);
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "s17-msb-lsb")
+        {
+            // A signed value in 17 bits, two's complement, most significant byte first, that byte
+            // carrying bits 14 - 16 only: the Alesis A6's MIDI Editing (<data2> is 0xxx xyyy, xxxx the
+            // mix channel, sent here as 0, and yyy bits 14 - 16; <data1> bits 7 - 13; <data0> 0 - 6).
+            auto value = (int) std::round (numeric);
+            if (value < -65536 || value > 65535)
+                return juce::Result::fail ("Encoded s17 value outside -65536-65535 for " + propString (parameter, "id"));
+            const auto wire = value & 0x1ffff;
+            encodedBytes.add ((wire >> 14) & 0x07);
             encodedBytes.add ((wire >> 7) & 0x7f);
             encodedBytes.add (wire & 0x7f);
             return juce::Result::ok();

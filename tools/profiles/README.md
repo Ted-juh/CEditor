@@ -37,6 +37,7 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | [`erica/`](erica/README.md) | 2 profiles from the MIDI charts of Erica Synths' manuals: the PĒRKONS HD-01 (a controller for each of a voice's knobs and switches, four voices) and the LXR-02 (its CC and NRPN lists, six voices and the effects). Read from the PDFs' word positions. |
 | [`expressive/`](expressive/README.md) | The Expressive E Osmose's sound engine from its MIDI implementation chart (the MMA's v2.0 form, read by a reader written for the form): the macros, gains and global effects, on the MPE master channel. |
 | [`sequential/`](sequential/README.md) | 17 profiles from the NRPN tables of Sequential's, Dave Smith Instruments' and Oberheim's manuals: Prophet-6, Rev2, 12, X, '08 and 5/10, Pro 2, Trigon-6, Take 5, Fourm, Tetra, the three Mophos, and the OB-6, OB-X8 and TEO-5. |
+| [`alesis/`](alesis/README.md) | The Alesis A6 Andromeda from its MIDI Sysex Specification's parameter chart: every program and mix parameter the chart gives a range (696), sent by its MIDI Editing message, a 17-bit signed value; and its mode select. Read from the PDF's text lines. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |
 
 **Makers looked at and not built** (November 2026), each for want of its own documents reachable

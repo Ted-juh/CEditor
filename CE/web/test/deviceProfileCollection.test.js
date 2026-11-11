@@ -135,6 +135,36 @@ test('s21-msb-lsb: two\'s complement over 21 bits, high byte first, sent and rea
   assert.deepEqual(localParseDumpMessage(probe, 'F0 42 30 68 4C 7F 7F 4E 4E F7').values, { tune: -50, intensity: -50, level: 78 });
 });
 
+// A signed value in 17 bits, most significant byte first, the first byte carrying bits 14 - 16 only:
+// the Alesis A6's MIDI Editing, whose <data2> holds the mix channel above them. The document's own
+// examples are the vectors (Filter 2 Offset to -0.02 is 07 7F 70); read back with the channel bits
+// set, which are not the value's. The C++ engine's runS17MsbFirstTests checks the same probe.
+test('s17-msb-lsb: two\'s complement over 17 bits, the first byte\'s other bits not the value\'s', () => {
+  const probe = {
+    schemaVersion: 1,
+    id: 'probe-s17',
+    variables: { channel: 1 },
+    parameters: [{ id: 'offset', name: 'offset', messageRecipe: 'edit', type: 'integer', range: { min: -65534, max: 65535 }, encoding: { type: 's17-msb-lsb' }, access: { canWrite: true, canRead: true } }],
+    messageRecipes: [{ id: 'edit', kind: 'sysex', template: ['F0', '00', '00', '0E', '1D', '0E', '13', '08', '$encodedValue', 'F7'] }],
+    dumpDefinitions: [{
+      id: 'probe',
+      kind: 'sysex',
+      matcher: { prefix: ['F0', '00', '00', '0E', '1D', '0E', '13', '08'], suffix: ['F7'] },
+      payload: { offset: 8, size: 3 },
+      completion: { expectedBytes: 12 },
+      mappings: [{ parameter: 'offset', offset: 0 }],
+    }],
+  };
+  for (const [value, hex] of [[-16, '07 7F 70'], [1, '00 00 01'], [65535, '03 7F 7F'], [-65534, '04 00 02'], [-1, '07 7F 7F']]) {
+    const compiled = localCompileParameter(probe, { parameterId: 'offset', value });
+    assert.ok(compiled.ok, compiled.error);
+    assert.equal(compiled.transaction.encodedValueHex, hex, String(value));
+  }
+  assert.equal(localCompileParameter(probe, { parameterId: 'offset', value: -16 }).transaction.hex, 'F0 00 00 0E 1D 0E 13 08 07 7F 70 F7');
+  assert.deepEqual(localParseDumpMessage(probe, 'F0 00 00 0E 1D 0E 13 08 07 7F 70 F7').values, { offset: -16 });
+  assert.deepEqual(localParseDumpMessage(probe, 'F0 00 00 0E 1D 0E 13 08 7F 7F 70 F7').values, { offset: -16 });
+});
+
 // `when`: a field another byte selects (a KRONOS EXi slot's engine settings, read only when the
 // slot's Algorithm Type holds that engine). The C++ engine's runDumpWhenTests checks the same probe.
 test('when: a field is read only when the byte that selects it holds its value', () => {

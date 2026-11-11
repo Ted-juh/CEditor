@@ -135,7 +135,7 @@ export function parameterValueWidth(parameter) {
     return length;
   }
   if (isU14(encoding)) return 2;
-  if (encoding === 's21-lsb-msb' || encoding === 's21-msb-lsb') return 3;
+  if (encoding === 's21-lsb-msb' || encoding === 's21-msb-lsb' || encoding === 's17-msb-lsb') return 3;
   if (encoding === 'nibbled') return nibbleCount(parameter).nibbles ?? 0;
   return 1;
 }
@@ -233,6 +233,11 @@ export function decodeParameterValue(parameter, bytes) {
     const raw = ((list[0] & 0x7f) << 14) | ((list[1] & 0x7f) << 7) | (list[2] & 0x7f);
     return raw >= 1048576 ? raw - 2097152 : raw;
   }
+  if (encoding === 's17-msb-lsb') {
+    // Bits 14 - 16 are the first byte's low three; its others are not the value's (the A6's mix channel).
+    const raw = ((list[0] & 0x07) << 14) | ((list[1] & 0x7f) << 7) | (list[2] & 0x7f);
+    return raw >= 65536 ? raw - 131072 : raw;
+  }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
     if (error) return null;
@@ -305,6 +310,15 @@ export function encodeParameterValue(parameter, value) {
     if (number < -1048576 || number > 1048575) return { error: `Encoded s21 value outside -1048576-1048575 for ${parameter?.id ?? ''}` };
     const wire = number & 0x1fffff;
     return { bytes: [(wire >> 14) & 0x7f, (wire >> 7) & 0x7f, wire & 0x7f], number, normalized: (number + 1048576) / 2097151, displayed: String(number) };
+  }
+  if (encoding === 's17-msb-lsb') {
+    // Signed over 17 bits, three bytes most significant first, the first carrying bits 14 - 16 only, as
+    // DeviceProfileEngine.cpp encodes it (the Alesis A6's MIDI Editing: <data2> is 0xxx xyyy, xxxx the
+    // mix channel and yyy bits 14 - 16; sent with the mix channel 0).
+    const number = Math.round(Number(value) || 0);
+    if (number < -65536 || number > 65535) return { error: `Encoded s17 value outside -65536-65535 for ${parameter?.id ?? ''}` };
+    const wire = number & 0x1ffff;
+    return { bytes: [(wire >> 14) & 0x07, (wire >> 7) & 0x7f, wire & 0x7f], number, normalized: (number + 65536) / 131071, displayed: String(number) };
   }
   if (encoding === 's14-lsb-msb') {
     // Signed, two's complement over 14 bits, least significant byte first, as DeviceProfileEngine.cpp
@@ -717,6 +731,10 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     const [hi, lo] = encodingType === 's21-msb-lsb' ? [offset, offset + 2] : [offset + 2, offset];
     numeric = ((bytes[hi] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[lo] & 0x7f);
     if (numeric >= 1048576) numeric -= 2097152;
+  } else if (encodingType === 's17-msb-lsb') {
+    if (offset + 2 >= bytes.length) return { ok: false, error: `17-bit dump value requires three bytes for ${parameter?.id ?? ''}` };
+    numeric = ((bytes[offset] & 0x07) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset + 2] & 0x7f);
+    if (numeric >= 65536) numeric -= 131072;
   } else if (encodingType === 'u14-lsb-msb' || encodingType === 's14-lsb-msb') {
     // Least significant byte first, as DeviceProfileEngine.cpp reads it. It came back as its first
     // byte alone: 12345 (39 60) as 57. s14 is the same bits read as two's complement.

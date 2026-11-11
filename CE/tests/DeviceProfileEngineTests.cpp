@@ -1628,6 +1628,70 @@ int runS21MsbFirstTests()
     return failures;
 }
 
+int runS17MsbFirstTests()
+{
+    // A signed value in 17 bits, two's complement, most significant byte first, the first byte
+    // carrying bits 14 - 16 only: the Alesis A6's MIDI Editing (opcode 0E), whose <data2> holds the
+    // mix channel above them. The document's own examples are the vectors: Filter 2 Offset to -0.02
+    // is 07 7F 70 (-16), Osc 2 Mod 3 on is 00 00 01. Read back with the channel bits set, which are
+    // not the value's. The JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-s17", "name": "Probe", "manufacturer": "Probe",
+      "variables": { "channel": 1 },
+      "parameters": [
+        { "id": "offset", "name": "Offset", "messageRecipe": "edit", "type": "integer",
+          "range": { "min": -65534, "max": 65535 }, "encoding": { "type": "s17-msb-lsb" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "edit", "kind": "sysex", "template": ["F0", "00", "00", "0E", "1D", "0E", "13", "08", "$encodedValue", "F7"] } ],
+      "dumpDefinitions": [
+        { "id": "probe", "kind": "sysex", "matcher": { "prefix": ["F0", "00", "00", "0E", "1D", "0E", "13", "08"], "suffix": ["F7"] }, "payload": { "offset": 8, "size": 3 },
+          "completion": { "expectedBytes": 12 }, "mappings": [ { "parameter": "offset", "offset": 0 } ] }
+      ]
+    })JSON";
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] s17 MSB first: probe did not load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const struct { int value; const char* hex; } cases[] = { { -16, "07 7F 70" }, { 1, "00 00 01" }, { 65535, "03 7F 7F" }, { -65534, "04 00 02" }, { -1, "07 7F 7F" } };
+    for (const auto& c : cases)
+    {
+        const auto compiled = engine.compileSetParameter ("mainSynth", "offset", c.value, true);
+        if (! compiled.ok || compiled.transaction.encodedValueHex != c.hex)
+        {
+            std::cerr << "[FAIL] s17 MSB first: " << c.value << " should encode as " << c.hex << ", got "
+                      << (compiled.ok ? compiled.transaction.encodedValueHex : compiled.error) << "\n";
+            ++failures;
+        }
+    }
+    const auto compiled = engine.compileSetParameter ("mainSynth", "offset", -16, true);
+    const auto whole = compiled.ok && compiled.transaction.messages.size() == 1
+                           ? ceditor::device::DeviceProfileEngine::bytesToHex (compiled.transaction.messages.getReference (0).bytes)
+                           : compiled.error;
+    if (whole != "F0 00 00 0E 1D 0E 13 08 07 7F 70 F7")
+    {
+        std::cerr << "[FAIL] s17 MSB first: -16 should be the document's F0 00 00 0E 1D 0E 13 08 07 7F 70 F7, got "
+                  << whole << "\n";
+        ++failures;
+    }
+    for (const auto* input : { "F0 00 00 0E 1D 0E 13 08 07 7F 70 F7", "F0 00 00 0E 1D 0E 13 08 7F 7F 70 F7" })
+    {
+        const auto parsed = engine.parseDumpMessage (input);
+        if (! parsed.ok || (int) parsed.values.getProperty ("offset", 0) != -16)
+        {
+            std::cerr << "[FAIL] s17 MSB first: " << input << " should read back as -16, got "
+                      << (parsed.ok ? parsed.values.getProperty ("offset", {}).toString() : parsed.error) << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] s17 MSB first :: two's complement over 17 bits, the first byte's other bits not the value's\n";
+    return failures;
+}
+
 int runCcPairTests()
 {
     const char* json = R"JSON({
@@ -4691,7 +4755,8 @@ int main (int argc, char** argv)
         root.getChildFile ("black-corporation-xerxes-mk2.ceditor-device.json"),
         root.getChildFile ("erica-lxr-02.ceditor-device.json"),
         root.getChildFile ("erica-perkons-hd-01.ceditor-device.json"),
-        root.getChildFile ("expressive-e-osmose.ceditor-device.json")
+        root.getChildFile ("expressive-e-osmose.ceditor-device.json"),
+        root.getChildFile ("alesis-a6-andromeda.ceditor-device.json")
     };
 
     auto failures = 0;
@@ -4706,6 +4771,7 @@ int main (int argc, char** argv)
     failures += runChecksumAlsoAcceptTests();
     failures += runDumpRecordTests();
     failures += runS21MsbFirstTests();
+    failures += runS17MsbFirstTests();
     failures += runDumpWhenTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
