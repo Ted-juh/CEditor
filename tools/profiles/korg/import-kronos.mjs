@@ -12,7 +12,11 @@
 //     Dump) and the footnotes they point to;
 //   - the voice model's file (SysExParams/VoiceModels/HD-1.txt): its message format and its list of
 //     AMS sources by number;
-//   - KRONOS_MIDI_Implementation.pdf, through pdftotext: the Device Inquiry reply and the member codes.
+//   - the MIDI implementation (the KRONOS's a PDF, read through pdftotext; the NAUTILUS's text): the
+//     Device Inquiry reply and the member codes.
+//
+// The NAUTILUS's archive is the same form (NAUTILUS_MIDIimp.zip, its tables under SysExDumps/), without
+// the voice model files.
 //
 // With each file's name and SHA-256 and the page's address. This is committed; Korg's files are not.
 
@@ -76,8 +80,11 @@ export function importArchive(dir, layout) {
   const read = (file) => readFileSync(path.join(dir, file), 'latin1');
   const objectText = read(doc.object);
   const messagesText = read(doc.messages);
-  const voiceText = read(doc.voiceModel);
-  const pdfText = execFileSync('pdftotext', ['-layout', path.join(dir, doc.implementation), '-'], { encoding: 'utf8', maxBuffer: 64 << 20 });
+  const voiceText = doc.voiceModel ? read(doc.voiceModel) : null;
+  // The KRONOS's implementation is a PDF, read with pdftotext (poppler); the NAUTILUS's is text.
+  const implementationText = doc.implementation.endsWith('.pdf')
+    ? execFileSync('pdftotext', ['-layout', path.join(dir, doc.implementation), '-'], { encoding: 'utf8', maxBuffer: 64 << 20 })
+    : read(doc.implementation);
   const printed = (text) => {
     const m = printedVersion(text);
     return m ? `Version ${m[1]} (${m[2].replace(/\s+/g, ' ')})` : null;
@@ -92,7 +99,7 @@ export function importArchive(dir, layout) {
       printed: printed(objectText),
       sha256: sha256(path.join(dir, doc.object)),
     },
-    files: [doc.messages, doc.voiceModel, doc.implementation].map((file) => ({
+    files: [doc.messages, doc.voiceModel, doc.implementation].filter(Boolean).map((file) => ({
       file,
       ...(file.endsWith('.txt') && printed(read(file)) ? { printed: printed(read(file)) } : {}),
       sha256: sha256(path.join(dir, file)),
@@ -100,15 +107,15 @@ export function importArchive(dir, layout) {
     object: readObjectHeader(objectText),
     messages: {
       parameterChange: messageBlock(messagesText, '43'),
-      ...Object.fromEntries((layout.functions ?? []).map((f) => [f.code, messageBlock(messagesText, f.code)])),
+      ...Object.fromEntries([...(layout.functions ?? []).map((f) => f.code), ...(layout.citedMessages ?? [])].map((code) => [code, messageBlock(messagesText, code)])),
       currentObjectDumpRequest: messageBlock(messagesText, '74'),
       currentObjectDump: messageBlock(messagesText, '75'),
       objects: footnote(messagesText, '1'),
       packing: footnote(messagesText, '3'),
       value: footnote(messagesText, '4'),
     },
-    voiceModel: { messageFormats: messageFormats(voiceText), amsSources: amsSources(voiceText) },
-    identity: inquiryReply(pdfText),
+    ...(voiceText ? { voiceModel: { messageFormats: messageFormats(voiceText), amsSources: amsSources(voiceText) } } : {}),
+    identity: inquiryReply(implementationText),
     rows: readObjectRows(objectText),
   };
 }
@@ -135,7 +142,7 @@ async function main() {
   const data = importArchive(dir, layout);
   const out = path.join(HERE, 'tables', `${name}.json`);
   writeFileSync(out, stringifyKronos(data));
-  console.log(`Wrote ${path.relative(process.cwd(), out)}: ${data.object.title}, ${data.rows.length} rows, ${data.voiceModel.amsSources?.length ?? 0} AMS sources, ${data.identity?.members.length ?? 0} member codes`);
+  console.log(`Wrote ${path.relative(process.cwd(), out)}: ${data.object.title}, ${data.rows.length} rows, ${data.voiceModel?.amsSources?.length ?? 0} AMS sources, ${data.identity?.members.length ?? 0} member codes`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

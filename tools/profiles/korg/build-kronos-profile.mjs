@@ -1,23 +1,26 @@
-// build-kronos-profile.mjs — a KRONOS object table's transcription (tables/<name>.json, from
-// import-kronos.mjs) and a layout (synths/<name>.mjs) -> a CEditor device profile.
+// build-kronos-profile.mjs — a KRONOS-style object table's transcription (tables/<name>.json, from
+// import-kronos.mjs) and a layout (synths/<name>.mjs) -> a CEditor device profile. The KRONOS and the
+// NAUTILUS publish their MIDI Implementations this way.
 //
 // What the archive says, and nothing it does not:
 //
-//   - every row with a parameter id is a parameter, sent by Parameter Change (function 43,
-//     `F0 42 3g 68 43 TYP SOC SUB PID IDX valueH valueM valueL F7`), its value 21 bits, two's
-//     complement, high byte first (*4; the voice model's file: "21-bit signed value, MSB first");
-//     the KARMA rows by KARMA Parameter Change (6D) and the Drum Track rows by Drum Track Parameter
-//     Change (6E), the same message under another function code: the table prints no message per
-//     row, and their ids are the program's own (layout.functions says so, and every id is then
-//     unique, which the builder checks);
-//     a PID above 126 takes the message's second form, `7F PIDH PIDL` (the instrument still receives
-//     it);
+//   - every row with a parameter id is a parameter, sent by Parameter Change (function 43: the
+//     exclusive header its block prints, then `43 TYP SOC SUB PID IDX valueH valueM valueL F7`), its
+//     value 21 bits, two's complement, high byte first (*4; the KRONOS's voice model files: "21-bit
+//     signed value, MSB first"); a PID above 126 takes the message's second form, `7F PIDH PIDL`
+//     (the instrument still receives it);
+//   - the table prints no message per row. Where the archive has a parameter change of its own for
+//     some groups (the KRONOS's KARMA and Drum Track ones), the layout routes those groups to it
+//     (`functions`), and the profile says, per group, whether their ids are also ones Parameter
+//     Change takes for other rows (so they cannot be sent by it) or whether the message's name alone
+//     sends them there. Groups the archive leaves undecided are left out (`leaveOut`), with the same
+//     count. The builder checks that every id it sends is unique per message;
 //   - its range is the row's data(hex): `00~7F` is 0~127, and a range whose first value is the larger
 //     (`9D~63`, `FF39~00C7`) is two's complement over its bytes, -99~+99 and -199~+199;
 //   - it is a choice where the row names both of two values (`00~01 | Off~On`), with the names as
 //     printed: the value column is 19 characters wide, and a name it cuts short keeps its cut, shown
 //     with an ellipsis; and where its ends are the ends of a list the archive prints in full (the
-//     voice model's AMS sources: `00~30 | Off~Tempo` is sources 0~48, Off to Tempo);
+//     KRONOS voice model's AMS sources: `00~30 | Off~Tempo` is sources 0~48, Off to Tempo);
 //   - it is read back from the Current Object Dump of the program (function 75) at the row's offset
 //     and bits, in Korg's 8-in-7 packing (*3);
 //   - rows the archive marks as working some other way are left out, each with its reason, and so is
@@ -84,7 +87,13 @@ export function buildKronosProfile(data, layout) {
   const fixed = [];
   const ids = new Set();
   const leave = (map, why, label) => map.set(why, [...(map.get(why) ?? []), label]);
-  const ams = data.voiceModel.amsSources ?? [];
+  const ams = data.voiceModel?.amsSources ?? [];
+  const bigEndian = data.rows.some((r) => /Big Endian/.test(r.note ?? ''));
+
+  const header = exclusiveHeader(data);
+  const routeOf = (row) => (layout.functions ?? []).find((f) => f.group.test(row.group))?.code ?? '43';
+  const leaveOutOf = (row) => (layout.leaveOut ?? []).find((l) => l.group.test(row.group));
+  const longForm = new Set();
 
   // A name printed for several settings of one group is numbered in the order printed: the chord pads'
   // eight notes, the 32 GE real-time parameters.
@@ -100,7 +109,8 @@ export function buildKronosProfile(data, layout) {
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    if (!row.id || !row.name) continue;
+    if (!row.id || !row.group) continue;          // a further byte of the value above, with its own id
+    if (!row.name) { leave(leftOut, 'printed with a group and no name', `${row.group} (offset ${row.ofs})`); continue; }
     const key = keyOf(row);
     const nth = (seen.get(key) ?? 0) + 1;
     seen.set(key, nth);
@@ -108,17 +118,19 @@ export function buildKronosProfile(data, layout) {
     const label = `${row.group} ${leaf}`;
     const read = readData(row.data);
     if (read?.fixed) { fixed.push(label); continue; }
+    const out = leaveOutOf(row);
+    if (out) { leave(leftOut, out.why, label); continue; }
     const why = noteReason(row.note) ?? (!row.data ? 'no range printed (data(hex) is blank)' : !read ? `data printed "${row.data}"` : read.cut ? 'its data(hex) cell is cut short' : null);
     if (why) { leave(leftOut, why, label); continue; }
-    // A row with an id and no name after this one is a further byte of its value, with its own id.
-    if (rows[i + 1]?.id && !rows[i + 1].name && rows[i + 1].ofs !== row.ofs) { leave(leftOut, 'its value spreads over bytes with ids of their own', label); continue; }
+    // A row with an id and neither group nor name after this one is a further byte of its value.
+    if (rows[i + 1]?.id && !rows[i + 1].group && !rows[i + 1].name && rows[i + 1].ofs !== row.ofs) { leave(leftOut, 'its value spreads over bytes with ids of their own', label); continue; }
 
     const bits = readBits(row.bit);
     if (read.bytes > 1 && row.bit) throw new Error(`${label}: bits of a value over ${read.bytes} bytes`);
     if (read.bytes === 1 && (read.signed ? read.max - read.min : read.max) >= 2 ** bits.bits) throw new Error(`${label}: ${row.data} does not fit bits ${row.bit}`);
     const [typ, soc, sub, pid, idx] = row.id;
     const idBytes = pid < 127 ? [typ, soc, sub, pid, idx] : [typ, soc, sub, 0x7f, (pid >> 7) & 0x7f, pid & 0x7f, idx];
-    const fn = (layout.functions ?? []).find((f) => f.group.test(row.group))?.code ?? '43';
+    const fn = routeOf(row);
     const recipeId = `${fn === '43' ? 'pc' : `pc${fn}_`}${idBytes.map(hex).join('')}`;
     if (recipes.has(recipeId)) throw new Error(`${label}: parameter id ${idBytes.map(hex).join(' ')} twice for function ${fn}`);
 
@@ -128,7 +140,7 @@ export function buildKronosProfile(data, layout) {
     if (labels && read.min === 0 && read.max === 1 && !labels.every((l, n) => numberLabel(l, n))) {
       // `* -> bypass, Invert Value`: the switch is sent as its effect's bypass, On as 0.
       choices = labels.map((l, n) => ({ id: camel(l.replace('…', '')) || `v${n}`, label: l, value: inverted ? 1 - n : n }));
-    } else if (labels && read.min === 0 && !read.signed && ams[read.min]?.label === labels[0] && ams[read.max]?.label === labels[1]) {
+    } else if (labels && read.min === 0 && !read.signed && ams.length && ams[read.min]?.label === labels[0] && ams[read.max]?.label === labels[1]) {
       const used = new Set();
       choices = ams.slice(0, read.max + 1).map((s) => {
         const id = used.has(camel(s.label)) ? `${camel(s.label)}${s.value}` : camel(s.label);
@@ -170,22 +182,68 @@ export function buildKronosProfile(data, layout) {
       };
     parameters.push(parameter);
     // A choice's value is one byte of the three, the low one: the template carries the two above it.
-    recipes.set(recipeId, { id: recipeId, kind: 'sysex', template: ['F0', '42', '$deviceId', '68', fn, ...idBytes.map(hex), ...(choices ? ['00', '00'] : []), '$encodedValue', 'F7'] });
+    recipes.set(recipeId, { id: recipeId, kind: 'sysex', template: [...header, fn, ...idBytes.map(hex), ...(choices ? ['00', '00'] : []), '$encodedValue', 'F7'] });
+    if (pid >= 127) longForm.add(recipeId);
 
-    if (read.bytes > 1) { leave(notReadBack, 'a value over two bytes: the archive marks only the KARMA Start Seed\'s bytes `Big Endian` and does not say the order of the others', label); continue; }
+    if (read.bytes > 1) { leave(notReadBack, bigEndian ? 'a value over two bytes: the archive marks only the KARMA Start Seed\'s bytes `Big Endian` and does not say the order of the others' : 'a value over two bytes, whose byte order the archive does not say', label); continue; }
     if (read.extra.length) { leave(notReadBack, `a value the dump may hold as ${read.extra.join(', ')}, which the parameter does not offer`, label); continue; }
     const codec = { type: 'bitfields', ...(read.signed ? { signed: true } : {}), parts: [{ at: 0, from: bits.from, bits: bits.bits, shift: 0 }], ...(inverted ? { map: [[0, 1], [1, 0]] } : {}) };
     mappings.push({ parameter: parameter.id, offset: row.ofs, codec, read, bits });
     parameter.access.canRead = true;
   }
 
-  return shell(data, layout, parameters, recipes, mappings, leftOut, notReadBack, fixed);
+  const routing = routingNotes(data, layout, { routeOf, leaveOutOf });
+  return shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing });
+}
+
+/** `F0, 42, 3g, 68` (or `F0, 42, 3g, 00, 01, 5D`) from the Parameter Change block, 3g as the device id. */
+export function exclusiveHeader(data) {
+  const header = (lines) => {
+    const line = (lines ?? []).find((l) => /Excl Header\s*$/.test(l));
+    return line ? line.replace(/Excl Header\s*$/, '').split(',').map((t) => t.trim()).filter(Boolean) : null;
+  };
+  const printed = header(data.messages.parameterChange);
+  if (!printed || printed[0] !== 'F0' || printed[1] !== '42' || printed[2] !== '3g') throw new Error('archive: the exclusive header no longer reads F0, 42, 3g, …');
+  for (const key of ['currentObjectDumpRequest', 'currentObjectDump']) {
+    if (header(data.messages[key])?.join(' ') !== printed.join(' ')) throw new Error(`archive: ${key} prints another exclusive header`);
+  }
+  return printed.map((t) => (t === '3g' ? '$deviceId' : t.toUpperCase()));
+}
+
+/**
+ * What decides each routed or left-out group's message: how many of its rows share an id with a row
+ * Parameter Change (43) sends. Those cannot go by 43; a group with none goes by its message's name.
+ */
+function routingNotes(data, layout, { routeOf, leaveOutOf }) {
+  const settings = data.rows.filter((r) => r.id && r.name && !readData(r.data)?.fixed && !noteReason(r.note));
+  const by43 = new Map();
+  for (const r of settings) if (routeOf(r) === '43' && !leaveOutOf(r)) by43.set(r.id.join(' '), r);
+  const tally = (rows) => {
+    const groups = new Map();
+    for (const r of rows) {
+      const g = groups.get(r.group) ?? { rows: 0, shared: 0, example: null };
+      g.rows++;
+      const other = by43.get(r.id.join(' '));
+      if (other) { g.shared++; g.example ??= `${r.id.join(' ')} is ${r.group} ${r.name} and ${other.group} ${other.name}`; }
+      groups.set(r.group, g);
+    }
+    return [...groups].map(([group, g]) => `${group}, ${g.shared} of ${g.rows}${g.example ? ` (${g.example})` : ''}`).join('; ');
+  };
+  const notes = (layout.functions ?? []).map((f) => {
+    const rows = settings.filter((r) => routeOf(r) === f.code && !leaveOutOf(r));
+    return `The rows of ${f.group.source.replace(/^\^/, '').trim()}… go by ${f.message} (function ${f.code}), the same message as Parameter Change under another code. The table prints no message per row. Per group, the rows whose ids Parameter Change also takes for another row, and so cannot go by it: ${tally(rows)}. A group goes by one message: one with such rows cannot go by Parameter Change, and one with none goes by ${f.code} on the message's name alone. A reading, not tried on an instrument.`;
+  });
+  for (const l of layout.leaveOut ?? []) {
+    const rows = settings.filter((r) => leaveOutOf(r) === l);
+    notes.push(`Left out, ${l.label}: per group, the rows whose ids Parameter Change also takes for another row: ${tally(rows)}.`);
+  }
+  return notes;
 }
 
 /** What the builder relies on, checked against the archive's own words so a new release cannot slip by. */
 function checkMessages(data, layout) {
   const has = (lines, re, what) => {
-    if (!(lines ?? []).some((l) => re.test(l))) throw new Error(`KRONOS archive: ${what} no longer reads as expected`);
+    if (!(lines ?? []).some((l) => re.test(l))) throw new Error(`${layout.name} archive: ${what} no longer reads as expected`);
   };
   const m = data.messages;
   has(m.parameterChange, /^\s*43\s+Function/, 'Parameter Change (function 43)');
@@ -195,30 +253,43 @@ function checkMessages(data, layout) {
     has(m[f.code], new RegExp(`^\\[${f.code}\\] ${f.message}\\b`), `${f.message} (function ${f.code})`);
     const fields = (lines) => lines.map((l) => /^\s+(\S+)\s{2,}/.exec(l)?.[1]).filter(Boolean).join(' ');
     if (fields(m[f.code]).replace(f.code, '43') !== fields(m.parameterChange.slice(0, m.parameterChange.findIndex((l) => /End of Excl/.test(l)) + 1))) {
-      throw new Error(`KRONOS archive: ${f.message} is no longer laid out as Parameter Change`);
+      throw new Error(`${layout.name} archive: ${f.message} is no longer laid out as Parameter Change`);
     }
   }
   has(m.parameterChange, /^\s*7F\s+part of parameter id/, 'the second form of the parameter id');
-  has(data.voiceModel.messageFormats, /21-bit signed value, MSB first/, 'the voice model\'s value format');
-  has(data.voiceModel.messageFormats, /7F pp pp: \(14-bit, MSB first\)/, 'the voice model\'s long parameter id');
+  if (data.voiceModel) {
+    has(data.voiceModel.messageFormats, /21-bit signed value, MSB first/, 'the voice model\'s value format');
+    has(data.voiceModel.messageFormats, /7F pp pp: \(14-bit, MSB first\)/, 'the voice model\'s long parameter id');
+  }
+  for (const code of layout.citedMessages ?? []) has(m[code], new RegExp(`^\\[${code}\\]`), `the block of function ${code}`);
   has(m.value, /21-bit 2's complement/, 'footnote *4');
   has(m.currentObjectDumpRequest, /^\s*74\s+Function/, 'Current Object Dump Request (function 74)');
   has(m.currentObjectDump, /^\s*version\s+obj's version number/, 'the Current Object Dump\'s version byte');
-  has(m.objects, new RegExp(`obj = 00 : Program \\(.*${data.source.file.replace('.', '\\.')}`), 'object 00 as the program');
+  has(m.objects, new RegExp(`obj = 00 : Program \\(.*${data.source.file.split('/').at(-1).replace('.', '\\.')}`), 'object 00 as the program');
   has(m.packing, /0GFEDCBA/, 'the 8-in-7 packing');
   has(m.packing, /sysExSize = binarySize \+ \(binarySize\+6\)\/7/, 'the packed size');
 }
 
-function shell(data, layout, parameters, recipes, mappings, leftOut, notReadBack, fixed) {
+function shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing }) {
   const object = data.object;
+  const instrument = layout.family;
   const packed = object.size + Math.floor((object.size + 6) / 7);
-  const prefix = ['F0', '42', '$deviceId', '68', '75', '00', hex(object.objectVersion)];
-  const request = ['F0', '42', '$deviceId', '68', '74', '00', 'F7'];
+  const prefix = [...header, '75', '00', hex(object.objectVersion)];
+  const request = [...header, '74', '00', 'F7'];
+  const device = (t) => (t === '$deviceId' ? '30' : t);
 
-  // The Device Inquiry reply: `F0,7E,0g,06,02,42,68,00,mm,00,…`, a member code per model.
+  // The Device Inquiry reply as printed: after KORG's 42, the two bytes where the universal reply puts
+  // the family code, then the two of the member code; a byte printed as a letter varies (`mm`, one
+  // per model) and is not checked.
   const reply = data.identity?.reply ?? [];
-  if (reply.slice(0, 8).join(' ') !== 'F0 7E 0g 06 02 42 68 00' || reply[8] !== 'mm') throw new Error('KRONOS: the Device Inquiry reply no longer reads F0,7E,0g,06,02,42,68,00,mm');
-  const members = data.identity.members.map((m) => `${m.model.replace(/\s+/g, ' ')} ${m.code}H`);
+  if (reply.slice(0, 6).join(' ') !== 'F0 7E 0g 06 02 42') throw new Error(`${layout.name}: the Device Inquiry reply no longer reads F0,7E,0g,06,02,42`);
+  const fixedByte = (b) => /^[0-7][0-9A-F]$/.test(b);
+  const familyCode = reply.slice(6, 8);
+  const modelNumber = reply.slice(8, 10);
+  if (!familyCode.every(fixedByte)) throw new Error(`${layout.name}: the reply's family bytes are not printed as values`);
+  const checked = modelNumber.every(fixedByte) ? [...familyCode, ...modelNumber] : familyCode;
+  const members = (data.identity.members ?? []).map((m) => `${m.model.replace(/\s+/g, ' ')} ${m.code}H`);
+  const universalLength = 15;
 
   const byId = new Map(parameters.map((p) => [p.id, p]));
   const recipeOf = (p) => recipes.get(p.messageRecipe);
@@ -237,7 +308,8 @@ function shell(data, layout, parameters, recipes, mappings, leftOut, notReadBack
     [integers.find((p) => p.range.max > 16383), (p) => p.range.max],
     [parameters.find((p) => p.description.includes('bypass')), (p) => p.choices[0].id],
     [parameters.find((p) => p.type === 'choice' && p.choices.length > 2), (p) => p.choices.at(-1).id],
-    [parameters.find((p) => recipeOf(p).template[8] === '7F'), (p) => (p.type === 'choice' ? p.choices.at(-1).id : p.range.max)],
+    [parameters.find((p) => longForm.has(p.messageRecipe)), (p) => (p.type === 'choice' ? p.choices.at(-1).id : p.range.max)],
+    ...(layout.functions ?? []).map((f) => [parameters.find((p) => recipeOf(p).template[header.length] === f.code && p.type === 'integer'), (p) => p.range.max]),
   ].filter(([p]) => p);
 
   // A dump to read back: every field it reads at a value its parameter takes, and a few at values
@@ -262,10 +334,11 @@ function shell(data, layout, parameters, recipes, mappings, leftOut, notReadBack
     else { const v = m.read.signed ? m.read.min + 1 : m.read.max; place(m, v); expected[p.id] = v; }
   }
   const wire = pack8to7(payload, 'msb-low-first', 7);
-  if (wire.length !== packed) throw new Error(`KRONOS: packed ${wire.length} bytes, *3 says ${packed}`);
+  if (wire.length !== packed) throw new Error(`${layout.name}: packed ${wire.length} bytes, *3 says ${packed}`);
 
   const summary = (map) => [...map].map(([why, labels]) => `${labels.length} ${labels.length === 1 ? 'setting' : 'settings'} (${[...new Set(labels.map((l) => l.replace(/ \d+$/, '')))].slice(0, 6).join('; ')}${labels.length > 6 ? '; …' : ''}): ${why}`);
   const source = data.source;
+  const ams = data.voiceModel?.amsSources?.length;
   return {
     schemaVersion: 1,
     profileVersion: layout.profileVersion ?? '0.1.0',
@@ -280,7 +353,7 @@ function shell(data, layout, parameters, recipes, mappings, leftOut, notReadBack
     sources: [
       {
         type: 'manual',
-        title: `${source.title}: ${object.title}, ${source.printed}, object version ${object.objectVersion}`,
+        title: `${source.title}: ${object.title}${source.printed ? `, ${source.printed}` : ''}, object version ${object.objectVersion}`,
         notes: `Rows read by tools/profiles/korg/read-kronos-table.mjs from ${source.file} (sha256 ${source.sha256}) in ${source.archive} of ${source.archiveDate}, ${source.url}. Not yet checked against the instrument itself.`,
       },
       ...data.files.map((f) => ({ type: 'manual', title: `${source.title}: ${f.file}${f.printed ? ` (${f.printed})` : ''}`, notes: `${f.file} (sha256 ${f.sha256}) in ${source.archive}.` })),
@@ -288,29 +361,29 @@ function shell(data, layout, parameters, recipes, mappings, leftOut, notReadBack
     testedWith: [],
     authoringNotes: [
       'Generated by tools/profiles/korg/make-profiles.mjs; edit the layout in tools/profiles/korg/synths/, not this file.',
-      `Every row of ${source.file} with a parameter id is a parameter, named by its group and its name as printed, and sent by Parameter Change (function 43): F0 42 3g 68 43 TYP SOC SUB PID IDX and the value as 21 bits, two's complement, high byte first ("21-bit signed value, MSB first"). Nothing here has been sent to a real instrument yet.`,
-      ...(layout.functions ?? []).map((f) => `The rows of the groups ${f.group.source.replace(/^\^/, '')}… are sent by ${f.message} (function ${f.code}), the same message under another function code. The table prints no message per row; these rows' ids are the program's own (TYP 0 PID 0 is the program's Oscillator Mode, KARMA Tempo and the drum track's Pattern Bank), and sent this way every id in the table is unique. A reading, not tried on an instrument.`),
-      'An HD-1 program only: the KRONOS takes program parameters in Program mode ("Which parameters are currently available for editing depends on the instrument\'s mode"), and a program of an EXi bank is laid out in Prog_EXi_Common.txt and Prog_EXi.txt, not here. The effects\' own parameters, which depend on the effect type (Effect.txt), are not here either.',
-      'A range whose first value is the larger (9D~63) is two\'s complement over its bytes, -99~+99. A choice is a row naming both of two values, or a row whose ends are the ends of the voice model\'s AMS source list (Off~Tempo, sources 0~48). The value column is 19 characters wide; a name it cuts short keeps its cut, with an ellipsis. Other value names are in each parameter\'s description.',
-      ...(parameters.some((p) => recipeOf(p).template[8] === '7F') ? ['A parameter id above 126 takes the message\'s second form, 7F PIDH PIDL, which the archive calls deprecated and says the instrument still receives.'] : []),
+      `Every row of ${source.file} with a parameter id is a parameter, named by its group and its name as printed, and sent by Parameter Change (function 43): ${header.map(device).join(' ').replace(/^F0 42 30/, 'F0 42 3g')} 43 TYP SOC SUB PID IDX and the value as 21 bits, two's complement, high byte first (*4). Nothing here has been sent to a real instrument yet.`,
+      ...routing,
+      `An HD-1 program only: the ${instrument} takes program parameters in Program mode ("Which parameters are currently available for editing depends on the instrument's mode"), and a program of an EXi bank is laid out in Prog_EXi_Common.txt and Prog_EXi.txt, not here. The effects' own parameters, which depend on the effect type (Effect.txt), are not here either.`,
+      `A range whose first value is the larger (9D~63) is two's complement over its bytes, -99~+99. A choice is a row naming both of two values${ams ? ', or a row whose ends are the ends of the voice model\'s AMS source list (Off~Tempo, sources 0~48)' : ''}. The value column is 19 characters wide; a name it cuts short keeps its cut, with an ellipsis. Other value names are in each parameter's description.`,
+      ...(longForm.size ? ['A parameter id above 126 takes the message\'s second form, 7F PIDH PIDL, which the archive calls deprecated and says the instrument still receives.'] : []),
       ...(layout.renames ?? []).map((r) => `"${r.name}" as "${r.to}": ${r.why}.`),
       `${fixed.length} rows with an id print a fixed value (\`10(fixed)\`, \`00(fixed)\`: ${[...new Set(fixed.map((l) => l.replace(/ \d+$/, '')))].slice(0, 3).join('; ')}; …) and are not settings.`,
       ...summary(leftOut).map((s) => `Left out: ${s}.`),
       `Pull: Current Object Dump Request (function 74) for object 00, the program, answered by a Current Object Dump (function 75) carrying object version ${object.objectVersion} and ${object.size} bytes in Korg's 8-in-7 packing (*3: ${packed} bytes). ${mappings.length} parameters are read back at their rows' offsets and bits. A program of an EXi bank is laid out otherwise, and its dump is not this length, so it does not match.`,
       ...summary(notReadBack).map((s) => `Sent and not read back: ${s}.`),
       'The exclusive header carries the global MIDI channel as 3g; the profile\'s deviceId variable is that byte, 30H for channel 1.',
-      `Identity: the Device Inquiry reply (KRONOS_MIDI_Implementation.pdf) is F0 7E 0g 06 02 42 68 00 mm 00 and the system version; the family 68 00 is checked, not the member code mm, which is one per model: ${members.join(', ')}.`,
+      `Identity: the Device Inquiry reply (${layout.document.implementation}) is printed ${reply.join(' ')}${reply.length !== universalLength ? `, ${reply.length} bytes where the universal reply has ${universalLength}` : ''}. Its 7th to ${6 + checked.length}th bytes, ${checked.join(' ')}, are checked as printed, where the universal reply puts the family${checked.length > 2 ? ' and member' : ''} code${members.length ? `; its ${reply.indexOf('mm') + 1}th byte, mm, is one per model and is not checked: ${members.join(', ')}` : ''}.`,
       'No preset recall yet: the implementation\'s Bank Select footnote is not read.',
     ],
     variables: { channel: 1, deviceId: 0x30 },
-    identity: { manufacturerId: ['42'], familyCode: ['68', '00'], timeoutMs: 1000, retries: 0 },
+    identity: { manufacturerId: ['42'], familyCode, ...(checked.length > 2 ? { modelNumber } : {}), timeoutMs: 1000, retries: 0 },
     coverage: {
       singleParameterWrite: `partial: ${parameters.length} settings of an HD-1 program; what is left out is in the notes`,
       realtimeEditing: `partial: ${parameters.length} settings of an HD-1 program by parameter change`,
       editBufferDumpRequest: 'complete: Current Object Dump Request (function 74), object 00',
       editBufferDumpParse: `partial: ${mappings.length} of the profile's ${parameters.length} parameters are read from the current program`,
       bankDump: 'notImplemented',
-      inboundControllers: 'the KRONOS also transmits Parameter Change (function 43) when edited on it; not tried on an instrument',
+      inboundControllers: `the ${instrument} also transmits Parameter Change (function 43) when edited on it; not tried on an instrument`,
       verifiedOnHardware: false,
     },
     timing: { minDelayBetweenMessagesMs: 0 },
@@ -323,9 +396,9 @@ function shell(data, layout, parameters, recipes, mappings, leftOut, notReadBack
     startup: { policy: 'pull', syncDirection: 'pull', sync: [{ request: 'identityRequest' }, { request: 'requestCurrentProgram' }] },
     tests: [
       { name: 'Universal Identity Request', kind: 'identityRequest', expectedHex: 'F0 7E 7F 06 01 F7' },
-      ...picks.map(([p, value]) => vector(p, value(p))),
-      { name: 'Current Object Dump Request (Program)', kind: 'request', request: 'requestCurrentProgram', expectedHex: request.map((t) => (t === '$deviceId' ? '30' : t)).join(' ') },
-      { name: 'Current Object Dump (Program), read back', kind: 'dumpParse', inputHex: [...prefix.map((t) => (t === '$deviceId' ? '30' : t)), ...wire.map(hex), 'F7'].join(' '), expectedValues: expected },
+      ...[...new Map(picks.map(([p, value]) => [p.id, vector(p, value(p))])).values()],
+      { name: 'Current Object Dump Request (Program)', kind: 'request', request: 'requestCurrentProgram', expectedHex: request.map(device).join(' ') },
+      { name: 'Current Object Dump (Program), read back', kind: 'dumpParse', inputHex: [...prefix.map(device), ...wire.map(hex), 'F7'].join(' '), expectedValues: expected },
     ],
     dumpDefinitions: [{
       id: 'currentProgramDump',

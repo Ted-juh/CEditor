@@ -12,17 +12,19 @@
 // name, its range in hex and as shown, the five bytes its parameter change takes, and a note after the
 // box. Reserved bytes are printed `*`. This reads the rows as printed and decides nothing about them.
 
-/** The header: `HD-1 Program Size: 3706 byte … Version 1.01 (Jan  7, 2015)` and `Object Version: 5`. */
+/**
+ * The header: `HD-1 Program Size: 3706 byte … Version 1.01 (Jan  7, 2015)` and `Object Version: 5`.
+ * The NAUTILUS's prints no version of the table, only its size.
+ */
 export function readObjectHeader(text) {
   const lines = text.split(/\r?\n/);
-  const size = lines.map((l) => /^(.*?)\s+Size:\s*(\d+)\s*byte\s+Version\s+(\S+)\s+\(([^)]*)\)/.exec(l)).find(Boolean);
+  const size = lines.map((l) => /^(.*?)\s+Size:\s*(\d+)\s*byte(?:\s+Version\s+(\S+)\s+\(([^)]*)\))?/.exec(l)).find(Boolean);
   const object = lines.map((l) => /^Object Version:\s*(\d+)/.exec(l)).find(Boolean);
-  if (!size) throw new Error('No "<object> Size: n byte … Version v (date)" line');
+  if (!size) throw new Error('No "<object> Size: n byte" line');
   return {
     title: size[1].trim(),
     size: Number(size[2]),
-    version: size[3],
-    date: size[4].replace(/\s+/g, ' ').trim(),
+    ...(size[3] ? { version: size[3], date: size[4].replace(/\s+/g, ' ').trim() } : {}),
     objectVersion: object ? Number(object[1]) : null,
   };
 }

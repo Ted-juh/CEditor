@@ -27,7 +27,7 @@ import { SYNTHS, build } from '../../../tools/profiles/korg/make-profiles.mjs';
 import { modes as omModes, readOmCcPage } from '../../../tools/profiles/korg/read-korg-om-cc.mjs';
 import { foldKnobs, matchKnobs, readOmValue } from '../../../tools/profiles/korg/build-korg-knobs.mjs';
 import { readObjectHeader, readObjectRows } from '../../../tools/profiles/korg/read-kronos-table.mjs';
-import { readBits, readData, readLabels } from '../../../tools/profiles/korg/build-kronos-profile.mjs';
+import { exclusiveHeader, readBits, readData, readLabels } from '../../../tools/profiles/korg/build-kronos-profile.mjs';
 import { pack8to7 } from '../../dpd/codecs.mjs';
 import {
   localCompileDeviceRequest,
@@ -548,6 +548,15 @@ test('the KRONOS reader: a row per id, a shared byte takes the OFS above, reserv
     [0, '', 'Name', ''], [89, '5~0', 'Channel', '7 0 0 14 0'], [89, '6', 'Switch', '6 0 0 0 0'], [3672, '', 'Amount A', '10 4 0 10 0'],
   ]);
   assert.equal(rows[2].note, '* -> bypass, Invert Value');
+  assert.deepEqual(readObjectHeader('HD-1 Program Size: 3700 byte\r\nObject Version: 6'), { title: 'HD-1 Program', size: 3700, objectVersion: 6 }, 'the NAUTILUS prints no version of its table');
+});
+
+test('the exclusive header is the one the Parameter Change block prints, and the dump requests must print the same', () => {
+  const block = (header) => [`        ${header}  Excl Header`, '        43                      Function'];
+  const messages = (a, b = a) => ({ messages: { parameterChange: block(a), currentObjectDumpRequest: block(b), currentObjectDump: block(b) } });
+  assert.deepEqual(exclusiveHeader(messages('F0, 42, 3g, 68')), ['F0', '42', '$deviceId', '68']);
+  assert.deepEqual(exclusiveHeader(messages('F0, 42, 3g, 00, 01, 5D')), ['F0', '42', '$deviceId', '00', '01', '5D']);
+  assert.throws(() => exclusiveHeader(messages('F0, 42, 3g, 68', 'F0, 42, 3g, 00, 01, 5D')), /another exclusive header/);
 });
 
 test('the KRONOS builder reads a range, its bits and its two names as the table prints them', () => {
@@ -602,4 +611,14 @@ test('the KRONOS: a program dump placed by hand reads back by the table\'s offse
     [64, 'on', 2, -99],
   );
   assert.equal(localParseDumpMessage(profile, hex([0xf0, 0x42, 0x30, 0x68, 0x75, 0x00, 0x05, ...wire, 0, 0xf7])).ok, false, 'an EXi program\'s dump, any other length, is not this one');
+});
+
+test('the NAUTILUS: its own header on every message, its reply checked as printed, no scene or step sequencer', { skip: !builtProfile('korg-nautilus') }, () => {
+  const profile = builtProfile('korg-nautilus');
+  for (const r of profile.messageRecipes) assert.deepEqual(r.template.slice(0, 7), ['F0', '42', '$deviceId', '00', '01', '5D', '43'], r.id);
+  assert.deepEqual(profile.dumpDefinitions[0].matcher.prefix, ['F0', '42', '$deviceId', '00', '01', '5D', '75', '00', '06']);
+  assert.equal(profile.dumpDefinitions[0].completion.maxBytes, 9 + 3700 + 529 + 1, 'object version 6, 3,700 bytes packed eight to seven');
+  assert.deepEqual([profile.identity.familyCode, profile.identity.modelNumber], [['00', '01'], ['5D', '00']], 'bytes 7 to 10 of F0,7E,0g,06,02,42,00,01,5D,00,mm,…');
+  assert.ok(!profile.parameters.some((p) => /^(Scene|Step Seq)/.test(p.group)), 'their message is not settled');
+  assert.ok(profile.authoringNotes.some((n) => n.startsWith('Left out, the scenes:')));
 });

@@ -68,6 +68,7 @@ What the builder takes as settled, and what it does not:
 | `korg-volca-kick` | volca kick MIDI Implementation 1.00 | 10 | 0 | — | — |
 | `korg-volca-nubass` | volca nubass MIDI Implementation 1.00 | 11 | 0 | — | — |
 | `korg-kronos` | KRONOS MIDI Implementation archive (2025-07-24): `Prog_HD-1.txt` 1.01, `KRONOS_MIDI_SysEx.txt` 1.27 | 1,790 | 376 | — | 68H 00H |
+| `korg-nautilus` | NAUTILUS MIDI Implementation archive (2022-09-22): `SysExDumps/Prog_HD-1.txt`, `NAUTILUS_MIDI_SysEx.txt` 1.0 | 1,019 | 122 | — | 00H 01H 5DH 00H |
 
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
 try to recognise them. The VOX Continental prints its reply inline with two member codes, 05 for the
@@ -180,7 +181,7 @@ whole on its own line. `build-korg-knobs.mjs` then:
 No Pull: its program dump lays a program out two ways, a synth's two timbres or the vocoder, chosen by
 the Voice Mode inside it, and a dump definition has one layout.
 
-## A table per object (KRONOS)
+## A table per object (KRONOS, NAUTILUS)
 
 Korg publishes the KRONOS's MIDI Implementation as a ZIP archive of plain text
 (`KRONOS_MIDIimp.zip` on its support page, 2025-07-24), not as one document: the messages in
@@ -204,10 +205,14 @@ blocks of the messages the profile uses, the voice model's message format and AM
   PID IDX` and the value as 21 bits, two's complement, high byte first (`*4`, and the voice model's
   "21-bit signed value, MSB first"). Both engines learned that encoding (`s21-msb-lsb`) for it. A
   PID above 126 takes the message's second form, `7F PIDH PIDL`;
-- the table prints no message per row, and its KARMA rows' ids and its Drum Track rows' ids are the
-  program's own (TYP 0 PID 0 is Oscillator Mode, KARMA Tempo and the drum track's Pattern Bank). The
-  archive has a KARMA Parameter Change (6D) and a Drum Track Parameter Change (6E), laid out as the
-  first; sent by those, every id in the table is unique. A reading, said in the profile;
+- the table prints no message per row. The archive has a KARMA Parameter Change (6D) and a Drum
+  Track Parameter Change (6E), laid out as the first, and the layout sends the KARMA and Drum Track
+  groups by them (`functions`). For each group the profile says what decides it: KARMA Common (24
+  of its 527 rows), KARMA Module (13 of 219) and Drum Track Common (all 11) have ids Parameter
+  Change takes for another row (TYP 0 PID 0 is Oscillator Mode, KARMA Tempo and the drum track's
+  Pattern Bank), so they cannot go by it; the group Drum Track (its program, volume, EQ and sends,
+  22 rows) has none, and goes by 6E on the message's name alone. Every id is then unique per
+  message, which the builder checks. A reading, said in the profile;
 - a range whose first value is the larger is two's complement over its bytes (`9D~63` is -99~+99,
   `FF39~00C7` -199~+199);
 - a choice where the row names both of two values (`Off~On`), or where its ends are the ends of the
@@ -232,6 +237,28 @@ not say the order of the others, and the KARMA Note Map, whose byte may hold `FF
 The Device Inquiry reply is `F0 7E 0g 06 02 42 68 00 mm 00 …`, with one member code per model
 (KRONOS/KRONOS 2 61, 73 and 88 keys: 05, 0E, 17; KRONOS 3: 1D, 26, 2F): the profile checks the
 family, 68 00, and not the member.
+
+**The NAUTILUS** publishes the same form (`NAUTILUS_MIDIimp.zip`, 2022-09-22, its tables under
+`SysExDumps/`), and `korg-nautilus` is built by the same tools from its own layout. What differs:
+
+- its exclusive header is `F0 42 3g 00 01 5D`, where the KRONOS's is `F0 42 3g 68`. The builder takes
+  the header from the Parameter Change block as printed, and checks that the dump request and the
+  dump print the same;
+- the program table is 3,700 bytes, object version 6, and prints no version of its own;
+- there are no voice model files, so no AMS source list: those settings are numbers, with their ends
+  in the description;
+- its program has four scenes and four step sequencers in place of KARMA. The archive has a Scene
+  Parameter Change (6D) and an Arp/Drum Track Parameter Change (6E) and names neither for any row.
+  Scene Common's and Scene 1's ids are ones Parameter Change takes for other rows (Scene Select is
+  the program's Assign Mode, Scene 1's ARP Pattern Number X-Y Control's Tempo Based), so the scenes
+  do not go by it, but 6D and 6E both leave every id unique; the step sequencers' ids are unique
+  under 43 and 6E alike. Both are left out (123 and 3,344 rows), with that count in the profile,
+  until an instrument settles them;
+- the Device Inquiry reply is printed `F0,7E,0g,06,02,42,00,01,5D,00,mm,00,vv,ww,xx,00,F7`: 17 bytes,
+  two more than the universal form, calling `01 5D` the series ID. Its 7th to 10th bytes,
+  `00 01 5D 00`, are checked as printed; the member code `mm` (61, 73, 88 keys: 05, 0E, 17) is not;
+- 1,019 settings are sent and 974 read back from the 4,229-byte dump; 45 values over two bytes are
+  sent and not read back (the NAUTILUS marks none `Big Endian`).
 
 ## Pull
 
@@ -317,7 +344,9 @@ Kept as printed and said where it applies:
   and wave sequences (their own parameter changes, 53~56), each effect's own parameters
   (`Effect.txt`, by effect type), and preset recall (the implementation's Bank Select footnote).
   The two-byte values wait for their byte order, from an instrument's dump.
-- **NAUTILUS**: its MIDI Implementation is a ZIP archive like the KRONOS's; not looked at yet.
+- **The rest of the NAUTILUS**: the same objects as the KRONOS's, and its scenes and step
+  sequencers, whose message the archive does not settle (6D or 6E for the scenes, 43 or 6E for the
+  step sequencers).
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document
   for these, not a parameter table.
 - **MS-20 mini** receives notes and the channel mode messages only; **KAOSSILATOR PRO+** lets you
