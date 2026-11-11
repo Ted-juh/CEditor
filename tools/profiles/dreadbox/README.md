@@ -1,10 +1,16 @@
 # Dreadbox device profiles
 
 Profiles for Dreadbox instruments, read from the documents Dreadbox publishes: the manuals on
-`dreadbox-fx.com/support/` (`wp-content/uploads`), the Artemis's CC list beside its manual, and the
-Nymphes's v2.0 owner's manual on Dreadbox's own store (`cdn.shopify.com/s/files/1/0527/2557/9960`).
-As with the other brands, the documents are not committed: what is committed is what was read from
+`dreadbox-fx.com/support/` (`wp-content/uploads`) and the Artemis's CC list beside its manual. As
+with the other brands, the documents are not committed: what is committed is what was read from
 them, with each file's name, SHA-256 and address.
+
+**The Nymphes is the exception, and says so.** Dreadbox's own copy of its v2.0 manual
+(`Nymhes_User_Manual.pdf`) sets the CC list as images, so the list was read from a copy of the same
+manual with a text layer, on a Shopify store (`cdn.shopify.com/s/files/1/0527/2557/9960`). An earlier
+version of this page called that store Dreadbox's own; nothing establishes that, and the same store
+serves Polyend's manuals. The two copies' CC pages were rendered side by side and compared row by
+row: every row is the same. The profile cites both files, with both checksums.
 
 ## Survey (November 2026)
 

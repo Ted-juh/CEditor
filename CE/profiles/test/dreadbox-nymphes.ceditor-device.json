@@ -13,7 +13,12 @@
     {
       "type": "manual",
       "title": "Nymphes Owner's Manual v2.0",
-      "notes": "CC list (pages 22, 23 of the PDF) read by tools/profiles/dreadbox/import-dreadbox.mjs from Nymphes_Owners-Manual-v2.0.pdf (sha256 62ff5bd06eb410752b0e9c68a20071abb84b6ed0fb9005c6a6c973218cad915a), https://cdn.shopify.com/s/files/1/0527/2557/9960/files/Nymphes_Owners-Manual-v2.0.pdf. Not yet checked against the instrument itself."
+      "notes": "CC list (pages 22, 23 of the PDF) read by tools/profiles/dreadbox/import-dreadbox.mjs from Nymphes_Owners-Manual-v2.0.pdf (sha256 62ff5bd06eb410752b0e9c68a20071abb84b6ed0fb9005c6a6c973218cad915a), https://cdn.shopify.com/s/files/1/0527/2557/9960/files/Nymphes_Owners-Manual-v2.0.pdf. That file is a copy of the manual with a text layer, on a Shopify store not established to be Dreadbox's; Dreadbox's own copy is the next source. Not yet checked against the instrument itself."
+    },
+    {
+      "type": "manual",
+      "title": "Nymphes User Manual V2.0",
+      "notes": "Dreadbox's own copy: Nymhes_User_Manual.pdf (sha256 2f321e1a883c54abdf87cb7373ce48e934887d403c69d8951228bb7ac9ed941d), https://dreadbox-fx.com/wp-content/uploads/2025/04/Nymhes_User_Manual.pdf (dreadbox-fx.com/support/). Its CC list (PDF pages 22 and 23) is set as images, so it was not read; the two copies' pages were rendered side by side and compared row by row, and every row is the same."
     }
   ],
   "testedWith": [],
