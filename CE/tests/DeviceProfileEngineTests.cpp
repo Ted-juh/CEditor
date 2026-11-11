@@ -1445,6 +1445,74 @@ int runChecksumAlsoAcceptTests()
     return failures;
 }
 
+int runDumpRecordTests()
+{
+    // A dump of records (the Groove Synthesis 3rd Wave's edit buffer): each setting a record of its
+    // key and value, two bytes each, in whatever order the device sends; a mapping names the key it
+    // reads, and a scope the record of another key it must follow (the part being edited). The
+    // JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const auto profile = [] (bool named)
+    {
+        return juce::String (R"JSON({
+          "schemaVersion": 1, "id": "probe-records", "name": "Probe", "manufacturer": "Probe",
+          "parameters": [
+            { "id": "tempo", "name": "Tempo", "messageRecipe": "cc7", "type": "integer",
+              "range": { "min": 200, "max": 2400 }, "encoding": { "type": "u14" }, "access": { "canWrite": true, "canRead": true } },
+            { "id": "cutoff", "name": "Cutoff", "messageRecipe": "cc7", "type": "integer",
+              "range": { "min": 0, "max": 255 }, "encoding": { "type": "u14" }, "access": { "canWrite": true, "canRead": true } },
+            { "id": "absent", "name": "Absent", "messageRecipe": "cc7", "type": "integer",
+              "range": { "min": 0, "max": 127 }, "encoding": { "type": "u14" }, "access": { "canWrite": true, "canRead": true } }
+          ],
+          "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+          "dumpDefinitions": [
+            { "id": "editBuffer", "kind": "sysex", "matcher": { "prefix": ["F0", "00", "02", "4A", "01", "03"], "suffix": ["F7"] },
+              "payload": { "offset": 6, "records": { "size": 4, "keyAt": 0, "keyType": "u14", "valueAt": 2, "valueType": "u14" } },
+              "completion": { "expectedMessages": 1 },
+              "mappings": [ { "parameter": "tempo")JSON")
+             + (named ? ", \"record\": 33" : "")
+             + R"JSON( },
+                { "parameter": "cutoff", "record": 300, "scope": { "record": 0, "value": 2 } },
+                { "parameter": "absent", "record": 400 } ] }
+          ]
+        })JSON";
+    };
+    const auto read = [] (const juce::String& json, const juce::String& hex)
+    {
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromJson (json, error))
+            return juce::String ("load: " + error);
+        const auto parsed = engine.parseDumpMessage (hex);
+        if (! parsed.ok)
+            return "refused " + parsed.matchStatus;
+        juce::StringArray got;
+        for (const auto* id : { "tempo", "cutoff", "absent" })
+            if (parsed.values.hasProperty (id))
+                got.add (juce::String (id) + "=" + parsed.values.getProperty (id, {}).toString());
+        return got.joinIntoString (" ");
+    };
+    // Part 1's cutoff (300 = 02 2C) is 10, part 2's 200; tempo (33 = 00 21) is 1200 (09 30).
+    const juce::String body = "00 00 00 01  02 2C 00 0A  00 21 09 30  00 00 00 02  02 2C 01 48";
+    const struct { bool named; juce::String hex; const char* expected; const char* why; } cases[] = {
+        { true, "F0 00 02 4A 01 03 " + body + " F7", "tempo=1200 cutoff=200", "part 2's cutoff, the tempo wherever it comes, nothing for a key the dump lacks" },
+        { true, "F0 00 02 4A 01 03 " + body + " 00 F7", "refused partial", "a record cut short is refused" },
+        { false, "F0 00 02 4A 01 03 " + body + " F7", "refused invalidDefinition", "a mapping of a dump of records names its record" },
+    };
+    auto failures = 0;
+    for (const auto& c : cases)
+    {
+        const auto got = read (profile (c.named), c.hex);
+        if (got != c.expected)
+        {
+            std::cerr << "[FAIL] Dump records: " << c.why << ": expected " << c.expected << ", got " << got << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] Dump records :: read by key, a scoped one after its scope, a short record refused\n";
+    return failures;
+}
+
 int runCcPairTests()
 {
     const char* json = R"JSON({
@@ -4505,6 +4573,7 @@ int main (int argc, char** argv)
     failures += runCcPairTests();
     failures += runCollectionEndsWithTests();
     failures += runChecksumAlsoAcceptTests();
+    failures += runDumpRecordTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runCatalogSummaryTests (root);

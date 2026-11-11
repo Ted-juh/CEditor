@@ -30,7 +30,7 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | [`modal/`](modal/README.md) | 15 profiles from the MIDI CC implementation charts of Modal's user manuals: Argon8, 8X and 8M; Cobalt8, 8X, 8M and Cobalt5S; Carbon8, 8X and 8M; Element One (no values printed); and the 002, 008, SKULPTsynth SE and CRAFTsynth 2.0, whose charts print each controller's values, read as ranges and choices. Read with the Nord and Behringer readers from the PDFs' word positions. |
 | [`dreadbox/`](dreadbox/README.md) | 3 profiles from Dreadbox's CC lists: the Nymphes (its owner's manual, the values the controller's own), the Artemis (its own CC list, values spread over 0 - 127 as it says) and the Murmux Adept (taken the same way). Read with the Behringer anchored-row reader. |
 | [`udo/`](udo/README.md) | 3 profiles from the MIDI specifications of UDO's manuals: Super 6, Super 8 and Super Gemini (each layer on its channel). Every parameter the NRPN table gives as its 14-bit NRPN, every other as the controller and values the controller table prints. Read with the Behringer anchored-row reader. |
-| [`groove/`](groove/README.md) | The Groove Synthesis 3rd Wave from its MIDI CC + SysEx Spec: 403 parameters as 14-bit NRPNs, with the ranges and value lists the spec prints and its mod source and destination lists. Read from the PDF's word positions. |
+| [`groove/`](groove/README.md) | The Groove Synthesis 3rd Wave from its MIDI CC + SysEx Spec: 403 parameters as 14-bit NRPNs, with the ranges and value lists the spec prints and its mod source and destination lists; Pull from the edit buffer, its settings read as NRPN records. Read from the PDF's word positions. |
 | [`teenage/`](teenage/README.md) | 6 profiles from the MIDI tables of teenage engineering's guides (web pages): OP-Z, OP-1 field, OP-XY, TX-6, EP-133 K.O. II and EP-40 Riddim. Every row as the controller it prints, the per-track ones on the track's channel; switches and actions as choices. |
 | [`sonicware/`](sonicware/README.md) | 11 profiles from the MIDI implementation charts Sonicware publishes for each instrument: the LIVEN XFM, Bass & Beats, Mega Synthesis, 8bit warps, Ambient Ø, Lofi-12, Lofi-6 and Texture Lab, the CyDrums, Lofi-12 XT and SmplTrek. Every control change the chart marks recognized, grouped by its block, on its block's channel; values 0 - 127. |
 | [`blackcorp/`](blackcorp/README.md) | 4 profiles from the MIDI CC charts at the end of Black Corporation's operation manuals: Deckard's Dream MK2 (with the ranges it prints: bands as choices, centred ranges), Kijimi MK2, Xerxes MK2 (its two channels) and Ise-Nin (its Upper and Lower layers). Read from the PDFs' word positions. |
@@ -126,6 +126,14 @@ where the instrument decides how many it sends, when the dump named by `completi
 of a collection may have no mappings (a Bulk Header or Footer): it counts toward the collection and
 reads nothing; alone, a definition without mappings is refused. A message that matches no definition
 is let pass, so a collection can name only the blocks a profile lays out.
+
+A dump that carries its settings as records rather than at fixed places (the 3rd Wave's edit
+buffer: each setting its NRPN and value, four bytes) says so with `payload.records`: `size`, where
+the key is and how wide (`keyAt`, `keyType` `u7` or `u14`), where the value is (`valueAt`,
+`valueType`). Each mapping then names its `record` (the key) and is read at that record's value with
+its parameter's own encoding; `scope: { record, value }` reads the one met while that other key last
+held that value (the 3rd Wave sets the part being edited before each part's settings). A key the
+dump does not carry leaves its parameter unread; records that do not fill the payload are refused.
 
 ## About midi.guide
 

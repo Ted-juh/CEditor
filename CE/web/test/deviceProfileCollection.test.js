@@ -58,6 +58,45 @@ const summed = (alsoAccept) => ({
   }],
 });
 
+// A dump of records (the Groove Synthesis 3rd Wave's edit buffer): each setting a record of its key
+// and value, two bytes each, in whatever order the device sends; a mapping names the key it reads,
+// and a scope the record of another key it must follow (the part being edited). The C++ engine's
+// runDumpRecordTests checks the same probe.
+const recorded = {
+  schemaVersion: 1,
+  id: 'probe-records',
+  parameters: [
+    { id: 'part', name: 'Part', type: 'integer', range: { min: 0, max: 15 }, encoding: { type: 'u14' }, access: { canRead: true } },
+    { id: 'tempo', name: 'Tempo', type: 'integer', range: { min: 200, max: 2400 }, encoding: { type: 'u14' }, access: { canRead: true } },
+    { id: 'cutoff', name: 'Cutoff', type: 'integer', range: { min: 0, max: 255 }, encoding: { type: 'u14' }, access: { canRead: true } },
+    { id: 'absent', name: 'Absent', type: 'integer', range: { min: 0, max: 127 }, encoding: { type: 'u14' }, access: { canRead: true } },
+  ],
+  dumpDefinitions: [{
+    id: 'editBuffer',
+    kind: 'sysex',
+    matcher: { prefix: ['F0', '00', '02', '4A', '01', '03'], suffix: ['F7'] },
+    payload: { offset: 6, records: { size: 4, keyAt: 0, keyType: 'u14', valueAt: 2, valueType: 'u14' } },
+    completion: { expectedMessages: 1 },
+    mappings: [
+      { parameter: 'tempo', record: 33 },
+      { parameter: 'cutoff', record: 300, scope: { record: 0, value: 2 } },
+      { parameter: 'absent', record: 400 },
+    ],
+  }],
+};
+
+test('a dump of records: each mapping read by its key, a scoped one only after its scope\'s record holds the value', () => {
+  // Part 1's cutoff (300 = 02 2C) is 10, part 2's 200; tempo (33 = 00 21) is 1200 (09 30).
+  const body = '00 00 00 01  02 2C 00 0A  00 21 09 30  00 00 00 02  02 2C 01 48';
+  const parsed = localParseDumpMessage(recorded, `F0 00 02 4A 01 03 ${body} F7`);
+  assert.ok(parsed.ok, parsed.error);
+  assert.deepEqual(parsed.values, { tempo: 1200, cutoff: 200 }, 'part 2\'s cutoff, the tempo wherever it comes, nothing for a key the dump lacks');
+  assert.equal(localParseDumpMessage(recorded, `F0 00 02 4A 01 03 ${body} 00 F7`).ok, false, 'a record cut short is refused');
+  const unnamed = structuredClone(recorded);
+  delete unnamed.dumpDefinitions[0].mappings[0].record;
+  assert.equal(localParseDumpMessage(unnamed, `F0 00 02 4A 01 03 ${body} F7`).matchStatus, 'invalidDefinition', 'a mapping of a dump of records names its record');
+});
+
 test('a dump checksum may be a value the device always accepts, where the profile says so', () => {
   const read = (profile, hex) => localParseDumpMessage(profile, hex);
   assert.equal(read(summed(null), 'F0 3E 13 01 40 41 F7').values.level, 64, '01 + 40 = 41: the sum');

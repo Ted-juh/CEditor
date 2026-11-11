@@ -14,7 +14,7 @@ import { readText } from './support/readText.mjs';
 import { readNrpnTable } from '../../../tools/profiles/groove/read-groove-spec.mjs';
 import { valuesIn } from '../../../tools/profiles/groove/build-groove-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/groove/make-profiles.mjs';
-import { localCompileParameter, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import { localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
 const line = (page, y, ...words) => ({ page, y, words: words.map(([x, t]) => ({ x0: x, x1: x + t.length * 5, text: t })) });
 
@@ -76,11 +76,30 @@ for (const { name, profile, text, out, data } of BUILT) {
       const values = p.type === 'choice' ? [p.choices[0], p.choices.at(-1)].map((c) => [c.id, c.value]) : [[p.range.min, p.range.min], [p.range.max, p.range.max]];
       for (const [value, wire] of values) assert.equal(lines(localCompileParameter(profile, { parameterId: p.id, value })), [[0x63, r.parameterMsb], [0x62, r.parameterLsb], [0x06, wire >> 7], [0x26, wire & 127]].map(([c, v]) => hex([0xb0, c, v])).join('\n'), `${p.id} = ${value}`);
     }
-    for (const t of profile.tests) assert.equal(lines(localCompileParameter(profile, { parameterId: t.parameter, value: t.value })), t.expectedHex, t.name);
+    for (const t of profile.tests.filter((x) => !x.kind)) assert.equal(lines(localCompileParameter(profile, { parameterId: t.parameter, value: t.value })), t.expectedHex, t.name);
     const spans = profile.authoringNotes.flatMap((n) => [...n.matchAll(/NRPN (\d+) - (\d+)/g)].map((m) => [Number(m[1]), Number(m[2])]));
     const named = (k) => profile.authoringNotes.some((n) => new RegExp(`\\b${k}\\b`).test(n)) || spans.some(([a, b]) => k >= a && k <= b);
     for (const row of data.nrpn) assert.ok(nrpns.has(row.nrpn) || named(row.nrpn), `NRPN ${row.nrpn}`);
   });
+
+  if (profile.dumpDefinitions) {
+    test(`${profile.id}: Pull asks for the edit buffer and reads its records back, part 1's for a Multi parameter`, () => {
+      const request = profile.tests.find((t) => t.kind === 'request');
+      const compiled = localCompileDeviceRequest(profile, { request: request.request });
+      assert.ok(compiled.ok, compiled.error);
+      assert.equal(compiled.transaction?.encodedValueHex ?? compiled.hex, request.expectedHex);
+      for (const vector of profile.tests.filter((t) => t.kind === 'dumpParse')) {
+        const parsed = localParseDumpMessage(profile, vector.inputHex);
+        assert.ok(parsed.ok, parsed.error);
+        assert.deepEqual(Object.keys(parsed.values).sort(), Object.keys(vector.expectedValues).sort(), 'a record no parameter reads is passed over; a parameter the dump lacks stays unread');
+        for (const [id, value] of Object.entries(vector.expectedValues)) assert.equal(parsed.values[id], value, `${vector.name}: ${id}`);
+      }
+      // Every parameter read from the dump is one the profile can also send, and every one but Edit part is read.
+      const readable = profile.parameters.filter((p) => p.access.canRead).map((p) => p.id);
+      assert.deepEqual(profile.dumpDefinitions[0].mappings.map((m) => m.parameter), readable);
+      assert.equal(readable.length, profile.parameters.length - 1);
+    });
+  }
 
   test(`${profile.id}: the source is Groove Synthesis's spec, and nobody has tried it on an instrument`, () => {
     assert.equal(profile.manufacturer, 'Groove Synthesis');

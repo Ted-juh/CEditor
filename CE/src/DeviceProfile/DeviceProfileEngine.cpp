@@ -66,6 +66,9 @@ juce::Array<int> parseHexBytes (const juce::String& text)
     juce::Array<int> bytes;
     juce::StringArray tokens;
     tokens.addTokens (text, " ,\t\r\n", "");
+    // Two separators in a row (`F0  7E`, a trailing space) leave an empty token between them, which
+    // read as a 00 byte here: the JavaScript engine (normalizeHex) drops it, and so does this.
+    tokens.removeEmptyStrings();
 
     for (const auto& token : tokens)
         bytes.add (parseHexByte (token));
@@ -2278,6 +2281,42 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         decodeBase = 0;
     }
 
+    // A payload of records (the Groove Synthesis 3rd Wave's program dump: every setting as its NRPN
+    // number and value, four bytes each) has no fixed place for a value. Its records are read first,
+    // each a key and where it starts; a mapping then names the key it reads (`record`), and may say
+    // it reads the one met while another key last held a value (`scope`: the 3rd Wave sets NRPN 0,
+    // the part being edited, before each part's settings). A key the dump does not carry leaves its
+    // parameter unread, as a parameter with no mapping is. deviceProfileLocalEngine.js reads them
+    // the same way.
+    auto* records = payload != nullptr ? asObject (payload->getProperty ("records")) : nullptr;
+    juce::Array<int> recordKeys, recordStarts;
+    const auto recordWidth = [] (const juce::String& type) { return type == "u14" ? 2 : 1; };
+    const auto recordField = [&bytes, &recordWidth] (int at, const juce::String& type)
+    {
+        return recordWidth (type) == 2 ? ((bytes[at] & 0x7f) << 7) | (bytes[at + 1] & 0x7f) : (bytes[at] & 0x7f);
+    };
+    const auto recordKeyAt = records != nullptr ? propInt (*records, "keyAt", 0) : 0;
+    const auto recordKeyType = records != nullptr ? propString (*records, "keyType") : juce::String();
+    const auto recordValueAt = records != nullptr ? propInt (*records, "valueAt", 1) : 1;
+    const auto recordValueType = records != nullptr ? propString (*records, "valueType") : juce::String();
+    if (records != nullptr)
+    {
+        const auto size = propInt (*records, "size", 0);
+        if (payloadPacked || size <= 0 || recordKeyAt < 0 || recordValueAt < 0
+            || recordKeyAt + recordWidth (recordKeyType) > size || recordValueAt + recordWidth (recordValueType) > size)
+            return failForMatchedDump ("invalidDefinition", "Dump records are not a shape the engine reads: " + dumpId, checksumStatus);
+        auto end = bytes.size() - suffix.size();
+        if (checksum != nullptr)
+            end = juce::jmin (end, propInt (*checksum, "byteOffset", end));
+        if (end < payloadOffset || (end - payloadOffset) % size != 0)
+            return failForMatchedDump ("partial", "Dump records do not fill the payload of " + dumpId, checksumStatus);
+        for (int at = payloadOffset; at < end; at += size)
+        {
+            recordKeys.add (recordField (at + recordKeyAt, recordKeyType));
+            recordStarts.add (at);
+        }
+    }
+
     // Owned from the start: two failure paths below return before `values` reaches the result.
     juce::DynamicObject::Ptr values = new juce::DynamicObject();
     for (const auto& mappingValue : *mappings)
@@ -2296,9 +2335,32 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         if (codecOverride.isVoid())
             codecOverride = mapping->getProperty ("nameCodec");
 
+        auto valueOffset = decodeBase + propInt (*mapping, "offset");
+        if (records != nullptr)
+        {
+            const auto key = propInt (*mapping, "record", -1);
+            if (key < 0)
+                return failForMatchedDump ("invalidDefinition", "Dump mapping names no record: " + parameterId, checksumStatus);
+            auto* scope = asObject (mapping->getProperty ("scope"));
+            const auto scopeKey = scope != nullptr ? propInt (*scope, "record", -1) : -1;
+            const auto scopeValue = scope != nullptr ? propInt (*scope, "value", 0) : 0;
+            auto scopeHeld = -1;
+            auto found = -1;
+            for (int i = 0; i < recordKeys.size() && found < 0; ++i)
+            {
+                if (recordKeys[i] == key && (scope == nullptr || scopeHeld == scopeValue))
+                    found = i;
+                else if (scope != nullptr && recordKeys[i] == scopeKey)
+                    scopeHeld = recordField (recordStarts[i] + recordValueAt, recordValueType);
+            }
+            if (found < 0)
+                continue;
+            valueOffset = recordStarts[found] + recordValueAt;
+        }
+
         auto decoded = decodeDumpParameterValue (*parameter,
-                                                 *decodeBytes,
-                                                 decodeBase + propInt (*mapping, "offset"),
+                                                 records != nullptr ? bytes : *decodeBytes,
+                                                 valueOffset,
                                                  semanticValue,
                                                  codecOverride);
         if (decoded.failed())

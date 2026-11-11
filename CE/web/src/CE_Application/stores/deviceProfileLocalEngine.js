@@ -907,16 +907,57 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
     decodeBase = 0;
   }
 
+  // A payload of records (the Groove Synthesis 3rd Wave's program dump: every setting as its NRPN
+  // number and value, four bytes each) has no fixed place for a value. Its records are read first,
+  // each a key and where it starts; a mapping then names the key it reads (`record`), and may say it
+  // reads the one met while another key last held a value (`scope`: the 3rd Wave sets NRPN 0, the
+  // part being edited, before each part's settings). A key the dump does not carry leaves its
+  // parameter unread, as a parameter with no mapping is. DeviceProfileEngine.cpp reads them the same
+  // way.
+  const records = dump?.payload?.records && typeof dump.payload.records === 'object' ? dump.payload.records : null;
+  const recordList = [];
+  const width = (type) => (String(type ?? '') === 'u14' ? 2 : 1);
+  const field = (at, type) => (width(type) === 2 ? ((bytes[at] & 0x7f) << 7) | (bytes[at + 1] & 0x7f) : bytes[at] & 0x7f);
+  const keyAt = Number(records?.keyAt ?? 0);
+  const valueAt = Number(records?.valueAt ?? 1);
+  if (records) {
+    const size = Number(records.size ?? 0);
+    if (pack || !(size > 0) || keyAt < 0 || valueAt < 0 || keyAt + width(records.keyType) > size || valueAt + width(records.valueType) > size) {
+      return failMatched('invalidDefinition', `Dump records are not a shape the engine reads: ${dumpId}`, checksumStatus);
+    }
+    let end = bytes.length - suffix.length;
+    if (checksum) end = Math.min(end, Number(checksum.byteOffset ?? end));
+    if (end < payloadOffset || (end - payloadOffset) % size !== 0) {
+      return failMatched('partial', `Dump records do not fill the payload of ${dumpId}`, checksumStatus);
+    }
+    for (let at = payloadOffset; at < end; at += size) recordList.push({ key: field(at + keyAt, records.keyType), at });
+  }
+
   const values = {};
   for (const mapping of mappings) {
     const parameterId = String(mapping?.parameter ?? '');
     const parameter = (profile?.parameters ?? []).find((item) => String(item?.id ?? '') === parameterId);
     if (!parameter) return failMatched('invalidDefinition', `Dump mapping references unknown parameter: ${parameterId}`, checksumStatus);
 
+    let valueOffset = decodeBase + Number(mapping?.offset ?? 0);
+    if (records) {
+      const key = Number(mapping?.record ?? -1);
+      if (!Number.isInteger(key) || key < 0) return failMatched('invalidDefinition', `Dump mapping names no record: ${parameterId}`, checksumStatus);
+      const scope = mapping?.scope && typeof mapping.scope === 'object' ? mapping.scope : null;
+      let held = -1;
+      let found = null;
+      for (const record of recordList) {
+        if (record.key === key && (!scope || held === Number(scope.value ?? 0))) { found = record; break; }
+        if (scope && record.key === Number(scope.record ?? -1)) held = field(record.at + valueAt, records.valueType);
+      }
+      if (!found) continue;
+      valueOffset = found.at + valueAt;
+    }
+
     const decoded = localDecodeDumpParameterValue(
       parameter,
-      decodeBytes,
-      decodeBase + Number(mapping?.offset ?? 0),
+      records ? bytes : decodeBytes,
+      valueOffset,
       mapping?.codec ?? mapping?.nameCodec ?? null
     );
     if (!decoded.ok) {
@@ -1620,6 +1661,14 @@ export function validateLocalProfileSource(profileId, source = '') {
           level: 'error',
           path: `dumpDefinitions.${index}.mappings.${mappingIndex}.parameter`,
           message: `Parameter "${parameterId}" does not exist.`,
+        });
+      }
+      // A dump of records is read by key: each mapping names the record it reads.
+      if (dump?.payload?.records && !(Number.isInteger(mapping?.record) && mapping.record >= 0)) {
+        validation.push({
+          level: 'error',
+          path: `dumpDefinitions.${index}.mappings.${mappingIndex}.record`,
+          message: 'A mapping of a dump of records names the record it reads.',
         });
       }
     }

@@ -10,7 +10,10 @@
 //   - a mod slot's source and destination, and the pitch wheel's, a choice of the spec's lists;
 //   - a Multi parameter is the parts being edited (NRPN 0, a bitmap of the four), laid out once;
 //   - left out, and named: the program name's 32 characters, the deprecated rows, the bit-packed
-//     ones (`See descrip`: the oscillators' wavetables, the song parts) and the one not settable.
+//     ones (`See descrip`: the oscillators' wavetables, the song parts) and the one not settable;
+//   - read back (Pull) from the spec's edit buffer data, the reply to its edit buffer request: every
+//     NRPN of the program as a record of four bytes (the number's MSB and LSB, the value's), NRPN 0
+//     set to each part before that part's Multi settings. A Multi parameter reads part 1's.
 
 import { camel, stringifyProfile } from '../roland/build-profile.mjs';
 
@@ -39,6 +42,8 @@ export function buildGrooveProfile(data, layout) {
   const parameters = [];
   const lists = { source: data.lists['Mod Source values'], destination: data.lists['Mod destination values'] };
   const widened = [];
+  const nrpnOf = new Map();
+  const multi = new Set();
   for (const r of data.nrpn) {
     const lines = r.description.split(' | ');
     const title = lines[0];
@@ -64,6 +69,8 @@ export function buildGrooveProfile(data, layout) {
     if (values === lists.source && lists.source.at(-1).value > hi) { widened.push(`${r.nrpn}`); hi = lists.source.at(-1).value; }
     const covers = values.length && values.length === hi - lo + 1 && values.every((v, k) => v.value === lo + k);
     const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+    nrpnOf.set(base.id, r.nrpn);
+    if (r.category === 'Multi') multi.add(base.id);
     if (covers) {
       const seen = new Set();
       const choices = values.map(({ value, label }) => { let id = camel(label) || `v${value}`; if (seen.has(id)) id = `${id}${value}`; seen.add(id); return { id, label, value }; });
@@ -89,8 +96,15 @@ export function buildGrooveProfile(data, layout) {
   if (left.deprecated.length) notes.push(`Left out, rows the spec marks deprecated: ${left.deprecated.join(', ')}.`);
   if (left.packed.length) notes.push(`Left out, rows whose value packs two fields (\`See descrip\`): ${left.packed.join(', ')}.`);
   if (left.unsettable.length) notes.push(`Left out, NRPN ${left.unsettable.join(', ')}: not settable, used internally for saving presets via SysEx.`);
+  if (layout.editBuffer) notes.push('Pull asks for the program being edited (the edit buffer request, F0 00 02 4A id 06 F7) and reads the reply (Edit buffer data, id 03), every setting in it as its NRPN and value. id is the variable productId: 1 for the 24K and 24M, 2 for the 8M; the instrument takes either in a request and answers with its own. A Multi parameter reads part 1\'s value; Edit part (NRPN 0) and the rows left out above are not read.');
 
-  const variables = { channel: 1 };
+  // Pull: the edit buffer, read by NRPN. NRPN 0 itself is not read back: the dump sets it once for
+  // each part, so what it last holds is not a setting of the program.
+  const bus = layout.editBuffer;
+  const variables = { channel: 1, ...(bus ? { productId: 1 } : {}) };
+  const sysex = (...tail) => ['F0', '00', '02', '4A', '$productId', ...tail];
+  const mappings = bus ? parameters.filter((p) => nrpnOf.get(p.id) !== 0).map((p) => ({ parameter: p.id, record: nrpnOf.get(p.id), ...(multi.has(p.id) ? { scope: { record: 0, value: 1 } } : {}) })) : [];
+  for (const m of mappings) parameters.find((p) => p.id === m.parameter).access.canRead = true;
   const status = 0xb0;
   const picks = [...new Set([parameters[0], parameters.find((p) => p.type === 'choice' && p.choices.length > 20), parameters.find((p) => p.display.min < 0), parameters.at(-1)].filter(Boolean))];
   const tests = picks.map((p) => {
@@ -99,6 +113,21 @@ export function buildGrooveProfile(data, layout) {
     const wire = p.type === 'choice' ? p.choices.at(-1).value : p.range.max;
     return { name: `${p.group} ${p.name} = ${value} (NRPN ${r.parameterMsb * 128 + r.parameterLsb})`, parameter: p.id, value, expectedHex: [[0x63, r.parameterMsb], [0x62, r.parameterLsb], [0x06, wire >> 7], [0x26, wire & 127]].map(([c, v]) => [status, c, v].map(hex).join(' ')).join('\n') };
   });
+  if (bus) {
+    // A dump made by hand: part 1, then part 2 with other values, which part 1's reading must not
+    // take; a Single parameter, a choice, and a record no parameter reads (NRPN 444).
+    const single = parameters.find((p) => !multi.has(p.id) && p.type === 'integer' && p.range.max > 127 && nrpnOf.get(p.id) !== 0);
+    const multis = parameters.filter((p) => multi.has(p.id) && p.type === 'integer' && p.range.max >= 127);
+    const choice = parameters.find((p) => multi.has(p.id) && p.type === 'choice' && p.choices.length > 3);
+    const [a, b] = multis;
+    const record = (n, v) => [n >> 7, n & 127, v >> 7, v & 127];
+    const valueOf = (p, k) => (p.type === 'choice' ? p.choices[k].value : Math.min(p.range.max, p.range.min + 100 + k));
+    const body = [record(0, 1), record(nrpnOf.get(single.id), valueOf(single, 200)), record(nrpnOf.get(a.id), valueOf(a, 0)), record(nrpnOf.get(choice.id), valueOf(choice, 2)), record(444, 5), record(nrpnOf.get(b.id), valueOf(b, 1)),
+      record(0, 2), record(nrpnOf.get(a.id), valueOf(a, 7)), record(nrpnOf.get(choice.id), valueOf(choice, 3)), record(nrpnOf.get(b.id), valueOf(b, 9))].flat();
+    const expectedValues = { [single.id]: valueOf(single, 200), [a.id]: valueOf(a, 0), [b.id]: valueOf(b, 1), [choice.id]: choice.choices[2].id };
+    tests.push({ name: 'Edit buffer program data request', kind: 'request', request: 'requestEditBuffer', expectedHex: sysex('06', 'F7').map((t) => (t === '$productId' ? '01' : t)).join(' ') });
+    tests.push({ name: 'Edit buffer data, read back: part 1\'s Multi values, not part 2\'s', kind: 'dumpParse', inputHex: [...sysex('03').map((t) => (t === '$productId' ? 1 : parseInt(t, 16))), ...body, 0xf7].map(hex).join(' '), expectedValues });
+  }
   const doc = data.sources[0];
   return {
     schemaVersion: 1,
@@ -111,7 +140,7 @@ export function buildGrooveProfile(data, layout) {
     status: 'experimental',
     trust: 'local',
     description: layout.description,
-    sources: [{ type: 'manual', title: doc.title, notes: `NRPN parameters and the lists after them (PDF pages ${layout.pages[0]} - ${layout.pages.at(-1)}) read by tools/profiles/groove/read-groove-spec.mjs from ${doc.file} (sha256 ${doc.sha256}), ${doc.url}. Not yet checked against the instrument itself.` }],
+    sources: [{ type: 'manual', title: doc.title, notes: `NRPN parameters and the lists after them (PDF pages ${layout.pages[0]} - ${layout.pages.at(-1)}) read by tools/profiles/groove/read-groove-spec.mjs from ${doc.file} (sha256 ${doc.sha256}), ${doc.url}.${bus ? ` The edit buffer request and its reply as its "Importing / Exporting Program Data via MIDI SysEx" prints them (PDF pages ${bus.pages[0]} - ${bus.pages.at(-1)}).` : ''} Not yet checked against the instrument itself.` }],
     testedWith: [],
     authoringNotes: [
       'Generated by tools/profiles/groove/make-profiles.mjs; edit the layout in tools/profiles/groove/synths/, not this file.',
@@ -124,14 +153,26 @@ export function buildGrooveProfile(data, layout) {
     coverage: {
       singleParameterWrite: 'complete-for-the-spec\'s-NRPN-table',
       realtimeEditing: 'complete-for-the-spec\'s-NRPN-table',
-      editBufferDumpRequest: 'notImplemented',
-      editBufferDumpParse: 'notImplemented',
+      editBufferDumpRequest: bus ? 'complete: Edit buffer program data request' : 'notImplemented',
+      editBufferDumpParse: bus ? `partial: ${mappings.length} of the profile's ${parameters.length} parameters are read from the edit buffer data (all but Edit part), the Multi ones part 1's` : 'notImplemented',
       bankDump: 'notImplemented',
       inboundControllers: 'the instrument sends these NRPNs when its MIDI param send includes NRPN',
       verifiedOnHardware: false,
     },
     timing: { minDelayBetweenMessagesMs: 0 },
     messageRecipes: [...recipes.values()].sort((a, b) => a.parameterMsb - b.parameterMsb || a.parameterLsb - b.parameterLsb),
+    ...(bus ? {
+      requests: [{ id: 'requestEditBuffer', name: 'Edit buffer program data request', kind: 'sysex', template: sysex('06', 'F7'), response: { dump: 'editBufferData' }, timeoutMs: 4000, retries: 1 }],
+      dumpDefinitions: [{
+        id: 'editBufferData',
+        name: 'Edit buffer data',
+        kind: 'sysex',
+        matcher: { prefix: sysex('03'), suffix: ['F7'] },
+        payload: { offset: 6, records: { size: 4, keyAt: 0, keyType: 'u14', valueAt: 2, valueType: 'u14' } },
+        completion: { expectedMessages: 1 },
+        mappings,
+      }],
+    } : {}),
     parameters,
     tests,
   };
