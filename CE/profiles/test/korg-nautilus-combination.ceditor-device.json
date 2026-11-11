@@ -44,7 +44,7 @@
     "Sent and not read back: 578 settings (Effect LFO1 BPM; Effect LFO2 BPM; Timbre1 Detune; Timbre1 Delay Time; Timbre1 Swing; Timbre1 Knob1 Value; …): a value over two bytes, whose byte order the archive does not say.",
     "The exclusive header carries the global MIDI channel as 3g; the profile's deviceId variable is that byte, 30H for channel 1.",
     "Identity: the Device Inquiry reply (NAUTILUS_MIDI_MIDI_Implentaion.txt) is printed F0 7E 0g 06 02 42 00 01 5D 00 mm 00 vv ww xx 00 F7, 17 bytes where the universal reply has 15. Its 7th to 10th bytes, 00 01 5D 00, are checked as printed, where the universal reply puts the family and member code; its 11th byte, mm, is one per model and is not checked: NAUTILUS 61Keys 05H, NAUTILUS 73Keys 0EH, NAUTILUS 88Keys 17H.",
-    "No preset recall yet: the implementation's Bank Select footnote is not read."
+    "Preset recall: Bank Select MSB and LSB, then Program Change, for the 14 banks the implementation's receive table gives in Combination mode when Global's Bank Map is KORG (A, B, C, D, E, F, G, H, I, J, K, L, M, N). With Bank Map GM(2) the MSBs differ, and this recall does not apply."
   ],
   "variables": {
     "channel": 1,
@@ -52723,6 +52723,167 @@
         "request": "requestCurrentCombination"
       }
     ]
+  },
+  "presets": {
+    "banks": [
+      {
+        "id": "combinationA",
+        "label": "Combination A",
+        "role": "user",
+        "writable": false,
+        "startSlot": 0,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 0
+      },
+      {
+        "id": "combinationB",
+        "label": "Combination B",
+        "role": "user",
+        "writable": false,
+        "startSlot": 128,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 1
+      },
+      {
+        "id": "combinationC",
+        "label": "Combination C",
+        "role": "user",
+        "writable": false,
+        "startSlot": 256,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 2
+      },
+      {
+        "id": "combinationD",
+        "label": "Combination D",
+        "role": "user",
+        "writable": false,
+        "startSlot": 384,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 3
+      },
+      {
+        "id": "combinationE",
+        "label": "Combination E",
+        "role": "user",
+        "writable": false,
+        "startSlot": 512,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 4
+      },
+      {
+        "id": "combinationF",
+        "label": "Combination F",
+        "role": "user",
+        "writable": false,
+        "startSlot": 640,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 5
+      },
+      {
+        "id": "combinationG",
+        "label": "Combination G",
+        "role": "user",
+        "writable": false,
+        "startSlot": 768,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 6
+      },
+      {
+        "id": "combinationH",
+        "label": "Combination H",
+        "role": "user",
+        "writable": false,
+        "startSlot": 896,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 8
+      },
+      {
+        "id": "combinationI",
+        "label": "Combination I",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1024,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 9
+      },
+      {
+        "id": "combinationJ",
+        "label": "Combination J",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1152,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 10
+      },
+      {
+        "id": "combinationK",
+        "label": "Combination K",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1280,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 11
+      },
+      {
+        "id": "combinationL",
+        "label": "Combination L",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1408,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 12
+      },
+      {
+        "id": "combinationM",
+        "label": "Combination M",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1536,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 13
+      },
+      {
+        "id": "combinationN",
+        "label": "Combination N",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1664,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 14
+      }
+    ],
+    "recall": {
+      "kind": "bankPc"
+    }
   },
   "tests": [
     {"name":"Universal Identity Request","kind":"identityRequest","expectedHex":"F0 7E 7F 06 01 F7"},

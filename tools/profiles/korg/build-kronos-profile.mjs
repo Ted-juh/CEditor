@@ -196,6 +196,52 @@ export function buildKronosProfile(data, layout) {
   return shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing });
 }
 
+/**
+ * Preset recall from the implementation's receive table of banks (Bank Map KORG): a bank per Bank
+ * Select MSB and LSB the object's column names, 128 programs each by Program Change. A run of LSBs
+ * (`79,01-09 : g(1)-g(9)`) is a bank each; a second select for a bank already reached (`38,00 : G`
+ * beside `79,00 : G`) is named in the notes and not offered. The banks numbered 001~128 are the GM
+ * ones, read-only (*2 of the SysEx text: `GM, g(1)-g(9), g(d) (read-only)`).
+ */
+export function presetBanks(banks, column, objectName) {
+  const kept = [];
+  const alternates = [];
+  for (const b of banks ?? []) {
+    const c = b[column];
+    if (!c) continue;
+    const from = Number.parseInt(b.lsb, 16);
+    const lsbs = b.lsbTo ? Array.from({ length: Number.parseInt(b.lsbTo, 16) - from + 1 }, (unused, i) => from + i) : [from];
+    let labels = [c.label];
+    if (b.lsbTo) {
+      const run = /^(\D*)(\d+)(\D*)-\1(\d+)\3$/.exec(c.label);
+      if (!run || Number(run[4]) - Number(run[2]) + 1 !== lsbs.length) throw new Error(`banks ${b.msb},${b.lsb}-${b.lsbTo}: "${c.label}" is not one name per LSB`);
+      labels = lsbs.map((unused, i) => `${run[1]}${Number(run[2]) + i}${run[3]}`);
+    }
+    lsbs.forEach((lsb, i) => {
+      const gm = c.first === 1;
+      if (kept.some((k) => k.name === labels[i] && k.gm === gm)) { alternates.push(`${b.msb},${hex(lsb)} (${labels[i]})`); return; }
+      kept.push({ name: labels[i], gm, msb: Number.parseInt(b.msb, 16), lsb, count: c.last - c.first + 1 });
+    });
+  }
+  let slot = 0;
+  const out = kept.map((k) => {
+    const bank = {
+      id: camel(`${objectName} ${k.gm ? 'gm ' : ''}${k.name.replace(/[()]/g, ' ')}`),
+      label: `${objectName} ${k.name}${k.gm ? ' (001-128)' : ''}`,
+      role: k.gm ? 'factory' : 'user',
+      writable: false,
+      startSlot: slot,
+      slotCount: k.count,
+      programBase: 0,
+      bankMsb: k.msb,
+      bankLsb: k.lsb,
+    };
+    slot += k.count;
+    return bank;
+  });
+  return { banks: out, alternates };
+}
+
 /** The object the table is, by its number in *1: 00 Program (the default), 01 Combination, … */
 const objectOf = (layout) => layout.object ?? { code: '00', name: 'Program' };
 
@@ -347,6 +393,10 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
   const wire = pack8to7(payload, 'msb-low-first', 7);
   if (wire.length !== packed) throw new Error(`${layout.name}: packed ${wire.length} bytes, *3 says ${packed}`);
 
+  const presets = presetBanks(data.banks, kind, objectName);
+  // The GM banks are factory ones because *2 says so; a release that stops saying it stops the build.
+  const gmReadOnly = (data.messages.banks ?? []).map((l) => /(GM, g\(1\)-g\(9\), g\(d\) \(read-only\))/.exec(l)?.[1]).find(Boolean);
+  if (presets.banks.some((b) => b.role === 'factory') && !gmReadOnly) throw new Error(`${layout.name}: *2 no longer calls the GM banks read-only`);
   const summary = (map) => [...map].map(([why, labels]) => `${labels.length} ${labels.length === 1 ? 'setting' : 'settings'} (${[...new Set(labels.map((l) => l.replace(/ \d+$/, '')))].slice(0, 6).join('; ')}${labels.length > 6 ? '; …' : ''}): ${why}`);
   const source = data.source;
   const amsUsed = parameters.some((p) => p.choices?.length > 2 && p.choices[0].label === data.voiceModel?.amsSources?.[0]?.label && p.choices.length === 49);
@@ -384,7 +434,9 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
       ...summary(notReadBack).map((s) => `Sent and not read back: ${s}.`),
       'The exclusive header carries the global MIDI channel as 3g; the profile\'s deviceId variable is that byte, 30H for channel 1.',
       `Identity: the Device Inquiry reply (${layout.document.implementation}) is printed ${reply.join(' ')}${reply.length !== universalLength ? `, ${reply.length} bytes where the universal reply has ${universalLength}` : ''}. Its 7th to ${6 + checked.length}th bytes, ${checked.join(' ')}, are checked as printed, where the universal reply puts the family${checked.length > 2 ? ' and member' : ''} code${members.length ? `; its ${reply.indexOf('mm') + 1}th byte, mm, is one per model and is not checked: ${members.join(', ')}` : ''}.`,
-      'No preset recall yet: the implementation\'s Bank Select footnote is not read.',
+      ...(presets.banks.length
+        ? [`Preset recall: Bank Select MSB and LSB, then Program Change, for the ${presets.banks.length} banks the implementation's receive table gives in ${objectName} mode when Global's Bank Map is KORG (${presets.banks.map((b) => b.label.replace(`${objectName} `, '')).join(', ')}).${presets.banks.some((b) => b.role === 'factory') ? ` The banks numbered 001-128 are the GM ones, read-only (${layout.document.messages} *2: "${gmReadOnly}").` : ''}${presets.alternates.length ? ` The table also reaches some of them by a second select (${presets.alternates.join(', ')}), not offered.` : ''} With Bank Map GM(2) the MSBs differ, and this recall does not apply.`]
+        : ['No preset recall: the implementation prints no banks for this object.']),
     ],
     variables: { channel: 1, deviceId: 0x30 },
     identity: { manufacturerId: ['42'], familyCode, ...(checked.length > 2 ? { modelNumber } : {}), timeoutMs: 1000, retries: 0 },
@@ -405,6 +457,7 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
       { id: requestId, name: `Current Object Dump Request (${objectName})`, kind: 'sysex', template: request, response: { dump: dumpId }, timeoutMs: 3000, retries: 1 },
     ],
     startup: { policy: 'pull', syncDirection: 'pull', sync: [{ request: 'identityRequest' }, { request: requestId }] },
+    ...(presets.banks.length ? { presets: { banks: presets.banks, recall: { kind: 'bankPc' } } } : {}),
     tests: [
       { name: 'Universal Identity Request', kind: 'identityRequest', expectedHex: 'F0 7E 7F 06 01 F7' },
       ...[...new Map(picks.map(([p, value]) => [p.id, vector(p, value(p))])).values()],

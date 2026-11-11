@@ -27,7 +27,8 @@ import { SYNTHS, build } from '../../../tools/profiles/korg/make-profiles.mjs';
 import { modes as omModes, readOmCcPage } from '../../../tools/profiles/korg/read-korg-om-cc.mjs';
 import { foldKnobs, matchKnobs, readOmValue } from '../../../tools/profiles/korg/build-korg-knobs.mjs';
 import { readObjectHeader, readObjectRows } from '../../../tools/profiles/korg/read-kronos-table.mjs';
-import { exclusiveHeader, readBits, readData, readLabels } from '../../../tools/profiles/korg/build-kronos-profile.mjs';
+import { exclusiveHeader, presetBanks, readBits, readData, readLabels } from '../../../tools/profiles/korg/build-kronos-profile.mjs';
+import { bankMap } from '../../../tools/profiles/korg/import-kronos.mjs';
 import { pack8to7 } from '../../dpd/codecs.mjs';
 import {
   localCompileDeviceRequest,
@@ -636,4 +637,29 @@ test('the combinations: object 01 asked for and read, sixteen timbres told apart
     }
   }
   assert.ok(!builtProfile('korg-nautilus-combination').parameters.some((p) => /^(Scene|Step Seq)/.test(p.group)));
+});
+
+test('the KRONOS-style bank map: a bank per select, a run of LSBs a bank each, a second select dropped', () => {
+  const text = [
+    '  *1 : When Bank Map in Global mode is KORG;',
+    '  MIDI In    [Hex]                 Program            Combination',
+    '  mm,bb,pp = 00,00,    00 - 7F   : Bank A 000 - 127 : Bank A 000 - 127',
+    '             00,06,    00 - 7F   :                  :      G 000 - 127',
+    '             00,08,    00 - 7F   :      G 000 - 127 :      H 000 - 127',
+    '             79,00,    00 - 7F   :          G 001 - 128',
+    '             79,01-09, 00 - 7F   :  g(1)-g(9) 001 - 128',
+    '             38,00,    00 - 7F   :          G 001 - 128',
+    '     : When Bank Map in Global mode is GM(2);',
+    '             3F,00,    00 - 7F   : Bank A 000 - 127 : Bank A 000 - 127',
+  ].join('\n');
+  const rows = bankMap(text);
+  assert.equal(rows.length, 6, 'up to the GM(2) map');
+  assert.deepEqual(rows[1], { msb: '00', lsb: '06', program: null, combination: { label: 'G', first: 0, last: 127 } });
+  const program = presetBanks(rows, 'program', 'Program');
+  assert.deepEqual(program.banks.map((b) => [b.label, b.bankMsb, b.bankLsb, b.role, b.startSlot]).slice(0, 4), [
+    ['Program A', 0, 0, 'user', 0], ['Program G', 0, 8, 'user', 128], ['Program G (001-128)', 121, 0, 'factory', 256], ['Program g(1) (001-128)', 121, 1, 'factory', 384],
+  ]);
+  assert.equal(program.banks.length, 12, 'A, G, the GM G and g(1)~g(9)');
+  assert.deepEqual(program.alternates, ['38,00 (G)']);
+  assert.deepEqual(presetBanks(rows, 'combination', 'Combination').banks.map((b) => b.label), ['Combination A', 'Combination G', 'Combination H']);
 });

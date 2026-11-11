@@ -163,6 +163,27 @@
       "              18 : Song (Song Timbre Set and Song Control in a single object. Song.txt)",
       " The table above includes the names of associated documentation files in SysExDumps."
     ],
+    "banks": [
+      "*2",
+      " The meaning of bank depends on the object type.",
+      " Program, Program Name:",
+      "        bank =  0 -  5 : A - F",
+      "               10 - 1A : GM, g(1)-g(9), g(d) (read-only)",
+      "               40 - 4d : G - T",
+      " Combi, Combi Name:",
+      "        bank =  0 -  6 : A - G",
+      "               40 - 46 : H - N",
+      " Drum Kit, Drum Kit Name:",
+      "        bank =       0 : A",
+      "                    10 : GM (read-only)",
+      "               40 - 4d : B - O",
+      " Wave Seq, Wave Seq Name:",
+      "        bank =       0 : INT",
+      "               40 - 4d : USER-A - G, AA - GG",
+      " Set List Slot Comments, Set List Slot Name",
+      "        bank =  0 - 7F : set list #",
+      " For all other types (e.g., Song, Set List, etc) bank must be 0."
+    ],
     "packing": [
       "*3",
       " The detailed information about \"data,\" see the text files specific to HD-1, EXi, etc.",
@@ -236,6 +257,321 @@
       }
     ]
   },
+  "banks": [
+    {
+      "msb": "00",
+      "lsb": "00",
+      "program": {
+        "label": "A",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "A",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "01",
+      "program": {
+        "label": "B",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "B",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "02",
+      "program": {
+        "label": "C",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "C",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "03",
+      "program": {
+        "label": "D",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "D",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "04",
+      "program": {
+        "label": "E",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "E",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "05",
+      "program": {
+        "label": "F",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "F",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "06",
+      "program": null,
+      "combination": {
+        "label": "G",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "08",
+      "program": {
+        "label": "G",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "H",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "09",
+      "program": {
+        "label": "H",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "I",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0A",
+      "program": {
+        "label": "I",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "J",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0B",
+      "program": {
+        "label": "J",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "K",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0C",
+      "program": {
+        "label": "K",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "L",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0D",
+      "program": {
+        "label": "L",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "M",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0E",
+      "program": {
+        "label": "M",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "N",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0F",
+      "program": {
+        "label": "N",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "10",
+      "program": {
+        "label": "O",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "11",
+      "program": {
+        "label": "P",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "12",
+      "program": {
+        "label": "Q",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "13",
+      "program": {
+        "label": "R",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "14",
+      "program": {
+        "label": "S",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "15",
+      "program": {
+        "label": "T",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "79",
+      "lsb": "00",
+      "program": {
+        "label": "G",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    },
+    {
+      "msb": "79",
+      "lsb": "01",
+      "lsbTo": "09",
+      "program": {
+        "label": "g(1)-g(9)",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    },
+    {
+      "msb": "78",
+      "lsb": "00",
+      "program": {
+        "label": "g(d)",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    },
+    {
+      "msb": "38",
+      "lsb": "00",
+      "program": {
+        "label": "G",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    },
+    {
+      "msb": "3E",
+      "lsb": "00",
+      "program": {
+        "label": "g(d)",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    }
+  ],
   "rows": [
     {"line":8,"ofs":0,"group":"Common","name":"Name","data":"00~FF","value":"~"},
     {"line":9,"ofs":1,"group":"Common","name":"Name","data":"00~FF","value":"~"},

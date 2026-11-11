@@ -67,10 +67,10 @@ What the builder takes as settled, and what it does not:
 | `korg-volca-beats` | volca beats MIDI Implementation 0.01 | 20 | 0 | — | — |
 | `korg-volca-kick` | volca kick MIDI Implementation 1.00 | 10 | 0 | — | — |
 | `korg-volca-nubass` | volca nubass MIDI Implementation 1.00 | 11 | 0 | — | — |
-| `korg-kronos` | KRONOS MIDI Implementation archive (2025-07-24): `Prog_HD-1.txt` 1.01, `KRONOS_MIDI_SysEx.txt` 1.27 | 1,790 | 376 | — | 68H 00H |
-| `korg-nautilus` | NAUTILUS MIDI Implementation archive (2022-09-22): `SysExDumps/Prog_HD-1.txt`, `NAUTILUS_MIDI_SysEx.txt` 1.0 | 1,019 | 122 | — | 00H 01H 5DH 00H |
-| `korg-kronos-combination` | the KRONOS archive: `CombiAndSongTimbreSet.txt` 1.01 | 6,109 | 2,139 | — | 68H 00H |
-| `korg-nautilus-combination` | the NAUTILUS archive: `SysExDumps/CombiAndSongTimbreSet.txt` | 2,433 | 767 | — | 00H 01H 5DH 00H |
+| `korg-kronos` | KRONOS MIDI Implementation archive (2025-07-24): `Prog_HD-1.txt` 1.01, `KRONOS_MIDI_SysEx.txt` 1.27 | 1,790 | 376 | 3,968 | 68H 00H |
+| `korg-nautilus` | NAUTILUS MIDI Implementation archive (2022-09-22): `SysExDumps/Prog_HD-1.txt`, `NAUTILUS_MIDI_SysEx.txt` 1.0 | 1,019 | 122 | 3,968 | 00H 01H 5DH 00H |
+| `korg-kronos-combination` | the KRONOS archive: `CombiAndSongTimbreSet.txt` 1.01 | 6,109 | 2,139 | 1,792 | 68H 00H |
+| `korg-nautilus-combination` | the NAUTILUS archive: `SysExDumps/CombiAndSongTimbreSet.txt` | 2,433 | 767 | 1,792 | 00H 01H 5DH 00H |
 
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
 try to recognise them. The VOX Continental prints its reply inline with two member codes, 05 for the
@@ -262,6 +262,14 @@ family, 68 00, and not the member.
 - 1,019 settings are sent and 974 read back from the 4,229-byte dump; 45 values over two bytes are
   sent and not read back (the NAUTILUS marks none `Big Endian`).
 
+**Preset recall** comes from the implementation's receive table of banks when Global's Bank Map is
+KORG (`*1 : When Bank Map in Global mode is KORG;`): Bank Select MSB and LSB, then Program Change,
+each bank in the object's own column. Programs: INT-A~F, USER-A~GG on the KRONOS (A~T on the
+NAUTILUS) and the GM banks G, g(1)~g(9) and g(d) on MSB 79 and 78, 31 banks; combinations: INT-A~G
+and USER-A~G (A~N), 14. The GM banks are `factory`, read-only by `*2` of the SysEx text, which the
+builder checks; the second selects the table also prints for two of them (38,00 and 3E,00) are named
+and not offered. With Bank Map GM(2) the MSBs differ, which the profiles say.
+
 **Combinations.** A layout names the object it reads (`object: { code: '01', name: 'Combination' }`,
 checked against the archive's list of objects, `*1`), and the profile asks for and reads that object:
 `korg-kronos-combination` and `korg-nautilus-combination`, from `CombiAndSongTimbreSet.txt`, edited
@@ -354,9 +362,9 @@ Kept as printed and said where it applies:
 - **The rest of the KRONOS**: the profiles hold an HD-1 program and a combination. Not yet read: an
   EXi program (`Prog_EXi_Common.txt`, with each engine's own parameters in `Prog_EXi.txt` and
   `SysExParams/VoiceModels/`), Global, the drum kits
-  and wave sequences (their own parameter changes, 53~56), each effect's own parameters
-  (`Effect.txt`, by effect type), and preset recall (the implementation's Bank Select footnote).
-  The two-byte values wait for their byte order, from an instrument's dump.
+  and wave sequences (their own parameter changes, 53~56), and each effect's own parameters
+  (`Effect.txt`, by effect type). The two-byte values wait for their byte order, from an
+  instrument's dump.
 - **The rest of the NAUTILUS**: the same objects as the KRONOS's, and its scenes and step
   sequencers, whose message the archive does not settle (in a program 6D or 6E for the scenes, 43
   or 6E for the step sequencers; in a combination any of the three).

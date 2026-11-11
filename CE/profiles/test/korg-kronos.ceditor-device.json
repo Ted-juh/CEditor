@@ -52,7 +52,7 @@
     "Sent and not read back: 128 settings (KARMA Common (Note Map) C-1; KARMA Common (Note Map) C#-1; KARMA Common (Note Map) D-1; KARMA Common (Note Map) D#-1; KARMA Common (Note Map) E-1; KARMA Common (Note Map) F-1; …): a value the dump may hold as FF, which the parameter does not offer.",
     "The exclusive header carries the global MIDI channel as 3g; the profile's deviceId variable is that byte, 30H for channel 1.",
     "Identity: the Device Inquiry reply (KRONOS_MIDI_Implementation.pdf) is printed F0 7E 0g 06 02 42 68 00 mm 00 vv ww xx 00 F7. Its 7th to 8th bytes, 68 00, are checked as printed, where the universal reply puts the family code; its 9th byte, mm, is one per model and is not checked: KRONOS/KRONOS2 61Keys 05H, KRONOS/KRONOS2 73Keys 0EH, KRONOS/KRONOS2 88Keys 17H, KRONOS3 61Keys 1DH, KRONOS3 73Keys 26H, KRONOS3 88Keys 2FH.",
-    "No preset recall yet: the implementation's Bank Select footnote is not read."
+    "Preset recall: Bank Select MSB and LSB, then Program Change, for the 31 banks the implementation's receive table gives in Program mode when Global's Bank Map is KORG (INT-A, INT-B, INT-C, INT-D, INT-E, INT-F, USER-A, USER-B, USER-C, USER-D, USER-E, USER-F, USER-G, USER-AA, USER-BB, USER-CC, USER-DD, USER-EE, USER-FF, USER-GG, G (001-128), g(1) (001-128), g(2) (001-128), g(3) (001-128), g(4) (001-128), g(5) (001-128), g(6) (001-128), g(7) (001-128), g(8) (001-128), g(9) (001-128), g(d) (001-128)). The banks numbered 001-128 are the GM ones, read-only (KRONOS_MIDI_SysEx.txt *2: \"GM, g(1)-g(9), g(d) (read-only)\"). The table also reaches some of them by a second select (38,00 (G), 3E,00 (g(d))), not offered. With Bank Map GM(2) the MSBs differ, and this recall does not apply."
   ],
   "variables": {
     "channel": 1,
@@ -34864,6 +34864,354 @@
         "request": "requestCurrentProgram"
       }
     ]
+  },
+  "presets": {
+    "banks": [
+      {
+        "id": "programIntA",
+        "label": "Program INT-A",
+        "role": "user",
+        "writable": false,
+        "startSlot": 0,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 0
+      },
+      {
+        "id": "programIntB",
+        "label": "Program INT-B",
+        "role": "user",
+        "writable": false,
+        "startSlot": 128,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 1
+      },
+      {
+        "id": "programIntC",
+        "label": "Program INT-C",
+        "role": "user",
+        "writable": false,
+        "startSlot": 256,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 2
+      },
+      {
+        "id": "programIntD",
+        "label": "Program INT-D",
+        "role": "user",
+        "writable": false,
+        "startSlot": 384,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 3
+      },
+      {
+        "id": "programIntE",
+        "label": "Program INT-E",
+        "role": "user",
+        "writable": false,
+        "startSlot": 512,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 4
+      },
+      {
+        "id": "programIntF",
+        "label": "Program INT-F",
+        "role": "user",
+        "writable": false,
+        "startSlot": 640,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 5
+      },
+      {
+        "id": "programUserA",
+        "label": "Program USER-A",
+        "role": "user",
+        "writable": false,
+        "startSlot": 768,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 8
+      },
+      {
+        "id": "programUserB",
+        "label": "Program USER-B",
+        "role": "user",
+        "writable": false,
+        "startSlot": 896,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 9
+      },
+      {
+        "id": "programUserC",
+        "label": "Program USER-C",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1024,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 10
+      },
+      {
+        "id": "programUserD",
+        "label": "Program USER-D",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1152,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 11
+      },
+      {
+        "id": "programUserE",
+        "label": "Program USER-E",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1280,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 12
+      },
+      {
+        "id": "programUserF",
+        "label": "Program USER-F",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1408,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 13
+      },
+      {
+        "id": "programUserG",
+        "label": "Program USER-G",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1536,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 14
+      },
+      {
+        "id": "programUserAa",
+        "label": "Program USER-AA",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1664,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 15
+      },
+      {
+        "id": "programUserBb",
+        "label": "Program USER-BB",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1792,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 16
+      },
+      {
+        "id": "programUserCc",
+        "label": "Program USER-CC",
+        "role": "user",
+        "writable": false,
+        "startSlot": 1920,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 17
+      },
+      {
+        "id": "programUserDd",
+        "label": "Program USER-DD",
+        "role": "user",
+        "writable": false,
+        "startSlot": 2048,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 18
+      },
+      {
+        "id": "programUserEe",
+        "label": "Program USER-EE",
+        "role": "user",
+        "writable": false,
+        "startSlot": 2176,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 19
+      },
+      {
+        "id": "programUserFf",
+        "label": "Program USER-FF",
+        "role": "user",
+        "writable": false,
+        "startSlot": 2304,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 20
+      },
+      {
+        "id": "programUserGg",
+        "label": "Program USER-GG",
+        "role": "user",
+        "writable": false,
+        "startSlot": 2432,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 21
+      },
+      {
+        "id": "programGmG",
+        "label": "Program G (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 2560,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 0
+      },
+      {
+        "id": "programGmG1",
+        "label": "Program g(1) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 2688,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 1
+      },
+      {
+        "id": "programGmG2",
+        "label": "Program g(2) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 2816,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 2
+      },
+      {
+        "id": "programGmG3",
+        "label": "Program g(3) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 2944,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 3
+      },
+      {
+        "id": "programGmG4",
+        "label": "Program g(4) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 3072,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 4
+      },
+      {
+        "id": "programGmG5",
+        "label": "Program g(5) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 3200,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 5
+      },
+      {
+        "id": "programGmG6",
+        "label": "Program g(6) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 3328,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 6
+      },
+      {
+        "id": "programGmG7",
+        "label": "Program g(7) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 3456,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 7
+      },
+      {
+        "id": "programGmG8",
+        "label": "Program g(8) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 3584,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 8
+      },
+      {
+        "id": "programGmG9",
+        "label": "Program g(9) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 3712,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 121,
+        "bankLsb": 9
+      },
+      {
+        "id": "programGmGD",
+        "label": "Program g(d) (001-128)",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 3840,
+        "slotCount": 128,
+        "programBase": 0,
+        "bankMsb": 120,
+        "bankLsb": 0
+      }
+    ],
+    "recall": {
+      "kind": "bankPc"
+    }
   },
   "tests": [
     {"name":"Universal Identity Request","kind":"identityRequest","expectedHex":"F0 7E 7F 06 01 F7"},

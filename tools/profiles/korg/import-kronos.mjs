@@ -13,7 +13,7 @@
 //   - the voice model's file (SysExParams/VoiceModels/HD-1.txt): its message format and its list of
 //     AMS sources by number;
 //   - the MIDI implementation (the KRONOS's a PDF, read through pdftotext; the NAUTILUS's text): the
-//     Device Inquiry reply and the member codes.
+//     Device Inquiry reply and the member codes, and the banks Bank Select reaches (Bank Map KORG).
 //
 // The NAUTILUS's archive is the same form (NAUTILUS_MIDIimp.zip, its tables under SysExDumps/), without
 // the voice model files.
@@ -75,6 +75,31 @@ export function inquiryReply(text) {
   return reply ? { reply: reply[1].split(',').map((b) => b.trim()), members } : null;
 }
 
+/**
+ * The receive table of banks when Global's Bank Map is KORG (`*1 : When Bank Map in Global mode is
+ * KORG;`): each line a Bank Select MSB and LSB (a range of LSBs, `79,01-09`, for a run of banks), and
+ * what that bank is in Program and in Combination mode (`: Bank INT-A 000 - 127 : Bank INT-A 000 -
+ * 127`), either blank. Up to the GM(2) map or the Set List table.
+ */
+export function bankMap(text) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => /When Bank Map in Global mode is KORG/.test(l));
+  if (start < 0) return null;
+  const cell = (c) => {
+    const m = /^\s*(?:Bank\s+)?(\S.*?)\s+(\d{3}) - (\d{3})\s*$/.exec(c ?? '');
+    return m ? { label: m[1], first: Number(m[2]), last: Number(m[3]) } : null;
+  };
+  const rows = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/GM\(2\)|Set List/.test(line)) break;
+    const m = /\b([0-9A-F]{2}),([0-9A-F]{2})(?:-([0-9A-F]{2}))?,\s+00 - 7F\s+:(.*)$/.exec(line);
+    if (!m) continue;
+    const [program, combination] = m[4].split(':');
+    rows.push({ msb: m[1], lsb: m[2], ...(m[3] ? { lsbTo: m[3] } : {}), program: cell(program), combination: cell(combination) });
+  }
+  return rows;
+}
+
 export function importArchive(dir, layout) {
   const doc = layout.document;
   const read = (file) => readFileSync(path.join(dir, file), 'latin1');
@@ -111,11 +136,13 @@ export function importArchive(dir, layout) {
       currentObjectDumpRequest: messageBlock(messagesText, '74'),
       currentObjectDump: messageBlock(messagesText, '75'),
       objects: footnote(messagesText, '1'),
+      banks: footnote(messagesText, '2'),
       packing: footnote(messagesText, '3'),
       value: footnote(messagesText, '4'),
     },
     ...(voiceText ? { voiceModel: { messageFormats: messageFormats(voiceText), amsSources: amsSources(voiceText) } } : {}),
     identity: inquiryReply(implementationText),
+    banks: bankMap(implementationText),
     rows: readObjectRows(objectText),
   };
 }
