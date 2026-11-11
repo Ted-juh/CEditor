@@ -26,7 +26,8 @@ export const SYNTHS = readdirSync(path.join(HERE, 'synths')).filter((f) => f.end
 
 export async function build(name) {
   const layout = await loadLayout(name);
-  const data = JSON.parse(readFileSync(path.join(HERE, 'tables', `${name}.json`), 'utf8'));
+  // (A layout may build from another's transcription: the JN-80's NRPN profile from the JN-80's.)
+  const data = JSON.parse(readFileSync(path.join(HERE, 'tables', `${layout.transcription ?? name}.json`), 'utf8'));
   const profile = layout.build === 'nrpn' ? buildBehringerNrpnProfile(data, layout)
     : layout.build === 'nrpn-table' ? buildBehringerNrpnTableProfile(data, layout)
       : layout.tables ? buildBehringerDumpProfile(data, layout) : buildBehringerProfile(data, layout);

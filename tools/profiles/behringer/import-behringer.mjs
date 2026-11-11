@@ -41,16 +41,21 @@ export function importDocument(layout, file) {
     };
   }
   const rows = layout.tables ? readLineTables(lines, layout.tables) : readCcTables(lines, layout.read ?? {});
+  // An NRPN table beside the controllers (the JN-80's): the words in its region, rows anchored on its
+  // MSB column, a name or a note over as many lines as it needs.
+  const nrpn = layout.nrpnTable;
+  const nrpns = nrpn ? readAnchoredRows(lines.filter((l) => l.y > nrpn.top).map((l) => ({ ...l, words: l.words.filter((w) => w.x0 >= nrpn.left) })).filter((l) => l.words.length), nrpn.read) : null;
   return {
     sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
     rows,
+    ...(nrpns ? { nrpns: nrpns.map(({ side, ...r }) => r) } : {}),
   };
 }
 
 /** One row per line, so a re-import that changes one row changes one line. */
 export function stringifyTranscription(data) {
   const rows = (items, indent) => (items.length ? `[\n${items.map((x) => `${indent}  ${JSON.stringify(x)}`).join(',\n')}\n${indent}]` : '[]');
-  return `{\n  "sources": ${rows(data.sources, '  ')},\n  "rows": ${rows(data.rows, '  ')}${data.flow !== undefined ? `,\n  "flow": ${JSON.stringify(data.flow)}` : ''}\n}\n`;
+  return `{\n  "sources": ${rows(data.sources, '  ')},\n  "rows": ${rows(data.rows, '  ')}${data.nrpns ? `,\n  "nrpns": ${rows(data.nrpns, '  ')}` : ''}${data.flow !== undefined ? `,\n  "flow": ${JSON.stringify(data.flow)}` : ''}\n}\n`;
 }
 
 async function main() {

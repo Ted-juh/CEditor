@@ -108,17 +108,36 @@ export function buildBehringerProfile(data, layout) {
     if (STANDARD.test(name)) { skip('the wheels, pedals, bank select, NRPN and RPN controllers and the channel mode messages', label); continue; }
     if (MIDI_SETUP.test(name)) { skip('controllers that change the instrument\'s MIDI channels', label); continue; }
     if (layout.leaveOut?.[r.cc]) { skip(layout.leaveOut[r.cc], label); continue; }
-    const recipe = { id: `cc${r.cc}${pair ? `_${pair.lsb}` : ''}`, kind: 'cc', channel: '$channel', controller: r.cc, ...(pair ? { lsbController: pair.lsb } : {}), value: '$encodedValue' };
+    // A layout asking for the NRPN table (the JN-80's): a controller the table gives an NRPN of the
+    // same number is sent as that NRPN, its value the table's (0 - 4095) on data entry, MSB on CC 6
+    // and LSB on CC 38.
+    const nrpn = layout.nrpn ? (data.nrpns ?? []).find((n) => Number(n.number) === r.cc) : null;
+    const nrpnRange = nrpn ? /^(\d+)\s*[–-]\s*(\d+)$/.exec(clean(nrpn.range)) : null;
+    const recipe = nrpn
+      ? { id: `nrpn${hex(Number(nrpn.msb))}${hex(Number(nrpn.lsb))}`, kind: 'nrpn', channel: '$channel', parameterMsb: Number(nrpn.msb), parameterLsb: Number(nrpn.lsb), valueResolution: 14, value: '$encodedValue' }
+      : { id: `cc${r.cc}${pair ? `_${pair.lsb}` : ''}`, kind: 'cc', channel: '$channel', controller: r.cc, ...(pair ? { lsbController: pair.lsb } : {}), value: '$encodedValue' };
     recipes.set(recipe.id, recipe);
+    // A group is the block a name begins with (`VCF`, `OSC 1`, `DCA_`, `Aux/`), `LFO1` and `LFO 1` alike.
+    // (Spelt as it first is: the UB-1 Micro's `OSC1 Wave` and `Osc 1 Fine Tune` are one group.)
+    const found = layout.groupOf?.(name) ?? (/^([A-Z][A-Za-z]*(?:\s?\d)?)(?=[\s_/]|$)/.exec(name)?.[1]?.replace(/([A-Za-z])(\d)$/, '$1 $2') ?? 'Sound');
+    const group = spelling.get(found.toLowerCase()) ?? (spelling.set(found.toLowerCase(), found), found);
+    if (nrpn) {
+      parameters.push({
+        id: unique(`${camel(group)}.${camel(name)}`), name, group,
+        description: `NRPN ${nrpn.msb}:${nrpn.lsb} (\`${clean(nrpn.name)}\`, scope ${clean(nrpn.scope ?? '')})${nrpn.notes ? `: ${clean(nrpn.notes)}` : ''}. The controller is CC ${r.cc}, 0 - 127.`,
+        access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id,
+        type: 'integer', range: { min: Number(nrpnRange[1]), max: Number(nrpnRange[2]) }, default: Number(nrpnRange[1]),
+        display: { mode: 'number', unit: '', shortLabel: camel(name) }, normalization: { mode: 'linear' }, encoding: { type: 'u14' },
+        sendPolicy: { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true },
+        ui: { preferredComponent: /Level|Attack|Decay|Sustain|Release|Amount|Volume|Cutoff|Resonance/i.test(name) ? 'Slider' : 'Knob' },
+      });
+      continue;
+    }
     const values = fromBands ? { choices: fromBands.choices } : readRange(rangeText);
     const describe = [];
     if (pair) describe.push(`14 bits: the MSB on CC ${r.cc}, then the LSB on CC ${pair.lsb}.`);
     if (values.text) describe.push(`Printed: ${values.text}.`);
     if (values.unsure) unclean.push(name);
-    // A group is the block a name begins with (`VCF`, `OSC 1`, `DCA_`, `Aux/`), `LFO1` and `LFO 1` alike.
-    // (Spelt as it first is: the UB-1 Micro's `OSC1 Wave` and `Osc 1 Fine Tune` are one group.)
-    const found = layout.groupOf?.(name) ?? (/^([A-Z][A-Za-z]*(?:\s?\d)?)(?=[\s_/]|$)/.exec(name)?.[1]?.replace(/([A-Za-z])(\d)$/, '$1 $2') ?? 'Sound');
-    const group = spelling.get(found.toLowerCase()) ?? (spelling.set(found.toLowerCase(), found), found);
     const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
     if (values.choices && !pair) {
       const seen = new Set();
@@ -139,12 +158,12 @@ export function buildBehringerProfile(data, layout) {
   const variables = { channel: 1, ...(layout.variables ?? {}) };
   const tests = [];
   const status = 0xb0 + variables.channel - 1;
-  for (const p of [...new Set([parameters.find((p) => p.type === 'choice'), parameters.find((p) => recipes.get(p.messageRecipe).lsbController !== undefined), parameters.find((p) => p.type === 'integer' && p.range.max > 1)].filter(Boolean))]) {
+  for (const p of [...new Set([parameters.find((p) => p.type === 'choice'), parameters.find((p) => recipes.get(p.messageRecipe).lsbController !== undefined), parameters.find((p) => recipes.get(p.messageRecipe).kind === 'nrpn'), parameters.find((p) => p.type === 'integer' && p.range.max > 1)].filter(Boolean))]) {
     const r = recipes.get(p.messageRecipe);
     const choice = p.type === 'choice' ? p.choices.at(-1) : null;
     const value = choice ? choice.value : Math.min(p.range.max, p.range.max > 127 ? 1000 : 100);
-    const bytes = r.lsbController !== undefined ? [[r.controller, value >> 7], [r.lsbController, value & 127]] : [[r.controller, value]];
-    tests.push({ name: `${p.name} = ${choice ? choice.label : value} (CC ${r.controller})`, parameter: p.id, value: choice ? choice.id : value, expectedHex: bytes.map(([cc, v]) => [status, cc, v].map(hex).join(' ')).join('\n') });
+    const bytes = r.kind === 'nrpn' ? [[0x63, r.parameterMsb], [0x62, r.parameterLsb], [0x06, value >> 7], [0x26, value & 127]] : r.lsbController !== undefined ? [[r.controller, value >> 7], [r.lsbController, value & 127]] : [[r.controller, value]];
+    tests.push({ name: `${p.name} = ${choice ? choice.label : value} (${r.kind === 'nrpn' ? `NRPN ${r.parameterMsb}:${r.parameterLsb}` : `CC ${r.controller}`})`, parameter: p.id, value: choice ? choice.id : value, expectedHex: bytes.map(([cc, v]) => [status, cc, v].map(hex).join(' ')).join('\n') });
   }
 
   const doc = data.sources[0];
@@ -180,7 +199,7 @@ export function buildBehringerProfile(data, layout) {
       ...(layout.coverage ?? {}),
     },
     timing: { minDelayBetweenMessagesMs: layout.delayMs ?? 0 },
-    messageRecipes: [...recipes.values()].sort((a, b) => a.controller - b.controller),
+    messageRecipes: [...recipes.values()].sort((a, b) => (a.controller ?? a.parameterLsb) - (b.controller ?? b.parameterLsb) || a.kind.localeCompare(b.kind)),
     parameters,
     tests,
   };

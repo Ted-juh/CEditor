@@ -330,6 +330,24 @@ test('the JN-80: its guide\'s values', () => {
   assert.equal(jn.parameters.some((p) => /pedal|Wheel$|NRPN/i.test(p.name)), false);
 });
 
+test('the JN-80 NRPN profile: the guide\'s twenty NRPNs at 12 bits, numbered as their controllers, the rest as the JN-80\'s', () => {
+  const jn = builtProfile('behringer-jn-80');
+  const nr = builtProfile('behringer-jn-80-nrpn');
+  const recipe = (p, q) => p.messageRecipes.find((r) => r.id === q.messageRecipe);
+  const nrpns = nr.parameters.filter((q) => recipe(nr, q).kind === 'nrpn');
+  assert.equal(nrpns.length, 20);
+  for (const q of nrpns) {
+    const twin = jn.parameters.find((x) => x.id === q.id);
+    assert.equal(recipe(nr, q).parameterLsb, recipe(jn, twin).controller, `${q.name}: the NRPN is the controller's number`);
+    assert.deepEqual(q.range, { min: 0, max: 4095 });
+  }
+  assert.equal(send(nr, param(nr, 'VCF', 'VCF Frequency'), 4095), 'B0 63 00\nB0 62 19\nB0 06 1F\nB0 26 7F', '4095: 31 on CC 6, 127 on CC 38');
+  assert.match(param(nr, 'VCF', 'VCF Frequency').description, /Approx\. 10 Hz to 16000 Hz/);
+  const others = nr.parameters.filter((q) => recipe(nr, q).kind !== 'nrpn');
+  assert.equal(others.length + 20, jn.parameters.length);
+  for (const q of others) assert.deepEqual(q, jn.parameters.find((x) => x.id === q.id), q.id);
+});
+
 test('anchored rows: two pages to a sheet, a description set around its row, a list under its row', () => {
   const columns = [{ name: 'nrpn', dx: 58 }, { name: 'hex', dx: 161 }, { name: 'description', dx: 264 }, { name: 'storage', dx: 367 }, { name: 'range', dx: 470 }];
   const rows = readAnchoredRows([

@@ -81,5 +81,27 @@
     {"page":12,"cc":99,"hex":"63","name":"NRPN Param MSB","range":"0 – 127"},
     {"page":12,"cc":120,"hex":"78","name":"All sounds off","range":"0 = Off 1 = On"},
     {"page":12,"cc":123,"hex":"7B","name":"All notes off","range":"0 = Off 1 = On"}
+  ],
+  "nrpns": [
+    {"page":12,"msb":"0","lsb":"8","number":"8","name":"LFO Rate","range":"0 – 4095","scope":"LFO","notes":"Approx. 0.3 Hz to 20 Hz"},
+    {"page":12,"msb":"0","lsb":"9","number":"9","name":"LFO Delay","range":"0 – 4095","scope":"LFO","notes":"Approx. 0 to 8 seconds"},
+    {"page":12,"msb":"0","lsb":"10","number":"10","name":"DCO LFO Modulation","range":"0 – 4095","scope":"DCO","notes":"Approx. 0 to 12 Semitones"},
+    {"page":12,"msb":"0","lsb":"12","number":"12","name":"DCO PWM Duty Cycle","range":"0 – 4095","scope":"DCO","notes":"Approx. 50 % to 95%"},
+    {"page":12,"msb":"0","lsb":"13","number":"13","name":"DCO SUB Amount","range":"0 – 4095","scope":"DCO"},
+    {"page":12,"msb":"0","lsb":"14","number":"14","name":"DCO Noise","range":"0 – 4095","scope":"DCO"},
+    {"page":12,"msb":"0","lsb":"26","number":"26","name":"HPF","range":"0 – 4095","scope":"HPF"},
+    {"page":12,"msb":"0","lsb":"25","number":"25","name":"VCF Frequency","range":"0 – 4095","scope":"VCF","notes":"Approx. 10 Hz to 16000 Hz"},
+    {"page":12,"msb":"0","lsb":"16","number":"16","name":"VCF Resonance","range":"0 – 4095","scope":"VCF"},
+    {"page":12,"msb":"0","lsb":"17","number":"17","name":"VCF Envelope Modulation","range":"0 – 4095","scope":"VCF"},
+    {"page":12,"msb":"0","lsb":"18","number":"18","name":"VCF LFO Modulation","range":"0 – 4095","scope":"VCF"},
+    {"page":12,"msb":"0","lsb":"19","number":"19","name":"VCF Keybed Modulation","range":"0 – 4095","scope":"VCF"},
+    {"page":12,"msb":"0","lsb":"20","number":"20","name":"VCA Level","range":"0 – 4095","scope":"VCA"},
+    {"page":12,"msb":"0","lsb":"21","number":"21","name":"Attack","range":"0 – 4095","scope":"ENV"},
+    {"page":12,"msb":"0","lsb":"22","number":"22","name":"Decay","range":"0 – 4095","scope":"ENV","notes":"0 = 3 ms; 2048 = 1 s; 4095 = 2 s"},
+    {"page":12,"msb":"0","lsb":"23","number":"23","name":"Sustain","range":"0 – 4095","scope":"ENV"},
+    {"page":12,"msb":"0","lsb":"24","number":"24","name":"Release","range":"0 – 4095","scope":"ENV"},
+    {"page":12,"msb":"0","lsb":"15","number":"15","name":"ARP Rate","range":"0 – 4095","scope":"ARP","notes":"10 to 265 BPM"},
+    {"page":12,"msb":"0","lsb":"34","number":"34","name":"Bender DCO Modulation","range":"0 – 4095","scope":"BENDER"},
+    {"page":12,"msb":"0","lsb":"35","number":"35","name":"Bender VCF Modulation","range":"0 – 4095","scope":"BENDER"}
   ]
 }

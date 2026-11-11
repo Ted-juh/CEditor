@@ -17,9 +17,12 @@ export default {
   // The four columns, from where their numbers start, below the page's running header; the fourth
   // stops at the NRPN table under it.
   read: { below: true, top: 85, tables: [52, 315, 632, 895].map((x) => ({ x, width: 258, cols, until: 'NRPNS' })) },
+  // The NRPN table beside the controllers, under its `MIDI NRPNS` heading: `MSB  LSB  14-bit  Parameter
+  // Name  Range  Scope  Notes`. Read here for the JN-80 NRPN profile (synths/jn-80-nrpn.mjs).
+  nrpnTable: { top: 256, left: 885, read: { columns: [{ name: 'msb', dx: 895 }, { name: 'lsb', dx: 920 }, { name: 'number', dx: 942 }, { name: 'name', dx: 971 }, { name: 'range', dx: 1019 }, { name: 'scope', dx: 1059 }, { name: 'notes', dx: 1093 }] } },
   fix: { 16: { name: 'VCF Resonance' } },
   fixNotes: { 16: 'printed VCF Resonace' },
   leaveOut: { 66: 'the wheels, pedals, bank select, NRPN and RPN controllers and the channel mode messages' },
   groupOf: (name) => [[/^(?:Note Priority|Same Note|Voice|Detune)/, 'Voice'], [/^Porta/, 'Portamento'], [/Transpose/, 'Transpose'], [/^(?:ENV|Envelope)/, 'Envelope'], [/^(?:Aftertouch|Velocity|Bender|Mod Wheel|Expression)/, 'Control']].find(([re]) => re.test(name))?.[1],
-  notes: ['The guide also prints an NRPN table: twenty of these parameters at 12 bits (0 - 4095), with their scale (`Approx. 10 Hz to 16000 Hz`). It is not read yet; these are the controllers.'],
+  notes: ['The guide also prints an NRPN table: twenty of these parameters at 12 bits (0 - 4095), with their scale (`Approx. 10 Hz to 16000 Hz`). The behringer-jn-80-nrpn profile sends those as NRPNs; this one is the controllers.'],
 };

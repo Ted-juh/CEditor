@@ -182,6 +182,15 @@ line under a row is that row's. A word on a column starts a cell however close i
 the page's running header (`22 JN-80 … 23`) is above where the tables start. Corrected by the layout:
 CC 16's `VCF Resonace`. The hex column misprints CC 36 and 37 as 23 and 24, and the decimal is taken.
 
+Beside the controllers, under `MIDI NRPNS`, the guide prints an NRPN table: `MSB  LSB  14-bit
+Parameter Name  Range  Scope  Notes`, twenty rows, every value 0 - 4095, the notes a scale (`Approx. 10
+Hz to 16000 Hz`, `0 = 3 ms; 2048 = 1 s; 4095 = 2 s`). Read by the anchored-row reader in the table's
+own region (right of x 885, below its header), into the same transcription. Each NRPN has the number
+and name of a controller, so the second profile, `behringer-jn-80-nrpn`, sends those twenty as their
+NRPNs at 12 bits and every other parameter as the controller; the value goes on data entry as 14 bits
+do, the high 7 on CC 6 and the low on CC 38 (the guide's `NRPN Data MSB` and `LSB`), the guide not
+saying how its 12 bits are split.
+
 ## The PolyEight
 
 Its manual is printed two pages to a sheet, and its MIDI chapter has the NRPN mappings (`NRPN  HEX
@@ -217,6 +226,7 @@ PolyEight's device ID bytes only as `Device-specific`.
 | `behringer-d-mini` | D MINI Quick Start Guide, p. 47 | 13 | 12 | 0 | 2 | 40 |
 | `behringer-deepmind-12` | DeepMind 12 User Manual, pp. 136 - 139, and its SysEx chapter | 182 | 226 | 0 | 38 | 5, 61, 70, 79, 219, 220 |
 | `behringer-jn-80` | JN-80 Quick Start Guide, p. 12 | 78 | 64 | 0 | 23 | 16 |
+| `behringer-jn-80-nrpn` | the same, and its NRPN table | 78 + 20 | 64 (20 of them NRPNs) | 0 | 23 | 16 |
 | `behringer-jt-4000-micro` | JT-4000 MICRO Quick Start Guide, p. 27 | 26 | 25 | 0 | 1 | — |
 | `behringer-jt-mini` | JT MINI Quick Start Guide, pp. 58 - 59 | 15 | 14 | 0 | 2 | — |
 | `behringer-pro-800` | PRO-800 Quick Start Guide V 4.0, pp. 54 - 55 | 112 | 98 | 0 | 0 | 49, 52, 53 |
@@ -238,6 +248,6 @@ where their MIDI settings send them.
 | The PolyEight's Pull, signed values, sources and destinations | no dump request and no device ID printed; how a negative value is carried; no source or destination list | the instrument: its own dump, and its answer to 0 and 16383 on a signed parameter |
 | The DeepMind 6, 12D and 12X | quick start guides only; the DeepMind 12's manual is the one with the table | each's own manual, or the instrument: the 12D and 12X are presumably the 12's, the 6 is not |
 | The DeepMind 12's lists | the mod matrix sources and destinations, FX types and routings, clock dividers, program categories: named, not printed | the instrument's screens, or another document of Behringer's |
-| The JN-80's NRPNs | its guide's NRPN table under the controllers: twenty parameters at 12 bits (0 - 4095), with their scales | the guide reader on that table, and a second profile (or the NRPNs in this one) for the instrument's NRPN mode |
+| How the JN-80 splits a 12-bit NRPN value | its guide gives the range, 0 - 4095, and the data entry controllers, not the split; the NRPN profile takes the MIDI convention | the instrument: send 4095 and look |
 | What a range means on the panel | every profile (`0 - 99`: the controller's values, or the display's?) | the instrument: sending 99 and 127 and looking |
 | Settings by SysEx | Model D, Poly D, Odyssey, Wasp Deluxe, Cat, Crave, Grind, MS-1, MonoPoly, VC340, Neutron | nothing to do: they set the instrument's MIDI and calibration, not a sound |
