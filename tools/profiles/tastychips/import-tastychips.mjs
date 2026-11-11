@@ -4,7 +4,8 @@
 //
 // The layout (synths/<name>.mjs) names the manual, where it is linked from, its pages and the
 // section labels its table sets between rows. read-gr-table.mjs reads the table and the three after
-// it. What is committed is them as printed, with the file's name, SHA-256 and address; the manual
+// it; the GR-1's table, of another shape (the layout's `form`), read-gr1-table.mjs; a web manual's
+// table (the ST-4's, the Arduino Piggyback's), twisted/read-twisted-page.mjs. What is committed is them as printed, with the file's name, SHA-256 and address; the manual
 // is not. Needs poppler's pdftotext.
 
 import { execFileSync } from 'node:child_process';
@@ -15,6 +16,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { documentLines } from '../nord/read-nord-cc.mjs';
 import { readCommandTable, readIndexTable } from './read-gr-table.mjs';
+import { readGr1Table } from './read-gr1-table.mjs';
+import { readTables } from '../twisted/read-twisted-page.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,7 +27,16 @@ export async function loadLayout(name) {
 
 export function importManual(layout, file) {
   const doc = layout.document;
+  if (layout.form === 'page') {
+    // A web manual's table, its header the first row where the page sets no `<th>` (the ST-4's).
+    const table = readTables(readFileSync(file, 'utf8')).find((t) => t.title === layout.table);
+    const [columns, rows] = table.columns.length ? [table.columns, table.rows] : [table.rows[0], table.rows.slice(1)];
+    return { source: { title: doc.title, file: doc.file, sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url, linkedFrom: doc.linkedFrom, saved: doc.saved }, columns, rows };
+  }
   const lines = documentLines(file, doc.pages);
+  if (layout.form === 'gr1') {
+    return { source: { title: doc.title, file: doc.file, sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url, linkedFrom: doc.linkedFrom, pages: doc.pages }, rows: readGr1Table(lines) };
+  }
   const intro = execFileSync('pdftotext', ['-layout', '-f', String(doc.pages[0]), '-l', String(doc.pages[0] + 1), file, '-'], { encoding: 'utf8' });
   const generated = /Generated from [^\n]*/.exec(intro)?.[0].trim() ?? null;
   return {
@@ -40,7 +52,7 @@ export function importManual(layout, file) {
 export function stringifyTranscription(data) {
   const { source, rows, ...lists } = data;
   const list = (items) => items.map((x) => `    ${JSON.stringify(x)}`).join(',\n');
-  return `{\n  "source": ${JSON.stringify(source)},\n${Object.entries(lists).map(([k, v]) => `  ${JSON.stringify(k)}: [\n${list(v)}\n  ]`).join(',\n')},\n  "rows": [\n${list(rows)}\n  ]\n}\n`;
+  return `{\n  "source": ${JSON.stringify(source)},\n${Object.entries(lists).map(([k, v]) => `  ${JSON.stringify(k)}: [\n${list(v)}\n  ],\n`).join('')}  "rows": [\n${list(rows)}\n  ]\n}\n`;
 }
 
 async function main() {
@@ -59,6 +71,7 @@ async function main() {
   const data = importManual(layout, file);
   const out = path.join(HERE, 'tables', `${name}.json`);
   writeFileSync(out, stringifyTranscription(data));
+  if (layout.form) { console.log(`Wrote ${path.relative(process.cwd(), out)}: ${data.rows.length} rows`); return; }
   console.log(`Wrote ${path.relative(process.cwd(), out)}: ${data.rows.length} rows; ${data.rateDivisions.length} rate divisions, ${data.modSources.length} mod sources, ${data.modDestinations.length} destinations`);
 }
 

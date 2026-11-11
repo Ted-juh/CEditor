@@ -69,7 +69,8 @@ const BUILT = await Promise.all(SYNTHS.map((name) => build(name)));
 const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 const lines = (compiled) => compiled.transaction.messages.flatMap((m) => Array.from({ length: m.bytes.length / 3 }, (u, i) => hex(m.bytes.slice(i * 3, i * 3 + 3)))).join('\n');
 
-for (const { name, profile, text, out, data } of BUILT) {
+// The GR-1's table, of another shape, is checked in tastychipsGr1.test.js; the web manuals' in tastychipsPages.test.js.
+for (const { name, profile, text, out, data } of BUILT.filter((b) => !b.layout.form)) {
   test(`${profile.id}: the committed profile is what the generator makes`, () => {
     assert.equal(readText(out), text, `stale — run: node tools/profiles/tastychips/make-profiles.mjs ${name}`);
   });

@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 import { readCommitted } from '../../scripts/readCommitted.mjs';
 import { buildTastyChipsProfile, stringifyProfile } from './build-tastychips-profile.mjs';
+import { buildGr1Profile } from './build-gr1-profile.mjs';
+import { buildPageProfile } from './build-page-profile.mjs';
 import { loadLayout } from './import-tastychips.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +26,7 @@ export const SYNTHS = readdirSync(path.join(HERE, 'synths')).filter((f) => f.end
 export async function build(name) {
   const layout = await loadLayout(name);
   const data = JSON.parse(readFileSync(path.join(HERE, 'tables', `${name}.json`), 'utf8'));
-  const profile = buildTastyChipsProfile(data, layout);
+  const profile = layout.form === 'gr1' ? buildGr1Profile(data, layout) : layout.form === 'page' ? buildPageProfile(data, layout) : buildTastyChipsProfile(data, layout);
   return { name, layout, data, profile, text: stringifyProfile(profile), out: path.join(PROFILE_DIR, `${layout.id}.ceditor-device.json`) };
 }
 
