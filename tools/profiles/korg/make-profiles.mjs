@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { readCommitted } from '../../scripts/readCommitted.mjs';
 import { stringifyProfile } from '../roland/build-profile.mjs';
 import { buildKorgProfile } from './build-korg-profile.mjs';
+import { buildKronosProfile } from './build-kronos-profile.mjs';
 import { loadLayout } from './import-korg.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -25,7 +26,8 @@ export const SYNTHS = readdirSync(path.join(HERE, 'synths')).filter((f) => f.end
 export async function build(name) {
   const layout = await loadLayout(name);
   const data = JSON.parse(readFileSync(path.join(HERE, 'tables', `${name}.json`), 'utf8'));
-  const profile = buildKorgProfile(data, layout);
+  // The KRONOS's archive is a table per object, not a MIDI Implementation text (build-kronos-profile.mjs).
+  const profile = layout.format === 'kronos' ? buildKronosProfile(data, layout) : buildKorgProfile(data, layout);
   return { name, layout, data, profile, text: stringifyProfile(profile), out: path.join(PROFILE_DIR, `${layout.id}.ceditor-device.json`) };
 }
 

@@ -26,6 +26,9 @@ import {
 import { SYNTHS, build } from '../../../tools/profiles/korg/make-profiles.mjs';
 import { modes as omModes, readOmCcPage } from '../../../tools/profiles/korg/read-korg-om-cc.mjs';
 import { foldKnobs, matchKnobs, readOmValue } from '../../../tools/profiles/korg/build-korg-knobs.mjs';
+import { readObjectHeader, readObjectRows } from '../../../tools/profiles/korg/read-kronos-table.mjs';
+import { readBits, readData, readLabels } from '../../../tools/profiles/korg/build-kronos-profile.mjs';
+import { pack8to7 } from '../../dpd/codecs.mjs';
 import {
   localCompileDeviceRequest,
   localCompileParameter,
@@ -245,9 +248,11 @@ for (const { name, profile, text, out, data } of BUILT) {
         let bytes;
         if (recipe.kind === 'sysex') {
           // Korg's parameter change: the value 14 bits, low seven first; a choice one byte and 00.
+          // The KRONOS's is 21 bits high byte first, a choice its low byte after the template's 00 00.
           const value = parameter.type === 'choice' ? [wire]
             : parameter.encoding.type === 's21-lsb-msb' ? [wire & 0x7f, (wire >> 7) & 0x7f, (wire >> 14) & 0x7f]
-              : [(wire & 0x3fff) & 0x7f, (wire & 0x3fff) >> 7];
+              : parameter.encoding.type === 's21-msb-lsb' ? [(wire >> 14) & 0x7f, (wire >> 7) & 0x7f, wire & 0x7f]
+                : [(wire & 0x3fff) & 0x7f, (wire & 0x3fff) >> 7];
           bytes = recipe.template.flatMap((t) => (t === '$deviceId' ? [0x30] : t === '$encodedValue' ? value : [Number.parseInt(t, 16)]));
         } else if (recipe.kind === 'cc') bytes = [0xb0, recipe.controller, wire];
         else if (recipe.lowBits) bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, recipe.lowBitsController, wire & ((1 << recipe.lowBits) - 1), 0xb0, 0x06, wire >> recipe.lowBits];
@@ -516,4 +521,85 @@ test('the VOX Continental: footnotes numbered afresh under each table, the recei
   assert.equal(localCompileParameter(profile, { parameterId: by('CONTROL BUTTON').id, value: 'eq' }).hex, 'B0 6F 02');
   assert.equal(profile.identity, undefined);
   assert.equal(profile.presets.banks[0].slotCount, 16);
+});
+
+/* ------------------------------------------------------------------ the KRONOS's object tables */
+
+// In the archive's style: a header, a reserved run (`*`), a byte shared by bit fields (the second row
+// prints no OFS), a note after the box, a value over two bytes whose second prints only its OFS.
+const KRONOS_FIXTURE = [
+  'HD-1 Program Size: 3706 byte                                     Version 1.01 (Jan  7, 2015)',
+  'Object Version: 5',
+  '+======+=====+==========+==========+==============+====================+===+===+===+===+===+',
+  '| OFS  | bit | parameter| parameter| data(hex)    | value              |TYP|SOC|SUB|PID|IDX|',
+  '|    0 |     | Common   | Name     | 00~FF        |  ~                 |   |   |   |   |   |',
+  '|   24 | *   | *        | *        | *            | *                  |   |   |   |   |   |',
+  '|    | | *   | *        | *        | *            | *                  |   |   |   |   |   |',
+  '|   89 | 5~0 | Insert Effect1 | Channel | 10(fixed) | Global      |  7|  0|  0| 14|  0|',
+  '|      | 6   | Insert Effect1 | Switch  | 00~01     | Off~On      |  6|  0|  0|  0|  0|* -> bypass, Invert Value',
+  '| 3672 |     | OSC2 Mod.Mixer1 | Amount A | FF39~00C7 | -199~+199 | 10|  4|  0| 10|  0|',
+  '| 3673 |     |          |          |              |                    |   |   |   |   |   |',
+].join('\r\n');
+
+test('the KRONOS reader: a row per id, a shared byte takes the OFS above, reserved rows and rules skipped', () => {
+  assert.deepEqual(readObjectHeader(KRONOS_FIXTURE), { title: 'HD-1 Program', size: 3706, version: '1.01', date: 'Jan 7, 2015', objectVersion: 5 });
+  const rows = readObjectRows(KRONOS_FIXTURE);
+  assert.deepEqual(rows.map((r) => [r.ofs, r.bit ?? '', r.name, r.id?.join(' ') ?? '']), [
+    [0, '', 'Name', ''], [89, '5~0', 'Channel', '7 0 0 14 0'], [89, '6', 'Switch', '6 0 0 0 0'], [3672, '', 'Amount A', '10 4 0 10 0'],
+  ]);
+  assert.equal(rows[2].note, '* -> bypass, Invert Value');
+});
+
+test('the KRONOS builder reads a range, its bits and its two names as the table prints them', () => {
+  assert.deepEqual(readData('00~7F'), { min: 0, max: 127, bytes: 1, signed: false, extra: [] });
+  assert.deepEqual(readData('9D~63'), { min: -99, max: 99, bytes: 1, signed: true, extra: [] }, 'the larger first: two\'s complement');
+  assert.deepEqual(readData('FF39~00C7'), { min: -199, max: 199, bytes: 2, signed: true, extra: [] });
+  assert.deepEqual(readData('00~7F, FF').extra, ['FF']);
+  assert.deepEqual(readData('10(fixed)'), { fixed: true });
+  assert.deepEqual(readData('80000000~7FFF'), { cut: true }, 'the column cuts its end short');
+  assert.deepEqual(readBits(undefined), { from: 0, bits: 8 });
+  assert.deepEqual(readBits('5~0'), { from: 0, bits: 6 });
+  assert.deepEqual(readBits('7'), { from: 7, bits: 1 });
+  assert.deepEqual(readLabels('Off~On'), ['Off', 'On']);
+  assert.deepEqual(readLabels('Symmetric~Asymmetri'), ['Symmetric', 'Asymmetri…'], 'nineteen characters: the column\'s width, so it may be cut');
+  assert.equal(readLabels(' ~ '), null);
+});
+
+test('the KRONOS: KARMA rows by function 6D, Drum Track rows by 6E, the rest by 43, every id once', { skip: !builtProfile('korg-kronos') }, () => {
+  const profile = builtProfile('korg-kronos');
+  const recipes = new Map(profile.messageRecipes.map((r) => [r.id, r]));
+  const sent = new Set();
+  for (const p of profile.parameters) {
+    const t = recipes.get(p.messageRecipe).template;
+    const fn = /^KARMA /.test(p.group) ? '6D' : /^Drum Track/.test(p.group) ? '6E' : '43';
+    assert.equal(t[4], fn, p.name);
+    const key = t.slice(4, t.indexOf('$encodedValue') - (p.type === 'choice' ? 2 : 0)).join(' ');
+    assert.ok(!sent.has(key), `${p.name}: ${key} twice`);
+    sent.add(key);
+  }
+  assert.deepEqual(profile.identity.familyCode, ['68', '00']);
+  assert.equal(profile.identity.modelNumber, undefined, 'one member code per model: not checked');
+  const by = (id) => profile.parameters.find((p) => p.id === id);
+  assert.deepEqual(by('insertEffect1.switch').choices.map((c) => [c.label, c.value]), [['Off', 1], ['On', 0]], 'sent as the bypass, inverted');
+  assert.equal(by('pitchEg.levelMod1Source').choices.at(-1).label, 'Tempo', 'Off~Tempo: the AMS sources 0~48');
+  assert.equal(by('osc1ModMixer1.offsetAmount').range.min, -199);
+  assert.deepEqual(recipes.get(by('karmaModule.linkToDrumTrack').messageRecipe).template.slice(4, 12), ['6D', '01', '00', '00', '7F', '00', '7F', '00'], 'PID 127: the long form');
+});
+
+test('the KRONOS: a program dump placed by hand reads back by the table\'s offsets and bits', { skip: !builtProfile('korg-kronos') }, () => {
+  const profile = builtProfile('korg-kronos');
+  const payload = new Array(3706).fill(0);
+  payload[92] = 0x40;                // Insert Effect1 Panpot, 00~7F
+  payload[89] = (1 << 6) | 0x10;     // bit 6: Insert Effect1 Switch, On; bits 5~0: its Channel, fixed 10H
+  payload[93] = 2 << 4;              // bits 5~4: Insert Effect1 Fx Control Bus
+  payload[2718] = 0x9d;              // Pitch EG Start Level, 9D~63
+  const wire = pack8to7(payload, 'msb-low-first', 7);
+  assert.equal(wire.length, 4236, '*3: sysExSize = binarySize + (binarySize+6)/7');
+  const parsed = localParseDumpMessage(profile, hex([0xf0, 0x42, 0x30, 0x68, 0x75, 0x00, 0x05, ...wire, 0xf7]));
+  assert.ok(parsed.ok, parsed.error);
+  assert.deepEqual(
+    ['insertEffect1.panpot', 'insertEffect1.switch', 'insertEffect1.fxControlBus', 'pitchEg.startLevel'].map((id) => parsed.values[id]),
+    [64, 'on', 2, -99],
+  );
+  assert.equal(localParseDumpMessage(profile, hex([0xf0, 0x42, 0x30, 0x68, 0x75, 0x00, 0x05, ...wire, 0, 0xf7])).ok, false, 'an EXi program\'s dump, any other length, is not this one');
 });
