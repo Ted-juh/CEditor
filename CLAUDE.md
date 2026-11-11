@@ -403,6 +403,7 @@ node tools/profiles/blackcorp/make-profiles.mjs --check
 node tools/profiles/erica/make-profiles.mjs --check
 node tools/profiles/expressive/make-profiles.mjs --check
 node tools/profiles/alesis/make-profiles.mjs --check
+node tools/profiles/gamechanger/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
 ```
 

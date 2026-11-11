@@ -4756,7 +4756,9 @@ int main (int argc, char** argv)
         root.getChildFile ("erica-lxr-02.ceditor-device.json"),
         root.getChildFile ("erica-perkons-hd-01.ceditor-device.json"),
         root.getChildFile ("expressive-e-osmose.ceditor-device.json"),
-        root.getChildFile ("alesis-a6-andromeda.ceditor-device.json")
+        root.getChildFile ("alesis-a6-andromeda.ceditor-device.json"),
+        root.getChildFile ("gamechanger-motor-synth.ceditor-device.json"),
+        root.getChildFile ("gamechanger-motor-synth-mkii.ceditor-device.json")
     };
 
     auto failures = 0;
