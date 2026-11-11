@@ -1,0 +1,60 @@
+{
+  "source": {
+    "title": "User Guide Mono Lancet '15",
+    "file": "ml15_manual_en.pdf",
+    "sha256": "9fc0d9cbd340d6b153c2b362f974357646fa652ba13e54f067e076f1a6138653",
+    "url": "https://www.vermona.com/media/pages/support/mono-lancet-15/0fa349cdb1-1789582258/ml15_manual_en.pdf",
+    "linkedFrom": "https://www.vermona.com/support/mono-lancet-15",
+    "pages": [
+      17,
+      17
+    ]
+  },
+  "switches": {
+    "meaning": "0..63 means OFF; 64..127 means ON",
+    "rows": [
+      {
+        "name": "Pitch Bender",
+        "cc": 84,
+        "description": "You can change the pitch of both oscillators within a range of ± 5 semi-tones by using the Pitch Bender of your keyboard. You can switch on/off this function for both oscillators using this control change message.",
+        "factory": "ON"
+      },
+      {
+        "name": "Modulation Wheel",
+        "cc": 85,
+        "description": "The pulse-width of both oscillators’ square wave can be adjusted using the modulation wheel. This is an effective way of sound shaping. You can switch on/off this function for both oscillators using this control change message",
+        "factory": "ON"
+      },
+      {
+        "name": "Aftertouch",
+        "cc": 86,
+        "description": "The filter’s cutoff frequency responds to MIDI aftertouch messages send by your MIDI source. If you hold a keyboard note and press it further, the aftertouch signal will open the filter.",
+        "factory": "ON"
+      },
+      {
+        "name": "Velocity",
+        "cc": 87,
+        "description": "Mono Lancet ’15 can respond to MIDI velocity, which is send by almost every master keyboard. If turned on, the VCA’s output - the volume of your sound - is controlled by velocity allowing you to play the synthesizer dynamically. This works only with the VCA’s MODE switch 1^ set to EG.",
+        "factory": "OFF"
+      },
+      {
+        "name": "Filter Velocity",
+        "cc": 88,
+        "description": "In addition to the VCA, velocity data can modulate the filter’s cutoff frequency. This function works only if the EG INT controller 1# is not in it’s center position and CC 87 is ON.",
+        "factory": "OFF"
+      },
+      {
+        "name": "Auto-Glide",
+        "cc": 89,
+        "description": "As a factory default, the glide effect is always active (if the GLIDE control o is not set fully left). Turning GLIDE o clockwise will reveal this effect. With activated Auto-Glide the glide-effect is only present if two adjacent notes are played legato.",
+        "factory": "OFF"
+      },
+      {
+        "name": "Legato",
+        "cc": 90,
+        "description": "By factory default the envelope generator is triggered with every incoming note-on command, wether it is played staccato or legato. With activated Legato mode, the envelop will only be triggered when playing legato.",
+        "factory": "OFF"
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "source": {
+    "title": "User Guide Kick Lancet",
+    "file": "kl_manual_web_en.pdf",
+    "sha256": "21159881ad69a965015a01100221b32eae7575cd581b3038467a30702c74aea6",
+    "url": "https://www.vermona.com/media/pages/support/kick-lancet/8dfcd65e36-1789582257/kl_manual_web_en.pdf",
+    "linkedFrom": "https://www.vermona.com/support/kick-lancet"
+  },
+  "values": [
+    {
+      "jack": "GATE",
+      "cc": 84,
+      "values": [
+        {
+          "value": 0,
+          "label": "standard 5V (factory default)",
+          "description": "An incoming voltage of approx. 0.5 volts will trigger KICK LANCET at a fixed volume."
+        },
+        {
+          "value": 1,
+          "label": "standard 5V + accent",
+          "description": "A voltage between approx. 0.5 and 5 volts will trigger KICK LANCET at a fixed volume. Voltages between 5 and 10 volts will trigger a second, fixed accent volume."
+        },
+        {
+          "value": 2,
+          "label": "standard 5V + dynamic",
+          "description": "A voltage between approx. 0.5 and 5 volts will trigger KICK LANCET at a fixed volume. Higher voltages (5-10 volts) are interpreted dynamically. At 10 volts, the full volume will be reached."
+        },
+        {
+          "value": 3,
+          "label": "dynamic",
+          "description": "KICK LANCET will be dynamically triggered, depending on the trigger voltages, ranging between 0.5 and 10 volts."
+        }
+      ]
+    },
+    {
+      "jack": "AUDIO",
+      "cc": 85,
+      "values": [
+        {
+          "value": 0,
+          "label": "fixed volume",
+          "description": "The sound of KICK LANCET will be triggered with a fixed volume, independently from intensity of the input signal."
+        },
+        {
+          "value": 1,
+          "label": "dynamic (factory default)",
+          "description": "KICK LANCET will be triggered dynamically, depending on the volume of the input signal."
+        }
+      ]
+    }
+  ]
+}

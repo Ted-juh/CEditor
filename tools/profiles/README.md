@@ -44,6 +44,7 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | [`jomox/`](jomox/README.md) | 16 profiles from the MIDI implementation of Jomox's operating manuals: Alpha Base and Mk II, XBASE 999, 888 and 09, AiRBase 99, MBase 01 and 11, M.Brane 11, Mod.Brane 11, ModBase 09 and Mk II, Mod FM, SunSyn Mk2, Moonwind and Mk II. Every row as its controller on its section's channel; named values as choices, MSB/LSB rows as one value. Read from the PDFs' text lines. |
 | [`twisted/`](twisted/README.md) | 7 profiles from Twisted Electrons' manuals: TWISTfm (its controllers and its SysEx editor parameters, with Pull), hapiNES L, deton8 and BlastBeats from their web manuals, TherapSID, AY3 and MEGAfm from their PDFs. Every row as its controller on its target's channel; value names and bands as choices. |
 | [`dexibell/`](dexibell/README.md) | 5 profiles from Dexibell's MIDI Implementations: VIVO S8 (S8M, S4, S2), S10, S9, SX8 and COMBO J7, the tonewheel organ's drawbars and controls on the organ's channel and the general controllers, value names and drawbar levels as choices. Read from the PDFs' word positions, two blocks side by side. |
+| [`vermona/`](vermona/README.md) | 2 profiles from Vermona's user guides: the Mono Lancet '15's seven MIDI switches with their factory settings, and the Kick Lancet's GATE and AUDIO input modes, as choices. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |
 
 **Makers looked at and not built** (November 2026), each for want of its own documents reachable

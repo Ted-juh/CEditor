@@ -4791,7 +4791,9 @@ int main (int argc, char** argv)
         root.getChildFile ("dexibell-s10.ceditor-device.json"),
         root.getChildFile ("dexibell-s8.ceditor-device.json"),
         root.getChildFile ("dexibell-s9.ceditor-device.json"),
-        root.getChildFile ("dexibell-sx8.ceditor-device.json")
+        root.getChildFile ("dexibell-sx8.ceditor-device.json"),
+        root.getChildFile ("vermona-kick-lancet.ceditor-device.json"),
+        root.getChildFile ("vermona-mono-lancet-15.ceditor-device.json")
     };
 
     auto failures = 0;
