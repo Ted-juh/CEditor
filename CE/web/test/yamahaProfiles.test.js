@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 
 import { readText } from './support/readText.mjs';
 import { pageBulkBlocks, pageParameterTables, readByteCount, readFormat } from '../../../tools/profiles/yamaha/read-yamaha-pdf.mjs';
-import { readHexRange, readPairRange, readPlaceholders, readShownRange, readValues, seriesNames, splitList } from '../../../tools/profiles/yamaha/build-yamaha-profile.mjs';
+import { readHexRange, readPairRange, readPlaceholders, readShownRange, readSplitNumber, readTwoBands, readValues, seriesNames, splitList, wholeAgrees } from '../../../tools/profiles/yamaha/build-yamaha-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/yamaha/make-profiles.mjs';
 import { localCollectDumpMessages, localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
@@ -223,6 +223,21 @@ test('the description says what each value shows: a list of names, a range of nu
   assert.deepEqual(readPlaceholders(['op = operator number', '00 – 03 (hex)', 'OP1 – OP4']), { op: { what: 'operator number', values: [0, 1, 2, 3], labels: ['OP1', 'OP2', 'OP3', 'OP4'] } });
 });
 
+test('a four-digit range over two lines: the bytes or the number, as the description says', () => {
+  assert.deepEqual(readSplitNumber('0005 –', '022C', '5 – 300'), [[5, 300]], 'the Motif XS: two 7-bit bytes, 02 2C');
+  assert.deepEqual(readSplitNumber('0001 -', '012C', '1 – 300'), [[1, 300]], 'the MOTIF: the number, 12C; as bytes it would end at 172');
+  assert.deepEqual(readSplitNumber('0000 –', '00C8', '0 – 200%'), [[0, 200]], 'C8 is no 7-bit byte');
+  assert.deepEqual(readSplitNumber('0008 –', '00F8', '-120 – 0 – +120'), [[8, 248]], 'the span the description counts');
+  assert.deepEqual(readSplitNumber('0000 –', '3FFF', '0 – 1786: Preset, 8192 – 8447: User, 16383: No Type'), [[0, 16383]], 'its largest number');
+  assert.equal(readSplitNumber('0008 –', '00F8', '0 – 1786: Preset, 8192 – 8447: User, 16383: No Type'), null, 'a range the description does not end at is not read');
+  assert.deepEqual(readSplitNumber('002E –', '0136', '50.1 – 2.00k'), [[46, 182]], 'a description that counts nothing: the bytes');
+  assert.deepEqual(readTwoBands(['00 – 34', '00 – 7B', '40 – 41', '00 – 7F'], 'off, Preset 0001 … 6779, User 001 … 256'), [[0, 6779], [8192, 8447]]);
+  assert.deepEqual(readTwoBands(['00 – 3E', '00 – 2D,', '40 – 41', '00 – 7F'], 'off, Preset 0001 … 7981, User 001 … 256'), [[0, 7981], [8192, 8447]], 'the MOXF');
+  assert.equal(readTwoBands(['00 – 34', '00 – 7B', '40 – 41', '00 – 7F'], 'off, Preset 0001 … 6000, User 001 … 256'), null, 'a description that does not name the first band\'s end');
+  assert.equal(wholeAgrees([[0, 127], [0, 127]], '0 – 1786: Preset, 8192 – 8447: User, 16383: No Type'), true);
+  assert.equal(wholeAgrees([[0, 1], [0, 127]], '-100 – +100'), false, 'a range of its own that is not the bytes\'');
+});
+
 /* ------------------------------------------------------------------ the profiles */
 
 const BUILT = await Promise.all(SYNTHS.map((name) => build(name)));
@@ -238,7 +253,7 @@ function handMade(profile, d, values = {}, at = null) {
   for (const m of d.mappings) {
     const p = byId.get(m.parameter);
     const low = values[p.id] ?? (p.type === 'choice' ? p.choices[0].value : p.type === 'text' ? 32 : p.range.min);
-    const bytes = p.type === 'text' ? new Array(p.encoding.length).fill(32) : p.encoding.type === 'u14-msb-lsb' ? [low >> 7, low & 127] : p.encoding.type === 'nibbled' ? [3, 2, 1, 0].map((k) => (low >> (k * 4)) & 15) : [low];
+    const bytes = p.type === 'text' ? new Array(p.encoding.length).fill(32) : p.encoding.type === 'u14-msb-lsb' ? [low >> 7, low & 127] : p.encoding.type === 'nibbled' ? Array.from({ length: p.encoding.nibbles }, (u, i) => (low >> ((p.encoding.nibbles - 1 - i) * 4)) & 15) : [low];
     bytes.forEach((b, k) => { data[m.offset + k] = b; });
   }
   const prefix = d.matcher.prefix.map((b) => parseInt(b, 16));
@@ -270,7 +285,7 @@ for (const { name, profile, text, out, data } of BUILT) {
         const compiled = localCompileParameter(profile, { parameterId: p.id, value });
         assert.ok(compiled.ok, `${p.id}: ${compiled.error}`);
         // A two-byte choice (the MODX M's) goes out as 00 and the choice.
-        const bytes = p.messageRecipe === 'parameterChangeChoice' ? [0, wire] : p.encoding.type === 'u14-msb-lsb' ? [wire >> 7, wire & 127] : p.encoding.type === 'nibbled' ? [3, 2, 1, 0].map((s) => (wire >> (s * 4)) & 15) : [wire];
+        const bytes = p.messageRecipe === 'parameterChangeChoice' ? [0, wire] : p.encoding.type === 'u14-msb-lsb' ? [wire >> 7, wire & 127] : p.encoding.type === 'nibbled' ? Array.from({ length: p.encoding.nibbles }, (u, i) => (wire >> ((p.encoding.nibbles - 1 - i) * 4)) & 15) : [wire];
         assert.equal(compiled.hex, `F0 43 10 ${head} ${p.address} ${hex(bytes)} F7`, `${p.id} = ${value}`);
       }
     }

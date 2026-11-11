@@ -305,7 +305,7 @@ parameter change here too, and the panel's CCs would be a second parameter for e
 
 ## What is left out, and what would read it
 
-The 29 profiles hold 84,481 parameters. Each profile's notes name every row it leaves out and why;
+The 29 profiles hold 86,725 parameters. Each profile's notes name every row it leaves out and why;
 across them, by what would close it (counts from those notes, November 2026):
 
 **The profile format** (recorded in [known issues](../../../docs/known-issues.md#device-profiles)):
@@ -319,16 +319,28 @@ across them, by what would close it (counts from those notes, November 2026):
 | MODX and MONTAGE parts 2 - 16; MODX M and MONTAGE M elements 9 - 128 | not counted | the same tables repeated, some 85,000 parameters a profile | a repeated group in the format |
 | Plug-in board native parameters (MOTIF ES generation) | 27 | defined by the board installed | nothing in the data list |
 
-**A reading rule here** (each a small change to `build-yamaha-profile.mjs`, checked by re-importing
-every transcription):
+**Read since by a reading rule** (November 2026; 2,244 parameters, every transcription re-imported
+and every parameter read before compared: none lost, 108 changed, each below):
 
-| Left out | Rows | As printed | The rule |
-| --- | ---: | --- | --- |
-| Wave Number on the MOTIF ES generation | about 630 | `1st bit 6-0 → bit 13-7`, an arrow for the colon | read `→` as `:` |
-| Detune (part and element) | about 270 | `1st bit 3-0 → bit 7-4`, `2nd bit 3-0 → bit 3-0`: two nibbles | two-nibble values (the engines take 1 - 8 nibbles) |
-| Arpeggio Assign offsets | about 420 | `001C –` over `0164`: one two-byte range over two lines | join a range ending in `–` with the next line, as one ending in `,` is |
-| Arpeggio Assign Types | about 360 | `0000 –` over `3FFF` beside `0 – 1786: Preset, 8192 – 8447: User, 16383: No Type` | the same join; a number, the description said |
-| Scaling offsets and envelope levels (MODX, MONTAGE, MOTIF XF and others) | about 310 | `:` for a description, as the row above (Level Scaling Offset 2 - 4 under Offset 1's `-128 – +127`) | read `:` as the row above's description, as `〃` is (not for the effect parameters, whose first row says `Refer to Effect Parameter List`) |
+| Printed | Read as |
+| --- | --- |
+| `1st bit 6-0 → bit 13-7`, the MOTIF ES generation's arrow for the colon (and the YC's `à`, the same arrow mis-set) | the colon: Wave Number and the rest of its kind read as the other lists' are |
+| `1st bit 3-0: bit 7-4, 2nd bit 3-0: bit 3-0` (Detune) | two nibbles |
+| `:` for a description (micro tunings, arpeggio offsets, the master effect knobs' destinations) | the row above's description, as `〃` is; 93 knob and slider destinations now show `1 – 16` as their first row prints |
+| A four-digit range over two lines (`0000 –` over `3FFF`, `0005 –` over `022C`) | one range: the two 7-bit bytes on the Motif XS, the value in hex on the MOTIF ES generation, whichever the description's span or largest number agrees with; the bytes where it says neither. The MOTIF's ARP Tempo (`0001 –` over `012C` beside `1 – 300`) had been read as bytes, 1 - 172; it is 1 - 300 now (15 parameters) |
+| Two bands of a high and a low range (`00 – 34`, `00 – 7B`, `40 – 41`, `00 – 7F` beside `off, Preset 0001 … 6779, User 001 … 256`) | a number over both, where the description names the first band's end and the second's count; the values between are unused, and the description says so |
+| `00 – 7F` over `00 – 7F` beside `0 – 1786: Preset, 8192-8447: User, 16383: No Type` | a 14-bit number, the description's largest number being the two bytes' together |
+
+**Still left by the reading rules**, each named in its profile's notes:
+
+| Left out | As printed | Why |
+| --- | --- | --- |
+| The S90 XS's arpeggio assign types | `00 – 34,` `40 – 41` `00 – 7F`: three ranges for two bands | the first band's low byte is not printed |
+| The S90 XS's arpeggio assign offsets | `00 – 01` over `00 – 7F` beside `-100 … 0 … +100` | the bytes span 0 - 255, the description 201 values; the MOTIF XS prints the same settings `001C – 0164` (28 - 228), which the MOTIF XF's, read as 0 - 255, may be too |
+| Each model's third arpeggio assign type | `0 -1 786: Preset`, the text layer breaking 1786 | the number is not printed whole |
+| The MOTIF XS's assign types | `00 – 7F` over `00 – 7F` and no description | nothing says how the bytes combine |
+| The MX's Wave Number | `00 – 0C` over `00 – 7F` beside `1 – 1566` | the bytes span 1,664 values, the description 1,566 |
+| Single-type EQ frequencies | `00 – 01` over `2E – 36` beside `50.1 – 2.00k` | a description that counts nothing, over two ranges |
 
 **Not settings of a sound**, left out by design: the Bulk Control headers and footers, micro tunings,
 user curves, Live Sets and Live Set names, motion and Super Knob sequences.

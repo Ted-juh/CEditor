@@ -72,6 +72,61 @@ export function readPairRange(text) {
   return out.length ? out : null;
 }
 
+/** The numbers a description prints, a hyphen between two digits a range's, not a sign (`8192-8447`). */
+const numbersIn = (text) => (clean(text).match(/(?<!\d)[+-]?\d+/g) ?? []).map(Number);
+
+/**
+ * A two-byte range printed as one four-digit number over two lines (`0000 –` over `3FFF`, `0005 –` over
+ * `022C`) -> [[from, to]], or null. The digits are the two 7-bit bytes on the Motif XS (`0005 – 022C`
+ * beside `5 – 300`) and the value written in hex on the MOTIF ES generation (`0000 – 00C8` beside `0 –
+ * 200%`, C8 not being a 7-bit byte): whichever the description agrees with, by the span its shown range
+ * counts or by its largest number (`0 – 1786: Preset, 8192 – 8447: User, 16383: No Type` over `3FFF`);
+ * the bytes where it says neither. The MOTIF's `0001 –` over `012C` beside `1 – 300` was read as bytes
+ * (1 - 172) before this.
+ */
+export function readSplitNumber(first, second, description) {
+  const a = clean(first).replace(/\s*[–-]$/, '');
+  const b = clean(second);
+  if (!/^[0-9A-F]{4}$/.test(a) || !/^[0-9A-F]{4}$/.test(b)) return null;
+  const shown = readShownRange(description);
+  const numbers = numbersIn(description);
+  const agrees = ([from, to]) => (shown ? to - from === shown.max - shown.min : numbers.length > 0 && Math.max(...numbers) === to && Math.min(...numbers) >= from);
+  const asBytes = readPairRange(`${a} – ${b}`)?.[0];
+  if (asBytes && agrees(asBytes)) return [asBytes];
+  const asNumber = [parseInt(a, 16), parseInt(b, 16)];
+  if (asNumber[1] <= 16383 && asNumber[0] <= asNumber[1] && agrees(asNumber)) return [asNumber];
+  // (A description that counts nothing, `50.1 – 2.00k`, says neither: the bytes, as a one-line range is read.)
+  return asBytes ? [asBytes] : null;
+}
+
+/**
+ * A two-byte value printed as two bands of a high and a low byte range each (the MOX's and MOXF's
+ * arpeggio assign types: `00 – 34`, `00 – 7B`, `40 – 41`, `00 – 7F` beside `off, Preset 0001 … 6779,
+ * User 001 … 256`) -> [[from, to], [from, to]], or null. Read only where the description names the
+ * first band's last value and the second's count.
+ */
+export function readTwoBands(ranges, description) {
+  if (ranges.length !== 4) return null;
+  const b = ranges.map((r) => readHexRange(clean(r).replace(/,$/, ''))?.[0]);
+  if (b.some((x) => !x)) return null;
+  const bands = [[(b[0][0] << 7) | b[1][0], (b[0][1] << 7) | b[1][1]], [(b[2][0] << 7) | b[3][0], (b[2][1] << 7) | b[3][1]]];
+  const numbers = numbersIn(description);
+  if (bands[0][1] >= bands[1][0] || !numbers.includes(bands[0][1]) || !numbers.includes(bands[1][1] - bands[1][0] + 1)) return null;
+  return bands;
+}
+
+/**
+ * Whether a description's numbers run within a high and a low byte's ranges taken together and end at
+ * their top: [[0, 127], [0, 127]] beside `… 16383: No Type`. A description printing a range of its own
+ * that is not the bytes' (`-100 … +100` over 0 - 255) does not.
+ */
+export function wholeAgrees(bounds, description) {
+  const numbers = numbersIn(description);
+  if (bounds.length !== 2 || !numbers.length) return false;
+  const [lo, hi] = [(bounds[0][0] << 7) | bounds[1][0], (bounds[0][1] << 7) | bounds[1][1]];
+  return hi > 127 && Math.max(...numbers) === hi && Math.min(...numbers) >= lo;
+}
+
 /** A description split at its commas, leaving those inside brackets alone. */
 export function splitList(text) {
   const out = [];
@@ -396,8 +451,10 @@ export function buildYamahaProfile(data, layout) {
       r.address = [...fix, r.address.at(-1)];
       if (!corrected.some((c) => c.startsWith(`${title}: ${printed.slice(0, -3)}`))) corrected.push(`${title}: ${printed.slice(0, -3)} taken as ${fix.join(' ')}`);
     }
-    // `〃`: as the row above (the MODX M's effect parameters and arpeggio offsets).
-    tableRows.forEach((r, i) => { if (clean(r.description) === '〃' && i > 0) r.description = tableRows[i - 1].description; });
+    // `〃`: as the row above (the MODX M's effect parameters and arpeggio offsets); `:` the same, as the
+    // MODX+'s arpeggio offsets and micro tunings and the CP1's effect parameters print it (a vertical
+    // ditto, read as a colon).
+    tableRows.forEach((r, i) => { if (/^(?:〃|:)$/.test(clean(r.description)) && i > 0) r.description = tableRows[i - 1].description; });
     const endWord = (r) => /\(([A-Za-z]+)\)\s*$/.exec(clean(r.description))?.[1];
     for (let i = 1; i < tableRows.length; i++) {
       if (clean(tableRows[i].name) || !tableRows[i].range.length || !endWord(tableRows[i])) continue;
@@ -442,7 +499,10 @@ export function buildYamahaProfile(data, layout) {
         // `1..16`, `0 .. 59 (Minute)`, `5 ... 300`, `-120 … +120`: a range printed with dots; the MOTIF's
         // `1 - 16`, `L63 - C - R63`, `-64 - +63`: with a hyphen set between spaces.
         const asPrinted = clean(row.description);
-        const description = asPrinted.replace(/(\d)\s*(?:\.{2,3}|…)\s*(?=[+-]?\d)/g, '$1 – ').replace(/(\S) - (?=\S)/g, '$1 – ');
+        // (`1st bit 6-0 → bit 13-7`, the MOTIF ES generation's, and the YC's `à`, the same arrow mis-set:
+        // the `:` other lists print; `bit 6 – 0`, the S90 XS's, is `bit 6-0`.)
+        const description = asPrinted.replace(/(\d)\s*(?:\.{2,3}|…)\s*(?=[+-]?\d)/g, '$1 – ').replace(/(\S) - (?=\S)/g, '$1 – ')
+          .replace(/\s*(?:→|\sà(?=\s|$))\s*/g, ': ').replace(/:\s*$/, '').replace(/\bbit\s*(\d+)\s*[–-]\s*(\d+)/g, 'bit $1-$2');
         const describe = [];
         // Several switches in one byte (`bit 6: Off, On Assignable Knob 8 bit 5: …`): sending one means
         // knowing the others.
@@ -480,7 +540,8 @@ export function buildYamahaProfile(data, layout) {
         // A high byte printed fixed and the low byte's range under it (the CP4 STAGE's `00` over `00 –
         // 1D`): the same as `00 00 – 00 1D`.
         const fixedHigh = row.size === 2 && row.range.length === 2 && !/1st bit/.test(description) && /^[0-9A-F]{2}$/.test(clean(row.range[0])) && /^([0-9A-F]{2})\s*–\s*([0-9A-F]{2})$/.exec(clean(row.range[1]));
-        const pairs = row.size === 2 ? readPairRange(fixedHigh ? `${clean(row.range[0])} ${fixedHigh[1]} – ${clean(row.range[0])} ${fixedHigh[2]}` : row.range.join(' ')) : null;
+        const split = row.size === 2 && row.range.length === 2 && /^[0-9A-F]{4}\s*[–-]$/.test(clean(row.range[0]));
+        const pairs = row.size === 2 ? (split ? readSplitNumber(row.range[0], row.range[1], description) : readPairRange(fixedHigh ? `${clean(row.range[0])} ${fixedHigh[1]} – ${clean(row.range[0])} ${fixedHigh[2]}` : row.range.join(' '))) : null;
         if (pairs) {
           // Two 7-bit bytes a value, every value (the MODX M): read as one range.
           const values = readValues(pairs, description);
@@ -500,9 +561,19 @@ export function buildYamahaProfile(data, layout) {
           else if (parts.length > 1) { skip('a data range in parts its description does not match', `${label}: ${row.range[0]} / ${description}`); continue; } else read = { min: parts[0][0], max: parts[0][1], ...values };
         } else {
           // Several bytes, split as the description says.
+          const bands = row.size === 2 ? readTwoBands(row.range, description) : null;
           const bounds = row.range.map((r) => readHexRange(r)?.[0]);
-          if (bounds.length !== row.size || bounds.some((b) => !b)) { skip(`a value over ${row.size} bytes whose ranges are not printed one a byte`, label); continue; }
-          if (row.size === 4 && /bit\s*3-0\s*:?\s*bit\s*15-?\s*12/.test(description)) {
+          if (!bands && (bounds.length !== row.size || bounds.some((b) => !b))) { skip(`a value over ${row.size} bytes whose ranges are not printed one a byte`, label); continue; }
+          if (bands) {
+            // Two bands, the values between them unused: a number over both, the description saying which.
+            encoding = { type: 'u14-msb-lsb' };
+            read = { min: bands[0][0], max: bands[1][1] };
+            describe.push(`Two bands: ${bands.map(([a, z]) => `${a} - ${z}`).join(' and ')}; the values between them are not used.`);
+          } else if (row.size === 2 && /bit\s*3-0\s*:?\s*bit\s*7-4/.test(description)) {
+            // Two nibbles (Detune: `1st bit 3-0: bit 7-4, 2nd bit 3-0: bit 3-0`).
+            encoding = { type: 'nibbled', nibbles: 2 };
+            read = { min: (bounds[0][0] << 4) | bounds[1][0], max: (bounds[0][1] << 4) | bounds[1][1] };
+          } else if (row.size === 4 && /bit\s*3-0\s*:?\s*bit\s*15-?\s*12/.test(description)) {
             encoding = { type: 'nibbled', nibbles: 4 };
             read = { min: bounds.reduce((n, b) => (n << 4) | b[0], 0), max: bounds.reduce((n, b) => (n << 4) | b[1], 0) };
           } else if (row.size === 2 && /bit\s*6-0\s*:?\s*bit\s*13-7/.test(description)) {
@@ -521,6 +592,11 @@ export function buildYamahaProfile(data, layout) {
             const shown = readShownRange(description);
             read = { min: (bounds[0][0] << 7) | bounds[1][0], max: (bounds[0][1] << 7) | bounds[1][1] };
             if (shown.min !== read.min) read = { ...read, shown: { min: shown.min, max: shown.max }, ...(shown.unit ? { unit: shown.unit } : {}) };
+          } else if (row.size === 2 && wholeAgrees(bounds, description)) {
+            // Two 7-bit bytes whose description's numbers end at the two together (the MO's `00 – 7F`
+            // over `00 – 7F` beside `0 – 1786: Preset, 8192 – 8447: User, 16383: No Type`).
+            encoding = { type: 'u14-msb-lsb' };
+            read = { min: (bounds[0][0] << 7) | bounds[1][0], max: (bounds[0][1] << 7) | bounds[1][1] };
           } else { skip(`a value over ${row.size} bytes split in a way not read`, label); continue; }
           width = row.size;
           describe.push(/1st bit/.test(description) ? `${row.size} bytes: ${description.replace(/^.*?(1st bit)/, '$1')}.` : `${row.size} bytes, the high 7 bits first.`);
@@ -657,8 +733,10 @@ export function buildYamahaProfile(data, layout) {
 
   const variables = { channel: 1, deviceId: 16, ...(layout.variables ?? {}) };
   const tests = [];
-  const pick = [...new Set([parameters.find((p) => p.type === 'choice'), parameters.find((p) => p.type === 'integer' && p.range.max > 1), parameters.find((p) => p.encoding.type === 'u14-msb-lsb' && p.type !== 'choice')].filter(Boolean))];
-  const valueBytes = (p, v) => (p.encoding.type === 'u14-msb-lsb' ? [v >> 7, v & 127] : p.encoding.type === 'nibbled' ? [3, 2, 1, 0].map((s) => (v >> (s * 4)) & 15) : [v]);
+  // (A nibbled value of each width the profile has: Master Tune's four, Detune's two.)
+  const nibbleWidths = [...new Set(parameters.filter((p) => p.encoding.type === 'nibbled').map((p) => p.encoding.nibbles))];
+  const pick = [...new Set([parameters.find((p) => p.type === 'choice'), parameters.find((p) => p.type === 'integer' && p.range.max > 1), parameters.find((p) => p.encoding.type === 'u14-msb-lsb' && p.type !== 'choice'), ...nibbleWidths.map((n) => parameters.find((p) => p.encoding.type === 'nibbled' && p.encoding.nibbles === n))].filter(Boolean))];
+  const valueBytes = (p, v) => (p.encoding.type === 'u14-msb-lsb' ? [v >> 7, v & 127] : p.encoding.type === 'nibbled' ? Array.from({ length: p.encoding.nibbles }, (u, i) => (v >> ((p.encoding.nibbles - 1 - i) * 4)) & 15) : [v]);
   for (const p of pick) {
     const choice = p.type === 'choice' ? p.choices.at(-1) : null;
     const v = choice ? choice.value : Math.min(p.range.max, Math.max(p.range.min, 100));

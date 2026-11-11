@@ -60,7 +60,7 @@ Work for the generators alone: the document is downloaded and says what is neede
 
 | Open | Brand | What it takes |
 | --- | --- | --- |
-| About 2,000 Yamaha rows printed in forms the builder does not read: Wave Number on the MOTIF ES generation (`→` for `:`), Detune as two nibbles, Arpeggio Assign offsets and types over two lines, scaling offsets under `:` | [yamaha](yamaha/README.md) | five reading rules in `build-yamaha-profile.mjs`, each checked by re-importing every transcription |
+| The Yamaha rows the reading rules still leave (the S90 XS's arpeggio assign types and offsets, the MX's Wave Number, single-type EQ frequencies, a few hundred in all); five rules read 2,244 in November 2026 | [yamaha](yamaha/README.md) | each a rule of its own, or the instrument; the README says why each is left |
 | The JN-80's NRPN table: twenty parameters at 12 bits (0 - 4095), with their scales | [behringer](behringer/README.md) | the guide reader on that table, and the parameters as NRPNs |
 | The Nord Lead 3's program dump, which its manual's SysEx chapter prints with a request | [nord](nord/README.md) | that chapter read for the dump's layout: Pull for the Lead 3 |
 | The microKORG's and microKORG S's program tables (`+1 B6,7`, timbres and vocoder over the same bytes) | [korg](korg/README.md) | a reader for that table form: Pull for both |
