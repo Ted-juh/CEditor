@@ -257,7 +257,14 @@ Kept as printed and said where it applies:
   unit; the profile sends the single channel mode's NRPNs.
 - **The microKORG's and microKORG S's Pull**: their program tables print offsets and bits in a form
   of their own (`+1 B6,7`), and lay the timbres or the vocoder over the same bytes by Voice Mode.
-- **KRONOS, NAUTILUS**: their MIDI Implementations are ZIP archives, not yet read.
+- **KRONOS, NAUTILUS**: their MIDI Implementations are ZIP archives of plain text, looked at in
+  November 2026 (the KRONOS's of 2025-07-24, `KRONOS_MIDIimp.zip` on its support page): the SysEx
+  messages in `KRONOS_MIDI_SysEx.txt`, and a table for each object (`Prog_HD-1.txt`, `Prog_EXi_Common.txt`,
+  `CombiAndSongTimbreSet.txt`, `Global.txt`, …) giving every setting its byte offset and bits, its
+  range and value names, and the id its parameter change takes, `TYP SOC SUB PID IDX`; the EXi
+  engines' parameters are in `SysExParams/VoiceModels/`. A parameter change carries its value as 21
+  bits, two's complement, high byte first (`valueH 0scccccc`, `valueM`, `valueL`), which neither
+  engine encodes yet. Not built: that encoding first, in both engines, then a reader for the tables.
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document
   for these, not a parameter table.
 - **MS-20 mini** receives notes and the channel mode messages only; **KAOSSILATOR PRO+** lets you
