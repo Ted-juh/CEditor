@@ -121,7 +121,7 @@ None reads anything back.
 
 | Left out | Why | What would read it |
 | --- | --- | --- |
-| Pull, on every Nord | the manuals print program dumps as something to send and receive, not their bytes; the Lead 3's prints a SysEx implementation with a dump request | the Lead 3's chapter, read for its dump's layout |
+| Pull, on every Nord | the manuals print program dumps as something to send and receive, not their bytes. The Lead 3's is the exception, and was read (November 2026): its requests (`F0 33 dev 09 30 slot 00 F7`), the dump's header, and a table of its bit fields, 114 of them from 1 to 208 bits, `viewed as a bit stream … most significant bit first` and `8 to 7 bit converted`. But the table's fields come to 1,340 data bits (192 bytes as 7-bit bytes, a 234-byte message), the message table prints 210 bytes of patch data (252), and the text says a dump is 261 bytes; nor does it say which 8-to-7 conversion it means (the bit stream cut into 7-bit bytes, or 7 bytes and a byte of their high bits) | one dump from the instrument, to see which of the three counts it sends and how its bits sit |
 | Values | the lists print controller numbers only; a selector's steps are its settings spread over 0 - 127 | each manual's chapters, a list of settings for each selector |
 | The Stage 4's organ presets (`16-24`) and sample choice (`3:4:x:x`), the Electro 7's organ preset (`59, 65`) and piano choice (`2:32-34` under one name) | not one message, and not explained | the instrument: send each and look |
 | The Modular G2's controllers | assigned in each patch | a patch's own assignments |

@@ -61,7 +61,6 @@ Work for the generators alone: the document is downloaded and says what is neede
 | Open | Brand | What it takes |
 | --- | --- | --- |
 | The Yamaha rows the reading rules still leave (the S90 XS's arpeggio assign types and offsets, the MX's Wave Number, single-type EQ frequencies, a few hundred in all); five rules read 2,244 in November 2026 | [yamaha](yamaha/README.md) | each a rule of its own, or the instrument; the README says why each is left |
-| The Nord Lead 3's program dump, which its manual's SysEx chapter prints with a request | [nord](nord/README.md) | that chapter read for the dump's layout: Pull for the Lead 3 |
 | The microKORG's and microKORG S's program tables (`+1 B6,7`, timbres and vocoder over the same bytes) | [korg](korg/README.md) | a reader for that table form: Pull for both |
 | KRONOS and NAUTILUS | [korg](korg/README.md) | their MIDI Implementations, which are ZIP archives |
 | The ELZ_1, ELZ_1 play and MINIMAL charts | [sonicware](sonicware/README.md) | a reader for each form (a macro naming the controllers; a matrix of tracks) |
@@ -100,6 +99,7 @@ false in every profile), and these are the questions the documents leave.
 | --- | --- |
 | Which end of the Deckard's Dream's six-way bands is the top setting; its DETUNE controller (the manual says 95, the chart 32); the Xerxes's two channels | [blackcorp](blackcorp/README.md) |
 | What the 3rd Wave's dump writes for parts 3 and 4 (the part bitmap's 4 and 8, or 3 and 4) | [groove](groove/README.md) |
+| The Nord Lead 3's program dump: its manual prints it in full, but its three byte counts disagree (234, 252 and 261 bytes) and its 8-to-7 conversion is not said | [nord](nord/README.md) |
 | The PolyEight's dump and how it carries a negative value; whether a Behringer range is the controller's values or the display's | [behringer](behringer/README.md) |
 | The Hydrasynth's LFO1 Smooth and Steps against ENV5 Loop and Legato (one NRPN printed for both) | [asm](asm/README.md) |
 | Whether the MatrixBrute sends its fine halves on CC n + 32; how the JN-80 splits a 12-bit NRPN value | [arturia](arturia/README.md), [behringer](behringer/README.md) |
