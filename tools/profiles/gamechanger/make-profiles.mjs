@@ -4,8 +4,8 @@
 //   node tools/profiles/gamechanger/make-profiles.mjs --check      # fail if a committed profile is stale
 //   node tools/profiles/gamechanger/make-profiles.mjs motor-synth-mkii      # just one
 //
-// An instrument is two files: tables/<name>.json (the NRPN map and SysEx pages as printed, from
-// import-gamechanger.mjs) and synths/<name>.mjs (the layout). Neither needs Gamechanger's documents.
+// An instrument is two files: tables/<name>.json (the NRPN map and SysEx pages, or a pedal's CC
+// table, as printed, from import-gamechanger.mjs) and synths/<name>.mjs (the layout). Neither needs Gamechanger's documents.
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readCommitted } from '../../scripts/readCommitted.mjs';
 import { buildGamechangerProfile, stringifyProfile } from './build-gamechanger-profile.mjs';
+import { buildPedalProfile } from './build-pedal-profile.mjs';
 import { loadLayout } from './import-gamechanger.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +25,7 @@ export const SYNTHS = readdirSync(path.join(HERE, 'synths')).filter((f) => f.end
 export async function build(name) {
   const layout = await loadLayout(name);
   const data = JSON.parse(readFileSync(path.join(HERE, 'tables', `${name}.json`), 'utf8'));
-  const profile = buildGamechangerProfile(data, layout);
+  const profile = layout.form ? buildPedalProfile(data, layout) : buildGamechangerProfile(data, layout);
   return { name, layout, data, profile, text: stringifyProfile(profile), out: path.join(PROFILE_DIR, `${layout.id}.ceditor-device.json`) };
 }
 

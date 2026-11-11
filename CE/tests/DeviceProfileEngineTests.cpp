@@ -4793,7 +4793,12 @@ int main (int argc, char** argv)
         root.getChildFile ("dexibell-s9.ceditor-device.json"),
         root.getChildFile ("dexibell-sx8.ceditor-device.json"),
         root.getChildFile ("vermona-kick-lancet.ceditor-device.json"),
-        root.getChildFile ("vermona-mono-lancet-15.ceditor-device.json")
+        root.getChildFile ("vermona-mono-lancet-15.ceditor-device.json"),
+        root.getChildFile ("gamechanger-auto-chorus.ceditor-device.json"),
+        root.getChildFile ("gamechanger-auto-delay.ceditor-device.json"),
+        root.getChildFile ("gamechanger-auto-reverb.ceditor-device.json"),
+        root.getChildFile ("gamechanger-bigsby.ceditor-device.json"),
+        root.getChildFile ("gamechanger-motor-pedal.ceditor-device.json")
     };
 
     auto failures = 0;

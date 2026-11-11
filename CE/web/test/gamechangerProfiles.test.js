@@ -65,7 +65,8 @@ const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2,
 const lines = (compiled) => compiled.transaction.messages.flatMap((m) => Array.from({ length: m.bytes.length / 3 }, (u, i) => hex(m.bytes.slice(i * 3, i * 3 + 3)))).join('\n');
 const numbers = (range) => range.split(' ... ').map(Number);
 
-for (const { name, profile, text, out, data } of BUILT) {
+// The pedals' CC tables are checked in gamechangerPedals.test.js.
+for (const { name, profile, text, out, data } of BUILT.filter((b) => !b.layout.form)) {
   test(`${profile.id}: the committed profile is what the generator makes`, () => {
     assert.equal(readText(out), text, `stale — run: node tools/profiles/gamechanger/make-profiles.mjs ${name}`);
   });
