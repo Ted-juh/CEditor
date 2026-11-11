@@ -703,3 +703,35 @@ test('the EXi programs: every engine in both slots by TYP 11 and 12, sent and no
     assert.equal(new Set(ep1).size, ep1.length);
   }
 });
+
+test('Global\'s table forms: a control and its attributes, a wrapped heading, a blank group under a named row', () => {
+  const row = (ofs, group, name, id) => `| ${String(ofs).padStart(5)} |     | ${group.padEnd(21)} | ${name.padEnd(42)} | 00~10        | 1~Gch              | 15|  0|  0|${String(id).padStart(3)}|  0|`;
+  const kronos = [
+    '+=======+', row(24620, 'Special Function', 'Program Up           Channel', 58), row(24621, 'Assignments', '                     Assignment', 59),
+    row(24622, '', 'Program Down         Channel', 60), row(24623, '', '                     Assignment', 61),
+    '+=======+', row(20682, 'QuickAccess User 1-A', 'Action', 126), row(20683, '', 'Sound Browse Type', 127),
+  ].join('\n');
+  assert.deepEqual(readObjectRows(kronos).map((r) => `${r.group} / ${r.name}`), [
+    'Special Function Assignments / Program Up Channel', 'Special Function Assignments / Program Up Assignment',
+    'Special Function Assignments / Program Down Channel', 'Special Function Assignments / Program Down Assignment',
+    'QuickAccess User 1-A / Action', 'QuickAccess User 1-A / Sound Browse Type',
+  ]);
+  // The NAUTILUS prints the second attribute flush left.
+  const nautilus = ['+=======+', row(24610, 'Special Function', 'Program Up           Channel', 58), row(24611, 'Assignments', 'Assignment', 59)].join('\n');
+  assert.deepEqual(readObjectRows(nautilus).map((r) => `${r.group} / ${r.name}`), ['Special Function Assignments / Program Up Channel', 'Special Function Assignments / Program Up Assignment']);
+  assert.deepEqual(readBits('0~1'), { from: 0, bits: 2 }, 'Global prints bits low first');
+  assert.deepEqual(readData('0 ~ 5C'), { min: 0, max: 92, bytes: 1, signed: false, extra: [] }, 'spaced, not padded');
+});
+
+test('the Global profiles: object 03, the External Sets\' copies left out in one note each, a misprinted field not read', { skip: !builtProfile('korg-kronos-global') || !builtProfile('korg-nautilus-global') }, () => {
+  for (const id of ['korg-kronos-global', 'korg-nautilus-global']) {
+    const profile = builtProfile(id);
+    assert.deepEqual(profile.requests.find((r) => r.id === 'requestCurrentGlobal').template.slice(-3), ['74', '03', 'F7']);
+    const noteReceive = profile.parameters.find((p) => p.name === 'MIDI Note Receive');
+    assert.ok(noteReceive.access.canWrite && !noteReceive.access.canRead, 'bit 0 printed for 00~02: sent, not read');
+    assert.ok(profile.parameters.some((p) => p.name === 'Special Function Assignments Program Up Assignment'));
+  }
+  const kronos = builtProfile('korg-kronos-global');
+  assert.ok(!kronos.parameters.some((p) => /External Set/.test(p.name)), 'one id per control, whichever set is selected');
+  assert.equal(kronos.authoringNotes.filter((n) => /numbered copies \("MIDI \(External Set# - Knob#\) Channel"\)/.test(n)).length, 1);
+});

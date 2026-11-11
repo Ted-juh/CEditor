@@ -36,15 +36,43 @@ const ID_CELLS = 5;
  * id, note }`. A row printing no OFS shares the byte of the row above it, and gets that OFS. Reserved
  * rows (`*`) and the boxes' rules are skipped; a row with an id and no name (the further bytes of a
  * value spread over several, each with its own id) is kept as printed.
+ *
+ * Forms of Global.txt's, read as printed:
+ *   - a name column of two sub-columns, a control and what of it (`Program Up        Channel`),
+ *     where a blank control (`                  Assignment`) is the control above, as is a bare
+ *     name straight after (the NAUTILUS prints `Assignment` flush left);
+ *   - a blank group cell under a named row of the same box: the group above (`QuickAccess User
+ *     1-A`, then its Sound Browse Type, Function Type, … with the cell blank);
+ *   - a group cell on a row that continues the name above it: the heading wrapped, its two lines
+ *     one group (`Special Function` over `Assignments`), for both rows.
  */
 export function readObjectRows(text) {
   const rows = [];
   let ofs = null;
+  let control = null;
+  let afterSplit = false;     // the row above was a control and its first attribute
+  let above = null;           // the last named row of the box, for a blank group cell under it
   text.split(/\r?\n/).forEach((raw, index) => {
+    if (raw.startsWith('+')) { above = null; return; }
     if (!raw.startsWith('|')) return;
     const cells = raw.split('|');
     if (cells.length < 7 + ID_CELLS) return;
-    const [ofsCell, bit, group, name, data, value] = cells.slice(1, 7).map((c) => c.trim());
+    const [ofsCell, bit, printedGroup, printedName, data, value] = cells.slice(1, 7).map((c) => c.trim());
+    let name = printedName;
+    let group = printedGroup;
+    const split = /^ (\S.*?\S)\s{3,}(\S.*?)\s*$/.exec(cells[4]);
+    const continued = /^ {4,}(\S.*?)\s*$/.exec(cells[4]);
+    let continues = false;
+    // The NAUTILUS prints the second attribute flush left (`Assignment`), the KRONOS under the first.
+    const bare = !split && !continued && printedName && !/\s{3,}/.test(printedName) && afterSplit;
+    afterSplit = false;
+    if (split && !/^[(*]/.test(split[1])) { control = split[1]; name = `${control} ${split[2]}`; afterSplit = true; }
+    else if ((continued || bare) && control) { name = `${control} ${continued ? continued[1] : printedName}`; continues = true; }
+    else control = null;
+    if (name && above) {
+      if (!group) group = above.group;
+      else if (continues && above.group && group !== above.group) { group = `${above.group} ${group}`; above.group = group; }
+    }
     const idCells = cells.slice(7, 7 + ID_CELLS).map((c) => c.trim());
     const note = cells.slice(7 + ID_CELLS).join('|').trim();
     if (/^data\(hex\)$/i.test(data)) return;                       // the heading row
@@ -52,7 +80,7 @@ export function readObjectRows(text) {
     if (/^\d+$/.test(ofsCell)) ofs = Number(ofsCell);
     if (!hasId && [ofsCell, bit, group, name, data, value].some((c) => c === '*' || c === '|')) return;
     if (!hasId && !name) return;
-    rows.push({
+    const row = {
       line: index + 1,
       ofs,
       ...(bit ? { bit } : {}),
@@ -62,7 +90,9 @@ export function readObjectRows(text) {
       value,
       ...(hasId ? { id: idCells.map(Number) } : {}),
       ...(note ? { note } : {}),
-    });
+    };
+    rows.push(row);
+    if (row.name) above = row;
   });
   return rows;
 }

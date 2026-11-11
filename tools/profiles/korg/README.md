@@ -73,6 +73,8 @@ What the builder takes as settled, and what it does not:
 | `korg-nautilus-combination` | the NAUTILUS archive: `SysExDumps/CombiAndSongTimbreSet.txt` | 2,433 | 767 | 1,792 | 00H 01H 5DH 00H |
 | `korg-kronos-exi` | the KRONOS archive: `Prog_EXi_Common.txt` 1.01, `Prog_EXi.txt` | 8,133 | 803 | 3,968 | 68H 00H |
 | `korg-nautilus-exi` | the NAUTILUS archive: `SysExDumps/Prog_EXi_Common.txt`, `SysExDumps/Prog_EXi.txt` | 7,362 | 648 | 3,968 | 00H 01H 5DH 00H |
+| `korg-kronos-global` | the KRONOS archive: `Global.txt` 1.01 | 481 | 24 | — | 68H 00H |
+| `korg-nautilus-global` | the NAUTILUS archive: `SysExDumps/Global.txt` | 599 | 22 | — | 00H 01H 5DH 00H |
 
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
 try to recognise them. The VOX Continental prints its reply inline with two member codes, 05 for the
@@ -293,6 +295,19 @@ rows take them (and the KRONOS's voice model files say: `0B: EXi patch 1, 0C: EX
   Switch and Chain Level, which the HD-1 table marks `* Chain Level`) is found by the builder and
   left out the same way.
 
+**Global** (object 03, edited in Global mode): `korg-kronos-global` and `korg-nautilus-global`, the
+tuning, curves, controllers, user scales, audio inputs and MIDI settings, nearly all read back. Its
+table prints some forms of its own, read as printed: bits low first (`0~1`); a name column of a
+control and its attribute (`Program Up        Channel`) with the next attribute under it (indented on
+the KRONOS, flush left on the NAUTILUS); a group heading wrapped over two rows (`Special Function`
+over `Assignments`); blank group cells under a named row; ranges spaced and unpadded (`0 ~ 5C`). The
+External Sets (128 sets of knobs, sliders and switches) print one id per control for every set, the
+set being the one Ext Mode Set Select selects: those are left out, one note per kind of control, and
+the 15,000 rows the table prints without an id are not transcribed. The KRONOS's MIDI Note Receive
+is printed `bit 0` for a range `00~02`; it is sent and not read back. Any id a table prints for two
+unmarked rows is found and left out by the builder, which on the NAUTILUS's Global catches two pairs
+(Foot SW Assign and Start/Stop Out Enable; Midi Clock and Analog Input 1 Gain).
+
 **Combinations.** A layout names the object it reads (`object: { code: '01', name: 'Combination' }`,
 checked against the archive's list of objects, `*1`), and the profile asks for and reads that object:
 `korg-kronos-combination` and `korg-nautilus-combination`, from `CombiAndSongTimbreSet.txt`, edited
@@ -382,13 +397,23 @@ Kept as printed and said where it applies:
   unit; the profile sends the single channel mode's NRPNs.
 - **The microKORG's and microKORG S's Pull**: their program tables print offsets and bits in a form
   of their own (`+1 B6,7`), and lay the timbres or the vocoder over the same bytes by Voice Mode.
-- **The rest of the KRONOS**: the profiles hold an HD-1 program, an EXi program and a combination.
-  Not yet read: Global, the drum kits and wave sequences (their own parameter changes, 53~56), and
-  each effect's own parameters (`Effect.txt`, by effect type). Waiting for an instrument's dump:
+- **The rest of the KRONOS**: the profiles hold an HD-1 program, an EXi program, a combination and
+  Global. Not built, each waiting for a feature of the profile format (in the open list):
+  - the drum kits (`DrumKit.txt`, Drum Kit Parameter Change `53 VSP note PID`): 128 notes of eight
+    velocity zones, printed as Note1 and Zone1 in full and the rest by their first and last rows,
+    300 and 34 bytes apart, some 19,500 settings: a repeated group;
+  - the wave sequences (`WaveSequence.txt`, `55 step PID`): 64 steps, printed the same way;
+  - each effect's own parameters (`Effect.txt`): a table per effect type (186), by `pid`. The
+    archive does not print their full id; the effect switch's bypass row (`6 0 0 0 0`, `* -> bypass`)
+    matches every type's pid 0, Bypass, which suggests TYP 6 with the slot in SOC. A parameter set
+    chosen by another parameter (the effect type).
+
+  Waiting for an instrument's dump:
   the two-byte values' byte order, and where an EXi engine's table starts in its slot's block, so
   its settings can be read back. The engines' own AMS source lists (`SysExParams/VoiceModels/`)
   would name the EXi engines' modulation sources; only the HD-1's is used.
-- **The rest of the NAUTILUS**: the same objects as the KRONOS's, and its scenes and step
+- **The rest of the NAUTILUS**: the same objects as the KRONOS's (the drum kits, the wave
+  sequences, the effects' own parameters, its `ArpPattern.txt`), and its scenes and step
   sequencers, whose message the archive does not settle (in a program 6D or 6E for the scenes, 43
   or 6E for the step sequencers; in a combination any of the three).
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document

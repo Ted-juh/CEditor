@@ -143,7 +143,9 @@ export function importArchive(dir, layout) {
     ...(voiceText ? { voiceModel: { messageFormats: messageFormats(voiceText), amsSources: amsSources(voiceText) } } : {}),
     identity: inquiryReply(implementationText),
     banks: bankMap(implementationText),
-    rows: readObjectRows(objectText),
+    // Global prints some 15,000 rows with no id (the External Sets' pads, …) that no profile can use:
+    // its layout keeps the rows with an id, and those it reads without one.
+    rows: readObjectRows(objectText).filter((r) => !layout.keepRowsWithId || r.id || (layout.readOnly ?? []).includes(r.name)),
     ...(doc.engines ? { engines: readEngineTables(read(doc.engines)) } : {}),
   };
 }
