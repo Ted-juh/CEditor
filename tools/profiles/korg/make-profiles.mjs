@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { readCommitted } from '../../scripts/readCommitted.mjs';
 import { stringifyProfile } from '../roland/build-profile.mjs';
 import { buildKorgProfile } from './build-korg-profile.mjs';
-import { buildKronosProfile } from './build-kronos-profile.mjs';
+import { buildKronosProfile, stringifyKronosProfile } from './build-kronos-profile.mjs';
 import { loadLayout } from './import-korg.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -26,9 +26,16 @@ export const SYNTHS = readdirSync(path.join(HERE, 'synths')).filter((f) => f.end
 export async function build(name) {
   const layout = await loadLayout(name);
   const data = JSON.parse(readFileSync(path.join(HERE, 'tables', `${name}.json`), 'utf8'));
+  // An archive's effect types are kept once per instrument and shared by its profiles (import-kronos.mjs).
+  if (layout.effectsTable) {
+    const effects = JSON.parse(readFileSync(path.join(HERE, 'tables', `${layout.effectsTable}.json`), 'utf8'));
+    data.effects = effects.types;
+    data.effectsSource = effects.source;
+  }
   // The KRONOS's archive is a table per object, not a MIDI Implementation text (build-kronos-profile.mjs).
   const profile = layout.format === 'kronos' ? buildKronosProfile(data, layout) : buildKorgProfile(data, layout);
-  return { name, layout, data, profile, text: stringifyProfile(profile), out: path.join(PROFILE_DIR, `${layout.id}.ceditor-device.json`) };
+  const text = layout.format === 'kronos' ? stringifyKronosProfile(profile, stringifyProfile) : stringifyProfile(profile);
+  return { name, layout, data, profile, text, out: path.join(PROFILE_DIR, `${layout.id}.ceditor-device.json`) };
 }
 
 async function main() {

@@ -145,7 +145,9 @@ export function readEngineTables(text) {
     const note = cells.slice(11).join('|').trim();
     if (/^data\(hex\)$/i.test(data)) return;
     if (/^\d+$/.test(ofsCell)) ofs = Number(ofsCell);
-    if (!name || name === '*') return;
+    if (name === '*') return;
+    // A row printing only an OFS (and bits, or none for the whole byte) holds the rest of the value above it.
+    if (!name) { if (/^\d+$/.test(ofsCell) || bit) { if (engines.at(-1).rows.length) engines.at(-1).rows.push({ line: index + 1, ofs, ...(bit ? { bit } : {}), continues: true }); } return; }
     const hasId = /^\d+\/\d+$/.test(typ) && idCells.every((c) => /^\d+$/.test(c));
     engines.at(-1).rows.push({
       line: index + 1,
@@ -159,4 +161,83 @@ export function readEngineTables(text) {
     });
   });
   return engines;
+}
+
+/** The runs of reserved bytes an object table prints (`| 2908 | *`, `|    | | *`, `| 3908 | *`): `{ from, to }`. */
+export function readReservedRuns(text) {
+  const runs = [];
+  let open = null;
+  for (const raw of text.split(/\r?\n/)) {
+    if (!raw.startsWith('|')) { if (open) { runs.push(open); open = null; } continue; }
+    const cells = raw.split('|').map((c) => c.trim());
+    const reserved = cells.slice(2, 7).some((c) => c === '*');
+    const ofs = /^\d+$/.test(cells[1]) ? Number(cells[1]) : null;
+    if (reserved) { if (ofs !== null) { if (open) open.to = ofs; else open = { from: ofs, to: ofs }; } }
+    else if (open) { runs.push(open); open = null; }
+  }
+  if (open) runs.push(open);
+  return runs;
+}
+
+/**
+ * Effect.txt: a table per effect type after a heading with its number and name (`01:Stereo Dyna
+ * Compressor`), each row a parameter of the type with its `pid`:
+ *
+ *   | OFS | bit | parameter      | DATA(hex) | Value     | pid |
+ *   |  0  | 0   | Bypass         | 00(fixed) | Off       |  0  |
+ *   |     | 7~1 | Wet/Dry        | 00~64     | Dry~Wet   |  1  |
+ *
+ * Kept: each type's number and name, and each row with a pid (its name, range and value as printed).
+ */
+export function readEffectTables(text) {
+  const types = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const heading = /^(\d+):(.+?)\s*$/.exec(raw);
+    if (heading) { types.push({ number: Number(heading[1]), name: heading[2].trim(), rows: [] }); continue; }
+    if (!raw.startsWith('|') || !types.length) continue;
+    const cells = raw.split('|').map((c) => c.trim());
+    if (cells.length < 7 || /^DATA\(hex\)$/i.test(cells[4]) || !cells[3] || !/^\d+$/.test(cells[6])) continue;
+    types.at(-1).rows.push({ name: cells[3], data: cells[4], value: cells[5], pid: Number(cells[6]) });
+  }
+  return types;
+}
+
+/**
+ * A table keyed by columns of its own (WaveSequence.txt's `IDX|PID`, DrumKit.txt's `note|VSP|PID`):
+ * `{ keys, rows }`, each row's `key` holding those columns by name. A value cell that wraps onto the
+ * next line (`Multisample,Rest,` then `Tie`) is joined; a group cell indented under the one above
+ * continues it (`Note1 Zone1 - 2` over `    Velocity Control`), and a blank one repeats it. The
+ * table's own elisions (`...`) are skipped: they are what the builder fills, from the rows printed.
+ */
+export function readKeyedRows(text) {
+  const lines = text.split(/\r?\n/);
+  const head = lines.find((l) => /^\|\s*OFS\s*\|/.test(l));
+  if (!head) throw new Error('No `| OFS |` heading');
+  const keys = head.split('|').slice(7).map((c) => c.trim()).filter(Boolean);
+  const rows = [];
+  let ofs = null;
+  let above = null;
+  lines.forEach((raw, index) => {
+    if (raw.startsWith('+')) { above = null; return; }
+    if (!raw.startsWith('|')) return;
+    const cells = raw.split('|');
+    if (cells.length < 7 + keys.length) return;
+    const [ofsCell, bit, printedGroup, name, data, value] = cells.slice(1, 7).map((c) => c.trim());
+    const keyCells = cells.slice(7, 7 + keys.length).map((c) => c.trim());
+    const note = cells.slice(7 + keys.length).join('|').trim();
+    if (/^data\(hex\)$/i.test(data) || /^\.\.\./.test(ofsCell)) return;
+    const hasKey = keyCells.every((c) => /^\d+$/.test(c));
+    if (/^\d+$/.test(ofsCell)) ofs = Number(ofsCell);
+    if (!hasKey && [ofsCell, bit, printedGroup, name, data, value].some((c) => c === '*' || c === '|')) return;
+    // A value wrapped onto the next line, nothing else printed on it.
+    if (!hasKey && !ofsCell && !name && !printedGroup && value && rows.length && rows.at(-1).line === index) { rows.at(-1).value += value; rows.at(-1).line = index + 1; return; }
+    if (!hasKey && !name) return;
+    let group = printedGroup;
+    if (above && /^ {3,}\S/.test(cells[3])) { group = `${above.group} ${printedGroup}`; above.group = group; }
+    else if (above && !group) group = above.group;
+    const row = { line: index + 1, ofs, ...(bit ? { bit } : {}), group, name, data, value, ...(hasKey ? { key: Object.fromEntries(keys.map((k, i) => [k, Number(keyCells[i])])) } : {}), ...(note ? { note } : {}) };
+    rows.push(row);
+    above = row;
+  });
+  return { keys, rows };
 }

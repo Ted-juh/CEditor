@@ -7,6 +7,7 @@ export default {
   name: 'Korg KRONOS',
   family: 'KRONOS',
   format: 'kronos',
+  effectsTable: 'kronos-effects',
   scope: 'An HD-1 program only: a program of an EXi bank is laid out in Prog_EXi_Common.txt and Prog_EXi.txt, not here.',
   coverageOf: 'an HD-1 program',
   otherLength: 'a program of an EXi bank, laid out otherwise, comes back under the same header',
@@ -19,6 +20,7 @@ export default {
     object: 'Prog_HD-1.txt',
     messages: 'KRONOS_MIDI_SysEx.txt',
     voiceModel: 'SysExParams/VoiceModels/HD-1.txt',
+    effects: 'Effect.txt',
     implementation: 'KRONOS_MIDI_Implementation.pdf',
   },
   // The table prints no message per row. Its KARMA rows' ids and its Drum Track rows' ids are the

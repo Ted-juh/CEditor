@@ -9,6 +9,7 @@ export default {
   name: 'Korg KRONOS Combination',
   family: 'KRONOS',
   format: 'kronos',
+  effectsTable: 'kronos-effects',
   object: { code: '01', name: 'Combination' },
   scope: 'A combination: its sixteen timbres, its four KARMA modules, its effects and controllers. The programs its timbres play are edited in Program mode (korg-kronos).',
   coverageOf: 'a combination',

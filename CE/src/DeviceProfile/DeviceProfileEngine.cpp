@@ -1465,6 +1465,17 @@ DumpBuildResult DeviceProfileEngine::buildDumpMessage (const juce::String& dumpI
             return fail ("Cannot encode " + parameterId + ": " + encoded.getErrorMessage());
 
         const auto offset = propInt (*mapping, "offset");
+        // A `when` field is written only where the dump being built already holds the selecting value.
+        if (auto* when = asObject (mapping->getProperty ("when")))
+        {
+            const auto at = propInt (*when, "offset", -1);
+            if (at < 0 || at >= body.size() || body[at] != propInt (*when, "value", -1))
+            {
+                consumed.erase (parameterId);
+                result.unmappedParameters.add (parameterId);
+                continue;
+            }
+        }
         if (offset < 0 || offset + encodedBytes.size() > body.size())
             return fail ("Mapping for " + parameterId + " writes outside the payload (offset "
                          + juce::String (offset) + ", " + juce::String (encodedBytes.size()) + " byte(s), payload "
@@ -2336,6 +2347,18 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
             codecOverride = mapping->getProperty ("nameCodec");
 
         auto valueOffset = decodeBase + propInt (*mapping, "offset");
+        // `when`: a field whose meaning another byte of the payload selects (a KRONOS EXi slot's engine
+        // settings, read only when the slot's Algorithm Type byte holds that engine). Unmet, the
+        // parameter is not read. deviceProfileLocalEngine.js reads it the same way.
+        if (auto* when = asObject (mapping->getProperty ("when")))
+        {
+            const auto& source = records != nullptr ? bytes : *decodeBytes;
+            const auto at = decodeBase + propInt (*when, "offset", -1);
+            if (at < decodeBase || at >= source.size())
+                return failForMatchedDump ("invalidDefinition", "Dump mapping condition is outside the payload: " + parameterId, checksumStatus);
+            if ((source[at] & 0xff) != propInt (*when, "value", -1))
+                continue;
+        }
         if (records != nullptr)
         {
             const auto key = propInt (*mapping, "record", -1);

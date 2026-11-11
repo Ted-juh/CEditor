@@ -27,7 +27,7 @@ import { SYNTHS, build } from '../../../tools/profiles/korg/make-profiles.mjs';
 import { modes as omModes, readOmCcPage } from '../../../tools/profiles/korg/read-korg-om-cc.mjs';
 import { foldKnobs, matchKnobs, readOmValue } from '../../../tools/profiles/korg/build-korg-knobs.mjs';
 import { readObjectHeader, readObjectRows } from '../../../tools/profiles/korg/read-kronos-table.mjs';
-import { exclusiveHeader, presetBanks, readBits, readData, readLabels } from '../../../tools/profiles/korg/build-kronos-profile.mjs';
+import { exclusiveHeader, expandRepeats, presetBanks, readBits, readData, readLabels } from '../../../tools/profiles/korg/build-kronos-profile.mjs';
 import { readEngineTables } from '../../../tools/profiles/korg/read-kronos-table.mjs';
 import { bankMap } from '../../../tools/profiles/korg/import-kronos.mjs';
 import { pack8to7 } from '../../dpd/codecs.mjs';
@@ -251,7 +251,7 @@ for (const { name, profile, text, out, data } of BUILT) {
         if (recipe.kind === 'sysex') {
           // Korg's parameter change: the value 14 bits, low seven first; a choice one byte and 00.
           // The KRONOS's is 21 bits high byte first, a choice its low byte after the template's 00 00.
-          const value = parameter.type === 'choice' ? [wire]
+          const value = parameter.type === 'choice' ? (parameter.encoding.type === 'u14-msb-lsb' ? [wire >> 7, wire & 0x7f] : [wire])
             : parameter.encoding.type === 's21-lsb-msb' ? [wire & 0x7f, (wire >> 7) & 0x7f, (wire >> 14) & 0x7f]
               : parameter.encoding.type === 's21-msb-lsb' ? [(wire >> 14) & 0x7f, (wire >> 7) & 0x7f, wire & 0x7f]
                 : [(wire & 0x3fff) & 0x7f, (wire & 0x3fff) >> 7];
@@ -615,14 +615,21 @@ test('the KRONOS: a program dump placed by hand reads back by the table\'s offse
   assert.equal(localParseDumpMessage(profile, hex([0xf0, 0x42, 0x30, 0x68, 0x75, 0x00, 0x05, ...wire, 0, 0xf7])).ok, false, 'an EXi program\'s dump, any other length, is not this one');
 });
 
-test('the NAUTILUS: its own header on every message, its reply checked as printed, no scene or step sequencer', { skip: !builtProfile('korg-nautilus') }, () => {
+test('the NAUTILUS: its own header on every message, its reply checked as printed, Scene Common by 6D and the arpeggiator, drum track and step sequencers by 6E', { skip: !builtProfile('korg-nautilus') }, () => {
   const profile = builtProfile('korg-nautilus');
-  for (const r of profile.messageRecipes) assert.deepEqual(r.template.slice(0, 7), ['F0', '42', '$deviceId', '00', '01', '5D', '43'], r.id);
+  const recipes = new Map(profile.messageRecipes.map((r) => [r.id, r]));
+  for (const r of profile.messageRecipes) assert.deepEqual(r.template.slice(0, 6), ['F0', '42', '$deviceId', '00', '01', '5D'], r.id);
+  for (const p of profile.parameters.filter((x) => x.access.canWrite)) {
+    const t = recipes.get(p.messageRecipe).template;
+    const fn = p.group === 'Scene Common' && t[7] === '00' ? '6D' : /^(Scene|Step Seq)/.test(p.group) ? '6E' : '43';
+    assert.equal(t[6], fn, p.name);
+  }
+  const sent = profile.messageRecipes.map((r) => r.template.slice(6, r.template.indexOf('$encodedValue')).join(' '));
+  assert.equal(new Set(sent).size, sent.length, 'every message once');
   assert.deepEqual(profile.dumpDefinitions[0].matcher.prefix, ['F0', '42', '$deviceId', '00', '01', '5D', '75', '00', '06']);
   assert.equal(profile.dumpDefinitions[0].completion.maxBytes, 9 + 3700 + 529 + 1, 'object version 6, 3,700 bytes packed eight to seven');
   assert.deepEqual([profile.identity.familyCode, profile.identity.modelNumber], [['00', '01'], ['5D', '00']], 'bytes 7 to 10 of F0,7E,0g,06,02,42,00,01,5D,00,mm,…');
-  assert.ok(!profile.parameters.some((p) => /^(Scene|Step Seq)/.test(p.group)), 'their message is not settled');
-  assert.ok(profile.authoringNotes.some((n) => n.startsWith('Left out, the scenes:')));
+  assert.ok(profile.authoringNotes.some((n) => /Scene Common takes the KRONOS KARMA Common's ids/.test(n)));
 });
 
 test('the combinations: object 01 asked for and read, sixteen timbres told apart by SOC', { skip: !builtProfile('korg-kronos-combination') || !builtProfile('korg-nautilus-combination') }, () => {
@@ -637,7 +644,10 @@ test('the combinations: object 01 asked for and read, sixteen timbres told apart
       assert.deepEqual(recipes.get(volume.messageRecipe).template.slice(header.length, header.length + 6), ['43', '04', hex([timbre - 1]), '00', '02', '00'], `${id} Timbre${timbre}`);
     }
   }
-  assert.ok(!builtProfile('korg-nautilus-combination').parameters.some((p) => /^(Scene|Step Seq)/.test(p.group)));
+  const nautilus = builtProfile('korg-nautilus-combination');
+  const recipes = new Map(nautilus.messageRecipes.map((r) => [r.id, r]));
+  const tempo = nautilus.parameters.find((p) => p.name === 'Scene Common Tempo');
+  assert.deepEqual(recipes.get(tempo.messageRecipe).template.slice(6, 12), ['6D', '05', '00', '00', '00', '00'], 'Scene Common, TYP 5 in a combination');
 });
 
 test('the KRONOS-style bank map: a bank per select, a run of LSBs a bank each, a second select dropped', () => {
@@ -675,30 +685,37 @@ test('the EXi engine tables: a table per engine after its heading, a continuatio
     '|   19 |     | [Mod.Mixer3]       | 00(fixed) | 0          |    ?|  ?|  ?|  ?|  ?|',
   ].join('\n');
   const engines = readEngineTables(text);
-  assert.deepEqual(engines.map((e) => [e.number, e.name, e.printedCount, e.rows.length]), [[0, 'Off', undefined, 0], [1, 'HD-1', undefined, 0], [2, 'AL-1', 3, 3]]);
+  assert.deepEqual(engines.map((e) => [e.number, e.name, e.printedCount, e.rows.filter((r) => !r.continues).length]), [[0, 'Off', undefined, 0], [1, 'HD-1', undefined, 0], [2, 'AL-1', 3, 3]]);
   assert.deepEqual(engines[2].rows[1], { line: 8, ofs: 1, bit: '7~5', name: '[LFO1] Start Phase', data: 'DC~25', value: '-180~RND', typ: '11/12', id: [6, 0, 1, 0] });
-  assert.equal(engines[2].rows[2].printedId, '? ? ? ? ?');
+  assert.deepEqual(engines[2].rows[2], { line: 9, ofs: 2, bit: '3~0', continues: true }, 'the rest of Start Phase');
+  assert.equal(engines[2].rows[3].printedId, '? ? ? ? ?');
 });
 
-test('the EXi programs: every engine in both slots by TYP 11 and 12, sent and not read; each slot\'s engine read and not sent', { skip: !builtProfile('korg-kronos-exi') || !builtProfile('korg-nautilus-exi') }, () => {
+test('the EXi programs: every engine in both slots by TYP 11 and 12, read only when its slot holds it; each slot\'s engine read and not sent', { skip: !builtProfile('korg-kronos-exi') || !builtProfile('korg-nautilus-exi') }, () => {
   for (const [id, headerLength] of [['korg-kronos-exi', 4], ['korg-nautilus-exi', 6]]) {
     const profile = builtProfile(id);
     const recipes = new Map(profile.messageRecipes.map((r) => [r.id, r]));
-    const read = new Set(profile.dumpDefinitions[0].mappings.map((m) => m.parameter));
+    const mappings = new Map(profile.dumpDefinitions[0].mappings.map((m) => [m.parameter, m]));
+    const read = new Set(mappings.keys());
+    const engines = ['Off', 'HD-1', 'AL-1', 'CX-3', 'STR-1', 'MS-20EX', 'PolysixEX', 'MOD-7', 'SGX-2', 'EP-1'];
     for (const [slot, typ] of [['EXi1', '0B'], ['EXi2', '0C']]) {
+      const type = profile.parameters.find((p) => p.name === `${slot} Common Algorithm Type`);
       const engine = profile.parameters.filter((p) => new RegExp(`^${slot} (AL-1|CX-3|STR-1|MS-20EX|PolysixEX|MOD-7|SGX-2|EP-1)\\b`).test(p.group));
       assert.ok(engine.length > 3000, `${id} ${slot}: ${engine.length}`);
       for (const p of engine) {
         assert.equal(recipes.get(p.messageRecipe).template[headerLength + 1], typ, p.name);
-        assert.ok(!read.has(p.id) && !p.access.canRead, `${p.name} is not read back`);
+        const m = mappings.get(p.id);
+        if (!m) continue;   // not read back, its reason in the notes
+        assert.deepEqual(m.when, { offset: mappings.get(type.id).offset, value: engines.indexOf(p.group.split(' ')[1]) }, `${p.name}: read when ${slot} holds its engine`);
       }
-      const type = profile.parameters.find((p) => p.name === `${slot} Common Algorithm Type`);
+      assert.ok(engine.filter((p) => read.has(p.id)).length > 3000, `${id} ${slot}: engines read back`);
       assert.deepEqual([type.access.canWrite, type.messageRecipe, read.has(type.id)], [false, undefined, true]);
       assert.deepEqual(type.choices.map((c) => c.label), ['Off', 'HD-1', 'AL-1', 'CX-3', 'STR-1', 'MS-20EX', 'PolysixEX', 'MOD-7', 'SGX-2', 'EP-1']);
     }
     // The EP-1's effects share their ids, one meaning per effect chosen: those are left out, and the
     // effect settings that remain each send a message of their own.
     assert.ok(!profile.parameters.some((p) => p.name === 'EXi1 EP-1 [IFX Small Phaser] Bypass'));
+    assert.ok(profile.authoringNotes.some((n) => /starting 51 bytes after its Algorithm Type/.test(n)), 'both slots\' blocks 51 bytes after their Algorithm Type');
     const ep1 = profile.parameters.filter((p) => /^EXi1 EP-1 /.test(p.group)).map((p) => recipes.get(p.messageRecipe).template.join(' '));
     assert.equal(new Set(ep1).size, ep1.length);
   }
@@ -734,4 +751,77 @@ test('the Global profiles: object 03, the External Sets\' copies left out in one
   const kronos = builtProfile('korg-kronos-global');
   assert.ok(!kronos.parameters.some((p) => /External Set/.test(p.name)), 'one id per control, whichever set is selected');
   assert.equal(kronos.authoringNotes.filter((n) => /numbered copies \("MIDI \(External Set# - Knob#\) Channel"\)/.test(n)).length, 1);
+});
+
+test('the EXi program: a dump with an AL-1 in EXi1 reads its settings, and an engine not in the slot reads nothing', { skip: !builtProfile('korg-kronos-exi') }, () => {
+  const profile = builtProfile('korg-kronos-exi');
+  const mappings = new Map(profile.dumpDefinitions[0].mappings.map((m) => [m.parameter, m]));
+  const payload = new Array(4960).fill(0);
+  payload[2857] = 2;                                   // EXi1 Algorithm Type: AL-1
+  // [LFO1] Start Phase: bits 7~5 of block byte 1, then 3~0 of byte 2; -36 over seven bits is 1011100.
+  const startPhase = mappings.get('exi1Al1Lfo1.startPhase');
+  assert.equal(startPhase.offset, 2908 + 1);
+  payload[2909] |= (0b1011100 & 0b111) << 5;
+  payload[2910] |= (0b1011100 >> 3) & 0b1111;
+  const parsed = localParseDumpMessage(profile, hex([0xf0, 0x42, 0x30, 0x68, 0x75, 0x00, 0x05, ...pack8to7(payload, 'msb-low-first', 7), 0xf7]));
+  assert.ok(parsed.ok, parsed.error);
+  assert.equal(parsed.values['exi1Common.algorithmType'], 'al1');
+  assert.equal(parsed.values['exi1Al1Lfo1.startPhase'], -36);
+  assert.ok(!Object.keys(parsed.values).some((k) => /^exi1Cx3/.test(k)), 'a CX-3 setting is not read from an AL-1 slot');
+  assert.ok(!Object.keys(parsed.values).some((k) => /^exi2Al1/.test(k)), 'EXi2 holds Off');
+});
+
+test('byte order: a value over two bytes is read low byte first', { skip: !builtProfile('korg-kronos') }, () => {
+  const profile = builtProfile('korg-kronos');
+  const tempo = profile.dumpDefinitions[0].mappings.find((m) => m.parameter === 'karmaCommon.tempo');
+  assert.deepEqual(tempo.codec.parts, [{ at: 0, from: 0, bits: 8, shift: 0 }, { at: 1, from: 0, bits: 8, shift: 8 }]);
+  const payload = new Array(3706).fill(0);
+  payload[tempo.offset] = 12000 & 0xff;                // 120.00 BPM
+  payload[tempo.offset + 1] = 12000 >> 8;
+  const parsed = localParseDumpMessage(profile, hex([0xf0, 0x42, 0x30, 0x68, 0x75, 0x00, 0x05, ...pack8to7(payload, 'msb-low-first', 7), 0xf7]));
+  assert.equal(parsed.values['karmaCommon.tempo'], 12000);
+  assert.ok(profile.authoringNotes.some((n) => /^Byte order: /.test(n)));
+});
+
+test('the effects: a parameter per pid for each slot, by the bypass row\'s TYP, the slot in SOC; Effect Type a choice, past 127 in two bytes', { skip: !builtProfile('korg-kronos') || !builtProfile('korg-kronos-combination') }, () => {
+  for (const [id, typ] of [['korg-kronos', '06'], ['korg-kronos-combination', '17']]) {
+    const profile = builtProfile(id);
+    const recipes = new Map(profile.messageRecipes.map((r) => [r.id, r]));
+    const p5 = profile.parameters.find((p) => p.name === 'Master Effect2 Parameter 5');
+    assert.deepEqual(recipes.get(p5.messageRecipe).template.slice(4, 10), ['43', typ, '0D', '00', '05', '00'], id);
+    assert.ok(!p5.access.canRead, 'not read back: each type lays the slot out its own way');
+    const type = profile.parameters.find((p) => p.name === 'Insert Effect1 Effect Type');
+    assert.equal(type.choices.length, 186);
+    assert.equal(type.choices.at(-1).label, 'Multitap BPM Delay // Multitap BPM Delay', 'the printed `Multitap` cut at a word');
+    const compiled = localCompileParameter(profile, { parameterId: type.id, value: type.choices.at(-1).id });
+    assert.ok(compiled.ok, compiled.error);
+    assert.equal(compiled.hex.split(' ').slice(-4, -1).join(' '), '00 01 39', '185 as valueH valueM valueL');
+  }
+});
+
+test('the drum kits and wave sequences: their blocks filled in by the printed stride, sent by their own messages', { skip: !builtProfile('korg-kronos-drum-kit') || !builtProfile('korg-kronos-wave-sequence') }, () => {
+  const kit = builtProfile('korg-kronos-drum-kit');
+  const kitMap = new Map(kit.dumpDefinitions[0].mappings.map((m) => [m.parameter, m]));
+  const recipes = new Map(kit.messageRecipes.map((r) => [r.id, r]));
+  const level = kit.parameters.find((p) => p.name === 'Note64 Zone3 DS Level');
+  assert.equal(kitMap.get(level.id).offset, 44 + 2 * 34 + 63 * 300, 'Zone1 Level at 44, zones 34 apart, notes 300');
+  assert.deepEqual(recipes.get(level.messageRecipe).template.slice(4, 8), ['53', '02', '3F', '09'], 'VSP 2, note 63, PID 9');
+  assert.equal(kit.parameters.filter((p) => /^Note128 /.test(p.group)).length, kit.parameters.filter((p) => /^Note1 /.test(p.group)).length);
+  assert.ok(kit.authoringNotes.some((n) => /Note128 High DS \(offset 38124\) is printed where the stride gives Note128 Zone1 DS/.test(n)));
+  const seq = builtProfile('korg-kronos-wave-sequence');
+  const seqMap = new Map(seq.dumpDefinitions[0].mappings.map((m) => [m.parameter, m]));
+  const step64 = seq.parameters.find((p) => p.name === 'Step64 Level');
+  assert.equal(seqMap.get(step64.id).offset, 60 + 63 * 34);
+  assert.deepEqual(seq.messageRecipes.find((r) => r.id === step64.messageRecipe).template.slice(4, 7), ['55', '3F', '13'], 'step 63, PID 19');
+  assert.deepEqual(seq.parameters.find((p) => p.name === 'Step1 Step Type').choices.map((c) => c.label), ['Multisample', 'Rest', 'Tie'], 'a value printed as its list, wrapped over two lines');
+});
+
+test('the repeat expander: a block\'s printed first and last rows checked against the stride', () => {
+  const row = (group, name, ofs, key) => ({ group, name, ofs, key, data: '00~7F', value: '0~127' });
+  const rows = [row('Step1', 'Type', 40, { IDX: 0, PID: 16 }), row('Step1', 'Level', 60, { IDX: 0, PID: 19 }), row('Step2', 'Type', 74, { IDX: 1, PID: 16 }), row('Step2', 'Level', 94, { IDX: 1, PID: 19 }), row('Step3', 'Type', 108, { IDX: 2, PID: 16 }), row('Step3', 'Level', 128, { IDX: 2, PID: 19 })];
+  const spec = { prefix: 'Step1', exact: true, make: (n) => `Step${n}`, count: 4, key: 'IDX' };
+  const out = expandRepeats(rows, [spec]);
+  assert.deepEqual(out.map((r) => `${r.group} ${r.name} ${r.ofs} ${r.key.IDX}`), ['Step1 Type 40 0', 'Step1 Level 60 0', 'Step2 Type 74 1', 'Step2 Level 94 1', 'Step3 Type 108 2', 'Step3 Level 128 2', 'Step4 Type 142 3', 'Step4 Level 162 3']);
+  const wrong = rows.map((r) => (r.group === 'Step3' && r.name === 'Level' ? { ...r, ofs: 129 } : r));
+  assert.throws(() => expandRepeats(wrong, [spec]), /block 3's printed Level at 129 is not the template's at stride 34/);
 });

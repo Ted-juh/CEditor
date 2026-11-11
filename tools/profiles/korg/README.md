@@ -67,14 +67,18 @@ What the builder takes as settled, and what it does not:
 | `korg-volca-beats` | volca beats MIDI Implementation 0.01 | 20 | 0 | — | — |
 | `korg-volca-kick` | volca kick MIDI Implementation 1.00 | 10 | 0 | — | — |
 | `korg-volca-nubass` | volca nubass MIDI Implementation 1.00 | 11 | 0 | — | — |
-| `korg-kronos` | KRONOS MIDI Implementation archive (2025-07-24): `Prog_HD-1.txt` 1.01, `KRONOS_MIDI_SysEx.txt` 1.27 | 1,790 | 376 | 3,968 | 68H 00H |
-| `korg-nautilus` | NAUTILUS MIDI Implementation archive (2022-09-22): `SysExDumps/Prog_HD-1.txt`, `NAUTILUS_MIDI_SysEx.txt` 1.0 | 1,019 | 122 | 3,968 | 00H 01H 5DH 00H |
-| `korg-kronos-combination` | the KRONOS archive: `CombiAndSongTimbreSet.txt` 1.01 | 6,109 | 2,139 | 1,792 | 68H 00H |
-| `korg-nautilus-combination` | the NAUTILUS archive: `SysExDumps/CombiAndSongTimbreSet.txt` | 2,433 | 767 | 1,792 | 00H 01H 5DH 00H |
-| `korg-kronos-exi` | the KRONOS archive: `Prog_EXi_Common.txt` 1.01, `Prog_EXi.txt` | 8,133 | 803 | 3,968 | 68H 00H |
-| `korg-nautilus-exi` | the NAUTILUS archive: `SysExDumps/Prog_EXi_Common.txt`, `SysExDumps/Prog_EXi.txt` | 7,362 | 648 | 3,968 | 00H 01H 5DH 00H |
+| `korg-kronos` | KRONOS MIDI Implementation archive (2025-07-24): `Prog_HD-1.txt` 1.01, `KRONOS_MIDI_SysEx.txt` 1.27, `Effect.txt` | 2,862 | 392 | 3,968 | 68H 00H |
+| `korg-kronos-exi` | the KRONOS archive: `Prog_EXi_Common.txt` 1.01, `Prog_EXi.txt`, `Effect.txt` | 9,205 | 819 | 3,968 | 68H 00H |
+| `korg-kronos-combination` | the KRONOS archive: `CombiAndSongTimbreSet.txt` 1.01, `Effect.txt` | 7,181 | 2,155 | 1,792 | 68H 00H |
 | `korg-kronos-global` | the KRONOS archive: `Global.txt` 1.01 | 481 | 24 | — | 68H 00H |
-| `korg-nautilus-global` | the NAUTILUS archive: `SysExDumps/Global.txt` | 599 | 22 | — | 00H 01H 5DH 00H |
+| `korg-kronos-wave-sequence` | the KRONOS archive: `WaveSequence.txt` | 975 | 132 | — | 68H 00H |
+| `korg-kronos-drum-kit` | the KRONOS archive: `DrumKit.txt` | 20,352 | 2,560 | — | 68H 00H |
+| `korg-nautilus` | NAUTILUS MIDI Implementation archive (2022-09-22): `SysExDumps/Prog_HD-1.txt`, `NAUTILUS_MIDI_SysEx.txt` 1.0, `Effect.txt` | 5,540 | 3,499 | 3,968 | 00H 01H 5DH 00H |
+| `korg-nautilus-exi` | the NAUTILUS archive: `Prog_EXi_Common.txt`, `Prog_EXi.txt`, `Effect.txt` | 11,883 | 4,025 | 3,968 | 00H 01H 5DH 00H |
+| `korg-nautilus-combination` | the NAUTILUS archive: `CombiAndSongTimbreSet.txt`, `Effect.txt` | 7,039 | 4,184 | 1,792 | 00H 01H 5DH 00H |
+| `korg-nautilus-global` | the NAUTILUS archive: `Global.txt` | 599 | 24 | — | 00H 01H 5DH 00H |
+| `korg-nautilus-wave-sequence` | the NAUTILUS archive: `WaveSequence.txt` | 975 | 132 | — | 00H 01H 5DH 00H |
+| `korg-nautilus-drum-kit` | the NAUTILUS archive: `DrumKit.txt` | 20,352 | 2,560 | — | 00H 01H 5DH 00H |
 
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
 try to recognise them. The VOX Continental prints its reply inline with two member codes, 05 for the
@@ -189,10 +193,11 @@ the Voice Mode inside it, and a dump definition has one layout.
 
 ## A table per object (KRONOS, NAUTILUS)
 
-Korg publishes the KRONOS's MIDI Implementation as a ZIP archive of plain text
-(`KRONOS_MIDIimp.zip` on its support page, 2025-07-24), not as one document: the messages in
-`KRONOS_MIDI_SysEx.txt`, and a table per object (`Prog_HD-1.txt`, `Prog_EXi_Common.txt`,
-`CombiAndSongTimbreSet.txt`, `Global.txt`, …) giving every setting a row:
+Korg publishes the KRONOS's and the NAUTILUS's MIDI Implementations as ZIP archives of plain text
+(`KRONOS_MIDIimp.zip`, 2025-07-24; `NAUTILUS_MIDIimp.zip`, 2022-09-22), not as one document: the
+messages in `KRONOS_MIDI_SysEx.txt` (`NAUTILUS_MIDI_SysEx.txt`), and a table per object
+(`Prog_HD-1.txt`, `Prog_EXi_Common.txt`, `CombiAndSongTimbreSet.txt`, `Global.txt`, `DrumKit.txt`,
+`WaveSequence.txt`, …) giving every setting a row:
 
 ```
 | OFS  | bit | parameter      | parameter | data(hex) | value     |TYP|SOC|SUB|PID|IDX|
@@ -200,124 +205,99 @@ Korg publishes the KRONOS's MIDI Implementation as a ZIP archive of plain text
 |      | 6   | Insert Effect1 | Switch    | 00~01     | Off~On    |  6|  0|  0|  0|  0|* -> bypass, Invert Value
 ```
 
-its byte in the object and its bits, its range in hex and as shown, and the five bytes its parameter
-change takes. `read-kronos-table.mjs` reads the rows; `import-kronos.mjs` keeps them, with the
-blocks of the messages the profile uses, the voice model's message format and AMS source list
-(`SysExParams/VoiceModels/HD-1.txt`), and the Device Inquiry reply from
-`KRONOS_MIDI_Implementation.pdf`, each file with its SHA-256; `build-kronos-profile.mjs` builds
-`korg-kronos` from an HD-1 program's table:
+its byte in the object and its bits, its range in hex and as shown, and the bytes its parameter
+change takes. `read-kronos-table.mjs` reads the tables (and `Effect.txt`, `Prog_EXi.txt`, the
+keyed tables of drum kits and wave sequences); `import-kronos.mjs` keeps them, with the blocks of
+the messages the profiles use, the KRONOS voice model's message format and AMS source list, the
+Device Inquiry reply and the bank map, each file with its SHA-256 (the effect types once per
+instrument, `tables/kronos-effects.json`); `build-kronos-profile.mjs` builds a profile per object.
+Every reading below that the archive does not state is said in the profile it shapes, and the
+builder checks what each rests on, stopping where the archive no longer reads that way.
 
-- every row with a parameter id is a parameter, sent by Parameter Change, `F0 42 3g 68 43 TYP SOC SUB
-  PID IDX` and the value as 21 bits, two's complement, high byte first (`*4`, and the voice model's
-  "21-bit signed value, MSB first"). Both engines learned that encoding (`s21-msb-lsb`) for it. A
-  PID above 126 takes the message's second form, `7F PIDH PIDL`;
-- the table prints no message per row. The archive has a KARMA Parameter Change (6D) and a Drum
-  Track Parameter Change (6E), laid out as the first, and the layout sends the KARMA and Drum Track
-  groups by them (`functions`). For each group the profile says what decides it: KARMA Common (24
-  of its 527 rows), KARMA Module (13 of 219) and Drum Track Common (all 11) have ids Parameter
-  Change takes for another row (TYP 0 PID 0 is Oscillator Mode, KARMA Tempo and the drum track's
-  Pattern Bank), so they cannot go by it; the group Drum Track (its program, volume, EQ and sends,
-  22 rows) has none, and goes by 6E on the message's name alone. Every id is then unique per
-  message, which the builder checks. A reading, said in the profile;
-- a range whose first value is the larger is two's complement over its bytes (`9D~63` is -99~+99,
-  `FF39~00C7` -199~+199);
-- a choice where the row names both of two values (`Off~On`), or where its ends are the ends of the
-  AMS source list (`00~30 | Off~Tempo`: sources 0~48). The value column is 19 characters wide and
-  cuts longer names short (`Symmetric~Asymmetri`); a cut name keeps its cut, with an ellipsis,
-  since the archive prints it nowhere whole;
-- a switch marked `* -> bypass, Invert Value` is sent as its effect's bypass, On as 0;
-- left out, each with its reason in the profile: the 629 rows printing a fixed value, Chain Switch
-  and Chain To and Chain Level (one id between them, and no word on which value turns the chain
-  off), the Tone Adjust assigns (`SUB = (Assign >> 7) & 0x01`: the id depends on the value), the
-  multisample banks' UUIDs (Parameter Change (binary)), the KARMA Start Seed (32 bits), the RT
-  parameters' Param.Assign (no range printed). In AMS Mixer, "Amount A" is printed for two
-  parameters; the second is named "Offset Amount", as the voice model's list calls it.
+**Sending.** Every row with a parameter id is a parameter, sent by Parameter Change: the exclusive
+header the archive prints (`F0 42 3g 68` on the KRONOS, `F0 42 3g 00 01 5D` on the NAUTILUS), `43
+TYP SOC SUB PID IDX`, and the value as 21 bits, two's complement, high byte first (`*4`; both engines
+learned `s21-msb-lsb` for it); a PID above 126 in the message's second form, `7F PIDH PIDL`. A
+choice goes as the low byte after `00 00`, or, past 127 (an Effect Type's 186 types), as 14 bits
+after `00`. The table prints no message per row, and some groups go by a parameter change of their
+own (`functions` in the layout), the profile saying per group what decides it:
 
-Pull asks for the program with Current Object Dump Request (function 74, object 00) and reads the
-Current Object Dump (75) that answers: object version 5 and 3,706 bytes in the 8-in-7 packing,
-4,236 on the wire. 1,476 parameters are read back at their rows' offsets and bits; the dump's length
-is fixed, so an EXi program's, laid out otherwise, does not match. Sent and not read back: the 186
-values over two bytes, since the archive marks only the Start Seed's bytes `Big Endian` and does
-not say the order of the others, and the KARMA Note Map, whose byte may hold `FF` (Remove).
+- the KRONOS's KARMA rows by KARMA Parameter Change (6D), its Drum Track rows by Drum Track
+  Parameter Change (6E): KARMA Common (24 of its 527 rows), KARMA Module (13 of 219) and Drum Track
+  Common (11 of 11) have ids Parameter Change takes for other rows, so cannot go by it; the group
+  Drum Track (22 rows) has none and goes by 6E on the message's name;
+- the NAUTILUS's Scene Common by Scene Parameter Change (6D): it takes the KRONOS KARMA Common's ids
+  for its own settings (Tempo PID 0, Latch Switch PID 3, the arpeggiator's switch PID 4 where KARMA
+  Fx Switch is, in the program and the combination alike, which the builder checks), and KARMA
+  Common goes by 6D; the scenes' arpeggiator and drum track rows and the step sequencers by
+  Arp/Drum Track Parameter Change (6E), by its name;
+- a drum kit by Drum Kit Parameter Change (`53 VSP note PID`), a wave sequence by Wave Seq Parameter
+  Change (`55 step PID`), their fields checked against the message blocks as printed.
 
-The Device Inquiry reply is `F0 7E 0g 06 02 42 68 00 mm 00 …`, with one member code per model
-(KRONOS/KRONOS 2 61, 73 and 88 keys: 05, 0E, 17; KRONOS 3: 1D, 26, 2F): the profile checks the
-family, 68 00, and not the member.
+Every id is then unique per message, which the builder checks.
 
-**The NAUTILUS** publishes the same form (`NAUTILUS_MIDIimp.zip`, 2022-09-22, its tables under
-`SysExDumps/`), and `korg-nautilus` is built by the same tools from its own layout. What differs:
+**Values.** A range whose first value is the larger is two's complement over its bytes (`9D~63` is
+-99~+99). A choice: a row naming both of two values (`Off~On`); a value printed as its whole list
+(`Multisample,Rest,Tie`, wrapped over two lines); or ends that are the ends of a list the archive
+prints in full: the KRONOS voice model's AMS sources (`Off~Tempo`, 0~48), the EXi engines by number,
+the effect types (`No Effect~Multitap`, the column cutting type 185's name at a word). The value
+column is 19 characters wide; a name it cuts short keeps its cut, with an ellipsis. A switch marked
+`* -> bypass, Invert Value` is sent as its effect's bypass, On as 0.
 
-- its exclusive header is `F0 42 3g 00 01 5D`, where the KRONOS's is `F0 42 3g 68`. The builder takes
-  the header from the Parameter Change block as printed, and checks that the dump request and the
-  dump print the same;
-- the program table is 3,700 bytes, object version 6, and prints no version of its own;
-- there are no voice model files, so no AMS source list: those settings are numbers, with their ends
-  in the description;
-- its program has four scenes and four step sequencers in place of KARMA. The archive has a Scene
-  Parameter Change (6D) and an Arp/Drum Track Parameter Change (6E) and names neither for any row.
-  Scene Common's and Scene 1's ids are ones Parameter Change takes for other rows (Scene Select is
-  the program's Assign Mode, Scene 1's ARP Pattern Number X-Y Control's Tempo Based), so the scenes
-  do not go by it, but 6D and 6E both leave every id unique; the step sequencers' ids are unique
-  under 43 and 6E alike. Both are left out (123 and 3,344 rows), with that count in the profile,
-  until an instrument settles them;
-- the Device Inquiry reply is printed `F0,7E,0g,06,02,42,00,01,5D,00,mm,00,vv,ww,xx,00,F7`: 17 bytes,
-  two more than the universal form, calling `01 5D` the series ID. Its 7th to 10th bytes,
-  `00 01 5D 00`, are checked as printed; the member code `mm` (61, 73, 88 keys: 05, 0E, 17) is not;
-- 1,019 settings are sent and 974 read back from the 4,229-byte dump; 45 values over two bytes are
-  sent and not read back (the NAUTILUS marks none `Big Endian`).
+**Reading back.** Each profile asks for its object with Current Object Dump Request (74) and reads
+the Current Object Dump (75) that answers, in Korg's 8-in-7 packing (`*3`), its length fixed (an EXi
+program's dump is not an HD-1 program's). A field is read at its row's offset and bits. Values over
+whole bytes are read low byte first, and a field that runs on into the next byte has its low bits
+in the earlier one: the tables fill each byte from bit 0 upward (Bypass is bit 0 of every effect's
+first byte, Wet/Dry bits 7~1 beside it) and continue a field crossing a byte upward in the next
+(an EXi engine's Start Phase at bits 7~5, then 3~0), the layout of a little-endian structure; the
+one exception marked, the KARMA Start Seed (`* Big Endian`), is left out.
+
+**EXi programs** (`Prog_EXi_Common.txt`) hold two slots, each with the engine chosen for it (AL-1,
+CX-3, STR-1, MS-20EX, PolysixEX, MOD-7, SGX-2, EP-1). Each engine's own settings (`Prog_EXi.txt`,
+every engine's row count matching its heading's `Number Of Param.`) are in the profile once per slot,
+sent by TYP 11 for EXi1 and 12 for EXi2 as the program table's own slot rows take them. They are
+read back from the slot's engine block: the run of reserved bytes after the slot's own rows (EXi1
+2908~3908, EXi2 3960~4959 on the KRONOS), which starts 51 bytes after the slot's Algorithm Type in
+both slots, every engine's table fitting it. A setting is read only when its slot's Algorithm Type
+holds its engine: both engines learned the mapping's `when` for it. The Algorithm Type has no id;
+it is read and not sent. The EP-1 prints the same ids for its eight effects' settings, one meaning
+per effect chosen: those are left out.
+
+**Effects.** Each effect slot (twelve insert, two master, two total) gets a parameter per pid of
+`Effect.txt` (`Insert Effect1 Parameter 5`), sent as the TYP the slot's switch row goes out with for
+its bypass (`6` in a program, `23` in a combination), the slot in SOC, the pid in PID: pid 0 is
+Bypass in every effect type, which the builder checks. A pid means what the slot's type makes it, so
+its range is the widest any type gives it (its description names some), and it is not read back:
+each type lays the slot's bytes out its own way. Effect Type is a choice of the types its printed
+range reaches; the KRONOS's `Effect.txt` lists twelve more (186~197) beyond its `00~B9`.
+
+**Combinations** (object 01): sixteen timbres (the timbre in SOC), the effects and controllers, the
+KRONOS's four KARMA modules and the NAUTILUS's scenes and step sequencers. **Global** (object 03): its
+forms read as printed (bits low first, a control and its attributes in one name column, a heading
+wrapped over two rows, `0 ~ 5C`); the External Sets print one id per control for all 128 sets, the
+set being the one Ext Mode Set Select selects, and are left out; the KRONOS's Note Receive, printed
+`bit 0` for `00~02`, is sent and not read back.
+
+**Drum kits and wave sequences** print a block once in full and then by the first and last rows of
+each repeat: a drum kit's eight velocity zones (34 bytes apart) and 128 notes (300 apart), a wave
+sequence's 64 steps (34 apart). The builder fills them in from the printed block (`repeats` in the
+layout, `expandRepeats`), checking every printed first and last row against the stride, offset, name
+and keys; the KRONOS's Note128 is printed `High DS` where the stride gives `Zone1 DS`, said in the
+profile. A drum kit is 20,352 settings and 17 MB, the library's largest profile.
 
 **Preset recall** comes from the implementation's receive table of banks when Global's Bank Map is
-KORG (`*1 : When Bank Map in Global mode is KORG;`): Bank Select MSB and LSB, then Program Change,
-each bank in the object's own column. Programs: INT-A~F, USER-A~GG on the KRONOS (A~T on the
-NAUTILUS) and the GM banks G, g(1)~g(9) and g(d) on MSB 79 and 78, 31 banks; combinations: INT-A~G
-and USER-A~G (A~N), 14. The GM banks are `factory`, read-only by `*2` of the SysEx text, which the
-builder checks; the second selects the table also prints for two of them (38,00 and 3E,00) are named
-and not offered. With Bank Map GM(2) the MSBs differ, which the profiles say.
+KORG: 31 program banks (the GM ones `factory`, read-only by `*2`) and 14 combination banks.
 
-**EXi programs.** A program of an EXi bank is laid out in `Prog_EXi_Common.txt` (4,960 bytes on the
-KRONOS, 4,954 on the NAUTILUS) and holds two EXi slots, each with the engine chosen for it.
-`korg-kronos-exi` and `korg-nautilus-exi` read the program's own rows as the HD-1 profiles do, and
-add every engine's own settings from `Prog_EXi.txt` (`read-kronos-table.mjs`'s `readEngineTables`:
-a table per engine under a heading like `2:AL-1, Number Of Param. = 609`, whose count the builder
-checks) once for each slot, sent by TYP 11 for EXi1 and 12 for EXi2 as the program table's own slot
-rows take them (and the KRONOS's voice model files say: `0B: EXi patch 1, 0C: EXi patch 2`):
+**Identity.** The KRONOS's reply is `F0 7E 0g 06 02 42 68 00 mm 00 …` (KRONOS and KRONOS 2 05, 0E,
+17; KRONOS 3 1D, 26, 2F): the family is checked, not the member. The NAUTILUS prints 17 bytes,
+`…42,00,01,5D,00,mm,00,…`, two more than the universal form; bytes 7~10 are checked as printed.
 
-- grouped by slot, engine and block, `EXi1 MS-20EX [LFO1]`. A slot takes the settings of the engine
-  in it; engines share ids, so a message from the instrument that several engines' settings send is
-  not attributed to any (the inbound index calls it ambiguous);
-- sent and not read back: `Prog_EXi.txt` gives each setting's offset inside its engine's block, and
-  the program table prints each slot's block only as reserved bytes (2908~3908 and 3960~4959 on the
-  KRONOS), without saying where the engine's table starts in it;
-- each slot's engine, `Algorithm Type` (`00~09 | Off~EP-1`, named by the engine tables' headings),
-  has no parameter id: it is read from the dump and not sent;
-- the EP-1 prints the same ids for the settings of its eight effects, one meaning per effect chosen;
-  those 200 are left out. An unmarked id printed for two rows (the EXi program's Master Effect Chain
-  Switch and Chain Level, which the HD-1 table marks `* Chain Level`) is found by the builder and
-  left out the same way.
-
-**Global** (object 03, edited in Global mode): `korg-kronos-global` and `korg-nautilus-global`, the
-tuning, curves, controllers, user scales, audio inputs and MIDI settings, nearly all read back. Its
-table prints some forms of its own, read as printed: bits low first (`0~1`); a name column of a
-control and its attribute (`Program Up        Channel`) with the next attribute under it (indented on
-the KRONOS, flush left on the NAUTILUS); a group heading wrapped over two rows (`Special Function`
-over `Assignments`); blank group cells under a named row; ranges spaced and unpadded (`0 ~ 5C`). The
-External Sets (128 sets of knobs, sliders and switches) print one id per control for every set, the
-set being the one Ext Mode Set Select selects: those are left out, one note per kind of control, and
-the 15,000 rows the table prints without an id are not transcribed. The KRONOS's MIDI Note Receive
-is printed `bit 0` for a range `00~02`; it is sent and not read back. Any id a table prints for two
-unmarked rows is found and left out by the builder, which on the NAUTILUS's Global catches two pairs
-(Foot SW Assign and Start/Stop Out Enable; Midi Clock and Analog Input 1 Gain).
-
-**Combinations.** A layout names the object it reads (`object: { code: '01', name: 'Combination' }`,
-checked against the archive's list of objects, `*1`), and the profile asks for and reads that object:
-`korg-kronos-combination` and `korg-nautilus-combination`, from `CombiAndSongTimbreSet.txt`, edited
-in Combination mode. Sixteen timbres (TYP 4 and 28, the timbre in SOC), the effects, the controllers;
-on the KRONOS four KARMA modules. A combination's ids have TYPs of their own, so in it no KARMA or
-Drum Track row clashes with a Parameter Change id: they go by 6D and 6E on the messages' names
-alone, as each profile says. The NAUTILUS's scenes and step sequencers are left out here too: in a
-combination their ids are unique under 43, 6D and 6E alike. The KRONOS combination sends 6,109
-settings and reads 4,521 back (1,460 values over two bytes are not, most of them the KARMA GE
-parameters); the NAUTILUS's sends 2,433 and reads 1,855.
+Left out, each with its reason in the profile: rows printing a fixed value, Chain Switch and Chain
+To or Level (one id between them), the Tone Adjust assigns (the id depends on the value), UUIDs
+(Parameter Change (binary)), ids a table prints for two unmarked rows (found by the builder), and
+the RT parameters' Param.Assign (no range printed). The NAUTILUS's `ArpPattern.txt` is not built:
+its object is not in the archive's object list, and no message takes its `STEP PID TONE`.
 
 ## Pull
 
@@ -397,25 +377,13 @@ Kept as printed and said where it applies:
   unit; the profile sends the single channel mode's NRPNs.
 - **The microKORG's and microKORG S's Pull**: their program tables print offsets and bits in a form
   of their own (`+1 B6,7`), and lay the timbres or the vocoder over the same bytes by Voice Mode.
-- **The rest of the KRONOS**: the profiles hold an HD-1 program, an EXi program, a combination and
-  Global. Not built, each waiting for a feature of the profile format (in the open list):
-  - the drum kits (`DrumKit.txt`, Drum Kit Parameter Change `53 VSP note PID`): 128 notes of eight
-    velocity zones, printed as Note1 and Zone1 in full and the rest by their first and last rows,
-    300 and 34 bytes apart, some 19,500 settings: a repeated group;
-  - the wave sequences (`WaveSequence.txt`, `55 step PID`): 64 steps, printed the same way;
-  - each effect's own parameters (`Effect.txt`): a table per effect type (186), by `pid`. The
-    archive does not print their full id; the effect switch's bypass row (`6 0 0 0 0`, `* -> bypass`)
-    matches every type's pid 0, Bypass, which suggests TYP 6 with the slot in SOC. A parameter set
-    chosen by another parameter (the effect type).
-
-  Waiting for an instrument's dump:
-  the two-byte values' byte order, and where an EXi engine's table starts in its slot's block, so
-  its settings can be read back. The engines' own AMS source lists (`SysExParams/VoiceModels/`)
-  would name the EXi engines' modulation sources; only the HD-1's is used.
-- **The rest of the NAUTILUS**: the same objects as the KRONOS's (the drum kits, the wave
-  sequences, the effects' own parameters, its `ArpPattern.txt`), and its scenes and step
-  sequencers, whose message the archive does not settle (in a program 6D or 6E for the scenes, 43
-  or 6E for the step sequencers; in a combination any of the three).
+- **The KRONOS's and NAUTILUS's readings** are said in each profile and want an instrument to
+  confirm: the byte order of values over two bytes, where an EXi engine's table starts in its
+  slot's block, the effects' own parameters under the bypass row's TYP, and the messages of the
+  KARMA, Drum Track and NAUTILUS scene rows. The effects' parameters are not read back (each type
+  lays its slot out its own way), and their names and ranges per type wait for a parameter set
+  chosen by another parameter in the profile format. The NAUTILUS's arp patterns have no object
+  number or message in its archive.
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document
   for these, not a parameter table.
 - **MS-20 mini** receives notes and the channel mode messages only; **KAOSSILATOR PRO+** lets you

@@ -27,7 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadLayout } from './import-korg.mjs';
-import { footnote, messageBlock, readEngineTables, readObjectHeader, readObjectRows } from './read-kronos-table.mjs';
+import { footnote, messageBlock, readEffectTables, readEngineTables, readKeyedRows, readObjectHeader, readObjectRows, readReservedRuns } from './read-kronos-table.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -132,7 +132,7 @@ export function importArchive(dir, layout) {
     object: readObjectHeader(objectText),
     messages: {
       parameterChange: messageBlock(messagesText, '43'),
-      ...Object.fromEntries([...(layout.functions ?? []).map((f) => f.code), ...(layout.citedMessages ?? [])].map((code) => [code, messageBlock(messagesText, code)])),
+      ...Object.fromEntries([...(layout.functions ?? []).map((f) => f.code), ...(layout.citedMessages ?? []), ...(layout.message ? [layout.message.code] : [])].map((code) => [code, messageBlock(messagesText, code)])),
       currentObjectDumpRequest: messageBlock(messagesText, '74'),
       currentObjectDump: messageBlock(messagesText, '75'),
       objects: footnote(messagesText, '1'),
@@ -145,8 +145,10 @@ export function importArchive(dir, layout) {
     banks: bankMap(implementationText),
     // Global prints some 15,000 rows with no id (the External Sets' pads, …) that no profile can use:
     // its layout keeps the rows with an id, and those it reads without one.
-    rows: readObjectRows(objectText).filter((r) => !layout.keepRowsWithId || r.id || (layout.readOnly ?? []).includes(r.name)),
-    ...(doc.engines ? { engines: readEngineTables(read(doc.engines)) } : {}),
+    rows: layout.message
+      ? readKeyedRows(objectText).rows
+      : readObjectRows(objectText).filter((r) => !layout.keepRowsWithId || r.id || (layout.readOnly ?? []).includes(r.name)),
+    ...(doc.engines ? { engines: readEngineTables(read(doc.engines)), reserved: readReservedRuns(objectText) } : {}),
   };
 }
 
@@ -176,6 +178,15 @@ async function main() {
   const data = importArchive(dir, layout);
   const out = path.join(HERE, 'tables', `${name}.json`);
   writeFileSync(out, stringifyKronos(data));
+  // The effect types, once per instrument: every profile with effect slots reads them from here.
+  if (layout.effectsTable) {
+    const file = layout.document.effects;
+    const types = readEffectTables(readFileSync(path.join(dir, file), 'latin1'));
+    const effectsOut = path.join(HERE, 'tables', `${layout.effectsTable}.json`);
+    const source = { file, sha256: createHash('sha256').update(readFileSync(path.join(dir, file))).digest('hex'), archive: layout.document.archive, url: layout.document.url };
+    writeFileSync(effectsOut, `{\n  "source": ${JSON.stringify(source)},\n  "types": [\n${types.map((t) => `    ${JSON.stringify(t)}`).join(',\n')}\n  ]\n}\n`);
+    console.log(`Wrote ${path.relative(process.cwd(), effectsOut)}: ${types.length} effect types`);
+  }
   console.log(`Wrote ${path.relative(process.cwd(), out)}: ${data.object.title}, ${data.rows.length} rows, ${data.voiceModel?.amsSources?.length ?? 0} AMS sources, ${data.identity?.members.length ?? 0} member codes`);
 }
 

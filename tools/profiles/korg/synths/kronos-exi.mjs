@@ -9,6 +9,7 @@ export default {
   name: 'Korg KRONOS EXi Program',
   family: 'KRONOS',
   format: 'kronos',
+  effectsTable: 'kronos-effects',
   scope: 'A program of an EXi bank: its two EXi slots, each with the settings of every engine it can hold, and its effects, KARMA and controllers. An HD-1 program is korg-kronos.',
   coverageOf: 'an EXi program',
   otherLength: 'an HD-1 program, laid out otherwise, comes back under the same header',

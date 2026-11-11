@@ -1513,6 +1513,58 @@ int runDumpRecordTests()
     return failures;
 }
 
+int runDumpWhenTests()
+{
+    // `when`: a field another byte selects (a KRONOS EXi slot's engine settings, read only when the
+    // slot's Algorithm Type holds that engine). Byte 0 selects which of two parameters byte 1 is.
+    // The JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-when", "name": "Probe", "manufacturer": "Probe",
+      "parameters": [
+        { "id": "engine", "name": "Engine", "messageRecipe": "cc7", "type": "integer", "range": { "min": 0, "max": 9 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } },
+        { "id": "alCutoff", "name": "AL Cutoff", "messageRecipe": "cc7", "type": "integer", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } },
+        { "id": "cxDrawbar", "name": "CX Drawbar", "messageRecipe": "cc7", "type": "integer", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+      "dumpDefinitions": [
+        { "id": "probe", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "05"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 2 },
+          "completion": { "expectedBytes": 6 },
+          "mappings": [ { "parameter": "engine", "offset": 0 },
+                        { "parameter": "alCutoff", "offset": 1, "when": { "offset": 0, "value": 2 } },
+                        { "parameter": "cxDrawbar", "offset": 1, "when": { "offset": 0, "value": 3 } } ] }
+      ]
+    })JSON";
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] when: probe did not load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const struct { const char* hex; const char* expected; } cases[] = {
+        { "F0 7D 05 02 40 F7", "engine=2 alCutoff=64" },
+        { "F0 7D 05 03 40 F7", "engine=3 cxDrawbar=64" },
+        { "F0 7D 05 00 40 F7", "engine=0" },
+    };
+    for (const auto& c : cases)
+    {
+        const auto parsed = engine.parseDumpMessage (c.hex);
+        juce::StringArray got;
+        for (const auto* id : { "engine", "alCutoff", "cxDrawbar" })
+            if (parsed.ok && parsed.values.hasProperty (id))
+                got.add (juce::String (id) + "=" + parsed.values.getProperty (id, {}).toString());
+        if (got.joinIntoString (" ") != c.expected)
+        {
+            std::cerr << "[FAIL] when: " << c.hex << " should read " << c.expected << ", got " << (parsed.ok ? got.joinIntoString (" ") : parsed.error) << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] when :: a field read only when the byte that selects it holds its value\n";
+    return failures;
+}
+
 int runS21MsbFirstTests()
 {
     // A signed value in 21 bits, two's complement, most significant byte first: the KRONOS's
@@ -4458,6 +4510,10 @@ int main (int argc, char** argv)
         root.getChildFile ("korg-nautilus-exi.ceditor-device.json"),
         root.getChildFile ("korg-kronos-global.ceditor-device.json"),
         root.getChildFile ("korg-nautilus-global.ceditor-device.json"),
+        root.getChildFile ("korg-kronos-wave-sequence.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus-wave-sequence.ceditor-device.json"),
+        root.getChildFile ("korg-kronos-drum-kit.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus-drum-kit.ceditor-device.json"),
         root.getChildFile ("novation-peak.ceditor-device.json"),
         root.getChildFile ("novation-summit.ceditor-device.json"),
         root.getChildFile ("novation-bass-station-ii.ceditor-device.json"),
@@ -4650,6 +4706,7 @@ int main (int argc, char** argv)
     failures += runChecksumAlsoAcceptTests();
     failures += runDumpRecordTests();
     failures += runS21MsbFirstTests();
+    failures += runDumpWhenTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runCatalogSummaryTests (root);

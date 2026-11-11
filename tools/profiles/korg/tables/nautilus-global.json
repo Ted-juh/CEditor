@@ -75,36 +75,6 @@
       " continue to receive it, but not transmit it.",
       ""
     ],
-    "6D": [
-      "[6D] Scene Parameter Change                                               Receive/Transmit",
-      "        F0, 42, 3g, 00, 01, 5D  Excl Header",
-      "        6D                      Function",
-      "        TYP                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        SOC                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        SUB                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        PID                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        IDX                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        valueH                  Value   (bit14-20)   (*4)",
-      "        valueM                  Value   (bit7-13)    (*4)",
-      "        valueL                  Value   (bit0-6)     (*4)",
-      "        F7                      End of Excl",
-      ""
-    ],
-    "6E": [
-      "[6E] Arp/Drum Track Parameter Change                                      Receive/Transmit",
-      "        F0, 42, 3g, 00, 01, 5D  Excl Header",
-      "        6E                      Function",
-      "        TYP                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        SOC                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        SUB                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        PID                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        IDX                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
-      "        valueH                  Value   (bit14-20)   (*4)",
-      "        valueM                  Value   (bit7-13)    (*4)",
-      "        valueL                  Value   (bit0-6)     (*4)",
-      "        F7                      End of Excl",
-      ""
-    ],
     "currentObjectDumpRequest": [
       "[74] Current Object Dump Request                                          Receive",
       "        F0, 42, 3g, 00, 01, 5D  Excl Header",

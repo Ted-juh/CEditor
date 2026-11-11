@@ -957,6 +957,18 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
     if (!parameter) return failMatched('invalidDefinition', `Dump mapping references unknown parameter: ${parameterId}`, checksumStatus);
 
     let valueOffset = decodeBase + Number(mapping?.offset ?? 0);
+    // `when`: a field whose meaning another byte of the payload selects (a KRONOS EXi slot's engine
+    // settings, read only when the slot's Algorithm Type byte holds that engine), as
+    // DeviceProfileEngine.cpp reads it. Unmet, the parameter is not read.
+    const when = mapping?.when && typeof mapping.when === 'object' ? mapping.when : null;
+    if (when) {
+      const source = records ? bytes : decodeBytes;
+      const at = decodeBase + Number(when.offset ?? -1);
+      if (!Number.isInteger(at) || at < decodeBase || at >= source.length) {
+        return failMatched('invalidDefinition', `Dump mapping condition is outside the payload: ${parameterId}`, checksumStatus);
+      }
+      if ((source[at] & 0xff) !== Number(when.value)) continue;
+    }
     if (records) {
       const key = Number(mapping?.record ?? -1);
       if (!Number.isInteger(key) || key < 0) return failMatched('invalidDefinition', `Dump mapping names no record: ${parameterId}`, checksumStatus);
@@ -1075,6 +1087,13 @@ export function localBuildDumpMessage(profile, dumpId = '', values = {}) {
     if (encoded?.error) return fail(`Cannot encode ${parameterId}: ${encoded.error}`);
 
     const offset = Number(mapping?.offset ?? 0);
+    // A `when` field is written only where the dump being built already holds the selecting value.
+    const when = mapping?.when && typeof mapping.when === 'object' ? mapping.when : null;
+    if (when && (body[Number(when.offset)] ?? -1) !== Number(when.value)) {
+      consumed.delete(parameterId);
+      unmapped.push(parameterId);
+      continue;
+    }
     if (offset < 0 || offset + encoded.bytes.length > body.length) {
       return fail(`Mapping for ${parameterId} writes outside the payload `
         + `(offset ${offset}, ${encoded.bytes.length} byte(s), payload ${payloadSize})`);

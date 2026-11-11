@@ -80,6 +80,12 @@ function noteReason(note) {
 
 export function buildKronosProfile(data, layout) {
   checkMessages(data, layout);
+  // A keyed object (a drum kit, a wave sequence): its blocks printed once and repeated by stride are
+  // filled in, and each row's id is its key columns in the message's order.
+  const repeatNotes = [];
+  if (layout.message) {
+    data = { ...data, rows: expandRepeats(data.rows, layout.repeats, repeatNotes).map((r) => (r.key ? { ...r, id: layout.message.fields.map((f) => r.key[f.key]) } : r)) };
+  }
   const parameters = [];
   const recipes = new Map();
   const mappings = [];
@@ -92,18 +98,23 @@ export function buildKronosProfile(data, layout) {
   const bigEndian = data.rows.some((r) => /Big Endian/.test(r.note ?? ''));
 
   const header = exclusiveHeader(data);
-  const routeOf = (row) => (layout.functions ?? []).find((f) => f.group.test(row.group))?.code ?? '43';
+  const routeOf = (row) => (layout.functions ?? []).find((f) => f.group.test(row.group) && (!f.typ || f.typ.includes(row.id?.[0])))?.code ?? '43';
   const leaveOutOf = (row) => (layout.leaveOut ?? []).find((l) => l.group.test(row.group));
   const longForm = new Set();
 
   // Value lists a range's two ends can name in full: the voice model's AMS sources, and the EXi
   // engines by number (`00~09 | Off~EP-1`).
-  const lists = [ams, (data.engines ?? []).map((e) => ({ value: e.number, label: e.name }))].filter((l) => l.length);
-  const listFor = (labels, read) => lists.find((l) => l[read.min]?.label === labels[0] && l[read.max]?.label === labels[1]);
+  const effectTypes = (data.effects ?? []).map((t) => ({ value: t.number, label: t.name }));
+  const lists = [ams, (data.engines ?? []).map((e) => ({ value: e.number, label: e.name })), effectTypes].filter((l) => l.length);
+  // An end label the column could not hold whole is cut, at a word (`No Effect~Multitap` for type 185,
+  // `Multitap BPM Delay // Multitap BPM Delay`): it matches the start of the list's name.
+  const sameEnd = (printed, full, first) => printed === full || (`${first}~${full}`.length > VALUE_WIDTH && full.startsWith(printed.replace(/…$/, '')));
+  const listFor = (labels, read) => lists.find((l) => l[read.min]?.label === labels[0] && l[read.max] && sameEnd(labels[1], l[read.max].label, labels[0]));
 
   // A name printed for several settings of one group is numbered in the order printed: the chord pads'
   // eight notes, the 32 GE real-time parameters.
   const engineRows = engineSettings(data, layout);
+  const engineBlocks = engineBlockOffsets(data, layout);
   // Global's group cells print `USB    Input L`: runs of spaces are one.
   const tidy = (r) => (/\s{2,}/.test(r.group ?? '') || /\s{2,}/.test(r.name ?? '') ? { ...r, group: r.group.replace(/\s+/g, ' '), name: r.name.replace(/\s+/g, ' ') } : r);
   const rows = [...data.rows.map(tidy), ...engineRows.rows];
@@ -184,8 +195,9 @@ export function buildKronosProfile(data, layout) {
     // one that does not is sent, its value not depending on them, and not read back.
     const misfit = !row.engine && ((read.bytes > 1 && row.bit) || (read.bytes === 1 && (read.signed ? read.max - read.min : read.max) >= 2 ** bits.bits));
     const [typ, soc, sub, pid, idx] = row.id;
-    const idBytes = pid < 127 ? [typ, soc, sub, pid, idx] : [typ, soc, sub, 0x7f, (pid >> 7) & 0x7f, pid & 0x7f, idx];
-    const fn = routeOf(row);
+    const idBytes = layout.message ? row.id : pid < 127 ? [typ, soc, sub, pid, idx] : [typ, soc, sub, 0x7f, (pid >> 7) & 0x7f, pid & 0x7f, idx];
+    if (layout.message && idBytes.some((b) => b > 127)) throw new Error(`${row.group} ${row.name}: a key over 127`);
+    const fn = layout.message?.code ?? routeOf(row);
     // An engine's ids are the slot's, whatever engine is in it: another engine's setting may send the
     // same message, so the recipe names the engine.
     const recipeId = `${fn === '43' ? 'pc' : `pc${fn}_`}${idBytes.map(hex).join('')}${row.engine ? `_${camel(row.engine)}` : ''}`;
@@ -197,6 +209,15 @@ export function buildKronosProfile(data, layout) {
     if (labels && read.min === 0 && read.max === 1 && !labels.every((l, n) => numberLabel(l, n))) {
       // `* -> bypass, Invert Value`: the switch is sent as its effect's bypass, On as 0.
       choices = labels.map((l, n) => ({ id: camel(l.replace('…', '')) || `v${n}`, label: l, value: inverted ? 1 - n : n }));
+    } else if (!labels && read.min === 0 && !read.signed && row.value.split(',').length === read.max + 1 && row.value.split(',').every((l) => l.trim())) {
+      // A value printed as the whole list (`Multisample,Rest,Tie`): its names in order.
+      const used = new Set();
+      choices = row.value.split(',').map((l, n) => {
+        const base = camel(l) || `v${n}`;
+        const id = used.has(base) ? `${base}${n}` : base;
+        used.add(id);
+        return { id, label: l.trim(), value: n };
+      });
     } else if (labels && read.min === 0 && !read.signed && listFor(labels, read)) {
       const used = new Set();
       choices = listFor(labels, read).slice(0, read.max + 1).map((s) => {
@@ -214,6 +235,7 @@ export function buildKronosProfile(data, layout) {
     for (let n = 2; ids.has(id); n++) id = `${camel(row.group)}.${camel(leaf) || 'value'}${n}`;
     ids.add(id);
     const base = { id, name: label, group: row.group, description, access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipeId };
+    const wideChoice = choices?.some((c) => c.value > 127);
     const parameter = choices
       ? {
         ...base,
@@ -222,7 +244,8 @@ export function buildKronosProfile(data, layout) {
         choices,
         display: { mode: 'choice', shortLabel: camel(leaf) },
         normalization: { mode: 'choiceIndex' },
-        encoding: { type: 'enum' },
+        // Values past 127 (an Effect Type's 186 types) go as valueM valueL, 14 bits, high byte first.
+        encoding: { type: wideChoice ? 'u14-msb-lsb' : 'enum' },
         sendPolicy: { mode: 'onCommit', coalesce: true },
         ui: { preferredComponent: choices.length === 2 ? 'ToggleButton' : 'Combobox' },
       }
@@ -238,21 +261,41 @@ export function buildKronosProfile(data, layout) {
         ui: { preferredComponent: /\b(Level|Time|Intensity|Amount|Depth|Send)\b/.test(leaf) ? 'Slider' : 'Knob' },
       };
     parameters.push(parameter);
-    // A choice's value is one byte of the three, the low one: the template carries the two above it.
-    recipes.set(recipeId, { id: recipeId, kind: 'sysex', template: [...header, fn, ...idBytes.map(hex), ...(choices ? ['00', '00'] : []), '$encodedValue', 'F7'] });
-    if (pid >= 127) longForm.add(recipeId);
+    // A choice's value is the low one byte of the three (or two, past 127): the template carries the rest.
+    recipes.set(recipeId, { id: recipeId, kind: 'sysex', template: [...header, fn, ...idBytes.map(hex), ...(choices ? (wideChoice ? ['00'] : ['00', '00']) : []), '$encodedValue', 'F7'] });
+    if (!layout.message && pid >= 127) longForm.add(recipeId);
 
-    if (misfit) { leave(notReadBack, 'its bits are printed narrower than its range (`bit 0` for `00~02`), so where its value ends in the byte is not said', `${label} (bit ${row.bit}, ${row.data})`); continue; }
-    if (row.engine) { leave(notReadBack, `an EXi engine's own setting: ${layout.document.engines} gives its offset inside the engine's block, and the program table prints the block only as reserved bytes, without saying where the engine's table begins in it`, label); continue; }
-    if (read.bytes > 1) { leave(notReadBack, bigEndian ? 'a value over two bytes: the archive marks only the KARMA Start Seed\'s bytes `Big Endian` and does not say the order of the others' : 'a value over two bytes, whose byte order the archive does not say', label); continue; }
     if (read.extra.length) { leave(notReadBack, `a value the dump may hold as ${read.extra.join(', ')}, which the parameter does not offer`, label); continue; }
-    const codec = { type: 'bitfields', ...(read.signed ? { signed: true } : {}), parts: [{ at: 0, from: bits.from, bits: bits.bits, shift: 0 }], ...(inverted ? { map: [[0, 1], [1, 0]] } : {}) };
-    mappings.push({ parameter: parameter.id, offset: row.ofs, codec, read, bits });
+    // The field's parts: its bits, then the rest of its value in the bytes after (an engine's field
+    // at bits 7~5 runs on at 3~0), the earlier part the low bits; a value over whole bytes, low byte
+    // first. The tables' own layout says so (see the note on byte order).
+    let parts;
+    let at = row.ofs;
+    if (row.engine) {
+      const block = engineBlocks.get(row.slot);
+      at = block.base + row.ofs;
+      parts = [{ at: 0, from: bits.from, bits: bits.bits, shift: 0 }];
+      let shift = bits.bits;
+      for (const c of row.more ?? []) {
+        const b = readBits(c.bit);
+        parts.push({ at: c.ofs - row.ofs, from: b.from, bits: b.bits, shift });
+        shift += b.bits;
+      }
+      if ((read.signed ? read.max - read.min : read.max) >= 2 ** shift) { leave(notReadBack, 'its printed bits are narrower than its range', label); continue; }
+    } else {
+      if (misfit) { leave(notReadBack, 'its bits are printed narrower than its range (`bit 0` for `00~02`), so where its value ends in the byte is not said', `${label} (bit ${row.bit}, ${row.data})`); continue; }
+      parts = read.bytes > 1
+        ? Array.from({ length: read.bytes }, (unused, i) => ({ at: i, from: 0, bits: 8, shift: 8 * i }))
+        : [{ at: 0, from: bits.from, bits: bits.bits, shift: 0 }];
+    }
+    const codec = { type: 'bitfields', ...(read.signed ? { signed: true } : {}), parts, ...(inverted ? { map: [[0, 1], [1, 0]] } : {}) };
+    mappings.push({ parameter: parameter.id, offset: at, codec, read, bits, ...(row.engine ? { when: { offset: engineBlocks.get(row.slot).typeAt, value: row.engineNumber } } : {}) });
     parameter.access.canRead = true;
   }
 
+  const effects = effectParameters(data, layout, { header, ids, parameters, recipes });
   const routing = routingNotes(data, layout, { routeOf, leaveOutOf });
-  return shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing, readOnly, engineNotes: engineRows.notes });
+  return shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing, readOnly, engineNotes: engineRows.notes, engineBlocks, effects, repeatNotes });
 }
 
 /**
@@ -269,11 +312,21 @@ function engineSettings(data, layout) {
   const notes = [];
   if (!data.engines || !layout.engineSlots) return { rows, shared, notes };
   for (const engine of data.engines) {
-    if (engine.printedCount !== undefined && engine.printedCount !== engine.rows.length) throw new Error(`${engine.name}: ${engine.rows.length} rows where its heading prints ${engine.printedCount}`);
+    const named = engine.rows.filter((r) => !r.continues);
+    if (engine.printedCount !== undefined && engine.printedCount !== named.length) throw new Error(`${engine.name}: ${named.length} rows where its heading prints ${engine.printedCount}`);
+    // The rows that hold the rest of a value, after the row naming it (`[LFO1] Start Phase` at bits
+    // 7~5, then bits 3~0 of the next byte).
+    const more = new Map();
+    engine.rows.forEach((r, i) => {
+      if (!r.continues) return;
+      let j = i - 1;
+      while (j >= 0 && engine.rows[j].continues) j--;
+      if (j >= 0) more.set(engine.rows[j], [...(more.get(engine.rows[j]) ?? []), r]);
+    });
     const byId = new Map();
-    for (const r of engine.rows.filter((x) => x.id)) byId.set(r.id.join(' '), [...(byId.get(r.id.join(' ')) ?? []), r]);
+    for (const r of named.filter((x) => x.id)) byId.set(r.id.join(' '), [...(byId.get(r.id.join(' ')) ?? []), r]);
     for (const slot of layout.engineSlots) {
-      for (const r of engine.rows) {
+      for (const r of named) {
         if (!r.id) continue;
         if (r.typ !== '11/12') throw new Error(`${engine.name} ${r.name}: TYP printed ${r.typ}`);
         const m = /^(\[[^\]]+\])\s*(.*)$/.exec(r.name);
@@ -282,16 +335,17 @@ function engineSettings(data, layout) {
           group: `${slot.label} ${engine.name}${m ? ` ${m[1]}` : ''}`,
           name: m ? m[2] || m[1] : r.name,
           data: r.data, value: r.value, id: [slot.typ, ...r.id], ...(r.note ? { note: r.note } : {}),
-          engine: engine.name,
+          engine: engine.name, engineNumber: engine.number, slot: slot.label,
+          ...(more.has(r) ? { more: more.get(r).map((c) => ({ ofs: c.ofs, bit: c.bit })) } : {}),
         };
         rows.push(row);
         if (byId.get(r.id.join(' ')).length > 1) sharedRows.push(row);
       }
     }
     // One reason per engine: the blocks whose settings share their ids (the EP-1's effects).
-    const blocks = [...new Set(engine.rows.filter((r) => r.id && byId.get(r.id.join(' ')).length > 1).map((r) => /^(\[[^\]]+\])/.exec(r.name)?.[1] ?? r.name))];
+    const blocks = [...new Set(named.filter((r) => r.id && byId.get(r.id.join(' ')).length > 1).map((r) => /^(\[[^\]]+\])/.exec(r.name)?.[1] ?? r.name))];
     for (const row of sharedRows.splice(0)) shared.set(row, `${engine.name} prints the same ids for the settings of ${blocks.length} blocks (${blocks.join(', ')}), one meaning per block chosen`);
-    if (engine.rows.length) notes.push(`${engine.name} ${engine.rows.length}`);
+    if (named.length) notes.push(`${engine.name} ${named.length}`);
   }
   return { rows, shared, notes };
 }
@@ -342,6 +396,97 @@ export function presetBanks(banks, column, objectName) {
   return { banks: out, alternates };
 }
 
+/**
+ * Each effect slot's own parameters, from Effect.txt: a parameter per pid (1 up to the largest any
+ * type in the slot's Effect Type range has), sent by Parameter Change as TYP 6, the slot in SOC, the
+ * pid in PID. The program table's Switch row goes out as that address with pid 0 (`6 0 0 0 0`,
+ * `* -> bypass`), and pid 0 is Bypass in every type: the reading that TYP 6 is the effects' own
+ * parameters. A pid means what the slot's type makes it, so its range is the widest any type gives
+ * it, and it is not read back (each type lays the slot's bytes out its own way).
+ */
+function effectParameters(data, layout, { header, ids, parameters, recipes }) {
+  if (!data.effects?.length) return null;
+  // The slots, by their Effect Type rows; the effects' TYP, by the switch rows' bypass address (6 in a
+  // program, 23 in a combination), which must be one TYP with PID 0, the slot in SOC as for its type.
+  const slots = data.rows.filter((r) => r.name === 'Effect Type' && r.id?.[3] === 0);
+  const bypass = data.rows.filter((r) => /bypass, Invert Value/.test(r.note ?? ''));
+  const effectTyp = new Set(bypass.map((r) => r.id[0]));
+  if (!slots.length || effectTyp.size !== 1 || !bypass.every((r) => r.id[3] === 0 && slots.some((sl) => sl.group === r.group && sl.id[1] === r.id[1]))) {
+    throw new Error(`${layout.name}: the effect switches no longer go out as one TYP, PID 0, the slot in SOC`);
+  }
+  const typ = [...effectTyp][0];
+  if (!data.effects.filter((t) => t.rows.length).every((t) => t.rows.some((r) => r.pid === 0 && r.name === 'Bypass'))) throw new Error(`${layout.name}: an effect type whose pid 0 is not Bypass`);
+  let count = 0;
+  let typeMax = 0;
+  for (const slot of slots) {
+    const range = readData(slot.data);
+    typeMax = range.max;
+    const types = data.effects.filter((t) => t.number >= range.min && t.number <= range.max && t.rows.length);
+    const byPid = new Map();
+    for (const t of types) for (const r of t.rows) if (r.pid > 0 && !/fixed/.test(r.data)) byPid.set(r.pid, [...(byPid.get(r.pid) ?? []), { type: t, row: r }]);
+    for (const [pid, uses] of [...byPid].sort((a, b) => a[0] - b[0])) {
+      const reads = uses.map((u) => readData(u.row.data)).filter((x) => x && !x.cut && !x.fixed);
+      if (!reads.length) continue;
+      const min = Math.min(...reads.map((x) => x.min));
+      const max = Math.max(...reads.map((x) => x.max));
+      const idBytes = [typ, slot.id[1], 0, pid, 0];
+      const recipeId = `pc${idBytes.map(hex).join('')}`;
+      if (recipes.has(recipeId)) throw new Error(`${layout.name}: effect parameter ${idBytes.join(' ')} twice`);
+      const id = `${camel(slot.group)}.parameter${pid}`;
+      ids.add(id);
+      const examples = uses.slice(0, 3).map((u) => `${u.type.name}: ${u.row.name}`).join('; ');
+      parameters.push({
+        id,
+        name: `${slot.group} Parameter ${pid}`,
+        group: slot.group,
+        description: `Parameter id ${idBytes.map(hex).join(' ')}. Effect.txt's pid ${pid} of the slot's effect type, which ${uses.length} of its ${types.length} types have (${examples}${uses.length > 3 ? '; …' : ''}); its range here is the widest of theirs, ${min}~${max}.`,
+        access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
+        messageRecipe: recipeId,
+        type: 'integer',
+        range: { min, max },
+        default: min <= 0 && max >= 0 ? 0 : min,
+        display: { mode: 'number', unit: '', shortLabel: `p${pid}` },
+        normalization: { mode: 'linear' },
+        encoding: { type: 's21-msb-lsb' },
+        sendPolicy: { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true },
+        ui: { preferredComponent: 'Knob' },
+      });
+      recipes.set(recipeId, { id: recipeId, kind: 'sysex', template: [...header, '43', ...idBytes.map(hex), '$encodedValue', 'F7'] });
+      count++;
+    }
+  }
+  const beyond = data.effects.filter((t) => t.number > typeMax);
+  return { count, slots: slots.length, types: data.effects.length, typeMax, typ, beyond: beyond.map((t) => `${t.number} ${t.name}`) };
+}
+
+/**
+ * Where each EXi slot's engine table starts in the program: the run of reserved bytes the program
+ * table prints after the slot's own rows (its common settings, output and mixers). It starts the same
+ * distance after the slot's Algorithm Type in both slots, and every engine's table fits in it: both
+ * checked, the build stopping where either fails.
+ */
+function engineBlockOffsets(data, layout) {
+  const blocks = new Map();
+  if (!layout.engineSlots) return blocks;
+  const slots = layout.engineSlots.map((slot) => {
+    const typeRow = data.rows.find((r) => r.group === `${slot.label} Common` && r.name === 'Algorithm Type');
+    const own = data.rows.filter((r) => r.group.startsWith(`${slot.label} `));
+    if (!typeRow || !own.length) throw new Error(`${layout.name}: no Algorithm Type or rows for ${slot.label}`);
+    const last = Math.max(...own.map((r) => r.ofs));
+    const run = (data.reserved ?? []).find((x) => x.from > last);
+    if (!run) throw new Error(`${layout.name}: no reserved run after ${slot.label}'s rows`);
+    return { label: slot.label, typeAt: typeRow.ofs, base: run.from, end: run.to + 1 };
+  });
+  const distances = new Set(slots.map((s) => s.base - s.typeAt));
+  if (distances.size !== 1) throw new Error(`${layout.name}: the EXi slots' engine tables start at different distances from their Algorithm Type (${[...distances].join(', ')})`);
+  const longest = Math.max(...(data.engines ?? []).flatMap((e) => e.rows.map((r) => r.ofs)));
+  for (const s of slots) {
+    if (s.base + longest >= s.end) throw new Error(`${layout.name}: an engine table runs past ${s.label}'s block`);
+    blocks.set(s.label, { ...s, distance: s.base - s.typeAt, longest });
+  }
+  return blocks;
+}
+
 /** Which TYP each EXi slot's rows of the program table print: `EXi1 Mod.Mixer1 Type` with 11, EXi2's 12. */
 function slotEvidence(data, layout) {
   return (layout.engineSlots ?? []).map((slot) => {
@@ -349,6 +494,57 @@ function slotEvidence(data, layout) {
     if (!row || row.id[0] !== slot.typ) throw new Error(`${layout.name}: the program table's ${slot.label} rows do not take TYP ${slot.typ}`);
     return `${row.group} ${row.name}, TYP ${row.id[0]}`;
   });
+}
+
+/**
+ * A block a table prints once in full and then by the first and last rows of each repeat (a drum
+ * kit's eight zones and 128 notes, a wave sequence's 64 steps): `repeats` names the template's group
+ * (`prefix`, the whole group or the start of it), the repeat's (`make(n)`), how many, and the key
+ * column that counts them. The stride is the second block's first row less the template's; every
+ * printed first and last row is checked against it (offset, name, keys), and the rest is filled in.
+ * A printed group name that differs from the one the stride gives is said in `notes`.
+ */
+export function expandRepeats(rows, repeats, notes = []) {
+  let out = rows;
+  for (const rep of repeats ?? []) {
+    const matches = (g, prefix) => (rep.exact ? g === prefix : g.startsWith(prefix));
+    const template = out.filter((r) => r.key && matches(r.group, rep.prefix));
+    if (!template.length) throw new Error(`repeat ${rep.prefix}: no template rows`);
+    const anchors = new Map();
+    for (let n = 2; n <= rep.count; n++) anchors.set(n, out.filter((r) => r.key && matches(r.group, rep.make(n))));
+    const second = anchors.get(2);
+    if (!second?.length) throw new Error(`repeat ${rep.prefix}: no second block printed`);
+    const stride = second[0].ofs - template[0].ofs;
+    const expect = (t, n) => ({ ofs: t.ofs + stride * (n - 1), name: t.name, key: { ...t.key, [rep.key]: t.key[rep.key] + (n - 1) } });
+    for (const [n, printed] of anchors) {
+      // The rows printed for a block: its first, and those of its last byte (the bit fields sharing it).
+      const lastByte = template.filter((t) => t.ofs === template.at(-1).ofs);
+      for (const p of printed) {
+        const t = p === printed[0] ? template[0] : lastByte.find((x) => x.name === p.name && x.bit === p.bit);
+        if (!t) throw new Error(`repeat ${rep.prefix}: block ${n} prints a row between its first and last bytes (${p.name})`);
+        const e = expect(t, n);
+        if (p.ofs !== e.ofs || p.name !== e.name || JSON.stringify(p.key) !== JSON.stringify(e.key)) {
+          throw new Error(`repeat ${rep.prefix}: block ${n}'s printed ${p.name} at ${p.ofs} is not the template's at stride ${stride}`);
+        }
+        const group = rep.make(n) + t.group.slice(rep.prefix.length);
+        if (p.group !== group) notes.push(`${p.group} (offset ${p.ofs}) is printed where the stride gives ${group}; read as ${group}`);
+      }
+    }
+    const printedIn = new Set([...anchors.values()].flat());
+    const expanded = [];
+    for (const r of out) {
+      if (printedIn.has(r)) continue;
+      expanded.push(r);
+      if (r === template.at(-1)) {
+        for (let n = 2; n <= rep.count; n++) {
+          for (const t of template) expanded.push({ ...t, ...expect(t, n), group: rep.make(n) + t.group.slice(rep.prefix.length), repeated: n });
+        }
+      }
+    }
+    notes.push(`${rep.prefix.trim()}: ${rep.count} blocks ${stride} bytes apart, the table printing the first in full and the others by their first and last rows, each checked`);
+    out = expanded;
+  }
+  return out;
 }
 
 /** The object the table is, by its number in *1: 00 Program (the default), 01 Combination, … */
@@ -387,9 +583,17 @@ function routingNotes(data, layout, { routeOf, leaveOutOf }) {
     }
     return [...groups].map(([group, g]) => `${group}, ${g.shared} of ${g.rows}${g.example ? ` (${g.example})` : ''}`).join('; ');
   };
+  const inRoute = (f, r) => f.group.test(r.group) && (!f.typ || f.typ.includes(r.id[0]));
   const notes = (layout.functions ?? []).map((f) => {
-    const rows = settings.filter((r) => routeOf(r) === f.code && !leaveOutOf(r));
-    return `The rows of ${f.group.source.replace(/^\^/, '').trim()}… go by ${f.message} (function ${f.code}), the same message as Parameter Change under another code. The table prints no message per row. Per group, the rows whose ids Parameter Change also takes for another row, and so cannot go by it: ${tally(rows)}. A group goes by one message: one with such rows cannot go by Parameter Change, and one with none goes by ${f.code} on the message's name alone. A reading, not tried on an instrument.`;
+    // A layout's evidence for a route, checked against the table: `checks` name rows and the PID each
+    // must print (the NAUTILUS's Scene Common where the KRONOS's KARMA Common has them).
+    for (const c of f.checks ?? []) {
+      const row = settings.find((r) => inRoute(f, r) && r.name === c.name);
+      if (!row || row.id[3] !== c.pid) throw new Error(`${layout.name}: ${f.group.source} ${c.name} is no longer PID ${c.pid}`);
+    }
+    const rows = settings.filter((r) => routeOf(r) === f.code && inRoute(f, r) && !leaveOutOf(r));
+    const groups = f.group.source.replace(/^\^|\$$/g, '').replace(/\\/g, '').trim();
+    return `The rows of ${groups}${f.typ ? ` with TYP ${f.typ.join(' or ')}` : ''}… go by ${f.message} (function ${f.code}), the same message as Parameter Change under another code${f.why ? `: ${f.why}` : ''}. The table prints no message per row. Per group, the rows whose ids Parameter Change also takes for another row, and so cannot go by it: ${tally(rows)}. A group with such rows cannot go by Parameter Change; one with none goes by ${f.code} on ${f.why ? 'the reason given' : 'the message\'s name'} alone. A reading, not tried on an instrument.`;
   });
   for (const l of layout.leaveOut ?? []) {
     const rows = settings.filter((r) => leaveOutOf(r) === l);
@@ -420,6 +624,15 @@ function checkMessages(data, layout) {
     has(data.voiceModel.messageFormats, /7F pp pp: \(14-bit, MSB first\)/, 'the voice model\'s long parameter id');
   }
   for (const code of layout.citedMessages ?? []) has(m[code], new RegExp(`^\\[${code}\\]`), `the block of function ${code}`);
+  // A keyed object's own parameter change: its fields after the function code, as the layout sends them.
+  if (layout.message) {
+    const block = m[layout.message.code] ?? [];
+    const fields = block.slice(block.findIndex((l) => /^\s*[0-9A-F]{2}\s+Function/.test(l)) + 1).map((l) => /^\s+(\S+)\s{2,}/.exec(l)?.[1]).filter(Boolean);
+    const printed = layout.message.fields.map((f) => f.printed);
+    if (fields.slice(0, printed.length).join(' ') !== printed.join(' ') || !/^valueH$/.test(fields[printed.length])) {
+      throw new Error(`${layout.name} archive: function ${layout.message.code} no longer reads ${printed.join(' ')} valueH …`);
+    }
+  }
   has(m.value, /21-bit 2's complement/, 'footnote *4');
   has(m.currentObjectDumpRequest, /^\s*74\s+Function/, 'Current Object Dump Request (function 74)');
   has(m.currentObjectDump, /^\s*version\s+obj's version number/, 'the Current Object Dump\'s version byte');
@@ -432,7 +645,7 @@ function checkMessages(data, layout) {
   has(m.packing, /sysExSize = binarySize \+ \(binarySize\+6\)\/7/, 'the packed size');
 }
 
-function shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing, readOnly = [], engineNotes = [] }) {
+function shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing, readOnly = [], engineNotes = [], engineBlocks = new Map(), effects = null, repeatNotes = [] }) {
   const object = data.object;
   const instrument = layout.family;
   const packed = object.size + Math.floor((object.size + 6) / 7);
@@ -440,8 +653,8 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
   const kind = objectName.toLowerCase();
   const prefix = [...header, '75', code, hex(object.objectVersion)];
   const request = [...header, '74', code, 'F7'];
-  const requestId = `requestCurrent${objectName}`;
-  const dumpId = `current${objectName}Dump`;
+  const requestId = `requestCurrent${objectName.replace(/\s+/g, '')}`;
+  const dumpId = `current${objectName.replace(/\s+/g, '')}Dump`;
   const device = (t) => (t === '$deviceId' ? '30' : t);
 
   // The Device Inquiry reply as printed: after KORG's 42, the two bytes where the universal reply puts
@@ -460,7 +673,7 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
   const byId = new Map(parameters.map((p) => [p.id, p]));
   const recipeOf = (p) => recipes.get(p.messageRecipe);
   // A choice's byte is the low one of three; its template carries the two above it.
-  const wireOf = (p, value) => (p.type === 'choice' ? [hex(p.choices.find((c) => c.id === value).value)] : [(value >> 14) & 0x7f, (value >> 7) & 0x7f, value & 0x7f].map((b) => hex(b & 0x7f)));
+  const wireOf = (p, value) => (p.type === 'choice' ? (({ value: v }) => (p.encoding.type === 'u14-msb-lsb' ? [hex(v >> 7), hex(v & 0x7f)] : [hex(v)]))(p.choices.find((c) => c.id === value)) : [(value >> 14) & 0x7f, (value >> 7) & 0x7f, value & 0x7f].map((b) => hex(b & 0x7f)));
   const vector = (p, value) => ({
     name: `${p.name} = ${p.type === 'choice' ? p.choices.find((c) => c.id === value).label : value} (parameter change)`,
     parameter: p.id,
@@ -532,13 +745,18 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
         notes: `Rows read by tools/profiles/korg/read-kronos-table.mjs from ${source.file} (sha256 ${source.sha256}) in ${source.archive} of ${source.archiveDate}, ${source.url}. Not yet checked against the instrument itself.`,
       },
       ...data.files.map((f) => ({ type: 'manual', title: `${source.title}: ${f.file}${f.printed ? ` (${f.printed})` : ''}`, notes: `${f.file} (sha256 ${f.sha256}) in ${source.archive}.` })),
+      ...(data.effectsSource ? [{ type: 'manual', title: `${source.title}: ${data.effectsSource.file}`, notes: `${data.effectsSource.file} (sha256 ${data.effectsSource.sha256}) in ${source.archive}, read by readEffectTables into tools/profiles/korg/tables/; shared by the instrument's profiles.` }] : []),
     ],
     testedWith: [],
     authoringNotes: [
       'Generated by tools/profiles/korg/make-profiles.mjs; edit the layout in tools/profiles/korg/synths/, not this file.',
-      `Every row of ${source.file} with a parameter id is a parameter, named by its group and its name as printed, and sent by Parameter Change (function 43): ${header.map(device).join(' ').replace(/^F0 42 30/, 'F0 42 3g')} 43 TYP SOC SUB PID IDX and the value as 21 bits, two's complement, high byte first (*4). Nothing here has been sent to a real instrument yet.`,
+      layout.message
+        ? `Every row of ${source.file} with a parameter id is a parameter, named by its group and its name as printed, and sent by ${layout.message.name} (function ${layout.message.code}): ${header.map(device).join(' ').replace(/^F0 42 30/, 'F0 42 3g')} ${layout.message.code} ${layout.message.fields.map((f) => f.printed).join(' ')} and the value as 21 bits, two's complement, high byte first (*4), the table's ${layout.message.fields.map((f) => f.key).join(', ')} columns giving the ${layout.message.fields.map((f) => f.printed).join(', ')}. Nothing here has been sent to a real instrument yet.`
+        : `Every row of ${source.file} with a parameter id is a parameter, named by its group and its name as printed, and sent by Parameter Change (function 43): ${header.map(device).join(' ').replace(/^F0 42 30/, 'F0 42 3g')} 43 TYP SOC SUB PID IDX and the value as 21 bits, two's complement, high byte first (*4). Nothing here has been sent to a real instrument yet.`,
+      ...repeatNotes.map((n) => `Repeated blocks: ${n}.`),
       ...routing,
-      `${layout.scope} The ${instrument} takes ${kind} parameters in ${objectName} mode ("Which parameters are currently available for editing depends on the instrument's mode"). The effects' own parameters, which depend on the effect type (Effect.txt), are not here.`,
+      `${layout.scope} The ${instrument} takes ${kind} parameters in ${objectName} mode ("Which parameters are currently available for editing depends on the instrument's mode"). ${effects ? '' : 'The effects\' own parameters, which depend on the effect type (Effect.txt), are not here.'}`.trim(),
+      ...(effects ? [`The effects' own parameters: ${effects.count} for the ${effects.slots} effect slots, a parameter per pid of Effect.txt (\`Insert Effect1 Parameter 5\`), sent by Parameter Change as TYP ${effects.typ} with the slot in SOC and the pid in PID. The table's effect switch goes out as that address with pid 0 (\`${effects.typ} 0 0 0 0\`, \`* -> bypass\`), and pid 0 is Bypass in every type, which the builder checks: TYP ${effects.typ} is read as the effects' own parameters, a reading, not tried on an instrument. A pid means what the slot's effect type makes it (its description gives some), so its range is the widest any type gives it, and it is not read back: each type lays the slot's bytes out its own way. Effect Type is a choice of the ${effects.typeMax + 1} types its range ${'0~' + effects.typeMax} reaches${effects.beyond.length ? `; Effect.txt also lists ${effects.beyond.length} beyond it (${effects.beyond.slice(0, 2).join(', ')}, …), outside the range the table prints, and not offered` : ''}.`] : []),
       `A range whose first value is the larger (9D~63) is two's complement over its bytes, -99~+99. A choice is a row naming both of two values${amsUsed ? ', or a row whose ends are the ends of the voice model\'s AMS source list (Off~Tempo, sources 0~48)' : ''}. The value column is 19 characters wide; a name it cuts short keeps its cut, with an ellipsis. Other value names are in each parameter's description.`,
       ...(longForm.size ? ['A parameter id above 126 takes the message\'s second form, 7F PIDH PIDL, which the archive calls deprecated and says the instrument still receives.'] : []),
       ...(layout.renames ?? []).map((r) => `"${r.name}" as "${r.to}": ${r.why}.`),
@@ -547,6 +765,10 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
       ...(fixed.length ? [`${fixed.length} rows with an id print a fixed value (\`10(fixed)\`, \`00(fixed)\`: ${[...new Set(fixed.map((l) => l.replace(/ \d+$/, '')))].slice(0, 3).join('; ')}; …) and are not settings.`] : []),
       ...summary(leftOut).map((s) => `Left out: ${s}.`),
       `Pull: Current Object Dump Request (function 74) for object ${code}, the ${kind}, answered by a Current Object Dump (function 75) carrying object version ${object.objectVersion} and ${object.size} bytes in Korg's 8-in-7 packing (*3: ${packed} bytes). ${mappings.length} parameters are read back at their rows' offsets and bits. A dump of any other length does not match${layout.otherLength ? `: ${layout.otherLength}` : ''}.`,
+      ...(mappings.some((m) => m.codec.parts.length > 1)
+        ? [`Byte order: a value over whole bytes is read low byte first, and a field that runs on into the next byte has its low bits in the earlier one. The tables fill each byte from bit 0 upward (every effect's Bypass is bit 0 of its first byte, Wet/Dry bits 7~1 beside it), and a field crossing a byte continues upward in the next (an EXi engine's [LFO1] Start Phase at bits 7~5, then 3~0): the layout of a little-endian structure.${data.rows.some((r) => /Big Endian/.test(r.note ?? '')) ? ' The one exception the archive marks, the KARMA Start Seed (`* Big Endian`), is left out.' : ''} A reading, not tried on an instrument.`]
+        : []),
+      ...[...engineBlocks.values()].slice(0, 1).map((b) => `The EXi engines' settings are read back from each slot's engine block, at their ${layout.document.engines} offset from its start: ${[...engineBlocks.values()].map((x) => `${x.label} bytes ${x.base}~${x.end - 1}, starting ${x.distance} bytes after its Algorithm Type`).join('; ')}. The program table prints the blocks as reserved bytes, and does not say where an engine's table starts in its slot's; read here as at the run's start, the same distance from the Algorithm Type in both slots, every engine's table fitting (the longest reaches byte ${b.longest} of it). A reading, not tried on an instrument. A setting is read only when its slot's Algorithm Type holds its engine (the mapping's \`when\`).`),
       ...summary(notReadBack).map((s) => `Sent and not read back: ${s}.`),
       'The exclusive header carries the global MIDI channel as 3g; the profile\'s deviceId variable is that byte, 30H for channel 1.',
       `Identity: the Device Inquiry reply (${layout.document.implementation}) is printed ${reply.join(' ')}${reply.length !== universalLength ? `, ${reply.length} bytes where the universal reply has ${universalLength}` : ''}. Its 7th to ${6 + checked.length}th bytes, ${checked.join(' ')}, are checked as printed, where the universal reply puts the family${checked.length > 2 ? ' and member' : ''} code${members.length ? `; its ${reply.indexOf('mm') + 1}th byte, mm, is one per model and is not checked: ${members.join(', ')}` : ''}.`,
@@ -588,7 +810,18 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
       payload: { offset: prefix.length, size: object.size, pack: { type: 'packed8to7', packOrder: 'msb-low-first', groupSize: 7 } },
       // Exactly this long: a program of an EXi bank comes back under the same header as an HD-1's.
       completion: { expectedMessages: 1, expectedBytes: prefix.length + packed + 1, maxBytes: prefix.length + packed + 1 },
-      mappings: mappings.map(({ parameter, offset, codec }) => ({ parameter, offset, codec })),
+      mappings: mappings.map(({ parameter, offset, codec, when }) => ({ parameter, offset, codec, ...(when ? { when } : {}) })),
     }],
   };
+}
+
+/**
+ * The library's profile text (stringifyProfile), with one message recipe per line as well: a profile
+ * here has a recipe per parameter, and written out over a dozen lines each they were most of its size.
+ */
+export function stringifyKronosProfile(profile, stringifyProfile) {
+  const { messageRecipes, ...rest } = profile;
+  const text = stringifyProfile({ ...rest, messageRecipes: '\u0000RECIPES\u0000' });
+  const lines = messageRecipes.map((r, i) => `    ${JSON.stringify(r)}${i < messageRecipes.length - 1 ? ',' : ''}`).join('\n');
+  return text.replace('"\\u0000RECIPES\\u0000"', `[\n${lines}\n  ]`);
 }

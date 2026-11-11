@@ -15,6 +15,5 @@ export default {
   coverageOf: 'Global',
   description: 'Korg NAUTILUS: its Global settings (tuning, curves, controller assignments, user scales, audio inputs, MIDI) by SysEx parameter change, read back from Global.',
   document: { ...nautilus.document, object: 'SysExDumps/Global.txt' },
-  citedMessages: nautilus.citedMessages,
   functions: [],
 };

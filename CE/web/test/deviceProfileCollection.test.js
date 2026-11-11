@@ -134,3 +134,29 @@ test('s21-msb-lsb: two\'s complement over 21 bits, high byte first, sent and rea
   }
   assert.deepEqual(localParseDumpMessage(probe, 'F0 42 30 68 4C 7F 7F 4E 4E F7').values, { tune: -50, intensity: -50, level: 78 });
 });
+
+// `when`: a field another byte selects (a KRONOS EXi slot's engine settings, read only when the
+// slot's Algorithm Type holds that engine). The C++ engine's runDumpWhenTests checks the same probe.
+test('when: a field is read only when the byte that selects it holds its value', () => {
+  const u7 = (id) => ({ id, name: id, type: 'integer', range: { min: 0, max: 127 }, encoding: { type: 'u7' }, access: { canRead: true } });
+  const probe = {
+    schemaVersion: 1,
+    id: 'probe-when',
+    parameters: [u7('engine'), u7('alCutoff'), u7('cxDrawbar')],
+    dumpDefinitions: [{
+      id: 'probe',
+      kind: 'sysex',
+      matcher: { prefix: ['F0', '7D', '05'], suffix: ['F7'] },
+      payload: { offset: 3, size: 2 },
+      completion: { expectedBytes: 6 },
+      mappings: [
+        { parameter: 'engine', offset: 0 },
+        { parameter: 'alCutoff', offset: 1, when: { offset: 0, value: 2 } },
+        { parameter: 'cxDrawbar', offset: 1, when: { offset: 0, value: 3 } },
+      ],
+    }],
+  };
+  assert.deepEqual(localParseDumpMessage(probe, 'F0 7D 05 02 40 F7').values, { engine: 2, alCutoff: 64 });
+  assert.deepEqual(localParseDumpMessage(probe, 'F0 7D 05 03 40 F7').values, { engine: 3, cxDrawbar: 64 });
+  assert.deepEqual(localParseDumpMessage(probe, 'F0 7D 05 00 40 F7').values, { engine: 0 });
+});
