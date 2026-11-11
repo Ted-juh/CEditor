@@ -622,3 +622,18 @@ test('the NAUTILUS: its own header on every message, its reply checked as printe
   assert.ok(!profile.parameters.some((p) => /^(Scene|Step Seq)/.test(p.group)), 'their message is not settled');
   assert.ok(profile.authoringNotes.some((n) => n.startsWith('Left out, the scenes:')));
 });
+
+test('the combinations: object 01 asked for and read, sixteen timbres told apart by SOC', { skip: !builtProfile('korg-kronos-combination') || !builtProfile('korg-nautilus-combination') }, () => {
+  for (const [id, header] of [['korg-kronos-combination', ['F0', '42', '$deviceId', '68']], ['korg-nautilus-combination', ['F0', '42', '$deviceId', '00', '01', '5D']]]) {
+    const profile = builtProfile(id);
+    const recipes = new Map(profile.messageRecipes.map((r) => [r.id, r]));
+    const request = profile.requests.find((r) => r.id === 'requestCurrentCombination');
+    assert.deepEqual(request.template, [...header, '74', '01', 'F7'], id);
+    assert.deepEqual(profile.dumpDefinitions[0].matcher.prefix.slice(0, -1), [...header, '75', '01'], id);
+    for (let timbre = 1; timbre <= 16; timbre++) {
+      const volume = profile.parameters.find((p) => p.name === `Timbre${timbre} Volume`);
+      assert.deepEqual(recipes.get(volume.messageRecipe).template.slice(header.length, header.length + 6), ['43', '04', hex([timbre - 1]), '00', '02', '00'], `${id} Timbre${timbre}`);
+    }
+  }
+  assert.ok(!builtProfile('korg-nautilus-combination').parameters.some((p) => /^(Scene|Step Seq)/.test(p.group)));
+});

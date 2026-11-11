@@ -4452,6 +4452,8 @@ int main (int argc, char** argv)
         root.getChildFile ("korg-vox-continental.ceditor-device.json"),
         root.getChildFile ("korg-kronos.ceditor-device.json"),
         root.getChildFile ("korg-nautilus.ceditor-device.json"),
+        root.getChildFile ("korg-kronos-combination.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus-combination.ceditor-device.json"),
         root.getChildFile ("novation-peak.ceditor-device.json"),
         root.getChildFile ("novation-summit.ceditor-device.json"),
         root.getChildFile ("novation-bass-station-ii.ceditor-device.json"),

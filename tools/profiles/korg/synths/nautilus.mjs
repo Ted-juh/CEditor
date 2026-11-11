@@ -8,6 +8,9 @@ export default {
   name: 'Korg NAUTILUS',
   family: 'NAUTILUS',
   format: 'kronos',
+  scope: 'An HD-1 program only: a program of an EXi bank is laid out in Prog_EXi_Common.txt and Prog_EXi.txt, not here.',
+  coverageOf: 'an HD-1 program',
+  otherLength: 'a program of an EXi bank, laid out otherwise, comes back under the same header',
   description: 'Korg NAUTILUS: the oscillators, filters, envelopes, effects and controllers of an HD-1 program by SysEx parameter change, read back from the current program.',
   document: {
     title: 'NAUTILUS MIDI Implementation',

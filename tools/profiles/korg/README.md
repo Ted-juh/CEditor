@@ -69,6 +69,8 @@ What the builder takes as settled, and what it does not:
 | `korg-volca-nubass` | volca nubass MIDI Implementation 1.00 | 11 | 0 | — | — |
 | `korg-kronos` | KRONOS MIDI Implementation archive (2025-07-24): `Prog_HD-1.txt` 1.01, `KRONOS_MIDI_SysEx.txt` 1.27 | 1,790 | 376 | — | 68H 00H |
 | `korg-nautilus` | NAUTILUS MIDI Implementation archive (2022-09-22): `SysExDumps/Prog_HD-1.txt`, `NAUTILUS_MIDI_SysEx.txt` 1.0 | 1,019 | 122 | — | 00H 01H 5DH 00H |
+| `korg-kronos-combination` | the KRONOS archive: `CombiAndSongTimbreSet.txt` 1.01 | 6,109 | 2,139 | — | 68H 00H |
+| `korg-nautilus-combination` | the NAUTILUS archive: `SysExDumps/CombiAndSongTimbreSet.txt` | 2,433 | 767 | — | 00H 01H 5DH 00H |
 
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
 try to recognise them. The VOX Continental prints its reply inline with two member codes, 05 for the
@@ -260,6 +262,17 @@ family, 68 00, and not the member.
 - 1,019 settings are sent and 974 read back from the 4,229-byte dump; 45 values over two bytes are
   sent and not read back (the NAUTILUS marks none `Big Endian`).
 
+**Combinations.** A layout names the object it reads (`object: { code: '01', name: 'Combination' }`,
+checked against the archive's list of objects, `*1`), and the profile asks for and reads that object:
+`korg-kronos-combination` and `korg-nautilus-combination`, from `CombiAndSongTimbreSet.txt`, edited
+in Combination mode. Sixteen timbres (TYP 4 and 28, the timbre in SOC), the effects, the controllers;
+on the KRONOS four KARMA modules. A combination's ids have TYPs of their own, so in it no KARMA or
+Drum Track row clashes with a Parameter Change id: they go by 6D and 6E on the messages' names
+alone, as each profile says. The NAUTILUS's scenes and step sequencers are left out here too: in a
+combination their ids are unique under 43, 6D and 6E alike. The KRONOS combination sends 6,109
+settings and reads 4,521 back (1,460 values over two bytes are not, most of them the KARMA GE
+parameters); the NAUTILUS's sends 2,433 and reads 1,855.
+
 ## Pull
 
 `build-korg-dump.mjs` reads the program table (`TABLE 2 : PROGRAM PARAMETER`) into fields and asks
@@ -338,15 +351,15 @@ Kept as printed and said where it applies:
   unit; the profile sends the single channel mode's NRPNs.
 - **The microKORG's and microKORG S's Pull**: their program tables print offsets and bits in a form
   of their own (`+1 B6,7`), and lay the timbres or the vocoder over the same bytes by Voice Mode.
-- **The rest of the KRONOS**: the profile holds an HD-1 program. Not yet read: an EXi program
-  (`Prog_EXi_Common.txt`, with each engine's own parameters in `Prog_EXi.txt` and
-  `SysExParams/VoiceModels/`), a combination (`CombiAndSongTimbreSet.txt`), Global, the drum kits
+- **The rest of the KRONOS**: the profiles hold an HD-1 program and a combination. Not yet read: an
+  EXi program (`Prog_EXi_Common.txt`, with each engine's own parameters in `Prog_EXi.txt` and
+  `SysExParams/VoiceModels/`), Global, the drum kits
   and wave sequences (their own parameter changes, 53~56), each effect's own parameters
   (`Effect.txt`, by effect type), and preset recall (the implementation's Bank Select footnote).
   The two-byte values wait for their byte order, from an instrument's dump.
 - **The rest of the NAUTILUS**: the same objects as the KRONOS's, and its scenes and step
-  sequencers, whose message the archive does not settle (6D or 6E for the scenes, 43 or 6E for the
-  step sequencers).
+  sequencers, whose message the archive does not settle (in a program 6D or 6E for the scenes, 43
+  or 6E for the step sequencers; in a combination any of the three).
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document
   for these, not a parameter table.
 - **MS-20 mini** receives notes and the channel mode messages only; **KAOSSILATOR PRO+** lets you
