@@ -538,6 +538,9 @@ findings in [`tools/profiles/sequential/README.md`](../tools/profiles/sequential
 brand's folder has its own README beside its tools (`korg/`, `novation/`, `moog/`, `yamaha/`,
 `waldorf/`, `elektron/`, `behringer/`, `arturia/`, `asm/`, `nord/`, `modal/`, `dreadbox/`, `udo/`, `groove/`, `teenage/`, `sonicware/`, `blackcorp/`, `erica/`, `expressive/`). They list what is still to read and why: tables that read with problems, scanned manuals
 with no text, and instruments for which no MIDI list was found.
+[What is still open](../tools/profiles/README.md#what-is-still-open) gathers it across the brands,
+sorted by what would close each item: a document already in hand, the profile format, the
+instrument, or a document not yet published.
 
 ## Catalogue
 

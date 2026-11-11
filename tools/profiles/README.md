@@ -45,8 +45,78 @@ UNO Synth; its download list is drawn by a script), Studiologic (the Sledge; lik
 (`kurzweil.com` refuses automated requests, its PDFs included), Casio (`www.casio.com`, where its
 manual lists now are, answers 403, and the MIDI implementation PDFs' old addresses are gone), Polyend
 (`polyend.com` answers with a Cloudflare challenge) and Kawai (its download list is drawn by a
-script).
-Retailers' copies exist for each and are not used: a profile cites its maker's own file.
+script). Retailers' copies exist for each and are not used: a profile cites its maker's own file.
+
+## What is still open
+
+Every brand's README names what its profiles leave out and why, and every profile names the rows it
+leaves out in its own notes. This is the same, gathered across the brands and sorted by what would
+close each item (November 2026). Nothing here is a reading error: each row of each document read is
+either laid out or named with the reason.
+
+### Readable now, from a document already in hand
+
+Work for the generators alone: the document is downloaded and says what is needed.
+
+| Open | Brand | What it takes |
+| --- | --- | --- |
+| About 2,000 Yamaha rows printed in forms the builder does not read: Wave Number on the MOTIF ES generation (`→` for `:`), Detune as two nibbles, Arpeggio Assign offsets and types over two lines, scaling offsets under `:` | [yamaha](yamaha/README.md) | five reading rules in `build-yamaha-profile.mjs`, each checked by re-importing every transcription |
+| The JN-80's NRPN table: twenty parameters at 12 bits (0 - 4095), with their scales | [behringer](behringer/README.md) | the guide reader on that table, and the parameters as NRPNs |
+| The Nord Lead 3's program dump, which its manual's SysEx chapter prints with a request | [nord](nord/README.md) | that chapter read for the dump's layout: Pull for the Lead 3 |
+| The microKORG's and microKORG S's program tables (`+1 B6,7`, timbres and vocoder over the same bytes) | [korg](korg/README.md) | a reader for that table form: Pull for both |
+| KRONOS and NAUTILUS | [korg](korg/README.md) | their MIDI Implementations, which are ZIP archives |
+| The ELZ_1, ELZ_1 play and MINIMAL charts | [sonicware](sonicware/README.md) | a reader for each form (a macro naming the controllers; a matrix of tracks) |
+| Values where a chart prints controller numbers only (Modal's newer instruments, every Nord, Sonicware, the Kijimi, Xerxes and Ise-Nin, the micro Q's Glide Mode and filter types, the MicroFreak's Speech categories) | [modal](modal/README.md), [nord](nord/README.md), [sonicware](sonicware/README.md), [blackcorp](blackcorp/README.md), [waldorf](waldorf/README.md), [arturia](arturia/README.md) | each manual's chapters, a list of settings for each selector: a map from the chart's names to the chapters' headings, written by hand per manual |
+| What an Elektron value shows | [elektron](elektron/README.md) | the same, a heading-to-row map per manual; matching them automatically was tried and matched wrongly |
+| ASM's effect parameters per effect type, and the mod matrix's sources and targets | [asm](asm/README.md) | the manual's effect and mod matrix chapters, as lists |
+
+### Needs the profile format or the engines
+
+Each needs a change to what a profile can say, made in both engines with tests before any
+generator uses it. Most are written up in [known issues](../../docs/known-issues.md#device-profiles)
+with what closing them takes; those it does not have are marked new.
+
+| Open | Where it bites | Recorded |
+| --- | --- | --- |
+| A repeated group: a block of parameters, a stride, a count | the MODX and MONTAGE parts 2 - 16 and MODX M elements 9 - 128; the Blofeld's, Microwaves' and Wave's multi instruments; the 3rd Wave's parts 2 - 4 | known issues |
+| A parameter set chosen by another parameter's value | Yamaha effect parameters and EQ frequencies (about 7,000 rows); the Blofeld's effect parameters; the microKORG's two-meaning knobs; the Digitone's shared controllers | known issues |
+| A bit-field encoding written from the byte's last read value | Yamaha receive and transmit switches (about 1,250); the Blofeld's arpeggiator pattern | known issues |
+| A parameter of several fields in one message | the Motif family's drum key voice (about 360) | known issues |
+| `identity.modelNumber` as a list | Yamaha ranges (MOXF, MODX M, MONTAGE, MOTIF); the Microwave II/XT | known issues |
+| Yamaha requests and dumps taking the device number | every Yamaha Pull | known issues |
+| Reading back: a channel other than `channel`; Korg's wide NRPN values; a controller two parameters share | the JP-08's Lower part; the minilogue xd; the microKORG, Digitone | known issues |
+| The startup read going on past an unanswered request; the JavaScript engine checking a value's range | every profile | known issues |
+| A preset name scan that sets a bank and a slot, and a text field read to the message's end | the 3rd Wave's program names | new |
+| Reading back an NRPN by its number and its data MSB together | the Hydrasynth's VV-selected parameters | new |
+| A request answered by control changes (a controller dump) | the Pulse's Controller Dump (`4B`) | new |
+| A pair sent as a selector and then a controller | the Artemis's modulation amounts through CC 31 | new |
+| A note-name display mode | the Wave's key centres | new |
+
+### Needs the instrument
+
+What only the instrument can answer: no profile here has been sent to one (`verifiedOnHardware` is
+false in every profile), and these are the questions the documents leave.
+
+| Open | Brand |
+| --- | --- |
+| Which end of the Deckard's Dream's six-way bands is the top setting; its DETUNE controller (the manual says 95, the chart 32); the Xerxes's two channels | [blackcorp](blackcorp/README.md) |
+| What the 3rd Wave's dump writes for parts 3 and 4 (the part bitmap's 4 and 8, or 3 and 4) | [groove](groove/README.md) |
+| The PolyEight's dump and how it carries a negative value; whether a Behringer range is the controller's values or the display's | [behringer](behringer/README.md) |
+| The Hydrasynth's LFO1 Smooth and Steps against ENV5 Loop and Legato (one NRPN printed for both) | [asm](asm/README.md) |
+| Whether the MatrixBrute sends its fine halves on CC n + 32 | [arturia](arturia/README.md) |
+| How the Murmux Adept maps 0 - 127 | [dreadbox](dreadbox/README.md) |
+| The SKULPTsynth SE's mod slot numbers | [modal](modal/README.md) |
+| The Stage 4's organ presets and sample choice, the Electro 7's organ preset and piano choice | [nord](nord/README.md) |
+| The values of every switch a chart prints no values for (Erica Synths, Black Corporation) | [erica](erica/README.md), [blackcorp](blackcorp/README.md) |
+
+### Needs a document the maker has not published
+
+No profile is made from anything but the maker's own document, so these wait for one: the makers
+listed above as not built; and, within the brands here, Pull wherever no dump format is printed
+(Modal, UDO, Moog, most of Nord and Novation), the Typhon, Pro 3, Evolver family, Tempest, Sub
+Phatty, Moog One, MiniFreak 49, UltraNova, the DeepMind 6, 12D and 12X, and the instruments whose
+controllers the player assigns (Waldorf's Iridium and Quantum, Nord's Modular G2, Korg's
+KAOSSILATOR PRO+). Each brand's README says what it looked at.
 
 ## The rules every profile here follows
 
