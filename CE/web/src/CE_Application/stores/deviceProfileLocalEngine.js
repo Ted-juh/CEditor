@@ -135,7 +135,7 @@ export function parameterValueWidth(parameter) {
     return length;
   }
   if (isU14(encoding)) return 2;
-  if (encoding === 's21-lsb-msb') return 3;
+  if (encoding === 's21-lsb-msb' || encoding === 's21-msb-lsb') return 3;
   if (encoding === 'nibbled') return nibbleCount(parameter).nibbles ?? 0;
   return 1;
 }
@@ -229,6 +229,10 @@ export function decodeParameterValue(parameter, bytes) {
     const raw = ((list[2] & 0x7f) << 14) | ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
     return raw >= 1048576 ? raw - 2097152 : raw;
   }
+  if (encoding === 's21-msb-lsb') {
+    const raw = ((list[0] & 0x7f) << 14) | ((list[1] & 0x7f) << 7) | (list[2] & 0x7f);
+    return raw >= 1048576 ? raw - 2097152 : raw;
+  }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
     if (error) return null;
@@ -293,6 +297,14 @@ export function encodeParameterValue(parameter, value) {
     if (number < -1048576 || number > 1048575) return { error: `Encoded s21 value outside -1048576-1048575 for ${parameter?.id ?? ''}` };
     const wire = number & 0x1fffff;
     return { bytes: [wire & 0x7f, (wire >> 7) & 0x7f, (wire >> 14) & 0x7f], number, normalized: (number + 1048576) / 2097151, displayed: String(number) };
+  }
+  if (encoding === 's21-msb-lsb') {
+    // The same 21 bits, most significant byte first, as DeviceProfileEngine.cpp encodes it (the
+    // KRONOS's parameter change: `valueH 0scccccc, valueM, valueL`, 21-bit two's complement).
+    const number = Math.round(Number(value) || 0);
+    if (number < -1048576 || number > 1048575) return { error: `Encoded s21 value outside -1048576-1048575 for ${parameter?.id ?? ''}` };
+    const wire = number & 0x1fffff;
+    return { bytes: [(wire >> 14) & 0x7f, (wire >> 7) & 0x7f, wire & 0x7f], number, normalized: (number + 1048576) / 2097151, displayed: String(number) };
   }
   if (encoding === 's14-lsb-msb') {
     // Signed, two's complement over 14 bits, least significant byte first, as DeviceProfileEngine.cpp
@@ -700,9 +712,10 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     for (let index = 0; index < nibbles; index += 1) {
       numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
     }
-  } else if (encodingType === 's21-lsb-msb') {
+  } else if (encodingType === 's21-lsb-msb' || encodingType === 's21-msb-lsb') {
     if (offset + 2 >= bytes.length) return { ok: false, error: `21-bit dump value requires three bytes for ${parameter?.id ?? ''}` };
-    numeric = ((bytes[offset + 2] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+    const [hi, lo] = encodingType === 's21-msb-lsb' ? [offset, offset + 2] : [offset + 2, offset];
+    numeric = ((bytes[hi] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[lo] & 0x7f);
     if (numeric >= 1048576) numeric -= 2097152;
   } else if (encodingType === 'u14-lsb-msb' || encodingType === 's14-lsb-msb') {
     // Least significant byte first, as DeviceProfileEngine.cpp reads it. It came back as its first
@@ -718,6 +731,7 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     const parts = Array.isArray(encoding?.parts) ? encoding.parts : [];
     if (!parts.length) return { ok: false, error: `Bitfields dump codec requires parts for ${parameter?.id ?? ''}` };
     numeric = 0;
+    let width = 0;
     for (const part of parts) {
       const at = offset + Number(part?.at ?? 0);
       const from = Number(part?.from ?? 0);
@@ -727,7 +741,10 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
         return { ok: false, error: `Bitfields dump codec part is outside the message for ${parameter?.id ?? ''}` };
       }
       numeric |= ((bytes[at] >> from) & ((1 << bits) - 1)) << shift;
+      width = Math.max(width, shift + bits);
     }
+    // Two's complement over the parts' width (the KRONOS keeps -99~+99 as a byte, 9DH~63H).
+    if (encoding?.signed === true && width < 31 && numeric >= 2 ** (width - 1)) numeric -= 2 ** width;
     if (Array.isArray(encoding?.map)) {
       const pair = encoding.map.find((entry) => Array.isArray(entry) && entry.length === 2 && Number(entry[0]) === numeric);
       if (!pair) return { ok: false, error: `Bitfields dump value ${numeric} is not in the map for ${parameter?.id ?? ''}` };

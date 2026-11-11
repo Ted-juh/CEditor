@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { localCollectDumpMessages, localParseDumpMessage } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import { localCollectDumpMessages, localCompileParameter, localParseDumpMessage } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
 const block = (id, byte, size, endsWith) => ({
   id,
@@ -103,4 +103,34 @@ test('a dump checksum may be a value the device always accepts, where the profil
   assert.equal(read(summed(null), 'F0 3E 13 01 40 7F F7').ok, false, 'without alsoAccept, 7F is a wrong checksum');
   assert.equal(read(summed(['7F']), 'F0 3E 13 01 40 7F F7').values.level, 64, 'with it, 7F is taken');
   assert.equal(read(summed(['7F']), 'F0 3E 13 01 40 42 F7').ok, false, 'and any other wrong value is still refused');
+});
+
+// A signed value in 21 bits, two's complement, most significant byte first: the KRONOS's parameter
+// change. Beside it a bit field read `signed`, as the KRONOS's dump keeps -99~+99 in a byte, and the
+// same byte read without. The C++ engine's runS21MsbFirstTests checks the same probe.
+test('s21-msb-lsb: two\'s complement over 21 bits, high byte first, sent and read back', () => {
+  const s21 = (id, min, max) => ({ id, name: id, messageRecipe: 'pc', type: 'integer', range: { min, max }, encoding: { type: 's21-msb-lsb' }, access: { canWrite: true, canRead: true } });
+  const field = (signed) => ({ type: 'bitfields', ...(signed ? { signed: true } : {}), parts: [{ at: 0, from: 0, bits: 7 }] });
+  const probe = {
+    schemaVersion: 1,
+    id: 'probe-s21',
+    variables: { channel: 1, deviceId: 48 },
+    parameters: [s21('tune', -1200, 1200), s21('intensity', -64, 63), s21('level', 0, 127)],
+    messageRecipes: [{ id: 'pc', kind: 'sysex', template: ['F0', '42', '$deviceId', '68', '43', '02', '00', '00', '05', '00', '$encodedValue', 'F7'] }],
+    dumpDefinitions: [{
+      id: 'probe',
+      kind: 'sysex',
+      matcher: { prefix: ['F0', '42', '30', '68', '4C'], suffix: ['F7'] },
+      payload: { offset: 5, size: 4 },
+      completion: { expectedBytes: 10 },
+      mappings: [{ parameter: 'tune', offset: 0 }, { parameter: 'intensity', offset: 3, codec: field(true) }, { parameter: 'level', offset: 3, codec: field(false) }],
+    }],
+  };
+  for (const [value, hex] of [[-50, '7F 7F 4E'], [300, '00 02 2C'], [0, '00 00 00'], [-1, '7F 7F 7F']]) {
+    const compiled = localCompileParameter(probe, { parameterId: 'tune', value });
+    assert.ok(compiled.ok, compiled.error);
+    assert.equal(compiled.transaction.encodedValueHex, hex, String(value));
+    assert.equal(compiled.transaction.hex, `F0 42 30 68 43 02 00 00 05 00 ${hex} F7`);
+  }
+  assert.deepEqual(localParseDumpMessage(probe, 'F0 42 30 68 4C 7F 7F 4E 4E F7').values, { tune: -50, intensity: -50, level: 78 });
 });

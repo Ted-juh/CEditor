@@ -2451,11 +2451,14 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
         numeric = ((bytes[offset] & 0x7f) << 7) | (bytes[offset + 1] & 0x7f);
     }
-    else if (encodingType == "s21-lsb-msb")
+    else if (encodingType == "s21-lsb-msb" || encodingType == "s21-msb-lsb")
     {
         if (offset + 2 >= bytes.size())
             return juce::Result::fail ("21-bit dump value requires three bytes for " + propString (parameter, "id"));
-        numeric = ((bytes[offset + 2] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+        // Least significant byte first (the KingKORG's), or most (the KRONOS's).
+        const auto hi = encodingType == "s21-msb-lsb" ? offset : offset + 2;
+        const auto lo = encodingType == "s21-msb-lsb" ? offset + 2 : offset;
+        numeric = ((bytes[hi] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[lo] & 0x7f);
         if (numeric >= 1048576)
             numeric -= 2097152;
     }
@@ -2496,14 +2499,17 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
         // one: the minilogue's VCO 1 PITCH is byte 20 (its bits 2-9) and bits 0-1 of byte 52, which
         // it shares with three other settings; the minilogue xd's is two bytes, low byte first.
         // Each part is { at: bytes after the mapping's offset, from: first bit, bits: how many,
-        // shift: where they go }. Then either `map` ([[dump value, wire value], ...]: a setting kept
-        // as 0-3 in the dump and sent as 0, 42, 84, 127), or `shiftRight` and `max` (a 10-bit value
-        // read as the 7-bit controller that sends it, its top seven bits).
+        // shift: where they go }. `signed` reads what the parts make as two's complement over their
+        // width (the KRONOS keeps -99~+99 as a byte, 9DH~63H). Then either `map` ([[dump value,
+        // wire value], ...]: a setting kept as 0-3 in the dump and sent as 0, 42, 84, 127), or
+        // `shiftRight` and `max` (a 10-bit value read as the 7-bit controller that sends it, its top
+        // seven bits).
         auto* parts = encoding != nullptr ? asArray (encoding->getProperty ("parts")) : nullptr;
         if (parts == nullptr || parts->isEmpty())
             return juce::Result::fail ("Bitfields dump codec requires parts for " + propString (parameter, "id"));
 
         numeric = 0;
+        auto width = 0;
         for (const auto& partValue : *parts)
         {
             auto* part = asObject (partValue);
@@ -2516,7 +2522,10 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             if (at < 0 || at >= bytes.size() || from < 0 || bits < 1 || from + bits > 8 || shift < 0 || shift > 24)
                 return juce::Result::fail ("Bitfields dump codec part is outside the message for " + propString (parameter, "id"));
             numeric |= ((bytes[at] >> from) & ((1 << bits) - 1)) << shift;
+            width = juce::jmax (width, shift + bits);
         }
+        if ((bool) encoding->getProperty ("signed") && width < 31 && numeric >= (1 << (width - 1)))
+            numeric -= 1 << width;
 
         if (auto* map = asArray (encoding->getProperty ("map")))
         {
@@ -2688,6 +2697,20 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             encodedBytes.add (wire & 0x7f);
             encodedBytes.add ((wire >> 7) & 0x7f);
             encodedBytes.add ((wire >> 14) & 0x7f);
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "s21-msb-lsb")
+        {
+            // The same 21 bits, most significant byte first: the KRONOS's parameter change
+            // ("valueH 0scccccc, valueM 0bbbbbbb, valueL 0aaaaaaa", 21-bit two's complement).
+            auto value = (int) std::round (numeric);
+            if (value < -1048576 || value > 1048575)
+                return juce::Result::fail ("Encoded s21 value outside -1048576-1048575 for " + propString (parameter, "id"));
+            const auto wire = value & 0x1fffff;
+            encodedBytes.add ((wire >> 14) & 0x7f);
+            encodedBytes.add ((wire >> 7) & 0x7f);
+            encodedBytes.add (wire & 0x7f);
             return juce::Result::ok();
         }
 

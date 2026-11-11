@@ -1513,6 +1513,69 @@ int runDumpRecordTests()
     return failures;
 }
 
+int runS21MsbFirstTests()
+{
+    // A signed value in 21 bits, two's complement, most significant byte first: the KRONOS's
+    // parameter change (`valueH 0scccccc, valueM, valueL`). Encoded into a SysEx template and read
+    // back from a dump; the KingKORG's s21-lsb-msb is the same bits the other way round. Beside it
+    // a bit field read `signed`, as the KRONOS's dump keeps -99~+99 in a byte, and the same byte
+    // read without. The JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-s21", "name": "Probe", "manufacturer": "Probe",
+      "variables": { "channel": 1, "deviceId": 48 },
+      "parameters": [
+        { "id": "tune", "name": "Tune", "messageRecipe": "pc", "type": "integer",
+          "range": { "min": -1200, "max": 1200 }, "encoding": { "type": "s21-msb-lsb" }, "access": { "canWrite": true, "canRead": true } },
+        { "id": "intensity", "name": "Intensity", "messageRecipe": "pc", "type": "integer",
+          "range": { "min": -64, "max": 63 }, "encoding": { "type": "s21-msb-lsb" }, "access": { "canWrite": true, "canRead": true } },
+        { "id": "level", "name": "Level", "messageRecipe": "pc", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "s21-msb-lsb" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "pc", "kind": "sysex", "template": ["F0", "42", "$deviceId", "68", "43", "02", "00", "00", "05", "00", "$encodedValue", "F7"] } ],
+      "dumpDefinitions": [
+        { "id": "probe", "kind": "sysex", "matcher": { "prefix": ["F0", "42", "30", "68", "4C"], "suffix": ["F7"] }, "payload": { "offset": 5, "size": 4 },
+          "completion": { "expectedBytes": 10 }, "mappings": [ { "parameter": "tune", "offset": 0 },
+            { "parameter": "intensity", "offset": 3, "codec": { "type": "bitfields", "signed": true, "parts": [ { "at": 0, "from": 0, "bits": 7 } ] } },
+            { "parameter": "level", "offset": 3, "codec": { "type": "bitfields", "parts": [ { "at": 0, "from": 0, "bits": 7 } ] } } ] }
+      ]
+    })JSON";
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] s21 MSB first: probe did not load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const struct { int value; const char* hex; } cases[] = { { -50, "7F 7F 4E" }, { 300, "00 02 2C" }, { 0, "00 00 00" }, { -1, "7F 7F 7F" } };
+    for (const auto& c : cases)
+    {
+        const auto compiled = engine.compileSetParameter ("mainSynth", "tune", c.value, true);
+        if (! compiled.ok || compiled.transaction.encodedValueHex != c.hex)
+        {
+            std::cerr << "[FAIL] s21 MSB first: " << c.value << " should encode as " << c.hex << ", got "
+                      << (compiled.ok ? compiled.transaction.encodedValueHex : compiled.error) << "\n";
+            ++failures;
+        }
+    }
+    const auto parsed = engine.parseDumpMessage ("F0 42 30 68 4C 7F 7F 4E 4E F7");
+    const auto read = [&parsed] (const char* id) { return parsed.ok ? parsed.values.getProperty (id, {}).toString() : parsed.error; };
+    if (! parsed.ok || (int) parsed.values.getProperty ("tune", 0) != -50)
+    {
+        std::cerr << "[FAIL] s21 MSB first: 7F 7F 4E should read back as -50, got " << read ("tune") << "\n";
+        ++failures;
+    }
+    if (read ("intensity") != "-50" || read ("level") != "78")
+    {
+        std::cerr << "[FAIL] signed bit field: 4E over 7 bits should read -50 signed and 78 not, got "
+                  << read ("intensity") << " and " << read ("level") << "\n";
+        ++failures;
+    }
+    if (failures == 0)
+        std::cout << "[PASS] s21 MSB first :: two's complement over 21 bits, high byte first, both ways; a signed bit field\n";
+    return failures;
+}
+
 int runCcPairTests()
 {
     const char* json = R"JSON({
@@ -4578,6 +4641,7 @@ int main (int argc, char** argv)
     failures += runCollectionEndsWithTests();
     failures += runChecksumAlsoAcceptTests();
     failures += runDumpRecordTests();
+    failures += runS21MsbFirstTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runCatalogSummaryTests (root);
