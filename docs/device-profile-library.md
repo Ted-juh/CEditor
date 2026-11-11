@@ -404,9 +404,10 @@ channel. Nothing is read back.
 Groove Synthesis publishes a MIDI spec for the 3rd Wave in which every setting of a program is an
 NRPN. [`tools/profiles/groove/`](../tools/profiles/groove/README.md) reads it: 403 parameters, each
 its NRPN with a 14-bit value, the ranges and value lists as printed, the mod slots choosing from the
-spec's lists. A Multi parameter goes to the parts NRPN 0 selects. Pull asks for the edit buffer and
-reads the reply, which carries every setting as its NRPN and value: a dump read by record rather
-than by offset, a Multi parameter taking part 1's value. Set the `productId` variable to 2 for an 8M.
+spec's lists. A Multi parameter goes to the parts NRPN 0 selects. Pull asks for the edit buffer, or
+the saved program the `bank` and `program` variables name, and reads the reply, which carries every
+setting as its NRPN and value: a dump read by record rather than by offset, a Multi parameter taking
+part 1's value. Set the `productId` variable to 2 for an 8M.
 
 ### teenage engineering profiles
 

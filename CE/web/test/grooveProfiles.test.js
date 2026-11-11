@@ -84,10 +84,14 @@ for (const { name, profile, text, out, data } of BUILT) {
 
   if (profile.dumpDefinitions) {
     test(`${profile.id}: Pull asks for the edit buffer and reads its records back, part 1's for a Multi parameter`, () => {
-      const request = profile.tests.find((t) => t.kind === 'request');
-      const compiled = localCompileDeviceRequest(profile, { request: request.request });
-      assert.ok(compiled.ok, compiled.error);
-      assert.equal(compiled.transaction?.encodedValueHex ?? compiled.hex, request.expectedHex);
+      for (const request of profile.tests.filter((t) => t.kind === 'request')) {
+        const compiled = localCompileDeviceRequest(profile, { request: request.request });
+        assert.ok(compiled.ok, compiled.error);
+        assert.equal(compiled.transaction?.encodedValueHex ?? compiled.hex, request.expectedHex, request.name);
+      }
+      // A saved program by its bank and slot: the variables are its bytes.
+      const slot = localCompileDeviceRequest(profile, { request: 'requestProgram', variables: { bank: 4, program: 99 } });
+      assert.equal(slot.transaction?.encodedValueHex ?? slot.hex, 'F0 00 02 4A 01 05 04 63 F7');
       for (const vector of profile.tests.filter((t) => t.kind === 'dumpParse')) {
         const parsed = localParseDumpMessage(profile, vector.inputHex);
         assert.ok(parsed.ok, parsed.error);
@@ -96,7 +100,7 @@ for (const { name, profile, text, out, data } of BUILT) {
       }
       // Every parameter read from the dump is one the profile can also send, and every one but Edit part is read.
       const readable = profile.parameters.filter((p) => p.access.canRead).map((p) => p.id);
-      assert.deepEqual(profile.dumpDefinitions[0].mappings.map((m) => m.parameter), readable);
+      for (const dump of profile.dumpDefinitions) assert.deepEqual(dump.mappings.map((m) => m.parameter), readable, dump.id);
       assert.equal(readable.length, profile.parameters.length - 1);
     });
   }

@@ -45,6 +45,10 @@ what was read from it, with the file's name, SHA-256 and where to get it.
   Multi parameter reads part 1's value; Edit part itself is not read, since the dump sets it once
   for each part. `id` is the variable `productId`: 1 for the 24K and 24M, 2 for the 8M, which the
   instrument answers with (it takes either in a request).
+- **A saved program** is read the same way: the program data request (`F0 00 02 4A id 05 bank
+  program F7`, with its sequence, which every firmware answers) names it by the variables `bank`
+  (0 - 4) and `program` (0 - 99), and the reply, Program data (`id 02`), carries the bank and slot
+  and then the same records.
 
 ## The profile
 
@@ -52,14 +56,15 @@ what was read from it, with the file's name, SHA-256 and where to get it.
 | --- | ---: | ---: | ---: |
 | `groove-synthesis-3rd-wave` | 469 | 403 | 79 |
 
-Pull reads 402 of the 403 back (all but Edit part), from the edit buffer.
+Pull reads 402 of the 403 back (all but Edit part), from the edit buffer or from a saved program.
 
 ## What is left out, and what would read it
 
 | Left out | Why | What would read it |
 | --- | --- | --- |
 | Parts 2 - 4 in a Pull | the panel lays out one value a Multi parameter; the dump carries four | parts as their own parameters (below), each read with its part's scope |
-| A saved program by slot | the program data request names a bank and a slot; the profile asks for the edit buffer | a request with the slot as variables |
+| Parts 3 and 4 in particular | the dump sets NRPN 0 once for each part, and the spec shows only part 1's (1); NRPN 0 is a bitmap (part 3 is 4, part 4 is 8), so whether the dump writes 3 and 4 or 4 and 8 is not said | the instrument's own dump |
+| Program names | the name request names a bank and a slot, and the preset scan sets one variable; the reply's name is as long as it is (up to 32 characters), and a text field is read at a fixed length | a scan that sets a bank and a slot, and a text field read to the message's end |
 | Parts 2 - 4 as their own parameters | they need the global MIDI include part in NRPN on | a profile variant with the +1000 offsets |
 | The wavetables and song parts | two fields in one value | a codec for the packed fields |
 | The per-model CC tables | they map each model's panel, and the NRPNs cover every setting | a CC profile for each model, if wanted |

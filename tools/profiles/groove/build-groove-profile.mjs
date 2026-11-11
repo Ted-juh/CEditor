@@ -96,12 +96,12 @@ export function buildGrooveProfile(data, layout) {
   if (left.deprecated.length) notes.push(`Left out, rows the spec marks deprecated: ${left.deprecated.join(', ')}.`);
   if (left.packed.length) notes.push(`Left out, rows whose value packs two fields (\`See descrip\`): ${left.packed.join(', ')}.`);
   if (left.unsettable.length) notes.push(`Left out, NRPN ${left.unsettable.join(', ')}: not settable, used internally for saving presets via SysEx.`);
-  if (layout.editBuffer) notes.push('Pull asks for the program being edited (the edit buffer request, F0 00 02 4A id 06 F7) and reads the reply (Edit buffer data, id 03), every setting in it as its NRPN and value. id is the variable productId: 1 for the 24K and 24M, 2 for the 8M; the instrument takes either in a request and answers with its own. A Multi parameter reads part 1\'s value; Edit part (NRPN 0) and the rows left out above are not read.');
+  if (layout.editBuffer) notes.push('Pull asks for the program being edited (the edit buffer request, F0 00 02 4A id 06 F7) and reads the reply (Edit buffer data, id 03), every setting in it as its NRPN and value. id is the variable productId: 1 for the 24K and 24M, 2 for the 8M; the instrument takes either in a request and answers with its own. A saved program is read the same way: the program data request (F0 00 02 4A id 05 bank program F7) asks for the one the variables bank (0 - 4) and program (0 - 99) name, and its reply carries the same records after them. A Multi parameter reads part 1\'s value; Edit part (NRPN 0) and the rows left out above are not read.');
 
   // Pull: the edit buffer, read by NRPN. NRPN 0 itself is not read back: the dump sets it once for
   // each part, so what it last holds is not a setting of the program.
   const bus = layout.editBuffer;
-  const variables = { channel: 1, ...(bus ? { productId: 1 } : {}) };
+  const variables = { channel: 1, ...(bus ? { productId: 1, bank: 0, program: 0 } : {}) };
   const sysex = (...tail) => ['F0', '00', '02', '4A', '$productId', ...tail];
   const mappings = bus ? parameters.filter((p) => nrpnOf.get(p.id) !== 0).map((p) => ({ parameter: p.id, record: nrpnOf.get(p.id), ...(multi.has(p.id) ? { scope: { record: 0, value: 1 } } : {}) })) : [];
   for (const m of mappings) parameters.find((p) => p.id === m.parameter).access.canRead = true;
@@ -127,6 +127,9 @@ export function buildGrooveProfile(data, layout) {
     const expectedValues = { [single.id]: valueOf(single, 200), [a.id]: valueOf(a, 0), [b.id]: valueOf(b, 1), [choice.id]: choice.choices[2].id };
     tests.push({ name: 'Edit buffer program data request', kind: 'request', request: 'requestEditBuffer', expectedHex: sysex('06', 'F7').map((t) => (t === '$productId' ? '01' : t)).join(' ') });
     tests.push({ name: 'Edit buffer data, read back: part 1\'s Multi values, not part 2\'s', kind: 'dumpParse', inputHex: [...sysex('03').map((t) => (t === '$productId' ? 1 : parseInt(t, 16))), ...body, 0xf7].map(hex).join(' '), expectedValues });
+    // A saved program: the same records after its bank and slot (bank 2, program 41 here).
+    tests.push({ name: 'Program data request (the bank and program variables)', kind: 'request', request: 'requestProgram', expectedHex: sysex('05', '$bank', '$program', 'F7').map((t) => (t.startsWith('$') ? '00' : t)).map((t, k) => (k === 4 ? '01' : t)).join(' ') });
+    tests.push({ name: 'Program data, read back: the records after its bank and slot', kind: 'dumpParse', inputHex: [...sysex('02').map((t) => (t === '$productId' ? 1 : parseInt(t, 16))), 2, 41, ...body, 0xf7].map(hex).join(' '), expectedValues });
   }
   const doc = data.sources[0];
   return {
@@ -155,20 +158,33 @@ export function buildGrooveProfile(data, layout) {
       realtimeEditing: 'complete-for-the-spec\'s-NRPN-table',
       editBufferDumpRequest: bus ? 'complete: Edit buffer program data request' : 'notImplemented',
       editBufferDumpParse: bus ? `partial: ${mappings.length} of the profile's ${parameters.length} parameters are read from the edit buffer data (all but Edit part), the Multi ones part 1's` : 'notImplemented',
-      bankDump: 'notImplemented',
+      bankDump: bus ? 'partial: one saved program at a time, by the bank (0 - 4) and program (0 - 99) variables' : 'notImplemented',
       inboundControllers: 'the instrument sends these NRPNs when its MIDI param send includes NRPN',
       verifiedOnHardware: false,
     },
     timing: { minDelayBetweenMessagesMs: 0 },
     messageRecipes: [...recipes.values()].sort((a, b) => a.parameterMsb - b.parameterMsb || a.parameterLsb - b.parameterLsb),
     ...(bus ? {
-      requests: [{ id: 'requestEditBuffer', name: 'Edit buffer program data request', kind: 'sysex', template: sysex('06', 'F7'), response: { dump: 'editBufferData' }, timeoutMs: 4000, retries: 1 }],
+      requests: [
+        { id: 'requestEditBuffer', name: 'Edit buffer program data request', kind: 'sysex', template: sysex('06', 'F7'), response: { dump: 'editBufferData' }, timeoutMs: 4000, retries: 1 },
+        // 05, with the program's sequence: the request every firmware answers (08, without it, is 1.8e's).
+        { id: 'requestProgram', name: 'Program data request (the bank and program variables)', kind: 'sysex', template: sysex('05', '$bank', '$program', 'F7'), response: { dump: 'programData' }, timeoutMs: 4000, retries: 1 },
+      ],
       dumpDefinitions: [{
         id: 'editBufferData',
         name: 'Edit buffer data',
         kind: 'sysex',
         matcher: { prefix: sysex('03'), suffix: ['F7'] },
         payload: { offset: 6, records: { size: 4, keyAt: 0, keyType: 'u14', valueAt: 2, valueType: 'u14' } },
+        completion: { expectedMessages: 1 },
+        mappings,
+      }, {
+        id: 'programData',
+        name: 'Program data',
+        kind: 'sysex',
+        matcher: { prefix: sysex('02'), suffix: ['F7'] },
+        // (The bank and slot it was saved in, then the same records.)
+        payload: { offset: 8, records: { size: 4, keyAt: 0, keyType: 'u14', valueAt: 2, valueType: 'u14' } },
         completion: { expectedMessages: 1 },
         mappings,
       }],
