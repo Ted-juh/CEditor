@@ -86,3 +86,47 @@ export function footnote(text, mark) {
   const end = lines.findIndex((l, i) => i > start && /^\*\d+\s*$/.test(l.trim()));
   return lines.slice(start, end < 0 ? undefined : end).map((l) => l.trimEnd()).filter(Boolean);
 }
+
+/**
+ * Prog_EXi.txt: a table per EXi engine, after a heading with its number and name (`2:AL-1, Number Of
+ * Param. = 609`), each row a setting of the engine's own block, its offset inside the block, and its
+ * id with TYP printed `11/12`, the slot (EXi1 or EXi2) the message names:
+ *
+ *   | OFS  | bit | parameter          | data(hex) | value      | TYP |SOC|SUB|PID|IDX|
+ *   |    1 | 4~0 | [LFO1] Waveform    | 00~11     | Triangle~… |11/12|  6|  0|  0|  0|
+ *
+ * A row printing only an OFS and bits holds the rest of the value above it. Engines with no table
+ * (`0:Off`, `1:HD-1`) are kept with no rows.
+ */
+export function readEngineTables(text) {
+  const engines = [];
+  let ofs = null;
+  text.split(/\r?\n/).forEach((raw, index) => {
+    const heading = /^(\d+):([^,|]+?)(?:,\s*Number Of Param\.\s*=\s*(\d+))?\s*$/.exec(raw);
+    if (heading) {
+      engines.push({ number: Number(heading[1]), name: heading[2].trim(), ...(heading[3] ? { printedCount: Number(heading[3]) } : {}), rows: [] });
+      ofs = null;
+      return;
+    }
+    if (!raw.startsWith('|') || !engines.length) return;
+    const cells = raw.split('|');
+    if (cells.length < 11) return;
+    const [ofsCell, bit, name, data, value, typ, ...idCells] = cells.slice(1, 11).map((c) => c.trim());
+    const note = cells.slice(11).join('|').trim();
+    if (/^data\(hex\)$/i.test(data)) return;
+    if (/^\d+$/.test(ofsCell)) ofs = Number(ofsCell);
+    if (!name || name === '*') return;
+    const hasId = /^\d+\/\d+$/.test(typ) && idCells.every((c) => /^\d+$/.test(c));
+    engines.at(-1).rows.push({
+      line: index + 1,
+      ofs,
+      ...(bit ? { bit } : {}),
+      name,
+      data,
+      value,
+      ...(hasId ? { typ, id: idCells.map(Number) } : { printedId: [typ, ...idCells].join(' ') }),
+      ...(note ? { note } : {}),
+    });
+  });
+  return engines;
+}

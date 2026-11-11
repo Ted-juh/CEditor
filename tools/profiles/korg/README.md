@@ -71,6 +71,8 @@ What the builder takes as settled, and what it does not:
 | `korg-nautilus` | NAUTILUS MIDI Implementation archive (2022-09-22): `SysExDumps/Prog_HD-1.txt`, `NAUTILUS_MIDI_SysEx.txt` 1.0 | 1,019 | 122 | 3,968 | 00H 01H 5DH 00H |
 | `korg-kronos-combination` | the KRONOS archive: `CombiAndSongTimbreSet.txt` 1.01 | 6,109 | 2,139 | 1,792 | 68H 00H |
 | `korg-nautilus-combination` | the NAUTILUS archive: `SysExDumps/CombiAndSongTimbreSet.txt` | 2,433 | 767 | 1,792 | 00H 01H 5DH 00H |
+| `korg-kronos-exi` | the KRONOS archive: `Prog_EXi_Common.txt` 1.01, `Prog_EXi.txt` | 8,133 | 803 | 3,968 | 68H 00H |
+| `korg-nautilus-exi` | the NAUTILUS archive: `SysExDumps/Prog_EXi_Common.txt`, `SysExDumps/Prog_EXi.txt` | 7,362 | 648 | 3,968 | 00H 01H 5DH 00H |
 
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
 try to recognise them. The VOX Continental prints its reply inline with two member codes, 05 for the
@@ -270,6 +272,27 @@ and USER-A~G (A~N), 14. The GM banks are `factory`, read-only by `*2` of the Sys
 builder checks; the second selects the table also prints for two of them (38,00 and 3E,00) are named
 and not offered. With Bank Map GM(2) the MSBs differ, which the profiles say.
 
+**EXi programs.** A program of an EXi bank is laid out in `Prog_EXi_Common.txt` (4,960 bytes on the
+KRONOS, 4,954 on the NAUTILUS) and holds two EXi slots, each with the engine chosen for it.
+`korg-kronos-exi` and `korg-nautilus-exi` read the program's own rows as the HD-1 profiles do, and
+add every engine's own settings from `Prog_EXi.txt` (`read-kronos-table.mjs`'s `readEngineTables`:
+a table per engine under a heading like `2:AL-1, Number Of Param. = 609`, whose count the builder
+checks) once for each slot, sent by TYP 11 for EXi1 and 12 for EXi2 as the program table's own slot
+rows take them (and the KRONOS's voice model files say: `0B: EXi patch 1, 0C: EXi patch 2`):
+
+- grouped by slot, engine and block, `EXi1 MS-20EX [LFO1]`. A slot takes the settings of the engine
+  in it; engines share ids, so a message from the instrument that several engines' settings send is
+  not attributed to any (the inbound index calls it ambiguous);
+- sent and not read back: `Prog_EXi.txt` gives each setting's offset inside its engine's block, and
+  the program table prints each slot's block only as reserved bytes (2908~3908 and 3960~4959 on the
+  KRONOS), without saying where the engine's table starts in it;
+- each slot's engine, `Algorithm Type` (`00~09 | Off~EP-1`, named by the engine tables' headings),
+  has no parameter id: it is read from the dump and not sent;
+- the EP-1 prints the same ids for the settings of its eight effects, one meaning per effect chosen;
+  those 200 are left out. An unmarked id printed for two rows (the EXi program's Master Effect Chain
+  Switch and Chain Level, which the HD-1 table marks `* Chain Level`) is found by the builder and
+  left out the same way.
+
 **Combinations.** A layout names the object it reads (`object: { code: '01', name: 'Combination' }`,
 checked against the archive's list of objects, `*1`), and the profile asks for and reads that object:
 `korg-kronos-combination` and `korg-nautilus-combination`, from `CombiAndSongTimbreSet.txt`, edited
@@ -359,12 +382,12 @@ Kept as printed and said where it applies:
   unit; the profile sends the single channel mode's NRPNs.
 - **The microKORG's and microKORG S's Pull**: their program tables print offsets and bits in a form
   of their own (`+1 B6,7`), and lay the timbres or the vocoder over the same bytes by Voice Mode.
-- **The rest of the KRONOS**: the profiles hold an HD-1 program and a combination. Not yet read: an
-  EXi program (`Prog_EXi_Common.txt`, with each engine's own parameters in `Prog_EXi.txt` and
-  `SysExParams/VoiceModels/`), Global, the drum kits
-  and wave sequences (their own parameter changes, 53~56), and each effect's own parameters
-  (`Effect.txt`, by effect type). The two-byte values wait for their byte order, from an
-  instrument's dump.
+- **The rest of the KRONOS**: the profiles hold an HD-1 program, an EXi program and a combination.
+  Not yet read: Global, the drum kits and wave sequences (their own parameter changes, 53~56), and
+  each effect's own parameters (`Effect.txt`, by effect type). Waiting for an instrument's dump:
+  the two-byte values' byte order, and where an EXi engine's table starts in its slot's block, so
+  its settings can be read back. The engines' own AMS source lists (`SysExParams/VoiceModels/`)
+  would name the EXi engines' modulation sources; only the HD-1's is used.
 - **The rest of the NAUTILUS**: the same objects as the KRONOS's, and its scenes and step
   sequencers, whose message the archive does not settle (in a program 6D or 6E for the scenes, 43
   or 6E for the step sequencers; in a combination any of the three).

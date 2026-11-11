@@ -28,6 +28,7 @@ import { modes as omModes, readOmCcPage } from '../../../tools/profiles/korg/rea
 import { foldKnobs, matchKnobs, readOmValue } from '../../../tools/profiles/korg/build-korg-knobs.mjs';
 import { readObjectHeader, readObjectRows } from '../../../tools/profiles/korg/read-kronos-table.mjs';
 import { exclusiveHeader, presetBanks, readBits, readData, readLabels } from '../../../tools/profiles/korg/build-kronos-profile.mjs';
+import { readEngineTables } from '../../../tools/profiles/korg/read-kronos-table.mjs';
 import { bankMap } from '../../../tools/profiles/korg/import-kronos.mjs';
 import { pack8to7 } from '../../dpd/codecs.mjs';
 import {
@@ -662,4 +663,43 @@ test('the KRONOS-style bank map: a bank per select, a run of LSBs a bank each, a
   assert.equal(program.banks.length, 12, 'A, G, the GM G and g(1)~g(9)');
   assert.deepEqual(program.alternates, ['38,00 (G)']);
   assert.deepEqual(presetBanks(rows, 'combination', 'Combination').banks.map((b) => b.label), ['Combination A', 'Combination G', 'Combination H']);
+});
+
+test('the EXi engine tables: a table per engine after its heading, a continuation row kept as printed', () => {
+  const text = [
+    '0:Off', '', '1:HD-1', '', '2:AL-1, Number Of Param. = 3',
+    '| OFS  | bit | parameter          | data(hex) | value      | TYP |SOC|SUB|PID|IDX|',
+    '|    1 | 4~0 | [LFO1] Waveform    | 00~11     | Triangle~  |11/12|  6|  0|  0|  0|',
+    '|      | 7~5 | [LFO1] Start Phase | DC~25     | -180~RND   |11/12|  6|  0|  1|  0|',
+    '|    2 | 3~0 |                    |           |            |     |   |   |   |   |',
+    '|   19 |     | [Mod.Mixer3]       | 00(fixed) | 0          |    ?|  ?|  ?|  ?|  ?|',
+  ].join('\n');
+  const engines = readEngineTables(text);
+  assert.deepEqual(engines.map((e) => [e.number, e.name, e.printedCount, e.rows.length]), [[0, 'Off', undefined, 0], [1, 'HD-1', undefined, 0], [2, 'AL-1', 3, 3]]);
+  assert.deepEqual(engines[2].rows[1], { line: 8, ofs: 1, bit: '7~5', name: '[LFO1] Start Phase', data: 'DC~25', value: '-180~RND', typ: '11/12', id: [6, 0, 1, 0] });
+  assert.equal(engines[2].rows[2].printedId, '? ? ? ? ?');
+});
+
+test('the EXi programs: every engine in both slots by TYP 11 and 12, sent and not read; each slot\'s engine read and not sent', { skip: !builtProfile('korg-kronos-exi') || !builtProfile('korg-nautilus-exi') }, () => {
+  for (const [id, headerLength] of [['korg-kronos-exi', 4], ['korg-nautilus-exi', 6]]) {
+    const profile = builtProfile(id);
+    const recipes = new Map(profile.messageRecipes.map((r) => [r.id, r]));
+    const read = new Set(profile.dumpDefinitions[0].mappings.map((m) => m.parameter));
+    for (const [slot, typ] of [['EXi1', '0B'], ['EXi2', '0C']]) {
+      const engine = profile.parameters.filter((p) => new RegExp(`^${slot} (AL-1|CX-3|STR-1|MS-20EX|PolysixEX|MOD-7|SGX-2|EP-1)\\b`).test(p.group));
+      assert.ok(engine.length > 3000, `${id} ${slot}: ${engine.length}`);
+      for (const p of engine) {
+        assert.equal(recipes.get(p.messageRecipe).template[headerLength + 1], typ, p.name);
+        assert.ok(!read.has(p.id) && !p.access.canRead, `${p.name} is not read back`);
+      }
+      const type = profile.parameters.find((p) => p.name === `${slot} Common Algorithm Type`);
+      assert.deepEqual([type.access.canWrite, type.messageRecipe, read.has(type.id)], [false, undefined, true]);
+      assert.deepEqual(type.choices.map((c) => c.label), ['Off', 'HD-1', 'AL-1', 'CX-3', 'STR-1', 'MS-20EX', 'PolysixEX', 'MOD-7', 'SGX-2', 'EP-1']);
+    }
+    // The EP-1's effects share their ids, one meaning per effect chosen: those are left out, and the
+    // effect settings that remain each send a message of their own.
+    assert.ok(!profile.parameters.some((p) => p.name === 'EXi1 EP-1 [IFX Small Phaser] Bypass'));
+    const ep1 = profile.parameters.filter((p) => /^EXi1 EP-1 /.test(p.group)).map((p) => recipes.get(p.messageRecipe).template.join(' '));
+    assert.equal(new Set(ep1).size, ep1.length);
+  }
 });

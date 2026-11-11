@@ -27,7 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadLayout } from './import-korg.mjs';
-import { footnote, messageBlock, readObjectHeader, readObjectRows } from './read-kronos-table.mjs';
+import { footnote, messageBlock, readEngineTables, readObjectHeader, readObjectRows } from './read-kronos-table.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -124,7 +124,7 @@ export function importArchive(dir, layout) {
       printed: printed(objectText),
       sha256: sha256(path.join(dir, doc.object)),
     },
-    files: [doc.messages, doc.voiceModel, doc.implementation].filter(Boolean).map((file) => ({
+    files: [doc.messages, doc.voiceModel, doc.implementation, doc.engines].filter(Boolean).map((file) => ({
       file,
       ...(file.endsWith('.txt') && printed(read(file)) ? { printed: printed(read(file)) } : {}),
       sha256: sha256(path.join(dir, file)),
@@ -144,13 +144,18 @@ export function importArchive(dir, layout) {
     identity: inquiryReply(implementationText),
     banks: bankMap(implementationText),
     rows: readObjectRows(objectText),
+    ...(doc.engines ? { engines: readEngineTables(read(doc.engines)) } : {}),
   };
 }
 
 export function stringifyKronos(data) {
-  const { rows, ...rest } = data;
+  const { rows, engines, ...rest } = data;
   const head = JSON.stringify(rest, null, 2).replace(/\n}$/, '');
-  return `${head},\n  "rows": [\n${rows.map((r) => `    ${JSON.stringify(r)}`).join(',\n')}\n  ]\n}\n`;
+  const list = (items, indent) => items.map((r) => `${indent}${JSON.stringify(r)}`).join(',\n');
+  const engineText = engines
+    ? `,\n  "engines": [\n${engines.map(({ rows: er, ...e }) => `    ${JSON.stringify(e).replace(/}$/, '')},"rows":[${er.length ? `\n${list(er, '      ')}\n    ` : ''}]}`).join(',\n')}\n  ]`
+    : '';
+  return `${head},\n  "rows": [\n${list(rows, '    ')}\n  ]${engineText}\n}\n`;
 }
 
 async function main() {

@@ -95,11 +95,17 @@ export function buildKronosProfile(data, layout) {
   const leaveOutOf = (row) => (layout.leaveOut ?? []).find((l) => l.group.test(row.group));
   const longForm = new Set();
 
+  // Value lists a range's two ends can name in full: the voice model's AMS sources, and the EXi
+  // engines by number (`00~09 | Off~EP-1`).
+  const lists = [ams, (data.engines ?? []).map((e) => ({ value: e.number, label: e.name }))].filter((l) => l.length);
+  const listFor = (labels, read) => lists.find((l) => l[read.min]?.label === labels[0] && l[read.max]?.label === labels[1]);
+
   // A name printed for several settings of one group is numbered in the order printed: the chord pads'
   // eight notes, the 32 GE real-time parameters.
-  const rows = data.rows;
+  const engineRows = engineSettings(data, layout);
+  const rows = [...data.rows, ...engineRows.rows];
   const named = (row) => {
-    const rename = (layout.renames ?? []).find((r) => r.group.test(row.group) && r.name === row.name && r.pid === row.id[3]);
+    const rename = (layout.renames ?? []).find((r) => r.group.test(row.group) && r.name === row.name && r.pid === row.id?.[3]);
     return rename ? rename.to : row.name;
   };
   const keyOf = (row) => `${row.group}\u0000${named(row)}`;
@@ -107,9 +113,49 @@ export function buildKronosProfile(data, layout) {
   for (const row of rows) if (row.id && row.name) counts.set(keyOf(row), (counts.get(keyOf(row)) ?? 0) + 1);
   const seen = new Map();
 
+  // An id the table prints for more than one setting, unmarked (the EXi program's Chain Switch and
+  // Chain Level, which the HD-1 table marks `* Chain Level`): which value means which it does not say.
+  const sameId = new Map();
+  for (const row of data.rows) {
+    if (!row.id || !row.group || !row.name || readData(row.data)?.fixed || noteReason(row.note) || leaveOutOf(row)) continue;
+    const key = `${routeOf(row)} ${row.id.join(' ')}`;
+    sameId.set(key, [...(sameId.get(key) ?? []), row]);
+  }
+  const sharedId = (row) => {
+    const same = sameId.get(`${routeOf(row)} ${row.id.join(' ')}`);
+    return same?.length > 1 ? `the table prints one id for ${same.map((r) => `${r.group} ${r.name}`).join(' and ')}, unmarked, and does not say which value means which` : null;
+  };
+
+  // A row the dump holds and no parameter change sets (the EXi slots' Algorithm Type): read, not sent.
+  const readOnlyRow = (row) => {
+    const read = readData(row.data);
+    const labels = readLabels(row.value);
+    const list = labels && read && !read.signed ? listFor(labels, read) : null;
+    const label = `${row.group} ${row.name}`;
+    const id = `${camel(row.group)}.${camel(row.name)}`;
+    ids.add(id);
+    const choices = list?.slice(read.min, read.max + 1).map((s) => ({ id: camel(s.label) || `v${s.value}`, label: s.label, value: s.value }));
+    parameters.push({
+      id,
+      name: label,
+      group: row.group,
+      description: `Offset ${row.ofs}. Read from the dump; the table prints no parameter id for it, so it is not sent.`,
+      access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' },
+      ...(choices
+        ? { type: 'choice', default: choices[0].id, choices, display: { mode: 'choice', shortLabel: camel(row.name) }, encoding: { type: 'enum' } }
+        : { type: 'integer', range: { min: read.min, max: read.max }, default: read.min, display: { mode: 'number', unit: '', shortLabel: camel(row.name) }, encoding: { type: 'u7' } }),
+    });
+    mappings.push({ parameter: id, offset: row.ofs, codec: { type: 'bitfields', parts: [{ at: 0, from: 0, bits: 8, shift: 0 }] }, read, bits: { from: 0, bits: 8 } });
+    readOnly.push(label);
+  };
+  const readOnly = [];
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
+    if (!row.id && row.group && (layout.readOnly ?? []).includes(row.name)) { readOnlyRow(row); continue; }
     if (!row.id || !row.group) continue;          // a further byte of the value above, with its own id
+    if (engineRows.shared.has(row)) { leave(leftOut, engineRows.shared.get(row), `${row.group} ${row.name}`); continue; }
+    if (!row.engine && row.name && sharedId(row) && !readData(row.data)?.fixed && !noteReason(row.note) && !leaveOutOf(row)) { leave(leftOut, sharedId(row), `${row.group} ${row.name}`); continue; }
     if (!row.name) { leave(leftOut, 'printed with a group and no name', `${row.group} (offset ${row.ofs})`); continue; }
     const key = keyOf(row);
     const nth = (seen.get(key) ?? 0) + 1;
@@ -126,12 +172,15 @@ export function buildKronosProfile(data, layout) {
     if (rows[i + 1]?.id && !rows[i + 1].group && !rows[i + 1].name && rows[i + 1].ofs !== row.ofs) { leave(leftOut, 'its value spreads over bytes with ids of their own', label); continue; }
 
     const bits = readBits(row.bit);
-    if (read.bytes > 1 && row.bit) throw new Error(`${label}: bits of a value over ${read.bytes} bytes`);
-    if (read.bytes === 1 && (read.signed ? read.max - read.min : read.max) >= 2 ** bits.bits) throw new Error(`${label}: ${row.data} does not fit bits ${row.bit}`);
+    // A field read back must fit its bits; an engine's may run on into the next byte, and is not read.
+    if (!row.engine && read.bytes > 1 && row.bit) throw new Error(`${label}: bits of a value over ${read.bytes} bytes`);
+    if (!row.engine && read.bytes === 1 && (read.signed ? read.max - read.min : read.max) >= 2 ** bits.bits) throw new Error(`${label}: ${row.data} does not fit bits ${row.bit}`);
     const [typ, soc, sub, pid, idx] = row.id;
     const idBytes = pid < 127 ? [typ, soc, sub, pid, idx] : [typ, soc, sub, 0x7f, (pid >> 7) & 0x7f, pid & 0x7f, idx];
     const fn = routeOf(row);
-    const recipeId = `${fn === '43' ? 'pc' : `pc${fn}_`}${idBytes.map(hex).join('')}`;
+    // An engine's ids are the slot's, whatever engine is in it: another engine's setting may send the
+    // same message, so the recipe names the engine.
+    const recipeId = `${fn === '43' ? 'pc' : `pc${fn}_`}${idBytes.map(hex).join('')}${row.engine ? `_${camel(row.engine)}` : ''}`;
     if (recipes.has(recipeId)) throw new Error(`${label}: parameter id ${idBytes.map(hex).join(' ')} twice for function ${fn}`);
 
     const labels = readLabels(row.value);
@@ -140,9 +189,9 @@ export function buildKronosProfile(data, layout) {
     if (labels && read.min === 0 && read.max === 1 && !labels.every((l, n) => numberLabel(l, n))) {
       // `* -> bypass, Invert Value`: the switch is sent as its effect's bypass, On as 0.
       choices = labels.map((l, n) => ({ id: camel(l.replace('…', '')) || `v${n}`, label: l, value: inverted ? 1 - n : n }));
-    } else if (labels && read.min === 0 && !read.signed && ams.length && ams[read.min]?.label === labels[0] && ams[read.max]?.label === labels[1]) {
+    } else if (labels && read.min === 0 && !read.signed && listFor(labels, read)) {
       const used = new Set();
-      choices = ams.slice(0, read.max + 1).map((s) => {
+      choices = listFor(labels, read).slice(0, read.max + 1).map((s) => {
         const id = used.has(camel(s.label)) ? `${camel(s.label)}${s.value}` : camel(s.label);
         used.add(id);
         return { id, label: s.label, value: s.value };
@@ -185,6 +234,7 @@ export function buildKronosProfile(data, layout) {
     recipes.set(recipeId, { id: recipeId, kind: 'sysex', template: [...header, fn, ...idBytes.map(hex), ...(choices ? ['00', '00'] : []), '$encodedValue', 'F7'] });
     if (pid >= 127) longForm.add(recipeId);
 
+    if (row.engine) { leave(notReadBack, `an EXi engine's own setting: ${layout.document.engines} gives its offset inside the engine's block, and the program table prints the block only as reserved bytes, without saying where the engine's table begins in it`, label); continue; }
     if (read.bytes > 1) { leave(notReadBack, bigEndian ? 'a value over two bytes: the archive marks only the KARMA Start Seed\'s bytes `Big Endian` and does not say the order of the others' : 'a value over two bytes, whose byte order the archive does not say', label); continue; }
     if (read.extra.length) { leave(notReadBack, `a value the dump may hold as ${read.extra.join(', ')}, which the parameter does not offer`, label); continue; }
     const codec = { type: 'bitfields', ...(read.signed ? { signed: true } : {}), parts: [{ at: 0, from: bits.from, bits: bits.bits, shift: 0 }], ...(inverted ? { map: [[0, 1], [1, 0]] } : {}) };
@@ -193,7 +243,48 @@ export function buildKronosProfile(data, layout) {
   }
 
   const routing = routingNotes(data, layout, { routeOf, leaveOutOf });
-  return shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing });
+  return shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing, readOnly, engineNotes: engineRows.notes });
+}
+
+/**
+ * Prog_EXi.txt's engines, as rows of the program for each slot the layout names (`engineSlots`: EXi1
+ * with TYP 11, EXi2 with 12): grouped `EXi1 AL-1 [LFO1]`, the id the slot's TYP and the row's four
+ * bytes. Each engine's rows are checked against the count its heading prints. An id the table prints
+ * for several of an engine's settings (the EP-1's effects, one meaning per effect type) is `shared`,
+ * with the reason it is left out.
+ */
+function engineSettings(data, layout) {
+  const rows = [];
+  const shared = new Map();
+  const sharedRows = [];
+  const notes = [];
+  if (!data.engines || !layout.engineSlots) return { rows, shared, notes };
+  for (const engine of data.engines) {
+    if (engine.printedCount !== undefined && engine.printedCount !== engine.rows.length) throw new Error(`${engine.name}: ${engine.rows.length} rows where its heading prints ${engine.printedCount}`);
+    const byId = new Map();
+    for (const r of engine.rows.filter((x) => x.id)) byId.set(r.id.join(' '), [...(byId.get(r.id.join(' ')) ?? []), r]);
+    for (const slot of layout.engineSlots) {
+      for (const r of engine.rows) {
+        if (!r.id) continue;
+        if (r.typ !== '11/12') throw new Error(`${engine.name} ${r.name}: TYP printed ${r.typ}`);
+        const m = /^(\[[^\]]+\])\s*(.*)$/.exec(r.name);
+        const row = {
+          line: r.line, ofs: r.ofs, ...(r.bit ? { bit: r.bit } : {}),
+          group: `${slot.label} ${engine.name}${m ? ` ${m[1]}` : ''}`,
+          name: m ? m[2] || m[1] : r.name,
+          data: r.data, value: r.value, id: [slot.typ, ...r.id], ...(r.note ? { note: r.note } : {}),
+          engine: engine.name,
+        };
+        rows.push(row);
+        if (byId.get(r.id.join(' ')).length > 1) sharedRows.push(row);
+      }
+    }
+    // One reason per engine: the blocks whose settings share their ids (the EP-1's effects).
+    const blocks = [...new Set(engine.rows.filter((r) => r.id && byId.get(r.id.join(' ')).length > 1).map((r) => /^(\[[^\]]+\])/.exec(r.name)?.[1] ?? r.name))];
+    for (const row of sharedRows.splice(0)) shared.set(row, `${engine.name} prints the same ids for the settings of ${blocks.length} blocks (${blocks.join(', ')}), one meaning per block chosen`);
+    if (engine.rows.length) notes.push(`${engine.name} ${engine.rows.length}`);
+  }
+  return { rows, shared, notes };
 }
 
 /**
@@ -240,6 +331,15 @@ export function presetBanks(banks, column, objectName) {
     return bank;
   });
   return { banks: out, alternates };
+}
+
+/** Which TYP each EXi slot's rows of the program table print: `EXi1 Mod.Mixer1 Type` with 11, EXi2's 12. */
+function slotEvidence(data, layout) {
+  return (layout.engineSlots ?? []).map((slot) => {
+    const row = data.rows.find((r) => r.id && r.group.startsWith(`${slot.label} Mod.Mixer`));
+    if (!row || row.id[0] !== slot.typ) throw new Error(`${layout.name}: the program table's ${slot.label} rows do not take TYP ${slot.typ}`);
+    return `${row.group} ${row.name}, TYP ${row.id[0]}`;
+  });
 }
 
 /** The object the table is, by its number in *1: 00 Program (the default), 01 Combination, … */
@@ -323,7 +423,7 @@ function checkMessages(data, layout) {
   has(m.packing, /sysExSize = binarySize \+ \(binarySize\+6\)\/7/, 'the packed size');
 }
 
-function shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing }) {
+function shell(data, layout, { header, parameters, recipes, mappings, leftOut, notReadBack, fixed, longForm, routing, readOnly = [], engineNotes = [] }) {
   const object = data.object;
   const instrument = layout.family;
   const packed = object.size + Math.floor((object.size + 6) / 7);
@@ -358,15 +458,18 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
     value,
     expectedHex: recipeOf(p).template.flatMap((t) => (t === '$deviceId' ? ['30'] : t === '$encodedValue' ? wireOf(p, value) : [t])).join(' '),
   });
-  const integers = parameters.filter((p) => p.type === 'integer');
+  const sendable = parameters.filter((p) => p.access.canWrite);
+  const integers = sendable.filter((p) => p.type === 'integer');
   const picks = [
     [integers.find((p) => p.range.min === -99), (p) => p.range.min],
     [integers.find((p) => p.range.min <= -5000), (p) => p.range.min],
     [integers.find((p) => p.range.max > 16383), (p) => p.range.max],
-    [parameters.find((p) => p.description.includes('bypass')), (p) => p.choices[0].id],
-    [parameters.find((p) => p.type === 'choice' && p.choices.length > 2), (p) => p.choices.at(-1).id],
-    [parameters.find((p) => longForm.has(p.messageRecipe)), (p) => (p.type === 'choice' ? p.choices.at(-1).id : p.range.max)],
-    ...(layout.functions ?? []).map((f) => [parameters.find((p) => recipeOf(p).template[header.length] === f.code && p.type === 'integer'), (p) => p.range.max]),
+    [sendable.find((p) => p.description.includes('bypass')), (p) => p.choices[0].id],
+    [sendable.find((p) => p.type === 'choice' && p.choices.length > 2), (p) => p.choices.at(-1).id],
+    [sendable.find((p) => longForm.has(p.messageRecipe)), (p) => (p.type === 'choice' ? p.choices.at(-1).id : p.range.max)],
+    ...(layout.functions ?? []).map((f) => [integers.find((p) => recipeOf(p).template[header.length] === f.code), (p) => p.range.max]),
+    // An engine's own setting in each slot: its recipe names the engine.
+    ...(layout.engineSlots ?? []).map((slot) => [integers.find((p) => p.group.startsWith(`${slot.label} `) && /_[a-z]/.test(p.messageRecipe) && p.range.min < 0), (p) => p.range.min]),
   ].filter(([p]) => p);
 
   // A dump to read back: every field it reads at a value its parameter takes, and a few at values
@@ -428,6 +531,8 @@ function shell(data, layout, { header, parameters, recipes, mappings, leftOut, n
       `A range whose first value is the larger (9D~63) is two's complement over its bytes, -99~+99. A choice is a row naming both of two values${amsUsed ? ', or a row whose ends are the ends of the voice model\'s AMS source list (Off~Tempo, sources 0~48)' : ''}. The value column is 19 characters wide; a name it cuts short keeps its cut, with an ellipsis. Other value names are in each parameter's description.`,
       ...(longForm.size ? ['A parameter id above 126 takes the message\'s second form, 7F PIDH PIDL, which the archive calls deprecated and says the instrument still receives.'] : []),
       ...(layout.renames ?? []).map((r) => `"${r.name}" as "${r.to}": ${r.why}.`),
+      ...(engineNotes.length ? [`The EXi engines' own settings come from ${layout.document.engines} (each engine's rows as many as its heading prints: ${engineNotes.join(', ')}), once for each slot: ${layout.engineSlots.map((s) => `${s.label} by TYP ${s.typ}`).join(', ')}, as the program table's own rows for each slot take them (${slotEvidence(data, layout).join(', ')})${data.voiceModel?.messageFormats?.some((l) => /0B: EXi patch 1/.test(l)) ? ' and the voice model files say ("<type> 0B: EXi patch 1, 0C: EXi patch 2")' : ''}. A slot takes the settings of the engine in it: another engine's are refused or mean something else, and engines share ids, so a message from the instrument that more than one engine's setting sends is not attributed to any.`] : []),
+      ...(readOnly.length ? [`Read and not sent: ${readOnly.join(', ')}; the table prints no parameter id for ${readOnly.length === 1 ? 'it' : 'them'}.`] : []),
       `${fixed.length} rows with an id print a fixed value (\`10(fixed)\`, \`00(fixed)\`: ${[...new Set(fixed.map((l) => l.replace(/ \d+$/, '')))].slice(0, 3).join('; ')}; …) and are not settings.`,
       ...summary(leftOut).map((s) => `Left out: ${s}.`),
       `Pull: Current Object Dump Request (function 74) for object ${code}, the ${kind}, answered by a Current Object Dump (function 75) carrying object version ${object.objectVersion} and ${object.size} bytes in Korg's 8-in-7 packing (*3: ${packed} bytes). ${mappings.length} parameters are read back at their rows' offsets and bits. A dump of any other length does not match${layout.otherLength ? `: ${layout.otherLength}` : ''}.`,
