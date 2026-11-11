@@ -399,6 +399,7 @@ node tools/profiles/udo/make-profiles.mjs --check
 node tools/profiles/groove/make-profiles.mjs --check
 node tools/profiles/teenage/make-profiles.mjs --check
 node tools/profiles/sonicware/make-profiles.mjs --check
+node tools/profiles/blackcorp/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
 ```
 

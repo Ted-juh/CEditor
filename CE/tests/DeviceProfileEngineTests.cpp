@@ -4488,7 +4488,11 @@ int main (int argc, char** argv)
         root.getChildFile ("sonicware-liven-texture-lab.ceditor-device.json"),
         root.getChildFile ("sonicware-liven-xfm.ceditor-device.json"),
         root.getChildFile ("sonicware-lofi-12-xt.ceditor-device.json"),
-        root.getChildFile ("sonicware-smpltrek.ceditor-device.json")
+        root.getChildFile ("sonicware-smpltrek.ceditor-device.json"),
+        root.getChildFile ("black-corporation-deckards-dream-mk2.ceditor-device.json"),
+        root.getChildFile ("black-corporation-ise-nin.ceditor-device.json"),
+        root.getChildFile ("black-corporation-kijimi-mk2.ceditor-device.json"),
+        root.getChildFile ("black-corporation-xerxes-mk2.ceditor-device.json")
     };
 
     auto failures = 0;

@@ -33,8 +33,15 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | [`groove/`](groove/README.md) | The Groove Synthesis 3rd Wave from its MIDI CC + SysEx Spec: 403 parameters as 14-bit NRPNs, with the ranges and value lists the spec prints and its mod source and destination lists. Read from the PDF's word positions. |
 | [`teenage/`](teenage/README.md) | 6 profiles from the MIDI tables of teenage engineering's guides (web pages): OP-Z, OP-1 field, OP-XY, TX-6, EP-133 K.O. II and EP-40 Riddim. Every row as the controller it prints, the per-track ones on the track's channel; switches and actions as choices. |
 | [`sonicware/`](sonicware/README.md) | 11 profiles from the MIDI implementation charts Sonicware publishes for each instrument: the LIVEN XFM, Bass & Beats, Mega Synthesis, 8bit warps, Ambient Ø, Lofi-12, Lofi-6 and Texture Lab, the CyDrums, Lofi-12 XT and SmplTrek. Every control change the chart marks recognized, grouped by its block, on its block's channel; values 0 - 127. |
+| [`blackcorp/`](blackcorp/README.md) | 4 profiles from the MIDI CC charts at the end of Black Corporation's operation manuals: Deckard's Dream MK2 (with the ranges it prints: bands as choices, centred ranges), Kijimi MK2, Xerxes MK2 (its two channels) and Ise-Nin (its Upper and Lower layers). Read from the PDFs' word positions. |
 | [`sequential/`](sequential/README.md) | 17 profiles from the NRPN tables of Sequential's, Dave Smith Instruments' and Oberheim's manuals: Prophet-6, Rev2, 12, X, '08 and 5/10, Pro 2, Trigon-6, Take 5, Fourm, Tetra, the three Mophos, and the OB-6, OB-X8 and TEO-5. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |
+
+**Makers looked at and not built** (November 2026), each for want of its own documents reachable
+from here: Access (the Virus manuals; `access-music.de` failed its TLS handshake), IK Multimedia (the
+UNO Synth; its download list is drawn by a script), Studiologic (the Sledge; likewise) and Kurzweil
+(`kurzweil.com` refuses automated requests, its PDFs included). Retailers' copies exist for each and
+are not used: a profile cites its maker's own file.
 
 ## The rules every profile here follows
 
