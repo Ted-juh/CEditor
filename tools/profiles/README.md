@@ -39,6 +39,7 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | [`sequential/`](sequential/README.md) | 17 profiles from the NRPN tables of Sequential's, Dave Smith Instruments' and Oberheim's manuals: Prophet-6, Rev2, 12, X, '08 and 5/10, Pro 2, Trigon-6, Take 5, Fourm, Tetra, the three Mophos, and the OB-6, OB-X8 and TEO-5. |
 | [`alesis/`](alesis/README.md) | The Alesis A6 Andromeda from its MIDI Sysex Specification's parameter chart: every program and mix parameter the chart gives a range (696), sent by its MIDI Editing message, a 17-bit signed value; and its mode select. Read from the PDF's text lines. |
 | [`gamechanger/`](gamechanger/README.md) | The Gamechanger Audio Motor Synth MKII (its NRPN map and SysEx PDFs) and the first Motor Synth (its manual's): every sound and global parameter as its 14-bit NRPN, with Pull from the sound and global parameter dumps, read by NRPN order. Read from the PDFs' word positions. |
+| [`hammond/`](hammond/README.md) | 3 profiles from the MIDI INFORMATION appendix of Hammond's owner's manuals: SK1/SK2, SKX and XK-1c. Every global, patch and Leslie parameter as its NRPN on the Upper channel, with its value names; the drawbars as their controllers. Read from the PDFs' word positions. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |
 
 **Makers looked at and not built** (November 2026), each for want of its own documents reachable
@@ -46,8 +47,9 @@ from here: Access (the Virus manuals; `access-music.de` failed its TLS handshake
 UNO Synth; its download list is drawn by a script), Studiologic (the Sledge; likewise), Kurzweil
 (`kurzweil.com` refuses automated requests, its PDFs included), Casio (`www.casio.com`, where its
 manual lists now are, answers 403, and the MIDI implementation PDFs' old addresses are gone), Polyend
-(`polyend.com` answers with a Cloudflare challenge) and Kawai (its download list is drawn by a
-script). Retailers' copies exist for each and are not used: a profile cites its maker's own file.
+(`polyend.com` answers with a Cloudflare challenge), Kawai (its download list is drawn by a
+script). Retailers' copies exist
+for each and are not used: a profile cites its maker's own file.
 
 ## What is still open
 

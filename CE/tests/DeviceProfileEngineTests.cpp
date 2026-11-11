@@ -4758,7 +4758,10 @@ int main (int argc, char** argv)
         root.getChildFile ("expressive-e-osmose.ceditor-device.json"),
         root.getChildFile ("alesis-a6-andromeda.ceditor-device.json"),
         root.getChildFile ("gamechanger-motor-synth.ceditor-device.json"),
-        root.getChildFile ("gamechanger-motor-synth-mkii.ceditor-device.json")
+        root.getChildFile ("gamechanger-motor-synth-mkii.ceditor-device.json"),
+        root.getChildFile ("hammond-sk1-sk2.ceditor-device.json"),
+        root.getChildFile ("hammond-skx.ceditor-device.json"),
+        root.getChildFile ("hammond-xk-1c.ceditor-device.json")
     };
 
     auto failures = 0;
