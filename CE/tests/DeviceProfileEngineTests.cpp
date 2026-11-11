@@ -4562,7 +4562,8 @@ int main (int argc, char** argv)
         root.getChildFile ("black-corporation-kijimi-mk2.ceditor-device.json"),
         root.getChildFile ("black-corporation-xerxes-mk2.ceditor-device.json"),
         root.getChildFile ("erica-lxr-02.ceditor-device.json"),
-        root.getChildFile ("erica-perkons-hd-01.ceditor-device.json")
+        root.getChildFile ("erica-perkons-hd-01.ceditor-device.json"),
+        root.getChildFile ("expressive-e-osmose.ceditor-device.json")
     };
 
     auto failures = 0;
