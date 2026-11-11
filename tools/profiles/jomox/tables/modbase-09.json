@@ -1,0 +1,25 @@
+{
+  "source": {"title":"ModBase 09 Operating Manual","file":"ModBase09_E.pdf","sha256":"710b65e9c7598a4ce38e8df83429358f1ca8c44f705eb44e373187ba22f05d0e","url":"https://www.jomox.de/upload/manuals/ModBase09_E.pdf","linkedFrom":"https://www.jomox.de/support.php?lang=2&product_id=16","pages":[27,28]},
+  "rows": [
+    {"page":27,"section":null,"name":"Tune","cc":100,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Pitch","cc":101,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Decay","cc":102,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Harmonics","cc":103,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Pulse","cc":104,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Noise","cc":105,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Attack","cc":106,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"EQ","cc":107,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Compression","cc":113,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Gate Time","cc":114,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"Metal Noise I","cc":115,"range":"0..127","internal":"499"},
+    {"page":27,"section":null,"name":"Metal Noise II","cc":116,"range":"0..127","internal":"499"},
+    {"page":27,"section":null,"name":"MetalNze II Mask","cc":120,"range":"0..15","internal":"16"},
+    {"page":27,"section":null,"name":"Volume","cc":117,"range":"0..127","internal":"256"},
+    {"page":27,"section":null,"name":"LFO 1 Wave","cc":119,"range":"0..15","internal":"Sup/Sdo/Sin/Si-/tri/tri-/rCt/rC-/PL1-PL8"},
+    {"page":27,"section":null,"name":"LFO 1 Intensity","cc":121,"range":"0..127","internal":"128"},
+    {"page":27,"section":null,"name":"LFO 1 Speed","cc":122,"range":"0..127","internal":"128"},
+    {"page":27,"section":null,"name":"LFO 2 Wave","cc":123,"range":"0..15","internal":"Sup/Sdo/Sin/Si-/tri/tri-/rCt/rC-/PL1-PL8"},
+    {"page":27,"section":null,"name":"LFO 2 Intensity","cc":124,"range":"0..127","internal":"128"},
+    {"page":27,"section":null,"name":"LFO 2 Speed","cc":125,"range":"0..127","internal":"128"}
+  ]
+}

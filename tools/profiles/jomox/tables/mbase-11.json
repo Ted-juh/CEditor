@@ -1,0 +1,21 @@
+{
+  "source": {"title":"MBase 11 Operating Manual","file":"MBase11_E.pdf","sha256":"10350e766ff794a6afca61b268d8aea2e094cbe8d595aebeb0449c81240b0ef0","url":"https://www.jomox.de/upload/manuals/MBase11_E.pdf","linkedFrom":"https://www.jomox.de/support.php?lang=2&product_id=12","pages":[15,16]},
+  "rows": [
+    {"page":15,"section":"BASS DRUM","name":"Tune","cc":100,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Pitch","cc":101,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Decay","cc":102,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Harmonics","cc":103,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Pulse","cc":104,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Noise","cc":105,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Attack","cc":106,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"EQ","cc":107,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Compression","cc":113,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Gate Time","cc":114,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Metal Noise","cc":115,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"Volume","cc":117,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"LFO Sync","cc":120,"range":"0/64","internal":"Off/On"},
+    {"page":15,"section":"BASS DRUM","name":"LFO One Shot","cc":123,"range":"0/64","internal":"Off/On"},
+    {"page":15,"section":"BASS DRUM","name":"LFO Intensity","cc":121,"range":"0..127","internal":"256"},
+    {"page":15,"section":"BASS DRUM","name":"LFO Rate","cc":122,"range":"0..127","internal":"256"}
+  ]
+}

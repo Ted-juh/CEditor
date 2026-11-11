@@ -4763,7 +4763,23 @@ int main (int argc, char** argv)
         root.getChildFile ("hammond-skx.ceditor-device.json"),
         root.getChildFile ("hammond-xk-1c.ceditor-device.json"),
         root.getChildFile ("tasty-chips-gr-2.ceditor-device.json"),
-        root.getChildFile ("tasty-chips-gr-mega.ceditor-device.json")
+        root.getChildFile ("tasty-chips-gr-mega.ceditor-device.json"),
+        root.getChildFile ("jomox-airbase-99.ceditor-device.json"),
+        root.getChildFile ("jomox-alpha-base-mk2.ceditor-device.json"),
+        root.getChildFile ("jomox-alpha-base.ceditor-device.json"),
+        root.getChildFile ("jomox-mbase-01.ceditor-device.json"),
+        root.getChildFile ("jomox-mbase-11.ceditor-device.json"),
+        root.getChildFile ("jomox-mbrane-11.ceditor-device.json"),
+        root.getChildFile ("jomox-mod-fm.ceditor-device.json"),
+        root.getChildFile ("jomox-modbase-09-mk2.ceditor-device.json"),
+        root.getChildFile ("jomox-modbase-09.ceditor-device.json"),
+        root.getChildFile ("jomox-modbrane-11.ceditor-device.json"),
+        root.getChildFile ("jomox-moonwind-mk2.ceditor-device.json"),
+        root.getChildFile ("jomox-moonwind.ceditor-device.json"),
+        root.getChildFile ("jomox-sunsyn-mk2.ceditor-device.json"),
+        root.getChildFile ("jomox-xbase-09.ceditor-device.json"),
+        root.getChildFile ("jomox-xbase-888.ceditor-device.json"),
+        root.getChildFile ("jomox-xbase-999.ceditor-device.json")
     };
 
     auto failures = 0;
