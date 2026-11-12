@@ -60,7 +60,17 @@ manual lists now are, answers 403, and the MIDI implementation PDFs' old address
 script), Melbourne Instruments (the Delia's and Nina's manuals redirect to Squarespace's file host,
 which this environment's network does not reach) and Synthstrom Audible (the Deluge's guidebook
 documents no fixed controller map: its controllers are learned; the community firmware's default map
-is on `synthstromaudible.github.io`, which this environment does not reach). Retailers' copies exist
+is on `synthstromaudible.github.io`, which this environment does not reach). Also MFB (`mfberlin.de` is
+now an unrelated news site), Fred's Lab (`fredslab.de` does not answer), Schmidt (its domain redirects
+to a shop host this environment's network does not reach), Nonlinear Labs (the C15 takes controllers
+only for its pedals, ribbons and aftertouch; its 317 parameters have no MIDI address), Doepfer (the
+Dark Energy's synth parameters are not on MIDI; its interfaces' controllers are user-assigned), the
+Mutable Instruments archive (no Shruthi, Ambika or Anushri pages; Yarns' chart is on Google Sheets,
+not reached), Kodamo's EssenceFM (no fixed controllers for its sound) and Radikal's Accelerator (its
+manuals are on `www.media.radikaltechnologies.com`, not reached). Soulsby, MeeBlip, Sonic Potions,
+Bastl, Analogue Solutions, Studio Electronics, Supercritical, Elta, Make Noise, Crumar, 1010music and
+Critter & Guitari were not surveyed: this environment's network does not reach their sites, and the
+change that would have allowed them was refused. Retailers' copies exist
 for each and are not used: a profile cites its maker's own file.
 
 ## What is still open
