@@ -218,7 +218,7 @@ function nativeDump(d) {
     ...(d.mappings?.length ? {} : { frameOnly: true }),
     message: {
       matcher: copyJson(d.matcher),
-      payload: Object.fromEntries(['offset', 'size', 'pack'].filter((k) => d.payload?.[k] !== undefined).map((k) => [k, copyJson(d.payload[k])])),
+      payload: Object.fromEntries(['offset', 'size', 'pack', 'records'].filter((k) => d.payload?.[k] !== undefined).map((k) => [k, copyJson(d.payload[k])])),
       ...(c ? { checksum: { type: c.type, fromOffset: c.fromOffset, toOffset: c.toOffset, byteOffset: c.byteOffset } } : {}),
       // null: the count is not set (a collection its footer ends), so the emitter does not work one out.
       completion: { messages: d.completion?.expectedMessages ?? null, bytes: d.completion?.expectedBytes ?? null },

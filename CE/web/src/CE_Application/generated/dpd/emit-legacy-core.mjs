@@ -131,6 +131,8 @@ export function buildDumpDefinitions(resolved) {
         ...(m.payload?.size != null ? { size: m.payload.size } : {}),
         // Whole-payload 8->7 block packing (Korg) — the C++ engine unpacks it before per-offset mapping.
         ...(m.payload?.pack ? { pack: m.payload.pack } : {}),
+        // A payload of records, each a key and a value: a field names its key (`record`).
+        ...(m.payload?.records ? { records: copyJson(m.payload.records) } : {}),
       },
     };
     // roland-7bit / sum-7bit / xor are all computed by the engine's dump decoder.

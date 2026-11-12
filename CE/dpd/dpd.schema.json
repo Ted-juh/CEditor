@@ -658,6 +658,18 @@
               "properties": {
                 "offset": { "type": "integer", "minimum": 0, "description": "Byte index where parameter data begins (after the header)." },
                 "size": { "type": "integer", "minimum": 0, "description": "Unpacked payload byte count." },
+            "records": {
+              "type": "object",
+              "description": "A payload of records, each `size` bytes: a key at `keyAt` and a value at `valueAt`, each u7 or u14 (`keyType`, `valueType`). A layout entry then names its key (`record`), and may name the record and value that must have come before it (`scope`): the Groove Synthesis 3rd Wave's dump is every setting as its NRPN number and value, NRPN 0 (the part) before each part's.",
+              "required": ["size"],
+              "properties": {
+                "size": { "type": "integer", "minimum": 1 },
+                "keyAt": { "type": "integer", "minimum": 0 },
+                "keyType": { "enum": ["u7", "u14"] },
+                "valueAt": { "type": "integer", "minimum": 0 },
+                "valueType": { "enum": ["u7", "u14"] }
+              }
+            },
                 "pack": { "$ref": "#/$defs/encoding", "description": "Optional block packing of the WHOLE payload before per-offset mapping (e.g. Korg packed8to7)." }
               }
             },

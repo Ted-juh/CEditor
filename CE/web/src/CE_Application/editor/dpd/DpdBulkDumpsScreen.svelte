@@ -53,7 +53,7 @@
     for (let i = 0; i < map.payloadOffset; i++) out[i] = 'header';
     for (let i = n - map.suffixLen; i < n; i++) out[i] = 'suffix';
     if (map.checksum) out[map.checksum.byteOffset ?? pEnd] = 'checksum';
-    if (!map.packed) map.fields.forEach((f, fi) => { for (let k = 0; k < f.size; k++) { const idx = map.payloadOffset + f.offset + k; if (idx < pEnd) out[idx] = 'f' + (fi % FIELD_COLORS); } });
+    if (!map.packed && !map.records) map.fields.forEach((f, fi) => { for (let k = 0; k < f.size; k++) { const idx = map.payloadOffset + f.offset + k; if (idx < pEnd) out[idx] = 'f' + (fi % FIELD_COLORS); } });
     return out;
   });
   let fieldFails = $derived(new Set((rt?.failures ?? []).map((f) => f.param)));
@@ -108,6 +108,8 @@
       {#if rt?.ok}<span class="status-pill"><span class="chk ok">✓</span> Round-trip verified — {map.fields.length} fields, {wire.length} bytes</span>
       {:else}<span class="status-pill warn"><span class="chk warn">!</span> Round-trip failing{#if rt?.failures?.length}: {rt.failures[0].param ?? rt.failures[0].error}{/if}</span>{/if}
       {#if map.packed}<span class="tag">payload 8→7 packed</span>{/if}
+      {#if map.records}<span class="tag">payload of records</span>{/if}
+      {#if rt?.shadowed?.length}<span class="tag" title={rt.shadowed.join(', ')}>{rt.shadowed.length} field{rt.shadowed.length === 1 ? '' : 's'} sharing bytes with another, not checked alone</span>{/if}
       {#if map.completion?.messages > 1}<span class="tag">{map.completion.messages}-message bank</span>{/if}
       <span style="margin-left:auto" class="lm">request via {active.requestShape ?? '—'}</span>
     </div>

@@ -164,3 +164,27 @@ test('a bit slice reads as the engine reads its bit fields: signed, by table, sh
   assert.equal(bitsliceDecode(top, [0x80, 0x3f]), 127);
   assert.equal(bitsliceDecode(top, bitsliceEncode(top, 100)), 100);
 });
+
+test('every dump of every generated profile round-trips in the Designer\'s own dump code', () => {
+  // The Designer's Bulk dumps screen checks a dump by assembling it and reading it back. It had to
+  // learn what the engine reads: bytes between the prefix and the payload (a Waldorf's program
+  // number), fields that hold only while another byte has a value (a KRONOS EXi slot's engine, a
+  // TWISTfm VALUE message's parameter), a payload of records (the 3rd Wave's NRPN number and value
+  // pairs), a choice stored in 14 bits (the Matriarch's settings) and a switch as boolean-u7.
+  const results = new Map();
+  for (const legacy of generatedProfiles().filter((l) => l.dumpDefinitions?.length)) {
+    const model = resolveModel(legacyToDpd(legacy, { handMade }).model, {});
+    for (const d of model.dumps) {
+      if (!d.message?.matcher || !d.layout?.length) continue;
+      const rt = dumpRoundTrip(d, model);
+      results.set(`${legacy.id}/${d.id}`, rt.ok ? 'ok' : JSON.stringify(rt.failures[0]));
+    }
+  }
+  const failing = [...results].filter(([, r]) => r !== 'ok').map(([k, r]) => `${k}: ${r}`);
+  assert.deepEqual(failing, []);
+  for (const key of ['waldorf-pulse/programDump', 'behringer-wave/editBuffer', 'twisted-electrons-twistfm/editorValue', 'korg-kronos-exi/currentProgramDump',
+    'groove-synthesis-3rd-wave/programData', 'moog-matriarch/reply02', 'roland-sh-201/patchCommonDump', 'korg-kronos-drum-kit/currentDrumKitDump']) {
+    assert.equal(results.get(key), 'ok', key);
+  }
+  assert.ok(results.size > 11000, `${results.size} dumps`);
+});

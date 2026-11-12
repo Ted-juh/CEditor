@@ -679,7 +679,14 @@ and tests, is carried for the engine as it is, on fewer than 2 parameters in 100
 A value packed into bits of a dump (a KRONOS keeps a switch in bit 6 of a byte whose other bits are
 another parameter's) is a DPD bit slice, the engine's bit fields under the DPD's name, signed, by
 table or shifted as the engine reads them; the Designer's own dump code reads and writes them, a
-field touching only its own bits, so its round-trip check covers every dump in the library.
+field touching only its own bits. It also reads what else the engine does (a payload of records, a
+field there only while another byte holds a value, a payload after a program number), so its
+round-trip check covers every one of the 11,742 dumps that have a byte map, and fails a layout that
+puts two fields on one byte. That check found three defects the engine's own tests could not: the
+KRONOS's and NAUTILUS's Swing read as sixteen bits over two switches; the CP5's and CP50's Reverb,
+Pre-Amplifier and Modulation Effect switches in the wrong blocks, from a page whose columns were read
+in the wrong order; and the MOTIF XS's Multi Insertion B sent to the Drum Voice's, as the data list
+misprints it.
 
 How the program talks to the device is the model's own too: its device id and variables (a part's
 channel), the pause between messages, its identity, what it can be asked (`requests`) and what is
