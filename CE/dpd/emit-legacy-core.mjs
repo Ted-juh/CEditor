@@ -3,7 +3,7 @@
 // produce an engine-loadable profile on save (no Node CLI); the CLI re-uses this for the generated
 // file. DEVICE-AGNOSTIC: manufacturer / family / identity / message recipes / CC controllers are all
 // derived from the resolved profile — no device is special-cased. Imports only browser-safe siblings.
-import { resolveParams } from './resolve.mjs';
+import { resolveParams, copyJson } from './resolve.mjs';
 import { hexToBytes } from './codecs.mjs';
 import { assembleDump } from './dumps.mjs';
 
@@ -47,7 +47,7 @@ function applyEngine(out, engine) {
   if (!engine || typeof engine !== 'object') return out;
   for (const [key, value] of Object.entries(engine)) {
     if (value === null) delete out[key];
-    else out[key] = structuredClone(value);
+    else out[key] = copyJson(value);
   }
   return out;
 }
@@ -139,7 +139,7 @@ export function buildDumpDefinitions(resolved) {
       const mapping = {
         parameter: p ? legacyParamId(p) : e.param, ...(e.offset != null ? { offset: e.offset } : {}), ...(codec ? { codec } : {}),
         // A record's key (and the record it follows), and a condition on another payload byte.
-        ...Object.fromEntries(['record', 'scope', 'when'].filter((k) => e[k] != null).map((k) => [k, structuredClone(e[k])])),
+        ...Object.fromEntries(['record', 'scope', 'when'].filter((k) => e[k] != null).map((k) => [k, copyJson(e[k])])),
       };
       return applyEngine(mapping, e.engine);
     });
@@ -237,7 +237,7 @@ function legacyParam(p, defaults = {}) {
   // and the readouts read these from the descriptor. The two above are the emitter's and stay.
   if (p.display && typeof p.display === 'object') {
     for (const key of ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC', 'mode', 'shortLabel']) {
-      if (p.display[key] !== undefined) out.display[key] = structuredClone(p.display[key]);
+      if (p.display[key] !== undefined) out.display[key] = copyJson(p.display[key]);
     }
   }
   // A string has no normalized position — there is no 0..1 to put it on.
@@ -267,7 +267,7 @@ function legacyParam(p, defaults = {}) {
   // Its own send policy, or its model's for its value type; failing both, a name and a choice are
   // committed and the rest dragged. null: none at all.
   const sendPolicy = p.sendPolicy !== undefined ? p.sendPolicy : defaults.sendPolicy?.[p.valueType];
-  if (sendPolicy !== null) out.sendPolicy = structuredClone(sendPolicy ?? { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true });
+  if (sendPolicy !== null) out.sendPolicy = copyJson(sendPolicy ?? { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true });
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
   // A parameter only read back (from a dump) has no write wire and is sent with nothing; a converted
   // one says so with `wires: []`. One with no wires list at all keeps the DT1 it always defaulted to.
@@ -440,7 +440,7 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   // engine's scan plumbing derived from it — a `requests` entry synthesized from the referenced
   // messageShape and a `presetBrowser` whose slots are the union of the bank ranges.
   if (resolved.presets) {
-    legacy.presets = structuredClone(resolved.presets);
+    legacy.presets = copyJson(resolved.presets);
     const nameRequestId = resolved.presets.nameRequest?.request;
     const shape = (resolved.messageShapes ?? []).find((s) => s.id === nameRequestId);
     if (shape) {
@@ -464,9 +464,9 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   }
 
   // The profile-wide display defaults (middleC): the engine hands them to each parameter.
-  if (resolved.display && typeof resolved.display === 'object') legacy.display = structuredClone(resolved.display);
+  if (resolved.display && typeof resolved.display === 'object') legacy.display = copyJson(resolved.display);
   // What a patch of this synth is (ce.patch): read from the document as the author wrote it.
-  if (resolved.patch && typeof resolved.patch === 'object') legacy.patch = structuredClone(resolved.patch);
+  if (resolved.patch && typeof resolved.patch === 'object') legacy.patch = copyJson(resolved.patch);
 
   // The engine-only fields of a converted profile, laid over the rest; an id or name the caller
   // asked for still stands.

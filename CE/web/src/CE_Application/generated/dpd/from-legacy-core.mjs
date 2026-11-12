@@ -11,8 +11,8 @@
 //     its options, or SysEx through a message shape with the parameter's address), and each dump's
 //     framing, payload, checksum, counts and layout;
 //   - `engine`, on a parameter, a dump, a mapping or the model, carries what the DPD does not model
-//     and the emitter cannot derive (a send policy, a KRONOS's bit-field codecs, the profile's
-//     sources, notes and tests), computed as exactly the difference between the engine profile and
+//     and the emitter cannot derive (a KRONOS's bit-field codecs, the profile's sources, notes and
+//     tests), computed as exactly the difference between the engine profile and
 //     what the emitter derives.
 //
 // THE GATE (compareEmission). Emitting the model must give the engine profile back: every field
@@ -20,7 +20,7 @@
 // what they send: every parameter compiled at the ends and middle of its range and at every choice,
 // through both profiles, must give the same bytes.
 
-import { resolveModel } from './resolve.mjs';
+import { resolveModel, copyJson } from './resolve.mjs';
 import { hexToBytes, bytesToHex, resolveAddress } from './codecs.mjs';
 import { buildLegacyProfile } from './emit-legacy-core.mjs';
 
@@ -58,7 +58,7 @@ const HEX = /^[0-9A-Fa-f]{2}$/;
 /** A recipe as a DPD messageShape: its template, checksum and delay (null: none, as it had none). */
 const shapeOf = (r, id = r.id, template = r.template) => ({
   id, kind: 'sysex', template: [...template],
-  ...(r.checksum ? { checksum: structuredClone(r.checksum) } : {}),
+  ...(r.checksum ? { checksum: copyJson(r.checksum) } : {}),
   delayAfterMs: r.delayAfterMs ?? null,
 });
 
@@ -145,21 +145,21 @@ function nativeParam(q, recipes, sysex) {
   const valueType = VALUE_TYPES[q.type];
   if (!valueType) return { why: `type ${q.type}` };
   const p = { id: q.id, name: q.name, ...(q.group != null ? { group: q.group } : {}), valueType };
-  if (q.range) p.range = structuredClone(q.range);
-  if (q.default !== undefined) p.default = structuredClone(q.default);
+  if (q.range) p.range = copyJson(q.range);
+  if (q.default !== undefined) p.default = copyJson(q.default);
   const enc = q.encoding?.type ?? 'u7';
   // The engine's nibble count is `nibbles`; the DPD's is `bytes`.
-  const { nibbles, ...encoding } = structuredClone(q.encoding ?? {});
+  const { nibbles, ...encoding } = copyJson(q.encoding ?? {});
   p.encoding = { ...encoding, type: ENCODINGS[enc] ?? enc, ...(enc === 'nibbled' ? { bytes: nibbles ?? 2 } : nibbles != null ? { nibbles } : {}) };
   p.access = {
     read: q.access?.canRead !== false, write: q.access?.canWrite !== false,
     ...(q.access?.realtimeSafe === false ? { realtimeSafe: false } : {}),
     ...(q.access?.source && q.access.source !== 'singleParameter' ? { source: q.access.source } : {}),
   };
-  p.sendPolicy = q.sendPolicy === undefined ? null : structuredClone(q.sendPolicy);
+  p.sendPolicy = q.sendPolicy === undefined ? null : copyJson(q.sendPolicy);
   if (Array.isArray(q.choices)) p.enum = q.choices.map((c) => ({ id: c.id, ...(c.label != null ? { label: c.label } : {}), wire: c.value }));
-  if (q.ui) p.ui = structuredClone(q.ui);
-  const display = Object.fromEntries(DISPLAY_KEYS.filter((k) => q.display?.[k] !== undefined).map((k) => [k, structuredClone(q.display[k])]));
+  if (q.ui) p.ui = copyJson(q.ui);
+  const display = Object.fromEntries(DISPLAY_KEYS.filter((k) => q.display?.[k] !== undefined).map((k) => [k, copyJson(q.display[k])]));
   if (Object.keys(display).length) p.display = display;
   if (q.description != null) p.description = q.description;
   // The parameter's address: its own (`$address` recipes), or the bytes of its written-out recipe
@@ -174,7 +174,7 @@ function overlay(original, derived, skip) {
   const out = {};
   for (const key of new Set([...Object.keys(original), ...Object.keys(derived)])) {
     if (skip.has(key) || deepEqual(original[key], derived[key])) continue;
-    out[key] = key in original ? structuredClone(original[key]) : null;
+    out[key] = key in original ? copyJson(original[key]) : null;
   }
   return out;
 }
@@ -208,8 +208,8 @@ function nativeDump(d) {
     ...(d.requestRecipe ? { requestShape: d.requestRecipe } : {}),
     ...(d.mappings?.length ? {} : { frameOnly: true }),
     message: {
-      matcher: structuredClone(d.matcher),
-      payload: Object.fromEntries(['offset', 'size', 'pack'].filter((k) => d.payload?.[k] !== undefined).map((k) => [k, structuredClone(d.payload[k])])),
+      matcher: copyJson(d.matcher),
+      payload: Object.fromEntries(['offset', 'size', 'pack'].filter((k) => d.payload?.[k] !== undefined).map((k) => [k, copyJson(d.payload[k])])),
       ...(c ? { checksum: { type: c.type, fromOffset: c.fromOffset, toOffset: c.toOffset, byteOffset: c.byteOffset } } : {}),
       // null: the count is not set (a collection its footer ends), so the emitter does not work one out.
       completion: { messages: d.completion?.expectedMessages ?? null, bytes: d.completion?.expectedBytes ?? null },
@@ -218,7 +218,7 @@ function nativeDump(d) {
       const codec = m.codec && DUMP_CODECS[m.codec.type]?.(m.codec);
       return {
         param: m.parameter, ...(m.offset != null ? { offset: m.offset } : {}), ...(codec ? { codec } : {}),
-        ...Object.fromEntries(['record', 'scope', 'when'].filter((k) => m[k] != null).map((k) => [k, structuredClone(m[k])])),
+        ...Object.fromEntries(['record', 'scope', 'when'].filter((k) => m[k] != null).map((k) => [k, copyJson(m[k])])),
       };
     }),
   };
@@ -336,7 +336,7 @@ function foldParam(instances, rest, ns, stride) {
   const wires = instances.map((q) => q.wires ?? []);
   const folded = wires.some((w) => w.length !== wires[0].length) ? null : foldWires(wires, ns);
   if (folded) p.wires = folded;
-  else { p.wires = structuredClone(wires[0]); perInstance.wires = structuredClone(wires); }
+  else { p.wires = copyJson(wires[0]); perInstance.wires = copyJson(wires); }
   // Everything else: the same, templated, or (as a last resort) one value per instance.
   const keys = new Set(instances.flatMap((q) => Object.keys(q)));
   for (const key of keys) {
@@ -349,8 +349,8 @@ function foldParam(instances, rest, ns, stride) {
     else {
       // Its first instance's value stands as the parameter's own, so the parameter is whole on its
       // own (a choice keeps a list); the instances' values are laid over it.
-      if (values[0] !== undefined) p[key] = structuredClone(values[0]);
-      perInstance[key] = values.map((v) => (v === undefined ? null : structuredClone(v)));
+      if (values[0] !== undefined) p[key] = copyJson(values[0]);
+      perInstance[key] = values.map((v) => (v === undefined ? null : copyJson(v)));
     }
   }
   if (Object.keys(perInstance).length) p.perInstance = perInstance;
@@ -522,7 +522,7 @@ export function legacyToDpd(legacy, { handMade = new Set() } = {}) {
   }
   for (const p of params) if (defaults[p.valueType] && JSON.stringify(p.sendPolicy) === JSON.stringify(defaults[p.valueType])) delete p.sendPolicy;
   if (Object.keys(defaults).length) model.defaults = { sendPolicy: defaults };
-  if (legacy.presets && !legacy.presets.nameRequest) model.presets = structuredClone(legacy.presets);
+  if (legacy.presets && !legacy.presets.nameRequest) model.presets = copyJson(legacy.presets);
   if (legacy.dumpDefinitions?.length) model.dumps = legacy.dumpDefinitions.map(nativeDump);
 
   // What the emitter derives from the DPD fields alone, and what it must be told besides.

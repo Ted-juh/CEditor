@@ -53,8 +53,9 @@
     appliedSavedFor = null;
     saveStatus = '';
     const id = resolveDpdId(pid);
-    model = id ? deepClone(dpdLibrary[id]) : null;
-    openingModelJson = model ? JSON.stringify($state.snapshot(model)) : null;
+    const opening = id ? deepClone(dpdLibrary[id]) : null;
+    openingModelJson = opening ? JSON.stringify(opening) : null;
+    model = opening;
     if (pid) requestProfileSource(pid); // ask the engine for the saved source (no-op without the bridge)
   });
 
@@ -70,7 +71,7 @@
     appliedSavedFor = pid;
     // The bridge may answer well after the bundled model is already editable. Never replace a
     // draft the user has changed while that request was in flight.
-    const currentJson = model ? JSON.stringify($state.snapshot(model)) : null;
+    const currentJson = model ? JSON.stringify(untrack(() => plain)) : null;
     if (currentJson !== openingModelJson) return;
     try {
       const parsed = JSON.parse(entry.source);
@@ -82,8 +83,8 @@
         const { model: converted } = legacyToDpd(parsed, { handMade: new Set(Object.keys(dpdLibrary)) });
         if (converted) {
           untrack(() => designerHistory?.startsNewDocument());
+          openingModelJson = JSON.stringify(converted);
           model = converted;
-          openingModelJson = JSON.stringify($state.snapshot(model));
         }
       }
     } catch { /* keep the bundled model */ }
@@ -137,12 +138,11 @@
 
   $effect(() => {
     const history = designerHistory;
-    // The deep read IS the subscription: walking every leaf is what makes this
-    // effect run again when a screen edits one five levels down. It costs one
-    // plain copy of the model per edit — the same walk `merged` above already
-    // does, and the one history would have had to make anyway to compare two
-    // states.
-    const snapshot = model ? $state.snapshot(model) : null;
+    // The deep read IS the subscription: `plain` walks every leaf, which is what
+    // makes this effect run again when a screen edits one five levels down. It is
+    // the one copy per edit that resolution and validation read too, and the one
+    // history would have had to make anyway to compare two states.
+    const snapshot = plain;
     if (!history) return;
     untrack(() => { dirty = history.observe(snapshot); });
   });
@@ -167,10 +167,16 @@
     };
   });
 
-  let resolved = $derived(model ? resolveParams(model) : []);
-  let validation = $derived(model ? validateProfile(model) : { ok: true, errors: [] });
-  // $state.snapshot before resolve — resolveModel's internal structuredClone can't process the $state proxy.
-  let merged = $derived(model ? resolveModel($state.snapshot(model), dpdLibrary) : null);
+  // One plain copy of the model per change, which everything below reads instead of the live proxy.
+  // It is the deep read that makes them follow an edit five levels down. Not $state.snapshot: that
+  // calls structuredClone on every string and number, and a KRONOS drum kit's model, copied three
+  // times over on opening (history, resolution, the opening state), cost 2 of its 8 seconds; and
+  // resolving through the proxy rather than a copy cost 1.3 more. Nothing may write to it: history
+  // keeps it, and `merged` is it when the model inherits nothing.
+  let plain = $derived(model ? deepClone(model) : null);
+  let resolved = $derived(plain ? resolveParams(plain) : []);
+  let validation = $derived(plain ? validateProfile(plain) : { ok: true, errors: [] });
+  let merged = $derived(plain ? resolveModel(plain, dpdLibrary) : null);
 
   // --- Save: resolve the new-schema model -> legacy engine profile -> persist via the bridge. ---
   let saveStatus = $state('');
@@ -310,10 +316,10 @@
           <DpdDiscoveryScreen onPick={adoptModel} />
         </div>
         <div class={['screen', activeScreen === 'params' && 'active']}>
-          <DpdParametersScreen {model} {resolved} {validation} />
+          <DpdParametersScreen {model} {resolved} {validation} shown={activeScreen === 'params'} />
         </div>
         <div class={['screen', activeScreen === 'overview' && 'active']}>
-          <DpdOverviewScreen {model} {merged} />
+          <DpdOverviewScreen {model} {merged} shown={activeScreen === 'overview'} />
         </div>
         <div class={['screen', activeScreen === 'device' && 'active']}>
           <DpdDeviceStructureScreen {model} {merged} />
@@ -328,10 +334,10 @@
           <DpdAdvancedScreen {model} {profileId} active={activeScreen === 'advanced'} onApplyModel={(m) => { model = m; appliedSavedFor = profileId; }} />
         </div>
         <div class={['screen', activeScreen === 'presets' && 'active']}>
-          <DpdPresetsScreen {model} {merged} {profileId} />
+          <DpdPresetsScreen {model} {merged} {profileId} shown={activeScreen === 'presets'} />
         </div>
         <div class={['screen', activeScreen === 'share' && 'active']}>
-          <DpdShareImpactScreen {model} {merged} {profileId} />
+          <DpdShareImpactScreen {model} {merged} {profileId} shown={activeScreen === 'share'} />
         </div>
         <div class={['screen', activeScreen === 'capture' && 'active']}>
           <DpdCaptureScreen {model} {profileId} />

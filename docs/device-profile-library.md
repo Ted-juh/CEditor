@@ -647,10 +647,10 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **Reading controllers back ignores the channel.** When a synth sends a controller, CEditor finds
   the parameter by its message with the channel masked out. For a profile with two parts on two
   channels (the JP-08), a knob turned on the Lower part is read as the Upper part's.
-- **The Device Profile Designer is slow on the largest profiles.** It converts and draws the whole
-  profile when it opens one: a FANTOM takes about 6 seconds, a KRONOS drum kit (20,352 parameters)
-  about 7, and the drum kit's Bulk dumps screen 4 more the first time it is shown. The parameter
-  list is not virtualised yet.
+- **The largest profiles take a moment to open in the Device Profile Designer.** It converts the
+  profile each time it opens one: about 2.5 seconds for a KRONOS drum kit (20,352 parameters), 1.7
+  for a FANTOM, under one for most. A drum kit's Bulk dumps screen takes about 3 more the first time
+  it is shown, most of it checking the dump's round trip.
 
 ## In the Device Profile Designer
 
@@ -675,6 +675,10 @@ trigger, momentary, text), and how it is sent as it moves (its send policy) is a
 model names it once per value type under `defaults.sendPolicy`, and a parameter only when it
 differs. What the DPD still does not describe, a KRONOS's bit-field codecs or the profile's notes
 and tests, is carried for the engine as it is, on fewer than 2 parameters in 100.
+
+The Parameters screen lists each parameter once, a scope's with how many instances it stands for
+(`×37`), draws only the rows in view, and finds them by name, id, group, message or address: `cutoff`,
+`CC 74`, `NRPN`, `19 01 00`.
 
 Every one of the 360 converts, and emitting the model gives the profile back: every field equal, and
 every parameter sending the same bytes at the ends and middle of its range and at every choice

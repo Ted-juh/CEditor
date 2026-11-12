@@ -37,6 +37,19 @@ export function mergeIncludes(resolved, components) {
   return out;
 }
 
+/**
+ * A copy of JSON-shaped data (objects, arrays, strings, numbers, booleans, null). The emitter and the
+ * converter copy thousands of small values (a range, a send policy, a display) for a large profile;
+ * structuredClone, which serialises each one, made that 0.6 of a second of opening a KRONOS drum kit.
+ */
+export function copyJson(value) {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(copyJson);
+  const out = {};
+  for (const key of Object.keys(value)) out[key] = copyJson(value[key]);
+  return out;
+}
+
 // `{n}` in every string of a value, the instance's number in its place.
 function fillNumber(value, n) {
   if (typeof value === 'string') return value.replaceAll('{n}', String(n));

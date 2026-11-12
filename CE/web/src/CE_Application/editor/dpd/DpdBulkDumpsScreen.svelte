@@ -13,8 +13,10 @@
   // fields; built while hidden, its table and byte map cost every opening of the designer half a
   // minute. They are built when the screen is shown, and the table a few hundred rows at a time.
   let { model, merged, shown = true } = $props();
-  const ROWS = 300;
+  // The ruler draws a box a byte and the legend a name a field: a drum kit's dump is 43,921 bytes.
+  const ROWS = 300, BYTES = 512, LEGEND = 48;
   let showAllFields = $state(false);
+  let showAllBytes = $state(false);
 
   const CODECS = ['u7', 'u8', 's7', 'u14', 'nibbles', 'packed8to7', 'bitslice', 'text-ascii', 'text-nibbled-ascii'];
   const FIELD_COLORS = 6; // .f0..f5 cycle in CSS
@@ -37,6 +39,7 @@
   let map = $derived(shown && isMapped ? safe(() => dumpByteMap(active, merged)) : null);
   let wire = $derived(shown && isMapped ? safe(() => assembleDump(active, {}, merged)) ?? [] : []);
   let rt = $derived(shown && isMapped ? safe(() => dumpRoundTrip(active, merged)) : null);
+  let visibleWire = $derived(showAllBytes ? wire : wire.slice(0, BYTES));
   let visibleLayout = $derived(!shown ? [] : showAllFields ? (active?.layout ?? []) : (active?.layout ?? []).slice(0, ROWS));
 
   function safe(fn) { try { return fn(); } catch { return null; } }
@@ -56,7 +59,7 @@
   let fieldFails = $derived(new Set((rt?.failures ?? []).map((f) => f.param)));
 
   // ── authoring ──
-  function selectDump(i) { selected = i; showAllFields = false; }
+  function selectDump(i) { selected = i; showAllFields = false; showAllBytes = false; }
   function defineLayout(d) {
     if (!d.message) d.message = { matcher: { prefix: ['F0', 'F7'].slice(0, 1).concat([]), suffix: ['F7'] }, payload: { offset: 1 } };
     if (!d.message.matcher) d.message.matcher = { prefix: ['F0'], suffix: ['F7'] };
@@ -111,15 +114,19 @@
 
     <!-- byte ruler: the framed message -->
     <div class="druler">
-      {#each wire as b, i (i)}
+      {#each visibleWire as b, i (i)}
         <div class={['dbyte', regions[i]]} title={regions[i]}>
           <span class="bi">{i}</span><span class="bv">{b.toString(16).padStart(2, '0').toUpperCase()}</span>
         </div>
       {/each}
     </div>
+    {#if wire.length > visibleWire.length}
+      <button class="addslot asbtn" onclick={() => { showAllBytes = true; }}>Show all {wire.length} bytes</button>
+    {/if}
     <div class="dlegend">
       <span class="lk header">header</span>
-      {#each map.fields as f, fi (f.param)}<span class={['lk', 'f' + (fi % FIELD_COLORS)]}>{f.name}</span>{/each}
+      {#each map.fields.slice(0, LEGEND) as f, fi (f.param)}<span class={['lk', 'f' + (fi % FIELD_COLORS)]}>{f.name}</span>{/each}
+      {#if map.fields.length > LEGEND}<span class="lk">… {map.fields.length - LEGEND} more fields</span>{/if}
       {#if map.checksum}<span class="lk checksum">checksum · {map.checksum.type}</span>{/if}
       <span class="lk suffix">end</span>
     </div>

@@ -6,6 +6,8 @@
  *     label in the title, its parameters on the Parameters screen, the CC each is sent on
  *   - a 14-bit pair and an NRPN profile open the same way (moog-sub-37, sequential-prophet-6), every
  *     parameter counted as addressed: an NRPN wire is an address as much as a CC
+ *   - the Parameters screen draws only the rows in view (a FANTOM's 7,710), scrolls to the last, and
+ *     finds parameters by search; a row standing for a scope's instances says how many (JD-Xi ×37)
  *   - a hand-made DPD profile (roland-gaia-dpd) still opens from the bundled library
  *   - a profile with no model opens empty and says so, without an error
  */
@@ -64,6 +66,8 @@ for (const [profile, label, param, wire] of [
     await page.waitForFunction(() => !/No profile/.test(document.querySelector('.crumb')?.textContent ?? 'No profile'), null, { timeout: 15000 });
     const crumb = await page.textContent('.crumb');
     if (label) assert.match(crumb, new RegExp(label), 'its label in the title');
+    // Only the rows in view are drawn: search for the parameter, as a person would.
+    if (param) { await page.fill('.screen.active .psearch', param); await page.waitForTimeout(100); }
     const text = await page.textContent('.dpd-app');
     if (param) assert.match(text, new RegExp(param), `${param} on the Parameters screen`);
     if (wire) assert.match(text.replace(/\s+/g, ' '), new RegExp(wire.replace(' ', '\\s*')), `${param} sent on ${wire}`);
@@ -77,8 +81,9 @@ for (const [profile, label, param, wire] of [
 
 // Profiles that read a dump back: the Bulk dumps screen shows their layouts, without an error, even a
 // KRONOS's (1,662 fields of 2,862 parameters, bit fields carried for the engine) and a Yamaha's
-// collection. Its rows once each held a <select> of every parameter, which hung the designer.
-for (const [profile, dumps] of [['waldorf-blofeld', 1], ['korg-kronos', 1], ['yamaha-reface-dx', 2]]) {
+// collection. Its rows once each held a <select> of every parameter, which hung the designer; and a
+// KRONOS drum kit's dump (20,352 fields, 43,921 bytes) is drawn a part at a time.
+for (const [profile, dumps] of [['waldorf-blofeld', 1], ['korg-kronos', 1], ['yamaha-reface-dx', 2], ['korg-kronos-drum-kit', 1]]) {
   await check(`${profile}: its dumps on the Bulk dumps screen`, async () => {
     const { page, errors } = await open(profile);
     await page.waitForFunction(() => !/No profile/.test(document.querySelector('.crumb')?.textContent ?? 'No profile'), null, { timeout: 20000 });
@@ -87,12 +92,51 @@ for (const [profile, dumps] of [['waldorf-blofeld', 1], ['korg-kronos', 1], ['ya
     assert.ok(Number(count) >= dumps, `${count} dumps listed`);
     // On the Bulk dumps screen itself: the first dump's layout, a row a field.
     await page.locator('.tnode', { hasText: 'Bulk dumps' }).click();
-    await page.waitForSelector('.screen.active .dlrow', { timeout: 20000 });
+    await page.waitForSelector('.screen.active .dlrow', { timeout: 30000 });
     assert.ok(await page.locator('.screen.active .dlrow').count() >= 1, 'its layout rows');
     assert.deepEqual(errors, []);
     await page.close();
   });
 }
+
+const shown = (page, timeout) => page.waitForFunction(() => !/No profile/.test(document.querySelector('.crumb')?.textContent ?? 'No profile'), null, { timeout });
+
+await check('roland-fantom: 7,710 parameters, only the rows in view drawn, and the last reached by scrolling', async () => {
+  const { page, errors } = await open('roland-fantom');
+  await shown(page, 30000);
+  await page.waitForSelector('.screen.active tr.prow');
+  const total = Number(/Search (\d+) parameters/.exec(await page.getAttribute('.screen.active .psearch', 'placeholder'))?.[1]);
+  assert.ok(total > 7000, `${total} parameters`);
+  const drawn = await page.locator('.screen.active tr.prow').count();
+  assert.ok(drawn > 5 && drawn < 120, `${drawn} rows drawn of ${total}`);
+  // Every row one height, so the scroller is as tall as all of them.
+  const { scrollHeight, rowHeight } = await page.$eval('.screen.active .vlist', (el) => ({ scrollHeight: el.scrollHeight, rowHeight: el.querySelector('tr.prow').getBoundingClientRect().height }));
+  assert.ok(Math.abs(scrollHeight - total * rowHeight) < rowHeight * 4, `scroller ${scrollHeight}px for ${total} rows of ${rowHeight}px`);
+  await page.$eval('.screen.active .vlist', (el) => { el.scrollTop = el.scrollHeight; });
+  await page.waitForFunction(() => !document.querySelector('.screen.active tr.prow:last-of-type ~ tr.vspace'));
+  const after = await page.$eval('.screen.active .vlist tbody', (tb) => {
+    const rows = [...tb.querySelectorAll('tr.prow')];
+    return { drawn: rows.length, nextIsAddRow: rows.at(-1)?.nextElementSibling?.classList.contains('emptyrow') };
+  });
+  assert.ok(after.drawn < 120 && after.nextIsAddRow, `at the end: ${JSON.stringify(after)}`);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+await check('roland-jd-xi: search finds a drum key\'s parameters, a row standing for its 37 keys', async () => {
+  const { page, errors } = await open('roland-jd-xi');
+  await shown(page, 20000);
+  await page.fill('.screen.active .psearch', 'drums partial name');
+  await page.waitForFunction(() => /\d+ of \d+/.test(document.querySelector('.screen.active .pcount')?.textContent ?? ''));
+  const [, found, all] = /(\d+) of (\d+)/.exec(await page.textContent('.screen.active .pcount'));
+  assert.ok(Number(found) >= 1 && Number(found) < Number(all), `${found} of ${all}`);
+  const tags = await page.locator('.screen.active tr.prow .inst').allTextContents();
+  assert.ok(tags.includes('×37'), `instance tags: ${tags.join(', ')}`);
+  await page.fill('.screen.active .psearch', 'no parameter is called this');
+  await page.waitForSelector('.screen.active tr.vnone');
+  assert.deepEqual(errors, []);
+  await page.close();
+});
 
 await check('roland-gaia-dpd: a hand-made DPD profile opens from the bundled library', async () => {
   const { page, errors } = await open('roland-gaia-dpd');

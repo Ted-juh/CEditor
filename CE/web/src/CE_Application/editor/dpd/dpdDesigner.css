@@ -119,6 +119,23 @@
 .dpd-app .rowlearn:hover{color:var(--accent)}
 .dpd-app .hint{margin-top:14px;font-size:12px;color:var(--txt-faint);display:flex;align-items:center;gap:8px}
 .dpd-app .hint b{color:var(--txt-dim);font-weight:600}
+.dpd-app .linkbtn{background:none;border:none;padding:0;color:var(--accent);font:inherit;cursor:pointer;text-decoration:underline}
+
+/* the parameters list: a window of rows in a scroller of its own, every row one height */
+.dpd-app .tablewrap.vlist{overflow:auto;max-height:calc(100vh - 250px);min-height:260px}
+.dpd-app .vlist table{table-layout:fixed}
+.dpd-app .vlist thead th{position:sticky;top:0;z-index:1}
+.dpd-app .vlist tr.prow td .cell{box-sizing:border-box;height:46px;min-height:0;white-space:nowrap;overflow:hidden}
+.dpd-app .vlist .pn{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dpd-app .vlist .inst{flex-shrink:0;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:9px;color:var(--violet);
+  border:1px solid rgba(169,140,240,.35);background:var(--bg-2)}
+.dpd-app .vlist tr.vspace td{border:none;padding:0}
+.dpd-app .vlist tr.vspace:hover{background:none}
+.dpd-app .vlist tr.vnone .cell{color:var(--txt-faint)}
+.dpd-app .psearch{flex:0 1 380px;min-width:180px;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--txt);
+  font-family:'Archivo',system-ui,sans-serif;font-size:13px;padding:8px 12px;outline:none}
+.dpd-app .psearch:focus{border-color:var(--accent-dim)}
+.dpd-app .pcount{font-size:12px;color:var(--txt-faint)}
 
 /* split + enum drawer */
 .dpd-app .split{display:flex;gap:0;align-items:stretch}
