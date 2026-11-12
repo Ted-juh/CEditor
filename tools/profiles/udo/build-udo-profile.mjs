@@ -74,7 +74,7 @@ export function buildUdoProfile(data, layout) {
     const msb = parseInt(r.msb, 16);
     const lsb = parseInt(r.lsb, 16);
     if (msb * 128 + lsb !== number) throw new Error(`NRPN ${number}: printed ${r.msb} ${r.lsb}`);
-    const row = { name: r.name, kind: 'nrpn', number, msb, lsb, values: readValues(r.range), printed: r.range, global: number >= 2048 };
+    const row = { name: r.name, kind: 'nrpn', number, msb, lsb, values: readValues(r.range), printed: r.range, global: number >= 2048, page: r.page };
     rows.push(row);
     byName.set(norm(r.name), row);
   }
@@ -84,7 +84,7 @@ export function buildUdoProfile(data, layout) {
     if (PERFORMANCE.test(r.name)) { left.push(`CC ${cc} ${r.name}`); continue; }
     const nrpn = byName.get(norm(r.name));
     if (nrpn) { both.push(`${r.name} (CC ${cc}, NRPN ${nrpn.number})`); nrpn.cc = cc; continue; }
-    rows.push({ name: r.name, kind: 'cc', cc, values: readValues(r.range), printed: r.range });
+    rows.push({ name: r.name, kind: 'cc', cc, values: readValues(r.range), printed: r.range, page: r.page });
   }
 
   for (const row of rows) {
@@ -100,7 +100,7 @@ export function buildUdoProfile(data, layout) {
       if (row.kind === 'nrpn') describe.push(`NRPN ${row.number} (CC 99 = ${hex(row.msb)}H, CC 98 = ${hex(row.lsb)}H), 14 bits${row.cc !== undefined ? `; also CC ${row.cc} at 7 bits` : ''}.`);
       if (row.values.text || row.values.choices || row.values.shown) describe.push(`Printed: ${row.printed}.`);
       if (layer) describe.push(`On the ${layer.toLowerCase()} layer's channel.`);
-      const base = { id: unique(`${camel(group)}.${camel(row.name)}`), name: row.name, group, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+      const base = { id: unique(`${camel(group)}.${camel(row.name)}`), name: row.name, group, source: { page: row.page }, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
       const encoding = { type: row.kind === 'nrpn' ? 'u14' : 'u7' };
       if (row.values.choices) {
         const seen = new Set();

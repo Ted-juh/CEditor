@@ -61,7 +61,7 @@ export function buildPedalProfile(data, layout) {
     // A name with a note in brackets (`MIDI NOTE ONLY MODE (disable instrument input pitchtracker e.g. for
     // vocoding)`) is the name before it; the note stays in the description.
     const name = /^(.*?)\s*\(([^)]*)\)$/.exec(row.name)?.[2].split(' ').length > 3 ? row.name.replace(/\s*\([^)]*\)$/, '') : row.name;
-    const base = { id: unique(`pedal.${camel(name)}`), name, description: `CC ${row.cc} (LSB CC ${row.cc + 32}), page ${row.page}: ${row.name}. 7 bits: ${row.msb}. 14 bits: ${row.pair}.`, access };
+    const base = { id: unique(`pedal.${camel(name)}`), name, source: { page: row.page }, description: `CC ${row.cc} (LSB CC ${row.cc + 32}), page ${row.page}: ${row.name}. 7 bits: ${row.msb}. 14 bits: ${row.pair}.`, access };
     // The columns print the same sweep with its dots spaced differently (`[min MOD ..max MOD]`).
     const same = (a, b) => a.replace(/\s*\.{2,}\s*/g, '...') === b.replace(/\s*\.{2,}\s*/g, '...');
     if (msb.length !== pair.length || msb.some((b, k) => !same(b.label, pair[k].label))) throw new Error(`${row.name}: the 7-bit and 14-bit columns name different values`);
@@ -84,7 +84,7 @@ export function buildPedalProfile(data, layout) {
     const lsb = msbName && rows.find((r) => r.name === `${msbName} LSB` && r.cc === row.cc + 32);
     // A pair whose name another row also has (`EXP out override value`, CC 105) is named for its bits.
     const name = lsb ? (rows.some((r) => r.name === msbName) ? `${msbName} (14 bits)` : msbName) : row.name;
-    const base = { id: unique(`pedal.${camel(name)}`), name, description: `${lsb ? `CC ${row.cc} (MSB) and CC ${lsb.cc} (LSB)` : `CC ${row.cc}`}, page ${row.page}: ${lsb ? `${row.name} and ${lsb.name}, ${row.range} each` : `${row.name}, ${row.range}`}.`, access };
+    const base = { id: unique(`pedal.${camel(name)}`), name, source: { page: row.page }, description: `${lsb ? `CC ${row.cc} (MSB) and CC ${lsb.cc} (LSB)` : `CC ${row.cc}`}, page ${row.page}: ${lsb ? `${row.name} and ${lsb.name}, ${row.range} each` : `${row.name}, ${row.range}`}.`, access };
     if (lsb) {
       paired.add(lsb);
       fourteen({ ...base, messageRecipe: recipe(row.cc, lsb.cc) }, { min: 0, max: 16383 });

@@ -57,7 +57,7 @@ export function buildDexibellProfile(data, layout) {
     recipes.set(id, { id, kind: 'cc', channel, controller: cc });
     const group = organ ? (/^(MAIN|UPPER|LOWER|PEDAL)\b/i.exec(b.name)?.[1].replace(/^./, (c) => c.toUpperCase()).replace(/(?<=.)./g, (c) => c.toLowerCase()) ?? 'Organ') : 'General';
     const base = {
-      id: unique(`${camel(group)}.${camel(b.name)}`), name: b.name, group,
+      id: unique(`${camel(group)}.${camel(b.name)}`), name: b.name, group, source: { page: b.page },
       description: `Received data (page ${b.page}): ${b.name}, CC ${b.controllers.join(' and ')}${organ ? ` (default channel ${organ[1]})` : ''}; ${b.values}${b.meanings.length ? `; ${b.meanings.join('; ')}` : ''}${b.notes.length ? ` ${b.notes.join(' ')}` : ''}`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id,
     };

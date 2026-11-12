@@ -44,6 +44,8 @@ export function buildGamechangerProfile(data, layout) {
   const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
   const idOf = new Map();
   const widened = [];
+  // Where a parameter is printed: its row's page, in the document the NRPN map is read from.
+  const nrpnDoc = data.sources.findIndex((s) => s.nrpnPages);
   for (const r of [...data.nrpn].sort((a, b) => a.nrpn - b.nrpn)) {
     const midi = numbers(r.midi);
     if (!midi || midi[0] >= midi.at(-1) || midi[0] < 0 || midi.at(-1) > 16383) { left.push(`${r.nrpn} ${r.name} (MIDI data range ${r.midi}, value range ${r.value})`); continue; }
@@ -65,6 +67,7 @@ export function buildGamechangerProfile(data, layout) {
       id,
       name: r.name,
       group: r.nrpn >= 8192 ? 'Global' : group,
+      source: { ...(nrpnDoc > 0 ? { doc: nrpnDoc } : {}), page: r.page },
       description: `NRPN ${r.nrpn} (page ${r.page}): ${r.name}, ${r.type}; parameter value range ${r.value}; MIDI data range ${r.midi}; retains ${r.retains}.`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,

@@ -151,7 +151,8 @@ export function buildAsmProfile(data, layout) {
         if (list && list.length !== spec.hi - spec.lo + 1) throw new Error(`${nrpn.name}: ${list.length} values in the list, ${spec.hi - spec.lo + 1} in the range`);
         const choices = list ? list.map((label, k) => ({ value: spec.lo + k, label })) : spec.choices;
         const describe = [spec.description, row.cc !== undefined ? `Also CC ${row.cc} when Param RX is CC.` : null, list ? `The ${layout.lists[nrpn.name]} rhythm list.` : null].filter(Boolean);
-        const base = { id: unique(`${camel(group)}.${camel(pName)}`), name: pName, group, ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+        // Where the spec prints it: the page of its row (a run's, or a comment's that names several).
+        const base = { id: unique(`${camel(group)}.${camel(pName)}`), name: pName, group, ...(row.page ? { source: { page: row.page } } : {}), ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
         const key = `${recipe.id}/${spec.base}`;
         shared.set(key, [...(shared.get(key) ?? []), pName]);
         if (choices) {

@@ -62,10 +62,12 @@ export function buildBehringerNrpnProfile(data, layout) {
     if (!range) throw new Error(`NRPN ${r.number} ${r.name}: range not read: ${r.range}`);
     const [lo, hi] = [Number(range[1]), Number(range[2])];
     const group = layout.groupOf(r.name);
+    // Where the manual prints it: the page of its row (a run's, for each NRPN of the run).
+    const source = printed.page ? { source: { page: printed.page } } : {};
     // The program name: ASCII bytes, read back only.
     if (/Program Name/.test(r.name)) {
       const length = n1 - n0;   // `16(+1) char`: the last is the terminating null
-      const p = { id: unique('program.name'), name: 'Program Name', group, description: `${length} ASCII characters, NRPN ${msb}:${lsb0} on. Read from the edit buffer; not written, a character being an NRPN of its own.`, type: 'text', default: '', display: { mode: 'text', shortLabel: 'name' }, encoding: { type: 'text-ascii', length, pad: 32 }, access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' }, sendPolicy: { mode: 'onCommit', coalesce: false }, ui: { preferredComponent: 'TextInput' } };
+      const p = { id: unique('program.name'), name: 'Program Name', group, ...source, description: `${length} ASCII characters, NRPN ${msb}:${lsb0} on. Read from the edit buffer; not written, a character being an NRPN of its own.`, type: 'text', default: '', display: { mode: 'text', shortLabel: 'name' }, encoding: { type: 'text-ascii', length, pad: 32 }, access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' }, sendPolicy: { mode: 'onCommit', coalesce: false }, ui: { preferredComponent: 'TextInput' } };
       parameters.push(p);
       mappings.push({ parameter: p.id, offset: n0 });
       continue;
@@ -80,7 +82,7 @@ export function buildBehringerNrpnProfile(data, layout) {
       const recipe = { id: `nrpn${hex(nMsb)}${hex(nLsb)}`, kind: 'nrpn', channel: '$channel', parameterMsb: nMsb, parameterLsb: nLsb, valueResolution: 14, value: '$encodedValue' };
       recipes.set(recipe.id, recipe);
       const describe = [r.notes && !value.choices ? `Printed: ${r.notes.replace(/\s+/g, ' ')}.` : null, layout.values?.[n0] ? `Values as printed: ${r.notes}.` : null].filter(Boolean);
-      const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: true, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+      const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...source, ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: true, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
       let p;
       if (value.choices) {
         const seen = new Set();

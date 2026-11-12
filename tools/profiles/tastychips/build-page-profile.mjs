@@ -63,7 +63,8 @@ export function buildPageProfile(data, layout) {
       const group = target.label ?? 'Controls';
       const wide = value.max - value.min > 16;
       parameters.push({
-        id: unique(`${camel(group)}.${camel(name)}`), name: target.label ? `${target.label} ${name}` : name, group,
+        // (A web page has no pages: the table, by the heading it is set under.)
+        id: unique(`${camel(group)}.${camel(name)}`), name: target.label ? `${target.label} ${name}` : name, group, source: { table: layout.table },
         description: `CC ${cc}${target.channel === '$channel' ? '' : `, channel ${target.channel}`}: ${name}; ${row[valueAt] || 'no value printed'}${scope ? ` (${scope})` : ''}${marked && layout.footnote ? `; ${layout.footnote}` : ''}.`,
         access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id,
         type: 'integer', range: { min: value.min, max: value.max }, default: value.min,

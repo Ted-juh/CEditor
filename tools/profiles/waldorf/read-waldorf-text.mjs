@@ -43,20 +43,21 @@ export function splitRow(text) {
  * The byte table from the line `start` matches to the one `end` does: [{ byte, to?, mark?, name,
  * values?, after? }], `to` the last byte of a run (the name's sixteen characters).
  */
-export function readByteTable(lines, start, end) {
+export function readByteTable(lines, start, end, where = () => ({})) {
   const rows = [];
   let on = false;
   let current = null;
   let text = '';
   const close = () => { if (current) rows.push({ ...current, ...splitRow(text) }); current = null; text = ''; };
-  for (const line of lines) {
+  for (const [i, line] of lines.entries()) {
     if (!on) { if (start.test(line)) on = true; continue; }
     if (current && depth(text) > 0) { text += ` ${line.trim()}`; continue; }
     if (end.test(line)) break;
     const m = /^\s*([*+])?\s*(\d+)(?:\s*-\s*(\d+))?\s+(\S.*?)\s*$/.exec(line);
     if (m) {
       close();
-      current = { byte: Number(m[2]), ...(m[3] ? { to: Number(m[3]) } : {}), ...(m[1] ? { mark: m[1] } : {}) };
+      // `where(i)`: where the document prints the row's first line, its line or page (import-waldorf.mjs).
+      current = { byte: Number(m[2]), ...(m[3] ? { to: Number(m[3]) } : {}), ...(m[1] ? { mark: m[1] } : {}), ...where(i) };
       text = m[4];
     } else close();
   }

@@ -98,7 +98,9 @@ export function buildTwistedProfile(data, layout) {
           const id = `cc${hex(cc)}${channel ? `ch${channel}` : ''}`;
           recipes.set(id, { id, kind: 'cc', channel: channel ?? '$channel', controller: cc });
           const base = {
-            id: unique(`${camel(group)}.${camel(name)}`), name, group,
+            // Where a web page prints it: its table, by the heading it is set under. (A PDF's rows keep no
+            // page, and its table's title is the layout's, not read from the manual: none is given.)
+            id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(layout.pdf ? {} : { source: { table: title } }),
             description: `${title}: CC ${cc}${channel ? ` on channel ${channel} (${label})` : ''}; ${row[nameAt]}${valueAt >= 0 ? `; values ${row[valueAt] || 'not printed'}` : ''}${values.printed ? '; sent as 0 - 127' : ''}.`,
             access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id,
           };
@@ -127,7 +129,7 @@ export function buildTwistedProfile(data, layout) {
       const recipe = { id: `editor${hex(n)}`, kind: 'sysex', template: [...header, set, hex(n), '$encodedValue', 'F7'] };
       recipes.set(recipe.id, recipe);
       const base = {
-        id: unique(`${camel(group)}.${camel(name)}`), name, group,
+        id: unique(`${camel(group)}.${camel(name)}`), name, group, source: { table: index.title },
         description: `Editor parameter ${n}: ${target}, ${storage}${bit ? `, bit ${bit}` : ''}; range ${range}. SET editor parameter (${set}).`,
         access: { canRead: true, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id,
       };

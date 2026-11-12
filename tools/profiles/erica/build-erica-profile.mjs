@@ -17,7 +17,7 @@ const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 
 /** A transcription's rows -> [{ kind, number, name, voice }], whichever shape the chart has. */
 export function rowsOf(data) {
-  return data.rows.map((r) => (r.kind ? r : { kind: 'cc', number: r.cc, name: r.name, voice: String(r.voice) }));
+  return data.rows.map((r) => (r.kind ? r : { kind: 'cc', number: r.cc, name: r.name, voice: String(r.voice), page: r.page }));
 }
 
 export const groupOf = (r) => (/^\d+$/.test(r.voice) ? `Voice ${r.voice}` : r.voice === 'all' ? 'All voices' : /^FX\b/.test(r.name) ? 'FX' : 'Global');
@@ -47,6 +47,7 @@ export function buildEricaProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(r.name.toLowerCase())}`),
       name: r.name,
       group,
+      source: { page: r.page },
       description: describe.join(' '),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,

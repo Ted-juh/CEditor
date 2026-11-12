@@ -119,6 +119,8 @@ export function buildNordProfile(data, layout) {
           id: unique(`${camel(group)}.${camel(label)}`),
           name: label,
           group,
+          // Where the manual prints it: the page of its row in the list (for each manual it is on).
+          ...(r.page ? { source: { page: r.page } } : {}),
           ...(describe.length ? { description: describe.join(' ') } : {}),
           access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
           messageRecipe: recipe.id,

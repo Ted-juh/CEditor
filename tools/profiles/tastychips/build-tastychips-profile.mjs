@@ -93,6 +93,7 @@ export function buildTastyChipsProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(name)}`),
       name,
       group,
+      source: { page: r.page },
       description: `${nrpn ? `NRPN ${r.cc}` : `CC ${r.cc}`} (page ${r.page}): ${r.name}; range ${r.range || 'not printed'}${r.curve ? `; curve ${r.curve}` : ''}${values.kind === 'printed' ? '; sent as 0 - 127' : ''}.`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,

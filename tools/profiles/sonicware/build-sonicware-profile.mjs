@@ -48,6 +48,7 @@ export function buildSonicwareProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(label.toLowerCase())}`),
       name: label,
       group,
+      source: { page: r.page },
       description: `CC ${r.cc}${variable === 'channel' ? '' : `, on ${variable}`}.${r.recognized ? '' : ' The chart prints no mark under Recognized for it.'}`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: id,

@@ -83,7 +83,8 @@ export function buildBehringerNrpnTableProfile(data, layout) {
     const recipe = { id: `nrpn${hex(msb)}${hex(lsb)}`, kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: 14, value: '$encodedValue' };
     recipes.set(recipe.id, recipe);
     const group = layout.groupOf(name);
-    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+    // Where the manual prints it: the page of its row in the NRPN table.
+    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(r.page ? { source: { page: r.page } } : {}), description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
     if (list.length) {
       const seen = new Set();
       const choices = list.map(({ value, label }) => { const s = slug(label); const id = seen.has(s) ? `${s}_${value}` : s; seen.add(id); return { id, label, value }; });

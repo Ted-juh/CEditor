@@ -63,6 +63,8 @@ export function buildJomoxProfile(data, layout) {
     const lsb = msb && next && new RegExp(`^${msb[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*LSB$`).test(next.name) ? next : null;
     const range = rangeOf(r.range);
     if (!range) { noRange.push(`${r.name} (CC ${r.cc}, ${r.range})`); continue; }
+    // Where the manual prints it: the page of its row (the MSB's, for a pair), on every channel.
+    const source = r.page ? { source: { page: r.page } } : {};
     for (const channel of channelsOf(r)) {
       const chan = channel ?? '$channel';
       const group = channel != null && /CH\s?\d+\s*-\s*CH/.test(r.section ?? '') ? `${(r.section ?? '').replace(/\s*CH\s?\d+\s*-\s*CH\s?\d+$/, '')} channel ${channel}` : r.section ?? layout.name.replace(/^Jomox /, '');
@@ -73,7 +75,7 @@ export function buildJomoxProfile(data, layout) {
         const id = `cc${hex(r.cc)}${hex(lsb.cc)}${channel != null ? `ch${channel}` : ''}`;
         recipes.set(id, { id, kind: 'cc', channel: chan, controller: r.cc, lsbController: lsb.cc });
         parameters.push({
-          id: unique(`${camel(group)}.${camel(msb[1])}`), name: msb[1], group,
+          id: unique(`${camel(group)}.${camel(msb[1])}`), name: msb[1], group, ...source,
           description: `CC ${r.cc} (MSB, ${r.range}) and CC ${lsb.cc} (LSB, ${lsb.range})${where} (page ${r.page}): one value of ${max + 1} steps${lsb.internal ? `; internal ${lsb.internal}` : ''}.`,
           access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id,
           type: 'integer', range: { min: 0, max }, default: 0, display: { mode: 'number', unit: '', shortLabel: camel(msb[1]) },
@@ -85,7 +87,7 @@ export function buildJomoxProfile(data, layout) {
       const id = `cc${hex(r.cc)}${channel != null ? `ch${channel}` : ''}`;
       recipes.set(id, { id, kind: 'cc', channel: chan, controller: r.cc });
       const base = {
-        id: unique(`${camel(group)}.${camel(r.name)}`), name: r.name, group,
+        id: unique(`${camel(group)}.${camel(r.name)}`), name: r.name, group, ...source,
         description: `CC ${r.cc}${where} (page ${r.page}): ${r.section ? `${r.section}, ` : ''}${r.name}; value range ${r.range}${r.internal ? `; internal ${r.internal}` : ''}.`,
         access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id,
       };

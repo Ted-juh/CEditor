@@ -69,7 +69,7 @@ export function buildDreadboxProfile(data, layout) {
     const value = readValue(String(r.value ?? '').replace(/\(POLY\)/, ''), r.notes, { spreads: !!layout.spreads });
     const describe = [`Printed: ${[r.value, r.notes].filter(Boolean).join(' ')}.`];
     if (poly) describe.push('The manual marks it POLY: per voice, by polyphonic aftertouch or MPE.');
-    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, source: { page: r.page }, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
     if (value.labels) {
       const values = value.spread ? spread(value.labels.length) : value.labels.map((l, k) => value.from + k);
       const seen = new Set();

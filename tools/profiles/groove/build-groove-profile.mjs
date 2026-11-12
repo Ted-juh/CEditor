@@ -68,7 +68,7 @@ export function buildGrooveProfile(data, layout) {
     let values = /\bsource\b/i.test(title) && /^Mod/i.test(title) ? lists.source : /\bdestination\b/i.test(title) ? lists.destination : valuesIn([r.range.replace(/^-?\d+\s*-\s*-?\d+\s*/, ''), ...lines.slice(1), title.includes(':') ? '' : ''].join(' | '));
     if (values === lists.source && lists.source.at(-1).value > hi) { widened.push(`${r.nrpn}`); hi = lists.source.at(-1).value; }
     const covers = values.length && values.length === hi - lo + 1 && values.every((v, k) => v.value === lo + k);
-    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, source: { page: r.page }, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
     nrpnOf.set(base.id, r.nrpn);
     if (r.category === 'Multi') multi.add(base.id);
     if (covers) {

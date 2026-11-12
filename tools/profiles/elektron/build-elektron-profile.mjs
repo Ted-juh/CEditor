@@ -64,7 +64,8 @@ export function buildElektronProfile(data, layout) {
     // (A row that prints neither, a dash in the CC table for a parameter the NRPN table has, is part of it.)
     const empty = (x) => x.cc === undefined && x.nrpn === undefined;
     const into = merged.find((m) => m.key === key && (r.cc === undefined || m.cc === undefined) && (r.nrpn === undefined || m.nrpn === undefined) && (empty(r) ? !empty(m) : empty(m) || (r.cc !== undefined ? m.nrpn !== undefined : m.cc !== undefined)));
-    if (into) { for (const k of ['cc', 'ccLsb', 'nrpn', 'values']) if (r[k] !== undefined && into[k] === undefined) into[k] = r[k]; continue; }
+    // (Each keeps the page it is printed on: the parameter's source is the row it is sent as.)
+    if (into) { for (const k of ['cc', 'ccLsb', 'nrpn', 'values']) if (r[k] !== undefined && into[k] === undefined) { into[k] = r[k]; into.pageOf = { ...into.pageOf, [k]: r.page }; } continue; }
     merged.push({ ...r, table: base(r.table), key });
   }
 
@@ -129,10 +130,14 @@ export function buildElektronProfile(data, layout) {
     if (meaning) describe.push(`What it sets depends on the machine: ${meaning.join('; ')}.`);
     const values = readValueNames(r.values);
     if (r.values && !values) describe.push(`Printed: ${r.values}.`);
+    // Where the appendix prints it: the page of its row (of the CC table's, or the NRPN table's, row
+    // for a parameter merged from both, whichever gives the message it is sent as).
+    const page = r.pageOf?.[recipe.kind] ?? r.page;
     const p = {
       id: unique(`${camel(group)}.${camel(name)}`),
       name,
       group,
+      ...(page ? { source: { page } } : {}),
       ...(describe.length ? { description: describe.join(' ') } : {}),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,

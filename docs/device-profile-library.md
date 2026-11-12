@@ -694,6 +694,11 @@ asked when it connects (`startup`). A Roland request is its RQ1 shape and the ad
 asks for; the bytes and the checksum are the shape's, and the gate checks them against the profile's.
 The Device structure screen shows all of it.
 
+Each parameter says where its maker's document prints it: the document, and the page (or the line,
+in a text file such as Korg's KRONOS archive). The Designer's drawer shows it beside the parameter
+it has selected, so one parameter can be checked against the printed table without reading the
+generator that made it.
+
 The Parameters screen lists each parameter once, a scope's with how many instances it stands for
 (`×37`), draws only the rows in view, and finds them by name, id, group, message or address: `cutoff`,
 `CC 74`, `NRPN`, `19 01 00`.

@@ -209,6 +209,8 @@ export function buildNrpnProfile(data, layout) {
             id: unique(`${layerId ? `${layerId}.` : ''}${camel(group)}.${camel(leaf) || `nrpn${n}`}`, n),
             name: layerName ? `${layerName}: ${name}` : name,
             group: layerName ? `${layerName}: ${group}` : group,
+            // The page of the manual its row is printed on; a run's every NRPN is that one row's.
+            source: { page: one.page },
             ...(describe.length ? { description: describe.join(' ') } : {}),
             access: { canRead: false, canWrite: !readOnly, realtimeSafe: true, source: 'singleParameter' },
             messageRecipe: recipeFor(n),

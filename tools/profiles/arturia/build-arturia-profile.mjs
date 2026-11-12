@@ -45,6 +45,8 @@ export function buildArturiaProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(name)}`),
       name,
       group,
+      // Where the manual prints it: the page of its row in the chart.
+      ...(r.page ? { source: { page: r.page } } : {}),
       ...(describe.length ? { description: describe.join(' ') } : {}),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,

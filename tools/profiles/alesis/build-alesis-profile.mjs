@@ -74,6 +74,7 @@ export function buildAlesisProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(name)}`),
       name,
       group,
+      source: { page: r.page },
       description: `Chart index ${r.index} (page ${r.page}): ${r.name}, parent ${r.parent}, child ${r.child}; NRPN ${r.nrpn ? 'ON' : 'OFF'}; default ${r.default}; range ${r.range}.`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,
@@ -93,7 +94,7 @@ export function buildAlesisProfile(data, layout) {
   if (modes.length !== 2) throw new Error(`the mode select's values are not read: "${modeLine}"`);
   recipes.push({ id: 'modeSelect', kind: 'sysex', template: [...HEADER, '0D', '$encodedValue', 'F7'] });
   parameters.unshift({
-    id: 'system.mode', name: 'Mode', group: 'System',
+    id: 'system.mode', name: 'Mode', group: 'System', source: { page: data.blocks.modeSelect.pages[0] },
     description: `MIDI Mode Select (opcode 0D, page ${data.blocks.modeSelect.pages[0]}): ${modeLine.trim().replace(/\s+/g, ' ')}. The settings are those the mode had when it was last left.`,
     access: { canRead: false, canWrite: true, realtimeSafe: false, source: 'singleParameter' },
     messageRecipe: 'modeSelect', type: 'choice', default: camel(modes[0].label),

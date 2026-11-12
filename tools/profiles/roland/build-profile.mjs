@@ -143,6 +143,7 @@ function buildParameter(row, block, address, stripName) {
     id: `${block.id}.${camel(leafName) || 'value'}`,
     name: printedName,
     group: block.group,
+    source: block.source,
     address,
     ...(impossible ? { description: `The manual prints ${row.min} - ${row.max} as this value's wire range, which this encoding cannot carry; read-only until an instrument shows the real wire values.` } : {}),
     access: { canRead: true, canWrite: !impossible, realtimeSafe: !block.system, source: 'singleParameter' },
@@ -204,6 +205,7 @@ function textParameter(run, block, address, stripName) {
     id: `${block.id}.${camel(stripName(run.label)) || 'name'}`,
     name: run.label,
     group: block.group,
+    source: block.source,
     type: 'text',
     address,
     length: run.length,
@@ -233,7 +235,11 @@ export function buildProfile(map, synth) {
     // `noPull` (a list of patterns over block ids) marks blocks the startup read leaves alone; a
     // block's own `pull: false` says the same for one block.
     const pull = block.pull ?? !(synth.noPull ?? []).some((pattern) => pattern.test(block.id));
-    return { ...block, pull, table, base: resolvePath(map, block.path), size: table.totalSize };
+    // Where the manual prints a block's parameters: their table, by the heading the manual sets
+    // above it, and the page the parser recorded for it, which is the page the table starts on.
+    // The map records no page per row: a row of a table that runs over a page break is overleaf.
+    const source = { ...(table.name !== '(unnamed)' ? { table: table.name } : {}), ...(table.page ? { page: table.page } : {}) };
+    return { ...block, pull, table, source, base: resolvePath(map, block.path), size: table.totalSize };
   });
 
   const parameters = [];

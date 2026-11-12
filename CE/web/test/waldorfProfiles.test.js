@@ -35,12 +35,13 @@ test('the sound data table: value and name apart at the widest gap, or marked wh
     line(130, [77, '1'], [115, '0..1'], [160, 'off,on'], [290, 'Multi'], [326, 'Mode']),
   );
   const rows = readSoundTable(pageLines(xml));
+  // Each row with the page it is printed on, which becomes its parameter's source.
   assert.deepEqual(rows, [
-    { index: 1, range: [16, 112], value: "128'..1/2'", name: 'Osc 1 Octave' },
-    { index: 12, range: null, value: '', name: 'reserved' },
-    { index: 311, range: [0, 3], value: 'off,on,One Shot,Hold', name: 'Arpeggiator Mode' },
-    { index: 317, range: [0, 3], value: '', name: 'Up,Down,Alt Up,Alt Down Arpeggiator Direction', unsure: true },
-    { index: 339, range: [0, 127], value: '', name: 'Arp Pattern Step' },
+    { index: 1, range: [16, 112], value: "128'..1/2'", name: 'Osc 1 Octave', page: 1 },
+    { index: 12, range: null, value: '', name: 'reserved', page: 1 },
+    { index: 311, range: [0, 3], value: 'off,on,One Shot,Hold', name: 'Arpeggiator Mode', page: 1 },
+    { index: 317, range: [0, 3], value: '', name: 'Up,Down,Alt Up,Alt Down Arpeggiator Direction', unsure: true, page: 1 },
+    { index: 339, range: [0, 127], value: '', name: 'Arp Pattern Step', page: 1 },
   ], 'the table ends at the next section; a row with no gap is marked, not guessed');
   assert.deepEqual(splitValueAndName({ x1: 100 }, []), { value: '', name: '', unsure: false });
 });

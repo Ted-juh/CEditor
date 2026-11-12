@@ -301,10 +301,17 @@ export function buildMoogProfile(data, layout) {
     if (!read.choices && /[a-z]{2,}/i.test(said) && !e.count) describe.push(`Printed: ${clean(e.values)}.`);
     const recipe = recipeFor(e.message);
     const leaf = e.name;
+    // Where the manual prints it: the page of its row, or of the rows a choice is made of when they
+    // share one (the Taurus 3's four LFO waves); rows on two pages name no page.
+    const from = used.has(e) ? together : [e];
+    const docs = new Set(from.map((x) => x.row.doc ?? 0));
+    const pages = new Set(from.map((x) => x.row.page));
+    const source = docs.size === 1 ? { ...([...docs][0] ? { doc: [...docs][0] } : {}), ...(pages.size === 1 && [...pages][0] ? { page: [...pages][0] } : {}) } : null;
     const base = {
       id: unique(`${camel(group)}.${camel(leaf) || recipe.id}`),
       name: e.name,
       group,
+      ...(source && (Object.keys(source).length || data.sources.length > 1) ? { source } : {}),
       ...(describe.length ? { description: describe.join(' ') } : {}),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,
@@ -438,7 +445,7 @@ function addSysex(data, layout, out) {
     const group = s.group ?? 'Global';
     const describe = [`Parameter ${id}, set by SysEx.`];
     const dflt = /Default\s*[:=]?\s*(\d+)/i.exec(row.values ?? '');
-    const base = { id: out.unique(`${camel(group)}.${camel(name)}`), name, group, description: describe.join(' '), access: { canRead: Boolean(s.request), canWrite: true, realtimeSafe: false, source: s.request ? 'sysexRequest' : 'singleParameter' }, messageRecipe: recipe.id };
+    const base = { id: out.unique(`${camel(group)}.${camel(name)}`), name, group, source: { ...(row.doc ? { doc: row.doc } : {}), page: row.page }, description: describe.join(' '), access: { canRead: Boolean(s.request), canWrite: true, realtimeSafe: false, source: s.request ? 'sysexRequest' : 'singleParameter' }, messageRecipe: recipe.id };
     let p;
     if (read.choices && !read.bands) {
       const seen = new Set();

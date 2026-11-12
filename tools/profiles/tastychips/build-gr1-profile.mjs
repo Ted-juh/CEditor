@@ -64,7 +64,7 @@ export function buildGr1Profile(data, layout) {
     recipes.set(id, nrpn ? { id, kind: 'nrpn', channel: '$channel', parameterMsb: row.cc >> 7, parameterLsb: row.cc & 127, valueResolution: 7, value: '$encodedValue' } : { id, kind: 'cc', channel: '$channel', controller: row.cc });
     const group = nrpn ? 'NRPN only' : 'Control changes';
     const base = {
-      id: unique(`${camel(group)}.${camel(row.name)}`), name: row.name, group,
+      id: unique(`${camel(group)}.${camel(row.name)}`), name: row.name, group, source: { page: row.page },
       description: `${nrpn ? 'NRPN' : 'CC'} ${row.cc} (page ${row.page}): ${row.name}; ${row.value}${row.description ? `; ${row.description}` : ''}${row.curve && row.curve !== '-' ? ` (curve: ${row.curve})` : ''}.`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id,
     };

@@ -35,7 +35,11 @@ export function importDocument(layout, file) {
     const lines = all.slice(at);
     return {
       sources: [{ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
-      table: readByteTable(lines, new RegExp(r.table.start), new RegExp(r.table.end)),
+      // Where each row is printed: its line in a text file; in a PDF, its page, counted by the form
+      // feeds pdftotext puts between pages.
+      table: readByteTable(lines, new RegExp(r.table.start), new RegExp(r.table.end), (i) => (/\.pdf$/i.test(file)
+        ? { page: 1 + all.slice(0, at + i + 1).reduce((n, l) => n + (l.match(/\f/g)?.length ?? 0), 0) }
+        : { line: at + i + 1 })),
       lists: Object.fromEntries(Object.entries(r.lists ?? {}).map(([k, l]) => [k, readIndexList(lines, new RegExp(l.start), new RegExp(l.end))])),
     };
   }

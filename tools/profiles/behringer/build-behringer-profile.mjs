@@ -83,6 +83,9 @@ export function buildBehringerProfile(data, layout) {
   for (const r of rows) { const m = /^(.*?)\s+MSB\s*\(use with CC (\d+)\)$/i.exec(clean(r.name)); if (m) lsbOf.set(r.cc, { name: m[1], lsb: Number(m[2]) }); }
   const lsbs = new Set([...lsbOf.values()].map((p) => p.lsb));
 
+  // Where the guide prints a parameter: the page of its row (of the NRPN table's row, for one sent as
+  // its NRPN; of the MSB's, for a pair).
+  const sourceOf = (row) => (row.page ? { source: { page: row.page } } : {});
   const recipes = new Map();
   const parameters = [];
   const unclean = [];
@@ -123,7 +126,7 @@ export function buildBehringerProfile(data, layout) {
     const group = spelling.get(found.toLowerCase()) ?? (spelling.set(found.toLowerCase(), found), found);
     if (nrpn) {
       parameters.push({
-        id: unique(`${camel(group)}.${camel(name)}`), name, group,
+        id: unique(`${camel(group)}.${camel(name)}`), name, group, ...sourceOf(nrpn),
         description: `NRPN ${nrpn.msb}:${nrpn.lsb} (\`${clean(nrpn.name)}\`, scope ${clean(nrpn.scope ?? '')})${nrpn.notes ? `: ${clean(nrpn.notes)}` : ''}. The controller is CC ${r.cc}, 0 - 127.`,
         access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id,
         type: 'integer', range: { min: Number(nrpnRange[1]), max: Number(nrpnRange[2]) }, default: Number(nrpnRange[1]),
@@ -138,7 +141,7 @@ export function buildBehringerProfile(data, layout) {
     if (pair) describe.push(`14 bits: the MSB on CC ${r.cc}, then the LSB on CC ${pair.lsb}.`);
     if (values.text) describe.push(`Printed: ${values.text}.`);
     if (values.unsure) unclean.push(name);
-    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...sourceOf(r), ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
     if (values.choices && !pair) {
       const seen = new Set();
       const list = values.choices.map(({ value, label: l }) => { const s = slug(l); const id = seen.has(s) ? `${s}_${value}` : s; seen.add(id); return { id, label: l, value }; });

@@ -76,7 +76,7 @@ export function readSoundTable(lines, heading = /^3\.1\s+SDATA/) {
       continue;
     }
     const index = Number(first.text);
-    if (second?.text === 'reserved') { rows.push({ index, range: null, value: '', name: 'reserved' }); continue; }
+    if (second?.text === 'reserved') { rows.push({ index, range: null, value: '', name: 'reserved', page: l.page }); continue; }
     const r = second && RANGE.exec(second.text);
     if (!r) continue;
     let split = splitValueAndName(second, rest);
@@ -92,7 +92,8 @@ export function readSoundTable(lines, heading = /^3\.1\s+SDATA/) {
     }
     // `!!`, `!!!`: the Microwave 2 marks what changed in a release.
     const name = split.name.replace(/\s*!{2,3}$/, '');
-    rows.push({ index, range: [Number(r[1]), Number(r[2])], value: split.value, name, ...(split.unsure ? { unsure: true } : {}) });
+    // The page it is printed on: a parameter says where its document prints it.
+    rows.push({ index, range: [Number(r[1]), Number(r[2])], value: split.value, name, ...(split.unsure ? { unsure: true } : {}), page: l.page });
   }
   return rows;
 }

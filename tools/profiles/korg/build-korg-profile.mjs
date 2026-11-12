@@ -336,6 +336,8 @@ export function buildKorgProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(leaf) || `cc${cc}`}`, `Cc${cc}`),
       name,
       group,
+      // Where the document prints it: the line of its row, the receive table's when it has one.
+      source: { line: row.line },
       ...(describe.length ? { description: describe.join(' ') } : {}),
       access: { canRead: false, canWrite: !!rx, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipeId,
@@ -355,12 +357,13 @@ export function buildKorgProfile(data, layout) {
   const skipped = new Map();
   const skip = (why, at) => skipped.set(why, [...(skipped.get(why) ?? []), at]);
   // A setting in the microKORG documents' hex notation (build-korg-hex.mjs), as a parameter.
-  const hexParameter = (name, read, recipeId, suffix, extra = null) => {
+  const hexParameter = (name, read, recipeId, suffix, line, extra = null) => {
     const { group, leaf } = groupOf(name, layout.groups);
     const words = [read.shown, read.note, read.unit && !read.shown ? `In ${read.unit}.` : null, extra].filter(Boolean);
     const base = {
       id: unique(`${camel(group)}.${camel(leaf) || recipeId}`, suffix),
       name, group,
+      source: { line },
       ...(words.length ? { description: words.join(' ') } : {}),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipeId, shortLabel: camel(leaf),
@@ -379,6 +382,8 @@ export function buildKorgProfile(data, layout) {
       const base = {
         id: unique(`${camel(spec.group)}.${camel(leaf) || recipeId}`, `Cc${spec.cc}`),
         name: spec.name, group: spec.group,
+        // The Owner's Manual, the profile's second document, prints the knob's control change.
+        source: { doc: 1, page: data.ownersManual.source.pdfPage },
         ...(spec.description ? { description: spec.description } : {}),
         access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
         messageRecipe: recipeId, shortLabel: camel(leaf),
@@ -396,7 +401,7 @@ export function buildKorgProfile(data, layout) {
       if (read.why) { skip(read.why, `CC ${row.cc} (${row.name})`); continue; }
       const recipeId = `cc${row.cc}`;
       recipes.set(recipeId, { id: recipeId, kind: 'cc', channel: '$channel', controller: row.cc, value: '$encodedValue' });
-      hexParameter(row.name.replace(/\s+/g, ' ').trim(), read, recipeId, `Cc${row.cc}`);
+      hexParameter(row.name.replace(/\s+/g, ' ').trim(), read, recipeId, `Cc${row.cc}`, row.line);
     }
   }
   let msbDashes = false;
@@ -439,7 +444,7 @@ export function buildKorgProfile(data, layout) {
         if (!read.wide && ((read.max ?? 0) > 127 || read.choices?.some((c) => c.value > 127))) { skip('wider than 7 bits', `${number} (${half.name})`); continue; }
         const recipeId = `nrpn${hex(msb)}${hex(lsb)}`;
         recipes.set(recipeId, { id: recipeId, kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: read.wide ? 14 : 7, value: '$encodedValue', nullAfterSend: false });
-        hexParameter(half.name, read, recipeId, `Nrpn${hex(lsb)}`, half.extra);
+        hexParameter(half.name, read, recipeId, `Nrpn${hex(lsb)}`, row.line, half.extra);
       }
       if (row.more.some((m) => /Synth Mode\s*\/\s*Vocoder Mode/i.test(m))) modeSplit = true;
       continue;
@@ -490,6 +495,7 @@ export function buildKorgProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(leaf) || recipeId}`, `Nrpn${hex(lsb)}`),
       name,
       group,
+      source: { line: row.line },
       ...(describe.length ? { description: describe.join(' ') } : {}),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipeId,

@@ -135,6 +135,8 @@ export function addParameterChangeById(profile, data, layout) {
         id: unique(camel(fullName.replace(/:/g, ' ')) || recipeId),
         name: fullName,
         group: group || 'Program',
+        // The line of its row, in the table of the block it is in, whichever chain reached it.
+        source: { line: row.line },
         ...(read.shown || read.unit ? { description: [read.shown, read.unit ? `In ${read.unit}.` : null].filter(Boolean).join(' ') } : {}),
         access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
         messageRecipe: recipeId,

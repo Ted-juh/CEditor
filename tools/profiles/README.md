@@ -180,8 +180,15 @@ They exist because each one was broken once, and the breakage looked like a work
    file): `doc` the index of its document in the profile's `sources`, left out for the first. The
    generator takes it from the row the parameter was read from, so anyone can open the page and
    check one parameter without reading the generator. The Device Profile Designer shows it beside
-   the parameter. A parameter read from no one row (a KRONOS effect slot's pid, which stands for
-   its row in every effect type) names its document alone.
+   the parameter. `page` is the PDF's page as a viewer counts it, not the number printed on it (the
+   microKORG's knob table is PDF page 62, printed 56). `table` names the table or section as the
+   document prints it (`Drawbar Data List 2`, `§7.4`, a web page's heading); with a page, where only
+   the table's first page was recorded, it is the page the table starts on (Roland's address maps:
+   `Program Common`, p. 44, the row perhaps overleaf). A parameter read from no one row (a KRONOS
+   effect slot's pid, which stands for its row in every effect type) names its document alone. A
+   generator whose reader keeps no page, line or printed heading gives none rather than a guess: the
+   Gotharman LD lists, the Kodamo, the Radikal, Teenage Engineering's pages, three Twisted Electrons
+   manuals and the Kick Lancet, until their readers keep one.
 
 ## Adding a brand
 

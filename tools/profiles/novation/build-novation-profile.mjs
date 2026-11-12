@@ -114,7 +114,10 @@ export function buildNovationProfile(data, layout) {
       const u = readUse(use);
       if (u.skip) { listedSkips.set(u.skip, [...(listedSkips.get(u.skip) ?? []), `${type} ${number}${u.name ? ` (${u.name})` : ''}`]); return null; }
       return {
-        doc: data.controllerList.doc, page: 0, section: '', parameter: u.name, type, number,
+        // The list it is printed in, by the heading the manual sets above it; the reader keeps no
+        // page for a row of a list that runs over four.
+        doc: data.controllerList.doc, page: 0, table: type === 'CC' ? 'MIDI Controller List' : 'MIDI NRPN List',
+        section: '', parameter: u.name, type, number,
         range: `${u.min}-${u.max}${u.shownMin !== undefined ? ` (${u.shownMin} to ${u.shownMax})` : ''}`,
         default: '',
         notes: u.choices ? u.choices.map((c) => `${c.value}=${c.label}`).join(', ') : '',
@@ -216,6 +219,8 @@ export function buildNovationProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(leaf) || recipe.id}`),
       name: fullName,
       group,
+      // Where its document prints it: the page of its row, in the guide or manual it was read from.
+      source: { ...(row.doc ? { doc: row.doc } : {}), ...(row.page ? { page: row.page } : {}), ...(row.table ? { table: row.table } : {}) },
       ...(describe.length ? { description: describe.join(' ') } : {}),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,

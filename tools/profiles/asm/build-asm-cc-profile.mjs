@@ -25,6 +25,8 @@ export function buildAsmCcProfile(data, layout) {
       id: unique(`${camel(r.module)}.${camel(r.name)}`),
       name: r.name,
       group: r.module,
+      // Where the manual prints it: the page of its row in the chart.
+      ...(r.page ? { source: { page: r.page } } : {}),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,
       type: 'integer',

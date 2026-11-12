@@ -129,6 +129,7 @@ export function addParameterChange(profile, data, layout) {
           id: unique(`${camel(copy ?? 'program')}.${camel(full)}`),
           name: copy ? `${copy}: ${full}` : full,
           group,
+          source: { line: row.line },
           ...(read.note || read.shown || read.unit ? { description: [read.shown ? `${read.min}~${read.max} = ${read.shown}` : null, read.unit ? `In ${read.unit}.` : null, read.note].filter(Boolean).join(' ') } : {}),
           access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
           messageRecipe: recipeId,

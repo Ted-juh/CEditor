@@ -39,6 +39,7 @@ export function buildExpressiveProfile(data, layout) {
       id: `${camel(group)}.${camel(r.name.toLowerCase())}`,
       name: r.name,
       group,
+      source: { page: r.page },
       description: `CC ${r.cc}. Printed: ${r.remarks || 'no remarks'}.${r.transmitted === 'Yes' ? ' The instrument sends it too.' : ''}`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,

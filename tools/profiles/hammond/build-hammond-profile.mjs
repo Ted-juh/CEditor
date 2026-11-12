@@ -143,6 +143,7 @@ export function buildHammondProfile(data, layout) {
       id: unique(`${camel(group)}.${camel(r.name)}`),
       name: r.name,
       group,
+      source: { page: r.page },
       description: `${r.table} parameters, page ${r.page}: NRPN LSB ${nl}, MSB ${nm}; SysEx address ${address.join(' ')}, ${two ? 'two bytes' : 'one byte'}; data ${range.text || 'not printed'}${r.default ? `; default ${r.default} (${r.description ?? ''})` : ''}${r.load ? `; ${r.table === 'Patch' ? 'loaded with' : 'load'} ${r.load}` : ''}.`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipe.id,
@@ -186,6 +187,8 @@ export function buildHammondProfile(data, layout) {
       id: unique(`drawbars.${camel(`${part} ${footage}`.replace(/\//g, ' '))}`),
       name: `${part} ${r.name}`,
       group: 'Drawbars',
+      // (Its controller and levels are the list's, which the transcription keeps no page for.)
+      source: { table: 'Drawbar Data List 2' },
       description: `Drawbar Data List 2: controller ${controller} (${hex(controller)}H), each level the first value of its band (${levels.map(hex).join(', ')}); the patch table's ${r.category} ${r.name} (SysEx address ${r.codes.slice(2, 5).join(' ')}, no NRPN).`,
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: id,

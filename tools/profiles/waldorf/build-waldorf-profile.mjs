@@ -62,6 +62,10 @@ export function listed(value, lo, hi) {
   return out.length === hi - lo + 1 ? out.map((label, k) => ({ value: lo + k, label })) : null;
 }
 
+// Where the document prints a row: its page in a PDF, its line in a text file.
+const sourceOf = (row) => (row?.page ? { page: row.page } : row?.line ? { line: row.line } : null);
+const sourced = (p, row) => { const s = sourceOf(row); if (s) p.source = s; return p; };
+
 export function buildWaldorfProfile(data, layout) {
   const notes = [];
   const skipped = new Map();
@@ -187,14 +191,14 @@ export function buildWaldorfProfile(data, layout) {
         ui: { preferredComponent: /Level|Attack|Decay|Sustain|Release|Rate|Amount|Volume|Cutoff|Resonance/i.test(name) ? 'Slider' : 'Knob' },
       };
     }
-    parameters.push(p);
+    parameters.push(sourced(p, row));
     placed.push({ parameter: p, index: row.index });
   }
   // The name: a character a row, one text parameter.
   if (nameRows.length) {
     const first = nameRows[0].index;
     const p = { id: unique('sound.name'), name: 'Name', group: groupOf('Name'), description: `${nameRows.length} characters, one per index from ${first}, ${nameRows[0].range.join(' – ')} (ASCII). Read from the sound dump; not written, since a parameter change carries one character.`, type: 'text', default: '', address: `${hex(first >> 7)} ${hex(first & 127)}`, display: { mode: 'text', shortLabel: 'name' }, encoding: { type: 'text-ascii', length: nameRows.length, pad: 32 }, access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' }, sendPolicy: { mode: 'onCommit', coalesce: false }, messageRecipe: recipe.id, ui: { preferredComponent: 'TextInput' } };
-    parameters.push(p);
+    parameters.push(sourced(p, nameRows[0]));
     placed.push({ parameter: p, index: first });
   }
 
@@ -376,7 +380,8 @@ export function buildWaldorfCcProfile(data, layout) {
     }
     const recipe = { id: `cc${row.controller}`, kind: 'cc', channel: '$channel', controller: row.controller, value: '$encodedValue' };
     if (!recipes.some((r) => r.id === recipe.id)) recipes.push(recipe);
-    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
+    // Where the manual prints it: the page of its row in the chart.
+    const base = { id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(row.page ? { source: { page: row.page } } : {}), ...(describe.length ? { description: describe.join(' ') } : {}), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipe.id };
     if (choices) {
       const seen = new Set();
       const list = choices.map(({ value: v, label: l }) => { const s = slug(l); const id = seen.has(s) ? `${s}_${v}` : s; seen.add(id); return { id, label: l, value: v }; });
@@ -655,14 +660,14 @@ export function buildWaldorfByteTableProfile(data, layout) {
         ui: { preferredComponent: /Level|Attack|Decay|Sustain|Release|Rate|Amount|Volume|Cutoff|Frequency|Resonance|Time/i.test(name) ? 'Slider' : 'Knob' },
       };
     }
-    parameters.push(p);
+    parameters.push(sourced(p, row));
     placed.push({ parameter: p, offset: n });
   }
   if (nameRow) {
     const length = nameRow.to - nameRow.byte + 1;
     const n = nameRow.byte - base0;
     const p = { id: unique('sound.name'), name: 'Name', group: groupOf('Name'), description: `${length} characters from byte ${nameRow.byte} (${nameRow.values}). Read from the sound dump; not written, since a parameter change carries one character.`, type: 'text', default: '', address: `${hex(m.instrument ?? 0)} ${hex(n >> 4)} ${hex(n & 15)}`, display: { mode: 'text', shortLabel: 'name' }, encoding: { type: 'text-ascii', length, pad: 32 }, access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' }, sendPolicy: { mode: 'onCommit', coalesce: false }, messageRecipe: recipe.id, ui: { preferredComponent: 'TextInput' } };
-    parameters.push(p);
+    parameters.push(sourced(p, nameRow));
     placed.push({ parameter: p, offset: n });
   }
 

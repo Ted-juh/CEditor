@@ -66,7 +66,7 @@ export function buildGotharmanProfile(data, layout) {
       if (['offset', 'names', 'off and sources'].includes(v.how)) counted.add(v.how);
       const group = row.section;
       const base = {
-        id: unique(`${camel(group)}.${camel(row.name)}`), name: row.name, group,
+        id: unique(`${camel(group)}.${camel(row.name)}`), name: row.name, group, source: { page: row.page },
         description: `NRPN ${hex(row.msb)}h ${hex(row.lsb)}h (page ${row.page}): ${row.name}; ${row.values}${row.ctrl != null ? `; also CC ${row.ctrl}${row.group ? ` in the ${row.group} controller set` : ''}` : ''}.`,
         access, messageRecipe: id,
       };

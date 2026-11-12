@@ -72,7 +72,7 @@ export function buildBlackProfile(data, layout) {
     const describe = [`Printed: CC${r.cc}${r.range ? `  ${r.range}` : ''}  ${r.name}${r.layer ? `  ${r.layer}` : ''}.`];
     if (variable !== 'channel') describe.push(`Sent on ${variable}, the chart's ${r.block}.`);
     if (!r.range) describe.push('The chart prints no values for it: 0 - 127.');
-    const base = { id: unique(`${camel(group)}.${camel(name.toLowerCase())}`), name, group, access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id };
+    const base = { id: unique(`${camel(group)}.${camel(name.toLowerCase())}`), name, group, source: { page: r.page }, access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id };
     if (range.bands) {
       const labels = layout.labels?.[r.name] ?? (range.bands.length === 2 ? ['Off', 'On'] : null);
       if (!labels || labels.length !== range.bands.length) throw new Error(`${layout.id}: ${r.name} has ${range.bands.length} bands and ${labels?.length ?? 'no'} labels`);

@@ -45,7 +45,7 @@ export function buildModorProfile(data, layout) {
     const group = groupOf(row.name, layout.otherGroup);
     const extra = [row.remarks, ...row.notes, vowelsOn.has(row.cc) ? `the preset vowels (§4.4): ${vowelsOn.get(row.cc)}` : ''].filter(Boolean).join('; ');
     parameters.push({
-      id: `${camel(group)}.${camel(row.name.replace(/^Drum [A-F] /, ''))}`, name: row.name, group,
+      id: `${camel(group)}.${camel(row.name.replace(/^Drum [A-F] /, ''))}`, name: row.name, group, source: { page: row.page },
       description: `CC ${row.cc} (page ${row.page}): ${row.name}${extra ? `; ${extra}` : ''}.${row.transmitted ? ' Also transmitted.' : ''}`,
       access, messageRecipe: id, ...shape, display: { mode: 'number', unit: '', shortLabel: camel(row.name) },
     });
@@ -63,7 +63,8 @@ export function buildModorProfile(data, layout) {
       recipes.set(id, { id, kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: 7, value: '$encodedValue' });
       const group = `Drum ${instrument}`;
       parameters.push({
-        id: `${camel(group)}.${camel(name)}`, name: `Drum ${instrument} ${name}`, group,
+        // (The NRPN table's rows keep no page: the section it is printed in.)
+        id: `${camel(group)}.${camel(name)}`, name: `Drum ${instrument} ${name}`, group, source: { table: '§7.4' },
         description: `NRPN ${msb}/${lsb} (MSB the drum, LSB the parameter; §7.4): Drum ${instrument} ${name}. The manual gives no range: sent 0 - 127 on data entry (CC 6).`,
         access, messageRecipe: id, ...shape, display: { mode: 'number', unit: '', shortLabel: camel(name) },
       });

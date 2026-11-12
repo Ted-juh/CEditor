@@ -58,10 +58,13 @@ export function buildBehringerDumpProfile(data, layout) {
     used.add(row);
     return recipe.id;
   };
-  const add = ({ group, name, description, range, recipe, choices, readOnly, byte }) => {
+  // Where the manual prints a parameter: the page of the row it is read from (the preset byte's, for a
+  // byte; the NRPN's or the controller's own, for one that is not).
+  const sourceOf = (row) => (row?.page ? { source: { page: row.page } } : {});
+  const add = ({ group, name, description, range, recipe, choices, readOnly, byte, row }) => {
     const [lo, hi] = range;
     const base = {
-      id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(description ? { description } : {}),
+      id: unique(`${camel(group)}.${camel(name)}`), name, group, ...sourceOf(row), ...(description ? { description } : {}),
       access: readOnly ? { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' } : { canRead: byte !== undefined, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       ...(recipe ? { messageRecipe: recipe } : {}),
     };
@@ -82,7 +85,7 @@ export function buildBehringerDumpProfile(data, layout) {
   const nameRow = preset.find((r) => /^\d+-\d+$/.test(r.byte) && /NAME/.test(r.name));
   if (nameRow) {
     const [first, last] = rangeOf(nameRow.byte);
-    const p = { id: unique('program.name'), name: 'Name', group: 'Program', description: `${last - first + 1} ASCII characters, bytes ${first} - ${last}. Read from the edit buffer; not written, since no controller carries it.`, type: 'text', default: '', display: { mode: 'text', shortLabel: 'name' }, encoding: { type: 'text-ascii', length: last - first + 1, pad: 32 }, access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' }, sendPolicy: { mode: 'onCommit', coalesce: false }, ui: { preferredComponent: 'TextInput' } };
+    const p = { id: unique('program.name'), name: 'Name', group: 'Program', ...sourceOf(nameRow), description: `${last - first + 1} ASCII characters, bytes ${first} - ${last}. Read from the edit buffer; not written, since no controller carries it.`, type: 'text', default: '', display: { mode: 'text', shortLabel: 'name' }, encoding: { type: 'text-ascii', length: last - first + 1, pad: 32 }, access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' }, sendPolicy: { mode: 'onCommit', coalesce: false }, ui: { preferredComponent: 'TextInput' } };
     parameters.push(p);
     mappings.push({ parameter: p.id, offset: first });
   }
@@ -101,11 +104,11 @@ export function buildBehringerDumpProfile(data, layout) {
     const printed = [`Printed ${r.name}${/\(/.test(r.notes) ? `, ${r.notes}` : ''}; byte ${byte}.`];
     if (!via) {
       readOnly.push(`${group} ${name}`);
-      add({ group, name, description: `${printed} Read from the edit buffer; no controller or NRPN is printed for it.`, range, readOnly: true, byte });
+      add({ group, name, description: `${printed} Read from the edit buffer; no controller or NRPN is printed for it.`, range, readOnly: true, byte, row: r });
       continue;
     }
     const how = viaCc ? `CC ${viaCc.cc}` : `NRPN ${viaNrpn.msb}:${viaNrpn.lsb}`;
-    add({ group, name, description: `${printed} Sent as ${how}${r.group ? `, to the group Group Select chooses` : ''}.`, range, recipe: recipeFor(via), byte });
+    add({ group, name, description: `${printed} Sent as ${how}${r.group ? `, to the group Group Select chooses` : ''}.`, range, recipe: recipeFor(via), byte, row: r });
   }
   // The NRPNs that are not preset bytes: the instrument's settings and the arpeggiator / sequencer.
   for (const n of nrpn) {
@@ -114,7 +117,7 @@ export function buildBehringerDumpProfile(data, layout) {
     if (!range || range[1] > 127) { left.push(`NRPN ${n.msb}:${n.lsb} ${n.name} (${n.notes}, ${n.range}: more than a data byte, and the manual does not say how it is split)`); continue; }
     const arp = /^Arp\/Seq - /.test(n.notes);
     const name = n.notes.replace(/^Arp\/Seq - /, '').replace(/\s*\([^()]*\)\s*$/, '').trim();
-    add({ group: arp ? 'Arp/Seq' : 'Global', name, description: `Printed ${n.name}${/\(/.test(n.notes) ? `, ${n.notes}` : ''}. Sent as NRPN ${n.msb}:${n.lsb}.`, range, recipe: recipeFor(n), choices: choicesOf(n.notes, ...range) });
+    add({ group: arp ? 'Arp/Seq' : 'Global', name, description: `Printed ${n.name}${/\(/.test(n.notes) ? `, ${n.notes}` : ''}. Sent as NRPN ${n.msb}:${n.lsb}.`, range, recipe: recipeFor(n), choices: choicesOf(n.notes, ...range), row: n });
   }
   // The controllers that are not preset bytes.
   for (const c of cc) {
@@ -122,7 +125,7 @@ export function buildBehringerDumpProfile(data, layout) {
     if ((layout.leaveOutCc ?? []).includes(Number(c.cc))) { left.push(`CC ${c.cc} ${c.function}`); continue; }
     const range = rangeOf(c.range);
     const name = c.remarks && /^[A-Z ]+$/.test(c.remarks) ? title(c.remarks) : c.function;
-    add({ group: 'Global', name, description: `Printed ${c.function}${c.remarks ? `, ${c.remarks}` : ''}. Sent as CC ${c.cc}.`, range, recipe: recipeFor(c), choices: choicesOf(c.remarks, ...range) });
+    add({ group: 'Global', name, description: `Printed ${c.function}${c.remarks ? `, ${c.remarks}` : ''}. Sent as CC ${c.cc}.`, range, recipe: recipeFor(c), choices: choicesOf(c.remarks, ...range), row: c });
   }
   if (corrected.length) notes.push(`Rows the manual prints wrongly, corrected by the layout: ${corrected.join('; ')}.`);
   if (readOnly.length) notes.push(`Read back and not written, no controller or NRPN being printed for them: Name, ${readOnly.join(', ')}.`);
