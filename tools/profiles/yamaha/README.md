@@ -63,6 +63,11 @@ lists do that it copes with, each found on a real page:
   EQ, 40 rows, were missed before this);
 - a table across the whole page under two columns of the one before (the MOTIF ES's MIX PART): its
   columns are read first, and its headings 42 points right of their cells, as far as its names lag;
+  a table whose Notes heading crosses the middle with rows of another beside it is not across the
+  page: the CP5's Performance Common (p. 36) sits beside the Reverb block's last rows run on at the
+  top of the right column, which, read before it, took p. 35's MComp address (Reverb On/Off on MComp
+  On/Off's `00 21 26`, the Pre-Amplifier's On/Off in the Part block, the Modulation Effect's in the
+  Pre-Amplifier's). The Designer's dump round trip found it: two fields on one byte;
 - a column's side taken from its `Address` heading (the MOTIF ES's right column sets it 14 points
   right of the page's middle, its left edge a point left of it); the columns measured over every
   row, past the first Total Size too (the S90 ES's Slider Setting sets its names a point and a half
@@ -117,7 +122,8 @@ under it end the bulk table.
   profile's notes say so: the MODX M prints Key Controller Set 2 Switch `00` between Set 1 Ratio at
   `0E` (two bytes) and Set 2 Destination at `12`; it is `10`. A table heading's address or a bulk
   block's that the data list prints otherwise elsewhere is corrected by the layout, named in the notes:
-  the Motif XF heads the Multi's Insertion B `46 04 00` (its base address table: `36 04 00`). A series
+  the Motif XF and MOTIF XS head the Multi's Insertion B `46 04 00`, the Drum Voice's (their base
+  address tables: `36 04 00`). A series
   whose last block is misprinted is ended by the layout where the data list prints it elsewhere: the
   MOTIF ES's and S90 ES's Multi print their last Plug-in Part `37 44 00` after `37 60 00`; their
   Performance's are `31 60` … `31 62`.

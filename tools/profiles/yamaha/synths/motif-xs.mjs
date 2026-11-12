@@ -17,7 +17,12 @@ export default motifLayout({
   audio: { '00': AUDIO, 35: AUDIO, 39: AUDIO },
   noIdentity: 'the data list prints the identity reply with the family bytes as `dd dd`, a code for each model',
   tables: {
-    // The data list heads the Drum Voice's Insertion L table `40 05 00`; it is 46 05 00.
+    // The data list heads the Drum Voice's Insertion L table `40 05 00` and the Multi's Insertion B
+    // table `46 04 00` (p. 72, between the Multi's Insertion A at 36 03 00 and its Master EQ at
+    // 36 10 00); its base address table (p. 56) puts them at 46 05 00 and 36 04 00. Read as printed,
+    // the Multi's Insertion B wrote to the Drum Voice's, which the dump round trip caught: both
+    // `Template Number`s on byte 46 04 02.
     'DRUM VOICE COMMON': { readdress: { '40 05': ['46', '05'] } },
+    'MULTI COMMON for Pattern, Song': { readdress: { '46 04': ['36', '04'] } },
   },
 });

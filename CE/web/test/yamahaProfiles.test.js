@@ -153,6 +153,29 @@ test('a column with no headings over it borrows the other\'s, a row printed with
   ]);
 });
 
+test('a table with rows beside it is not across the page, though its Notes heading crosses the middle', () => {
+  // The CP5's p. 36: the Performance Common table on the left runs its Notes heading past the middle,
+  // and the right column's top rows, no heading of their own, carry on the table that ends the left
+  // column (the Reverb block, 30 01). Read as a table across the page, it was read after them, and
+  // they took the address of p. 35's last table: Reverb On/Off at MComp On/Off's 00 21 26.
+  const xml = page(
+    say(40, 40, 'MIDI PARAMETER CHANGE TABLE (PERFORMANCE COMMON)'),
+    say(45, 60, 'Address'), say(90, 60, 'Size'), say(105, 60, 'Data'), say(105, 68, 'Range'), say(150, 60, 'Parameter Name'), say(250, 60, 'Description'), say(310, 60, 'Notes'),
+    say(42, 84, '30 00 00'), say(92, 84, '1'), say(103, 84, '20 – 7F'), say(150, 84, 'Performance Name 1'), say(250, 84, '32 – 126'),
+    say(77, 94, '01'), say(92, 94, '1'), say(103, 94, '20 – 7F'), say(150, 94, 'Performance Name 2'), say(250, 94, '32 – 126'),
+    say(42, 104, '30 01 00'), say(92, 104, '2'), say(103, 104, '00 – 7F'), say(150, 104, 'Reverb Type'), say(250, 104, 'Refer to list'),
+    // The right column, from the top: the Reverb block's last rows.
+    say(352, 84, '22'), say(367, 84, '2'), say(378, 84, '00 – 7F'), say(430, 84, 'Reverb Parameter 16'),
+    say(352, 94, '24'), say(367, 94, '1'), say(383, 94, '00'), say(430, 94, 'reserved'),
+    say(352, 104, '26'), say(367, 104, '1'), say(378, 104, '00 – 01'), say(430, 104, 'Reverb On/Off'), say(510, 104, 'off, on'),
+  );
+  const tables = pageParameterTables(xml);
+  assert.deepEqual(tables.map((t) => [t.title, t.rows[0]?.address.join(' ')]), [
+    ['MIDI PARAMETER CHANGE TABLE (PERFORMANCE COMMON)', '30 00 00'],
+    [null, '22'],
+  ], 'the left column first, the right column\'s rows after it, carrying its 30 01');
+});
+
 test('the bulk dump block table: a series over a column\'s foot, and the CP5/CP50\'s order, its address first', () => {
   // The MOTIF's drum keys: `KEY C 0` and `: 73 Blocks` at the foot of the left column (the page's
   // number under it), `KEY C 6` at the head of the right.
@@ -497,4 +520,18 @@ test('the CP1, CP5 and CP50: a model ID byte and an identity each, and the CP50 
   assert.equal(cp50.parameters.filter((p) => /^3[46] /.test(p.address)).length, 0, 'no Power-Amp/Insertion 2, no A/D input');
   assert.equal(cp50.dumpDefinitions.filter((d) => /^3[46]$/.test(d.matcher.prefix.at(-3))).length, 0);
   assert.ok(builtProfile('yamaha-cp5').parameters.some((p) => /^36 /.test(p.address)));
+});
+
+test('the CP5 and MOTIF XS: each switch in its own block, as the data lists\' own tables place them', { skip: !builtProfile('yamaha-cp5') || !builtProfile('yamaha-motif-xs') }, () => {
+  const cp5 = builtProfile('yamaha-cp5');
+  const at = (address) => cp5.parameters.filter((p) => p.address === address).map((p) => `${p.group}: ${p.name}`);
+  assert.deepEqual(at('30 01 26'), ['Performance Reverb: Reverb On/Off'], 'p. 36: the Reverb block run on at the top of the right column');
+  assert.deepEqual(at('00 21 26'), ['MasterComp: MComp On/Off']);
+  assert.deepEqual(at('32 00 26'), ['Part 1 (L1) Pre-Amp: Pre-Amplifier On/Off'], 'p. 38: the Pre-Amplifier block, not the Part\'s');
+  assert.ok(at('33 00 26')[0]?.endsWith('Modulation Effect On/Off'), 'p. 39: the Modulation Effect block');
+  // The MOTIF XS heads the Multi's Insertion B `46 04 00`, the Drum Voice's; its base address table
+  // (p. 56) has it at 36 04 00.
+  const xs = builtProfile('yamaha-motif-xs');
+  const templates = xs.parameters.filter((p) => p.name === 'Template Number' && /^(36|46) 04 02$/.test(p.address)).map((p) => `${p.group} ${p.address}`);
+  assert.deepEqual(templates.sort(), ['Drum Voice Common 46 04 02', 'Multi Common for Pattern, Song 36 04 02']);
 });

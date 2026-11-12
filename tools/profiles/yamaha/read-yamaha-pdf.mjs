@@ -76,10 +76,20 @@ function findHeads(lines, width) {
   }
   // A table across the whole page: its `Description` or `Notes` heading past the middle, and no other
   // table's `Address` on its band (the MOTIF ES's MIX PART, under two columns of the table before).
+  // Nor one with rows of another table beside it: the CP5's Performance Common table runs its Notes
+  // heading past the middle of p. 36, beside the Reverb table's last rows run on at the top of the
+  // right column, with no heading of their own (`22  2  00 – 7F  Reverb Parameter 16`). Read as a
+  // table across the page, it was read before them, and those rows took the address of the table
+  // before on p. 35 (00 21 22 for 30 01 22): Reverb On/Off became MComp On/Off's byte.
+  const rowsBeside = (h) => lines.filter((l) => l.y0 > h.name.y1 && l.y0 < h.name.y1 + 120).filter((l) => {
+    const ws = l.words.filter((w) => w.x0 >= width / 2);
+    return ws.length >= 3 && ADDRESS_BYTE.test(ws[0].text) && /^\d$/.test(ws[1].text);
+  }).length >= 3;
   for (const h of heads) {
     const band = (x) => Math.abs(middle(x) - middle(h.name)) <= 13;
     h.full = h.address.x0 < width / 2 && words.some((x) => band(x) && x.x0 >= width / 2 && /^(Description|Settings|Notes|Default)$/.test(x.text))
-      && !words.some((x) => band(x) && /^Address/.test(x.text) && x.x0 > h.address.x0 + 20);
+      && !words.some((x) => band(x) && /^Address/.test(x.text) && x.x0 > h.address.x0 + 20)
+      && !rowsBeside(h);
   }
   // A column of the page with rows and no headings over them: the MOTIF ES heads its left column alone
   // on some pages (p. 77), and the rows beside it are set under the same headings, moved across; the
