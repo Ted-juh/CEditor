@@ -54,9 +54,9 @@ function applyEngine(out, engine) {
 const toBytes = (hex) => (hex ? String(hex).trim().split(/\s+/) : []);
 
 // DPD per-offset dump codec -> the C++ engine's legacy dump codec vocabulary
-// (u7 / u8 / s7 / u14-msb-lsb / nibbled / text-ascii / text-nibbled-ascii / enum). The engine's dump
-// decoder handles u7/u8/s7 directly; the two that remain unsupported there (per-field packed8to7,
-// bitslice) degrade to u7 best-effort + a note — the DPD's own assemble/parse still handles them.
+// (u7 / u8 / s7 / u14-msb-lsb / nibbled / text-ascii / text-nibbled-ascii / bitfields). The one the
+// engine's dump decoder lacks (per-field packed8to7) degrades to u7 best-effort + a note — the DPD's
+// own assemble/parse still handles it.
 function legacyDumpCodec(codec, note) {
   switch (codec?.type) {
     case undefined: case 'u7': return undefined; // default; engine reads the parameter's own type
@@ -72,7 +72,15 @@ function legacyDumpCodec(codec, note) {
     case 'text-ascii': return { type: 'text-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'text-nibbled-ascii': return { type: 'text-nibbled-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'packed8to7': note?.(`packed8to7 per-field unsupported by the engine dump decoder`); return undefined;
-    case 'bitslice': note?.(`bitslice unsupported by the engine dump decoder`); return undefined;
+    // The engine's `bitfields`: a part a slice, and the slices' signedness, table, shift and ceiling.
+    case 'bitslice': return {
+      type: 'bitfields',
+      parts: codec.slices.map((s) => ({ at: s.byte, from: s.fromBit, bits: s.toBit - s.fromBit + 1, shift: s.valueShift })),
+      ...(codec.signed ? { signed: true } : {}),
+      ...(Array.isArray(codec.map) ? { map: copyJson(codec.map) } : {}),
+      ...(codec.shiftRight != null ? { shiftRight: codec.shiftRight } : {}),
+      ...(codec.max != null ? { max: codec.max } : {}),
+    };
     default: return undefined;
   }
 }

@@ -196,6 +196,15 @@ const DUMP_CODECS = {
   nibbled: (c) => ({ type: 'nibbles', bytes: c.nibbles ?? 2 }),
   'text-ascii': (c) => ({ type: 'text-ascii', length: c.length, pad: c.pad ?? 32 }),
   'text-nibbled-ascii': (c) => ({ type: 'text-nibbled-ascii', length: c.length, pad: c.pad ?? 32 }),
+  // The engine's bit fields are the DPD's bit slices: each part bits from..from+bits-1 of a byte.
+  bitfields: (c) => ({
+    type: 'bitslice',
+    slices: c.parts.map((q) => ({ byte: q.at, fromBit: q.from, toBit: q.from + q.bits - 1, valueShift: q.shift })),
+    ...(c.signed ? { signed: true } : {}),
+    ...(Array.isArray(c.map) ? { map: copyJson(c.map) } : {}),
+    ...(c.shiftRight != null ? { shiftRight: c.shiftRight } : {}),
+    ...(c.max != null ? { max: c.max } : {}),
+  }),
 };
 
 /** An engine dump definition's own DPD fields: its framing, payload, checksum, counts and layout. */

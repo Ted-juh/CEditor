@@ -79,6 +79,14 @@ export function readObjectRows(text) {
     const hasId = idCells.every((c) => /^\d+$/.test(c));
     if (/^\d+$/.test(ofsCell)) ofs = Number(ofsCell);
     if (!hasId && [ofsCell, bit, group, name, data, value].some((c) => c === '*' || c === '|')) return;
+    // A row with a byte and bits and nothing else carries the rest of the value above: Swing is the
+    // whole of byte 2578 and bits 1~0 of 2579, whose bits 6 and 7 are Quantize Trigger and Key Sync.
+    // Read as two whole bytes, Swing took those two switches as its sign.
+    if (!hasId && !name && !group && /^\d+$/.test(ofsCell) && bit && !data && !value && rows.at(-1)?.name) {
+      const last = rows.at(-1);
+      (last.more ??= []).push({ ofs, bit });
+      return;
+    }
     if (!hasId && !name) return;
     const row = {
       line: index + 1,

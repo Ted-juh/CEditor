@@ -4211,7 +4211,7 @@
       {"parameter":"assignableController.knob6Assign","offset":2575,"codec":{"type":"bitfields","parts":[{"at":0,"from":0,"bits":8,"shift":0}]}},
       {"parameter":"assignableController.knob7Assign","offset":2576,"codec":{"type":"bitfields","parts":[{"at":0,"from":0,"bits":8,"shift":0}]}},
       {"parameter":"assignableController.knob8Assign","offset":2577,"codec":{"type":"bitfields","parts":[{"at":0,"from":0,"bits":8,"shift":0}]}},
-      {"parameter":"common.swing","offset":2578,"codec":{"type":"bitfields","signed":true,"parts":[{"at":0,"from":0,"bits":8,"shift":0},{"at":1,"from":0,"bits":8,"shift":8}]}},
+      {"parameter":"common.swing","offset":2578,"codec":{"type":"bitfields","signed":true,"parts":[{"at":0,"from":0,"bits":8,"shift":0},{"at":1,"from":0,"bits":2,"shift":8}]}},
       {"parameter":"common.quantizeTrigger","offset":2579,"codec":{"type":"bitfields","parts":[{"at":0,"from":6,"bits":1,"shift":0}]}},
       {"parameter":"common.keySync","offset":2579,"codec":{"type":"bitfields","parts":[{"at":0,"from":7,"bits":1,"shift":0}]}},
       {"parameter":"trackEq.trim","offset":2580,"codec":{"type":"bitfields","parts":[{"at":0,"from":0,"bits":7,"shift":0}]}},

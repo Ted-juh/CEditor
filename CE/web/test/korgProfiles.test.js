@@ -610,13 +610,17 @@ test('the KRONOS: a program dump placed by hand reads back by the table\'s offse
   payload[89] = (1 << 6) | 0x10;     // bit 6: Insert Effect1 Switch, On; bits 5~0: its Channel, fixed 10H
   payload[93] = 2 << 4;              // bits 5~4: Insert Effect1 Fx Control Bus
   payload[2718] = 0x9d;              // Pitch EG Start Level, 9D~63
+  // Swing -300: ten bits, D4 and bits 1~0 of the next byte (10b); bits 6 and 7 of that byte are
+  // Quantize Trigger and Key Sync, both On. Read as two whole bytes, Swing came back -15660.
+  payload[2578] = 0xd4;
+  payload[2579] = 0b11000010;
   const wire = pack8to7(payload, 'msb-low-first', 7);
   assert.equal(wire.length, 4236, '*3: sysExSize = binarySize + (binarySize+6)/7');
   const parsed = localParseDumpMessage(profile, hex([0xf0, 0x42, 0x30, 0x68, 0x75, 0x00, 0x05, ...wire, 0xf7]));
   assert.ok(parsed.ok, parsed.error);
   assert.deepEqual(
-    ['insertEffect1.panpot', 'insertEffect1.switch', 'insertEffect1.fxControlBus', 'pitchEg.startLevel'].map((id) => parsed.values[id]),
-    [64, 'on', 2, -99],
+    ['insertEffect1.panpot', 'insertEffect1.switch', 'insertEffect1.fxControlBus', 'pitchEg.startLevel', 'common.swing', 'common.quantizeTrigger', 'common.keySync'].map((id) => parsed.values[id]),
+    [64, 'on', 2, -99, -300, 'on', 'on'],
   );
   assert.equal(localParseDumpMessage(profile, hex([0xf0, 0x42, 0x30, 0x68, 0x75, 0x00, 0x05, ...wire, 0, 0xf7])).ok, false, 'an EXi program\'s dump, any other length, is not this one');
 });

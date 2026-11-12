@@ -404,7 +404,11 @@
               "valueShift": { "type": "integer", "minimum": 0, "description": "Bit position in the assembled value where this slice lands." }
             }
           }
-        }
+        },
+        "signed": { "type": "boolean", "description": "For bitslice: the assembled bits are two's complement over the slices' width (a KRONOS keeps -99..+99 as one byte, 9D..63)." },
+        "map": { "type": "array", "items": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }, "description": "For bitslice: [[raw, value], ...], the value given by table (a switch stored inverted)." },
+        "shiftRight": { "type": "integer", "minimum": 0, "maximum": 24, "description": "For bitslice: the raw bits moved right (a 16-bit field the device reads the top bits of)." },
+        "max": { "type": "integer", "description": "For bitslice: the value no larger than this." }
       }
     },
 

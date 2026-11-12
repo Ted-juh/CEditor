@@ -21,7 +21,7 @@
 // expressed for emit but collected by the C++ engine; the DPD verifies single-message round-trips.
 
 import { resolveParams } from './resolve.mjs';
-import { hexToBytes, encodeValue, decodeValue, pack8to7, unpack8to7, checksumOf } from './codecs.mjs';
+import { hexToBytes, encodeValue, decodeValue, pack8to7, unpack8to7, checksumOf, bitsliceMask, bitsliceWidth } from './codecs.mjs';
 
 // value codecs encodeValue/decodeValue understand directly; everything else is handled in (en|de)codeField.
 const VALUE_CODECS = new Set(['u7', 'u8', 's7', 'nibbles', 'packed8to7', 'bitslice']);
@@ -36,13 +36,32 @@ const manufBytes = (r) => Array.isArray(r?.manufacturerId)
 
 // Resolve a profile's params into a lookup keyed by resolvedId, plus a forgiving "scope.paramId" alias
 // for instance 0 so single-tone layouts need not spell out "tone1.".
+// Kept per scopes object: a dump's round trip resolves the map seven times, and a FANTOM checks 441
+// dumps against 11,852 parameters, which took minutes. The Designer resolves a fresh copy per edit, so a
+// changed model is a new object and is never served a stale map.
+const paramMaps = new WeakMap();
 function buildParamMap(resolved) {
+  if (!resolved?.scopes) return {};
+  const cached = paramMaps.get(resolved.scopes);
+  if (cached) return cached;
+  const map = buildParamMapUncached(resolved);
+  paramMaps.set(resolved.scopes, map);
+  return map;
+}
+function buildParamMapUncached(resolved) {
   const map = {};
-  if (!resolved?.scopes) return map;
-  for (const p of resolveParams(resolved)) {
+  const params = resolveParams(resolved);
+  for (const p of params) {
     map[p.resolvedId] = p;
     const alias = `${p.scope}.${p.paramId}`;
     if (p.instance === 0 && !(alias in map)) map[alias] = p;
+  }
+  // A model converted from an engine profile names a parameter by the id the engine gives it, as the
+  // emitter does (byOwnId): an instance of a named scope by its own ('part2.level'), any other by its
+  // id. Without this its dump fields found no parameter, and were probed over the codec's whole range.
+  for (const p of params) {
+    const own = p.named ? p.legacyId : p.instance === 0 ? p.paramId : null;
+    if (own && !(own in map)) map[own] = p;
   }
   return map;
 }
@@ -145,7 +164,13 @@ export function assembleDump(dump, valuesById, resolved) {
   for (const e of layout) {
     const { param, codec, size } = resolveEntry(e, paramMap);
     const bytes = encodeField(codec, valuesById?.[e.param], param);
-    for (let i = 0; i < size && i < bytes.length; i++) payload[(e.offset ?? 0) + i] = bytes[i] & 0xff;
+    // A bit-sliced field writes only its own bits: a KRONOS keeps a switch in bit 6 of a byte
+    // whose other bits are another parameter's.
+    const mask = codec?.type === 'bitslice' ? bitsliceMask(codec) : null;
+    for (let i = 0; i < size && i < bytes.length; i++) {
+      const at = (e.offset ?? 0) + i;
+      payload[at] = mask ? (payload[at] & ~mask[i]) | (bytes[i] & mask[i]) : bytes[i] & 0xff;
+    }
   }
 
   const wirePayload = msg.payload?.pack
@@ -206,6 +231,12 @@ function codecRange(codec, param) {
   else if (t === 'u14' || t === 'u14-lsb') hi = 16383;
   else if (t === 'nibbles') hi = (1 << (4 * (codec.bytes ?? 2))) - 1;
   else if (t === 'packed8to7') hi = Math.pow(2, 8 * (codec.bytes ?? 1)) - 1;
+  else if (t === 'bitslice') {
+    const w = bitsliceWidth(codec);
+    if (codec.signed) { lo = -(2 ** (w - 1)); hi = 2 ** (w - 1) - 1; } else hi = 2 ** w - 1;
+    if (codec.shiftRight) { lo >>= codec.shiftRight; hi >>= codec.shiftRight; }
+    if (codec.max !== undefined) hi = Math.min(hi, codec.max);
+  }
   if (param?.range) { lo = Math.max(lo, param.range.min); hi = Math.min(hi, param.range.max); }
   if (hi < lo) hi = lo;
   return [lo, hi];
@@ -215,6 +246,11 @@ function probeValue(level, param, codec, entry) {
   if (isText(codec)) {
     const len = codec.length ?? entry.size ?? 8;
     return 'PROBE NAME 0123456789'.slice(0, len);
+  }
+  // A value given by table: the table's first, middle and last.
+  if (codec?.type === 'bitslice' && Array.isArray(codec.map) && codec.map.length && param?.valueType !== 'enum') {
+    const n = codec.map.length;
+    return codec.map[level === 'min' ? 0 : level === 'max' ? n - 1 : (n >> 1)][1];
   }
   if (param?.valueType === 'enum' && param.enum?.length) {
     const n = param.enum.length;

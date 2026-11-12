@@ -674,9 +674,12 @@ Each parameter's kind is one of the DPD's own value types (continuous, signed, e
 trigger, momentary, text), and how it is sent as it moves (its send policy) is a DPD field: the
 model names it once per value type under `defaults.sendPolicy`, and a parameter only when it
 differs. What the DPD still does not describe, a KRONOS's bit-field codecs or the profile's notes
-and tests, is carried for the engine as it is, on fewer than 2 parameters in 100. (The KRONOS's
-bit fields are why a KRONOS dump's round trip shows as failing in the Designer: its own dump code
-does not read them yet.)
+and tests, is carried for the engine as it is, on fewer than 2 parameters in 100.
+
+A value packed into bits of a dump (a KRONOS keeps a switch in bit 6 of a byte whose other bits are
+another parameter's) is a DPD bit slice, the engine's bit fields under the DPD's name, signed, by
+table or shifted as the engine reads them; the Designer's own dump code reads and writes them, a
+field touching only its own bits, so its round-trip check covers every dump in the library.
 
 How the program talks to the device is the model's own too: its device id and variables (a part's
 channel), the pause between messages, its identity, what it can be asked (`requests`) and what is

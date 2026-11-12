@@ -75,6 +75,20 @@ function checkDisplay(display, where, E) {
   }
 }
 
+// A bit-sliced value: each slice bits fromBit..toBit of one byte (0-7), at valueShift in the value;
+// a table of [raw, value] pairs, or a shift and a ceiling, say what the bits mean.
+function checkSlices(c, where, E) {
+  if (!Array.isArray(c.slices) || !c.slices.length) { E(`${where}: bitslice needs slices`); return; }
+  for (const [i, s] of c.slices.entries()) {
+    const ok = [s.byte, s.fromBit, s.toBit, s.valueShift].every((n) => Number.isInteger(n) && n >= 0)
+      && s.toBit <= 7 && s.fromBit <= s.toBit && s.valueShift <= 24;
+    if (!ok) E(`${where}: slice ${i} needs byte >= 0, 0 <= fromBit <= toBit <= 7, valueShift 0-24`);
+  }
+  if (c.map != null && !(Array.isArray(c.map) && c.map.every((pair) => Array.isArray(pair) && pair.length === 2 && pair.every(Number.isInteger))))
+    E(`${where}: bitslice map must be [[raw, value], ...]`);
+  if (c.shiftRight != null && !(Number.isInteger(c.shiftRight) && c.shiftRight >= 0 && c.shiftRight <= 24)) E(`${where}: shiftRight must be 0-24`);
+}
+
 export function validateProfile(profile) {
   const errs = [];
   const E = (m) => errs.push(m);
@@ -115,7 +129,7 @@ export function validateProfile(profile) {
       }
       if (p.encoding) {
         if (!PARAM_ENCODING_TYPES.includes(p.encoding.type)) E(`${sk}.${id}: bad encoding.type ${p.encoding.type}`);
-        if (p.encoding.type === 'bitslice' && !Array.isArray(p.encoding.slices)) E(`${sk}.${id}: bitslice encoding needs slices`);
+        if (p.encoding.type === 'bitslice') checkSlices(p.encoding, `${sk}.${id}`, E);
         if (TEXT_CODEC_TYPES.includes(p.encoding.type) && !(p.encoding.length > 0)) {
           E(`${sk}.${id}: a text encoding needs a positive length`);
         }
@@ -152,6 +166,7 @@ export function validateProfile(profile) {
       // An entry is placed by its offset, or in a dump of records by its record's key.
       if (e.record != null ? !Number.isInteger(e.record) || e.record < 0 : !Number.isInteger(e.offset) || e.offset < 0) E(`dump ${d.id}: layout[${i}] needs an integer offset >= 0, or a record`);
       if (e.codec && !DUMP_CODEC_TYPES.includes(e.codec.type)) E(`dump ${d.id}: layout[${i}] bad codec.type ${e.codec.type}`);
+      if (e.codec?.type === 'bitslice') checkSlices(e.codec, `dump ${d.id}: layout[${i}]`, E);
     });
   }
 

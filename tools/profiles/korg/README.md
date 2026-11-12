@@ -251,7 +251,11 @@ whole bytes are read low byte first, and a field that runs on into the next byte
 in the earlier one: the tables fill each byte from bit 0 upward (Bypass is bit 0 of every effect's
 first byte, Wet/Dry bits 7~1 beside it) and continue a field crossing a byte upward in the next
 (an EXi engine's Start Phase at bits 7~5, then 3~0), the layout of a little-endian structure; the
-one exception marked, the KARMA Start Seed (`* Big Endian`), is left out.
+one exception marked, the KARMA Start Seed (`* Big Endian`), is left out. A row with an offset and
+bits and nothing else is the rest of the value above it: Swing is the whole of its byte and bits 1~0
+of the next (ten bits, signed), and bits 6 and 7 of that next byte are Quantize Trigger and Key Sync.
+Read as two whole bytes, as it was until the Designer's round trip caught it, Swing took those two
+switches as its sign.
 
 **EXi programs** (`Prog_EXi_Common.txt`) hold two slots, each with the engine chosen for it (AL-1,
 CX-3, STR-1, MS-20EX, PolysixEX, MOD-7, SGX-2, EP-1). Each engine's own settings (`Prog_EXi.txt`,

@@ -84,23 +84,52 @@ export function decodeValue(encoding, bytes) {
   throw new Error(`decodeValue: unsupported type ${t}`);
 }
 
+// A value put together from bit slices: each slice bits fromBit..toBit of one byte, placed at
+// valueShift in the value. What the raw bits mean, as the engine's `bitfields` codec reads them:
+//   signed      two's complement over the slices' width (a KRONOS keeps -99..+99 as a byte, 9D..63)
+//   map         [[raw, value], ...]: a value given by table (a switch stored inverted)
+//   shiftRight  the raw value moved right (a 16-bit field of which the device uses the top 9 bits)
+//   max         the value no larger than this
+// Several slices may share a byte with other fields: bitsliceMask says which bits are this one's.
+export function bitsliceWidth(encoding) {
+  return Math.max(0, ...encoding.slices.map((s) => s.valueShift + s.toBit - s.fromBit + 1));
+}
+export function bitsliceMask(encoding) {
+  const maxByte = Math.max(...encoding.slices.map((s) => s.byte));
+  const out = new Array(maxByte + 1).fill(0);
+  for (const s of encoding.slices) out[s.byte] |= ((1 << (s.toBit - s.fromBit + 1)) - 1) << s.fromBit;
+  return out;
+}
 export function bitsliceEncode(encoding, value) {
+  let raw = value;
+  if (Array.isArray(encoding.map)) {
+    const pair = encoding.map.find(([, v]) => v === value);
+    raw = pair ? pair[0] : 0;
+  } else if (encoding.shiftRight) raw = value << encoding.shiftRight;
+  const width = bitsliceWidth(encoding);
+  if (encoding.signed && raw < 0) raw += 2 ** width;
   const maxByte = Math.max(...encoding.slices.map((s) => s.byte));
   const out = new Array(maxByte + 1).fill(0);
   for (const s of encoding.slices) {
-    const width = s.toBit - s.fromBit + 1;
-    const mask = (1 << width) - 1;
-    out[s.byte] |= ((value >> s.valueShift) & mask) << s.fromBit;
+    const mask = (1 << (s.toBit - s.fromBit + 1)) - 1;
+    out[s.byte] |= ((raw >> s.valueShift) & mask) << s.fromBit;
   }
   return out;
 }
 export function bitsliceDecode(encoding, bytes) {
   let v = 0;
   for (const s of encoding.slices) {
-    const width = s.toBit - s.fromBit + 1;
-    const mask = (1 << width) - 1;
+    const mask = (1 << (s.toBit - s.fromBit + 1)) - 1;
     v |= ((bytes[s.byte] >> s.fromBit) & mask) << s.valueShift;
   }
+  const width = bitsliceWidth(encoding);
+  if (encoding.signed && width < 31 && v >= 2 ** (width - 1)) v -= 2 ** width;
+  if (Array.isArray(encoding.map)) {
+    const pair = encoding.map.find(([raw]) => raw === v);
+    return pair ? pair[1] : v;
+  }
+  if (encoding.shiftRight) v >>= encoding.shiftRight;
+  if (encoding.max !== undefined) v = Math.min(v, encoding.max);
   return v;
 }
 

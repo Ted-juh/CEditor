@@ -4510,7 +4510,7 @@
     {"line":4418,"ofs":2565,"group":"Common","name":"Scale Random","data":"00~07","value":"0~7","id":[0,0,0,12,0]},
     {"line":4420,"ofs":2566,"bit":"7","group":"Assignable Controller","name":"Switch1 Status","data":"00~01","value":"Off~On","id":[26,0,0,6,0]},
     {"line":4421,"ofs":2567,"bit":"7","group":"Assignable Controller","name":"Switch2 Status","data":"00~01","value":"Off~On","id":[26,0,0,6,1]},
-    {"line":4427,"ofs":2572,"group":"Common","name":"Swing","data":"FED4~012C","value":"-300~+300","id":[0,0,0,22,0]},
+    {"line":4427,"ofs":2572,"group":"Common","name":"Swing","data":"FED4~012C","value":"-300~+300","id":[0,0,0,22,0],"more":[{"ofs":2573,"bit":"1~0"}]},
     {"line":4429,"ofs":2573,"bit":"6","group":"Common","name":"Quantize Trigger","data":"00~01","value":"Off~On","id":[0,0,0,27,0]},
     {"line":4430,"ofs":2573,"bit":"7","group":"Common","name":"Key Sync","data":"00~01","value":"Off~On","id":[0,0,0,21,0]},
     {"line":4432,"ofs":2574,"bit":"6~0","group":"Track EQ","name":"Trim","data":"00~63","value":"0~99","id":[9,0,0,1,0]},

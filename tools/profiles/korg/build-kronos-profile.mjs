@@ -282,6 +282,17 @@ export function buildKronosProfile(data, layout) {
         shift += b.bits;
       }
       if ((read.signed ? read.max - read.min : read.max) >= 2 ** shift) { leave(notReadBack, 'its printed bits are narrower than its range', label); continue; }
+    } else if (row.more?.length) {
+      // Its low bits here and the rest in the bytes after, as the table prints them: Swing is byte
+      // 2578 and bits 1~0 of 2579 (ten bits, signed), whose bits 6 and 7 are two switches of their own.
+      parts = [{ at: 0, from: bits.from, bits: bits.bits, shift: 0 }];
+      let shift = bits.bits;
+      for (const c of row.more) {
+        const b = readBits(c.bit);
+        parts.push({ at: c.ofs - row.ofs, from: b.from, bits: b.bits, shift });
+        shift += b.bits;
+      }
+      if ((read.signed ? read.max - read.min : read.max) >= 2 ** shift) { leave(notReadBack, 'its printed bits are narrower than its range', label); continue; }
     } else {
       if (misfit) { leave(notReadBack, 'its bits are printed narrower than its range (`bit 0` for `00~02`), so where its value ends in the byte is not said', `${label} (bit ${row.bit}, ${row.data})`); continue; }
       parts = read.bytes > 1

@@ -2638,7 +2638,7 @@
     {"line":2091,"ofs":2575,"group":"Assignable Controller","name":"Knob6 Assign","data":"00~8E","value":"Off~CC#119","id":[26,0,0,2,1]},
     {"line":2092,"ofs":2576,"group":"Assignable Controller","name":"Knob7 Assign","data":"00~8E","value":"Off~CC#119","id":[26,0,0,2,2]},
     {"line":2093,"ofs":2577,"group":"Assignable Controller","name":"Knob8 Assign","data":"00~8E","value":"Off~CC#119","id":[26,0,0,2,3]},
-    {"line":2095,"ofs":2578,"group":"Common","name":"Swing","data":"FED4~012C","value":"-300~+300","id":[0,0,0,22,0]},
+    {"line":2095,"ofs":2578,"group":"Common","name":"Swing","data":"FED4~012C","value":"-300~+300","id":[0,0,0,22,0],"more":[{"ofs":2579,"bit":"1~0"}]},
     {"line":2097,"ofs":2579,"bit":"6","group":"Common","name":"Quantize Trigger","data":"00~01","value":"Off~On","id":[0,0,0,27,0]},
     {"line":2098,"ofs":2579,"bit":"7","group":"Common","name":"Key Sync","data":"00~01","value":"Off~On","id":[0,0,0,21,0]},
     {"line":2100,"ofs":2580,"bit":"6~0","group":"Track EQ","name":"Trim","data":"00~63","value":"0~99","id":[9,0,0,1,0]},

@@ -15,6 +15,9 @@ import { readFileSync } from 'node:fs';
 import { legacyToDpd, compareEmission, emitModel, dpdIdOf } from '../../dpd/from-legacy-core.mjs';
 import { checkProfile, generatedProfiles, handMadeIds } from '../../dpd/tools/from-legacy.mjs';
 import { localCompileParameter } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import { resolveModel } from '../../dpd/resolve.mjs';
+import { assembleDump, parseDump, dumpRoundTrip } from '../../dpd/dumps.mjs';
+import { bitsliceEncode, bitsliceDecode } from '../../dpd/codecs.mjs';
 
 const legacyOf = (id) => JSON.parse(readFileSync(new URL(`../../profiles/test/${id}.ceditor-device.json`, import.meta.url), 'utf8'));
 const handMade = handMadeIds();
@@ -127,4 +130,37 @@ test('the device\'s conversation is the model\'s own: requests, startup, identit
   setup.address = '01 00 00 01';
   const problems = compareEmission(legacy, model, localCompileParameter);
   assert.ok(problems.includes('profile field requests differs'), problems.join('\n'));
+});
+
+test('the engine\'s bit fields are the DPD\'s bit slices, and a KRONOS dump round-trips in the Designer\'s own code', () => {
+  const legacy = legacyOf('korg-kronos');
+  const { model } = legacyToDpd(legacy, { handMade });
+  const [dump] = model.dumps;
+  // Swing: all of its byte and bits 1~0 of the next, ten bits signed. Bits 6 and 7 of that next byte
+  // are Quantize Trigger and Key Sync, which a sixteen-bit Swing took as its sign.
+  const swing = dump.layout.find((e) => e.param === 'common.swing');
+  assert.deepEqual(swing.codec, { type: 'bitslice', signed: true, slices: [{ byte: 0, fromBit: 0, toBit: 7, valueShift: 0 }, { byte: 1, fromBit: 0, toBit: 1, valueShift: 8 }] });
+  assert.equal(dump.layout.filter((e) => e.engine?.codec).length, 0, 'no bit field left to the engine');
+  const resolved = resolveModel(model, {});
+  const rt = dumpRoundTrip(dump, resolved);
+  assert.ok(rt.ok, JSON.stringify(rt.failures.slice(0, 3)));
+  // A switch in bit 7 and Swing at its most negative, together, read back as themselves.
+  const values = { 'common.swing': -300, 'common.keySync': 'on', 'common.quantizeTrigger': 'on' };
+  const back = parseDump(dump, assembleDump(dump, values, resolved), resolved).valuesById;
+  assert.deepEqual([back['common.swing'], back['common.keySync'], back['common.quantizeTrigger']], [-300, 'on', 'on']);
+  // And a slice moved is caught by the gate.
+  swing.codec.slices[1].toBit = 7;
+  assert.ok(compareEmission(legacy, model, localCompileParameter).includes('profile field dumpDefinitions differs'));
+});
+
+test('a bit slice reads as the engine reads its bit fields: signed, by table, shifted and capped', () => {
+  const one = [{ byte: 0, fromBit: 0, toBit: 7, valueShift: 0 }];
+  assert.deepEqual(bitsliceEncode({ slices: one, signed: true }, -99), [0x9d]);
+  assert.equal(bitsliceDecode({ slices: one, signed: true }, [0x9d]), -99);
+  const inverted = { slices: [{ byte: 0, fromBit: 6, toBit: 6, valueShift: 0 }], map: [[0, 1], [1, 0]] };
+  assert.deepEqual(bitsliceEncode(inverted, 1), [0]);
+  assert.equal(bitsliceDecode(inverted, [0x40]), 0);
+  const top = { slices: [{ byte: 0, fromBit: 0, toBit: 7, valueShift: 0 }, { byte: 1, fromBit: 0, toBit: 7, valueShift: 8 }], shiftRight: 7, max: 127 };
+  assert.equal(bitsliceDecode(top, [0x80, 0x3f]), 127);
+  assert.equal(bitsliceDecode(top, bitsliceEncode(top, 100)), 100);
 });
