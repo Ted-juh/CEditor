@@ -26,7 +26,9 @@
     "Left out, a range printed as the value shown, not the value sent: osc 1 fine (cc 26:58): -100 to 100* (to 1 dec place, no 0 for ints), osc 1 Mod Env depth (cc 71): -63 to +63*, osc 1 LFO 1 depth (cc 28:60): -127 to 127*, osc 1 Mod Env PW mod amount (cc 72): -63 to 63*, osc 1 LFO 2 PW mod amount (cc 73): -90 to 90 (MIDI val of 63 & 64 = 0%), osc 2 fine (cc 29:61): -100 to 100* (to 1 dec place, no 0 for ints), osc 2 Mod Env depth (cc 76): -63 to +63*, osc 2 LFO 1 depth (cc 31:63): -127 to 127*, osc 2 env 2 PW mod amount (cc 77): -63 to +63*, osc 2 LFO 2 PW mod amount (cc 78): -90 to 90 (MIDI val of 63 & 64 = 0%), Mod Env depth (cc 85): -63 to +63*, LFO 2 depth (cc 17:49): -127 to 127*, Mod Wh LFO 1 Osc Pitch (NRPN 0:70): -63 to +63, Mod Wh Osc 2 Pitch (NRPN 0:78): -63 to +63, Aftertouch Filter Freq (NRPN 0:74): -63 to +63, Aftertouch LFO 1 to Osc Pitch (NRPN 0:75): -63 to +63.",
     "Left out, printed without a range: osc 1 coarse (cc 27:59), osc 1 manual PW amount (cc 74), osc 2 coarse (cc 30:62), osc 2 manual PW amount (cc 79), sub osc oct (cc 81), osc tuning error (NRPN 0:111), paraphonic mode (NRPN 0:107), osc glide divergence (NRPN 0:113), sub-osc coarse (NRPN 0:84), sub-osc fine (NRPN 0:77), slope (cc 106), filter tracking (NRPN 0:108), portamento time (cc 5), LFO 1 delay (cc 86), LFO 2 delay (cc 87), LFO 1 wave (cc 88), LFO 2 wave (cc 89), amp env triggering (NRPN 0:73), amp env retrigger (NRPN 0:109), amp env fixed sustatin duration (NRPN 0:114), amp env retrigger count (NRPN 0:117), Mod Env triggering (NRPN 0:105), Mod Env retrigger (NRPN 0:110), Mod Env fixed sustain duration (NRPN 0:115), Mod Env retrigger count (NRPN 0:118), Osc Filter Mod (cc 115), on (cc 108), latch (cc 109), rhythm (cc 119), note mode (cc 118), octaves (cc 111), Mod Wh LFO 2 Filter Freq (NRPN 0:71), Aftertouch LFO 2 Speed (NRPN 0:76), Speed/Sync LFO 1 (NRPN 0:87), Speed/Sync LFO 2 (NRPN 0:91), Slew LFO 1 (NRPN 0:86), Slew LFO 2 (NRPN 0:90), Velocity Amp Env (cc 112), Velocity Mod Env (cc 113), Arp Swing (cc 116).",
     "Left out, its values named but not numbered: osc 1 waveform (NRPN 0:72): sine, tri, saw, pulse, osc 2 waveform (NRPN 0:82): sine, tri, saw, pulse, sub osc wave (cc 80): sine, pulse, square, Type (cc 83): Classic, acid, shape (cc 84): LP, BP, HP, Key Sync LFO 1 (NRPN 0:89): OFF or On, Key Sync LFO 2 (NRPN 0:93): OFF or On, Osc 1-2 Sync (cc 110): OFF or On.",
-    "Left out, an NRPN printed without its MSB: LFO 1 Sync value (NRPN 87), LFO 2 Sync value (NRPN 91), Seq Retrig (NRPN 106)."
+    "Left out, an NRPN printed without its MSB: LFO 1 Sync value (NRPN 87), LFO 2 Sync value (NRPN 91), Seq Retrig (NRPN 106).",
+    "Left out, the guide's `mod  cc 0`, which would be sent as MIDI's bank select (the mod wheel is CC 1; a misprint): mod (cc 0).",
+    "Left out, the sustain pedal: sustain (cc 64)."
   ],
   "variables": {
     "channel": 1
@@ -44,13 +46,6 @@
     "minDelayBetweenMessagesMs": 0
   },
   "messageRecipes": [
-    {
-      "id": "cc0",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 0,
-      "value": "$encodedValue"
-    },
     {
       "id": "cc7",
       "kind": "cc",
@@ -119,13 +114,6 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 25,
-      "value": "$encodedValue"
-    },
-    {
-      "id": "cc64",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 64,
       "value": "$encodedValue"
     },
     {
@@ -258,8 +246,6 @@
     {"id":"envelope.modEnvSustain","name":"Mod Env sustain","group":"Envelope","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc104","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"modEnvSustain"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
     {"id":"envelope.modEnvRelease","name":"Mod Env release","group":"Envelope","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc105","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"modEnvRelease"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
     {"id":"effects.distortion","name":"Distortion","group":"Effects","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc94","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"distortion"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"other.mod","name":"mod","group":"Other","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc0","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"mod"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"other.sustain","name":"sustain","group":"Other","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc64","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"sustain"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
     {"id":"oscillator.bendAmount","name":"Bend Amount","group":"Oscillator","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc107","type":"integer","range":{"min":1,"max":12},"default":1,"display":{"mode":"number","unit":"","shortLabel":"bendAmount"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
     {"id":"vca.limit","name":"Limit","group":"VCA","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc95","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"limit"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}}
   ],

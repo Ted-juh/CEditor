@@ -113,11 +113,11 @@ bits, `see packed parameter 2`) are left out: sending one means knowing the othe
 |---|---|---:|---:|---|
 | `novation-peak` | Peak User Guide 1.2, pp. 40-43, and the Summit and Peak 2.1 addendum, p. 18 | 246 | 0 | — |
 | `novation-summit` | Summit User Guide 1.1, pp. 47-49, and the 2.1 addendum | 184 | 0 | — |
-| `novation-bass-station-ii` | Bass Station II User Guide v5, pp. 71-74 | 27 | 2 | — |
+| `novation-bass-station-ii` | Bass Station II User Guide v5, pp. 71-74 | 25 | 2 | — |
 | `novation-circuit-mono-station` | Circuit Mono Station MIDI Parameters v1 | 73 | 11 | — |
 | `novation-circuit-tracks` | Circuit Tracks Programmer's Reference Guide v3, pp. 3-22 | 618 | 67 | 548 read back |
 | `novation-circuit-rhythm` | Circuit Rhythm Programmer's Reference Guide v5.2, pp. 3-5 | 231 | 0 | — |
-| `novation-mininova` | MiniNova Extended CC & NRPN Map, Version 0002 | 374 | 104 | — |
+| `novation-mininova` | MiniNova Extended CC & NRPN Map, Version 0002 | 365 | 103 | — |
 | `novation-k-station` | K-Station User Manual, pp. 44-47 | 130 | 7 | — |
 | `novation-ks-series` | KS Series User Manual (KS4, KS5, KS Rack), pp. 62-65 | 162 | 4 | — |
 

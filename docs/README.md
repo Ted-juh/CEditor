@@ -51,6 +51,9 @@ system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the res
   come with CEditor, most of them read out of the manufacturer's own MIDI documentation: where they
   come from, how they are checked, what they do not cover, and a catalogue of every one, generated
   from the profiles. The tools that build them are in [tools/profiles](../tools/profiles/README.md).
+- [Checking the profiles against MIDI Guide](device-profile-crosscheck.md) — the profiles' controller
+  and NRPN numbers compared with an independent transcription, and what each disagreement turned
+  out to be in the maker's own document.
 - [CLAP export](clap-export.md) — the format map: CLAP, LV2, AU and VST3, and which are gated.
 - [Validating exported plug-ins](plugin-validation.md) — pluginval and clap-validator over an
   export: how to run them, where to get them, and the five defects the first run found.

@@ -22,12 +22,15 @@
     "Every parameter is a row of the guide's MIDI parameter table, with its printed name. Nothing here has been sent to a real instrument yet.",
     "No identity check: the guide prints no Device Inquiry reply.",
     "Messages that carry several switches, each with values of its own, a choice each: NRPN 0:122, NRPN 1:123. CEditor does not attribute one of these to a parameter when the instrument sends it.",
+    "Left out, the performance controllers: MIDI Modulation (CC 1), MIDI Breath Controlller (CC 2), MIDI Expression Controller (CC 11), MIDI Sustain Pedal (CC 64).",
+    "Left out, MIDI's own controllers, which carry the NRPNs this profile sends: MIDI Data Entry MSB (CC 6), MIDI Data Entry LSB (CC 38), MIDI NPRN LSB (CC 98), MIDI NPRN MSB (CC 99).",
     "Left out, a range that wraps past 127 (two's complement, 124 - 4): Voice KeyboardOctave (CC 13).",
+    "Left out, bank select: MIDI Bank LSB (CC 32).",
     "Left out, a message another row already has: LFO2 OneShot (NRPN 0:122), LFO2 KeySync (NRPN 0:122), LFO2 CommonSync (NRPN 0:122), LFO2 DelayTrigger (NRPN 0:122), LFO2 FadeMode (NRPN 1:123), LFO3 OneShot (NRPN 0:122), LFO3 KeySync (NRPN 0:122), LFO3 CommonSync (NRPN 0:122), LFO3 DelayTrigger (NRPN 0:122), LFO3 FadeMode (NRPN 1:123), VocalTune Insert (NRPN 1:123).",
     "Left out, printed without a control number: Gator Levels (NRPN 5:0-31), Vocoder SpectrumLevels (NRPN 6:0-31), Chorder Chorder Keys (NRPN 7:17-25).",
     "Left out, printed without a range: Vocoder SpectrumResample (NRPN 6:32), MIDI All Sounds Off (CC 120), MIDI All Notes Off (CC 123).",
     "Left out, a range of 40 - 240, wider than its message carries: MIDI Tempo Rate (NRPN 2:63).",
-    "104 choice(s), their names from the value tables the rows point to (Table 1: Waveform Table, Table 2: List of Modulation Destinations, Table 3: Sync Values, Table 4: Tweak Assignments) where a table numbers every value of the range, or from the rows' own notes."
+    "103 choice(s), their names from the value tables the rows point to (Table 1: Waveform Table, Table 2: List of Modulation Destinations, Table 3: Sync Values, Table 4: Tweak Assignments) where a table numbers every value of the range, or from the rows' own notes."
   ],
   "variables": {
     "channel": 1
@@ -46,20 +49,6 @@
   },
   "messageRecipes": [
     {
-      "id": "cc1",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 1,
-      "value": "$encodedValue"
-    },
-    {
-      "id": "cc2",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 2,
-      "value": "$encodedValue"
-    },
-    {
       "id": "cc3",
       "kind": "cc",
       "channel": "$channel",
@@ -71,13 +60,6 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 5,
-      "value": "$encodedValue"
-    },
-    {
-      "id": "cc6",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 6,
       "value": "$encodedValue"
     },
     {
@@ -99,13 +81,6 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 10,
-      "value": "$encodedValue"
-    },
-    {
-      "id": "cc11",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 11,
       "value": "$encodedValue"
     },
     {
@@ -242,13 +217,6 @@
       "value": "$encodedValue"
     },
     {
-      "id": "cc32",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 32,
-      "value": "$encodedValue"
-    },
-    {
       "id": "cc33",
       "kind": "cc",
       "channel": "$channel",
@@ -281,13 +249,6 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 37,
-      "value": "$encodedValue"
-    },
-    {
-      "id": "cc38",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 38,
       "value": "$encodedValue"
     },
     {
@@ -456,13 +417,6 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 63,
-      "value": "$encodedValue"
-    },
-    {
-      "id": "cc64",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 64,
       "value": "$encodedValue"
     },
     {
@@ -680,20 +634,6 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 97,
-      "value": "$encodedValue"
-    },
-    {
-      "id": "cc98",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 98,
-      "value": "$encodedValue"
-    },
-    {
-      "id": "cc99",
-      "kind": "cc",
-      "channel": "$channel",
-      "controller": 99,
       "value": "$encodedValue"
     },
     {
@@ -3254,15 +3194,11 @@
   "parameters": [
     {"id":"patch.category","name":"Patch Category","group":"Patch","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"nrpn0240","type":"choice","default":"none","choices":[{"id":"none","label":"None","value":0},{"id":"arp","label":"Arp","value":1},{"id":"bass","label":"Bass","value":2},{"id":"bell","label":"Bell","value":3},{"id":"classic","label":"Classic","value":4},{"id":"drum","label":"Drum","value":5},{"id":"keyboard","label":"Keyboard","value":6},{"id":"lead","label":"Lead","value":7},{"id":"movement","label":"Movement","value":8},{"id":"pad","label":"Pad","value":9},{"id":"poly","label":"Poly","value":10},{"id":"sfx","label":"SFX","value":11},{"id":"string","label":"String","value":12},{"id":"extinput","label":"ExtInput","value":13},{"id":"voctune","label":"Voc/Tune","value":14}],"display":{"mode":"choice","shortLabel":"category"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"Combobox"}},
     {"id":"patch.genre","name":"Patch Genre","group":"Patch","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"nrpn0241","type":"choice","default":"none","choices":[{"id":"none","label":"None","value":0},{"id":"classic","label":"Classic","value":1},{"id":"dbbrks","label":"D&B/Brks","value":2},{"id":"house","label":"House","value":3},{"id":"industrl","label":"Industrl","value":4},{"id":"jazz","label":"Jazz","value":5},{"id":"rbhhop","label":"R&B/HHop","value":6},{"id":"rockpop","label":"Rock/Pop","value":7},{"id":"techno","label":"Techno","value":8},{"id":"dubstep","label":"Dubstep","value":9}],"display":{"mode":"choice","shortLabel":"genre"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"Combobox"}},
-    {"id":"midi.modulation","name":"MIDI Modulation","group":"MIDI","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc1","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"modulation"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"midi.breathControlller","name":"MIDI Breath Controlller","group":"MIDI","description":"Only received, routed to expression pedal.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc2","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"breathControlller"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"voice.polyphonymode","name":"Voice PolyphonyMode","group":"Voice","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc3","type":"choice","default":"mono","choices":[{"id":"mono","label":"Mono","value":0},{"id":"monoag","label":"Mono AG","value":1},{"id":"poly1","label":"Poly 1","value":2},{"id":"poly2","label":"Poly 2","value":3},{"id":"mono2","label":"Mono 2","value":4}],"display":{"mode":"choice","shortLabel":"polyphonymode"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"RadioButtonGroup"}},
     {"id":"voice.portamentorate","name":"Voice PortamentoRate","group":"Voice","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc5","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"portamentorate"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"midi.dataEntryMsb","name":"MIDI Data Entry MSB","group":"MIDI","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc6","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"dataEntryMsb"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"mixer.wetlevel","name":"Mixer WetLevel","group":"Mixer","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc8","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"wetlevel"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
     {"id":"voice.preglide","name":"Voice PreGlide","group":"Voice","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc9","type":"bipolar","range":{"min":52,"max":76},"default":64,"display":{"mode":"number","unit":"","shortLabel":"preglide","min":-12,"max":12},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"fx.panposition","name":"FX PanPosition","group":"FX","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc10","type":"bipolar","range":{"min":0,"max":127},"default":64,"display":{"mode":"number","unit":"","shortLabel":"panposition","min":-64,"max":63},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"midi.expressionController","name":"MIDI Expression Controller","group":"MIDI","description":"Expression Pedal.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc11","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"expressionController"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"voice.portamentomode","name":"Voice PortamentoMode","group":"Voice","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc12","type":"choice","default":"expo","choices":[{"id":"expo","label":"Expo","value":0},{"id":"linear","label":"Linear","value":1}],"display":{"mode":"choice","shortLabel":"portamentomode"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"ToggleButton"}},
     {"id":"voice.unison","name":"Voice Unison","group":"Voice","description":"0=Off, 1, 2, 3, 4.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc14","type":"integer","range":{"min":0,"max":4},"default":0,"display":{"mode":"number","unit":"","shortLabel":"unison"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"voice.unisondetune","name":"Voice UnisonDetune","group":"Voice","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc15","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"unisondetune"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
@@ -3282,13 +3218,11 @@
     {"id":"osc2.wave","name":"Osc2 Wave","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc29","type":"choice","default":"sine","choices":[{"id":"sine","label":"Sine","value":0},{"id":"triangle","label":"Triangle","value":1},{"id":"sawtooth","label":"Sawtooth","value":2},{"id":"saw91pw","label":"Saw9:1PW","value":3},{"id":"saw82pw","label":"Saw8:2PW","value":4},{"id":"saw73pw","label":"Saw7:3PW","value":5},{"id":"saw64pw","label":"Saw6:4PW","value":6},{"id":"saw55pw","label":"Saw5:5PW","value":7},{"id":"saw46pw","label":"Saw4:6PW","value":8},{"id":"saw37pw","label":"Saw3:7PW","value":9},{"id":"saw28pw","label":"Saw2:8PW","value":10},{"id":"saw19pw","label":"Saw1:9PW","value":11},{"id":"pw","label":"PW","value":12},{"id":"square","label":"Square","value":13},{"id":"basscamp","label":"BassCamp","value":14},{"id":"bassfm","label":"Bass_FM","value":15},{"id":"epdull","label":"EP_Dull","value":16},{"id":"epbell","label":"EP_Bell","value":17},{"id":"clav","label":"Clav","value":18},{"id":"doubreed","label":"DoubReed","value":19},{"id":"retro","label":"Retro","value":20},{"id":"strnmch1","label":"StrnMch1","value":21},{"id":"strnmch2","label":"StrnMch2","value":22},{"id":"organ1","label":"Organ_1","value":23},{"id":"organ2","label":"Organ_2","value":24},{"id":"evilorg","label":"EvilOrg","value":25},{"id":"histuff","label":"HiStuff","value":26},{"id":"bellfm1","label":"Bell_FM1","value":27},{"id":"bellfm2","label":"Bell_FM2","value":28},{"id":"digbell1","label":"DigBell1","value":29},{"id":"digbell2","label":"DigBell2","value":30},{"id":"digbell3","label":"DigBell3","value":31},{"id":"digbell4","label":"DigBell4","value":32},{"id":"digipad","label":"DigiPad","value":33},{"id":"wtable1","label":"Wtable 1","value":34},{"id":"wtable2","label":"Wtable 2","value":35},{"id":"wtable3","label":"Wtable 3","value":36},{"id":"wtable4","label":"Wtable 4","value":37},{"id":"wtable5","label":"Wtable 5","value":38},{"id":"wtable6","label":"Wtable 6","value":39},{"id":"wtable7","label":"Wtable 7","value":40},{"id":"wtable8","label":"Wtable 8","value":41},{"id":"wtable9","label":"Wtable 9","value":42},{"id":"wtable10","label":"Wtable10","value":43},{"id":"wtable11","label":"Wtable11","value":44},{"id":"wtable12","label":"Wtable12","value":45},{"id":"wtable13","label":"Wtable13","value":46},{"id":"wtable14","label":"Wtable14","value":47},{"id":"wtable15","label":"Wtable15","value":48},{"id":"wtable16","label":"Wtable16","value":49},{"id":"wtable17","label":"Wtable17","value":50},{"id":"wtable18","label":"Wtable18","value":51},{"id":"wtable19","label":"Wtable19","value":52},{"id":"wtable20","label":"Wtable20","value":53},{"id":"wtable21","label":"Wtable21","value":54},{"id":"wtable22","label":"Wtable22","value":55},{"id":"wtable23","label":"Wtable23","value":56},{"id":"wtable24","label":"Wtable24","value":57},{"id":"wtable25","label":"Wtable25","value":58},{"id":"wtable26","label":"Wtable26","value":59},{"id":"wtable27","label":"Wtable27","value":60},{"id":"wtable28","label":"Wtable28","value":61},{"id":"wtable29","label":"Wtable29","value":62},{"id":"wtable30","label":"Wtable30","value":63},{"id":"wtable31","label":"Wtable31","value":64},{"id":"wtable32","label":"Wtable32","value":65},{"id":"wtable33","label":"Wtable33","value":66},{"id":"wtable34","label":"Wtable34","value":67},{"id":"wtable35","label":"Wtable35","value":68},{"id":"wtable36","label":"Wtable36","value":69},{"id":"audinlm","label":"AudInL/M","value":70},{"id":"audioinr","label":"AudioInR","value":71}],"display":{"mode":"choice","shortLabel":"wave"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"Combobox"}},
     {"id":"osc2.waveinterpolate","name":"Osc2 WaveInterpolate","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc30","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"waveinterpolate"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"osc2.pulsewidthindex","name":"Osc2 PulseWidthIndex","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc31","type":"bipolar","range":{"min":0,"max":127},"default":64,"display":{"mode":"number","unit":"","shortLabel":"pulsewidthindex","min":-64,"max":63},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"midi.bankLsb","name":"MIDI Bank LSB","group":"MIDI","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc32","type":"choice","default":"a","choices":[{"id":"a","label":"A","value":1},{"id":"b","label":"B","value":2},{"id":"c","label":"C","value":3}],"display":{"mode":"choice","shortLabel":"bankLsb"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"RadioButtonGroup"}},
     {"id":"osc2.virtualsyncdepth","name":"Osc2 VirtualSyncDepth","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc33","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"virtualsyncdepth"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
     {"id":"osc2.hardness","name":"Osc2 Hardness","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc34","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"hardness"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"osc2.density","name":"Osc2 Density","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc35","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"density"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"osc2.densitydetune","name":"Osc2 DensityDetune","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc36","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"densitydetune"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"osc2.semitones","name":"Osc2 Semitones","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc37","type":"bipolar","range":{"min":0,"max":127},"default":64,"display":{"mode":"number","unit":"","shortLabel":"semitones","min":-64,"max":63},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"midi.dataEntryLsb","name":"MIDI Data Entry LSB","group":"MIDI","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc38","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"dataEntryLsb"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"osc2.cents","name":"Osc2 Cents","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc39","type":"bipolar","range":{"min":0,"max":127},"default":64,"display":{"mode":"number","unit":"","shortLabel":"cents","min":-64,"max":63},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"osc2.pitchbend","name":"Osc2 PitchBend","group":"Osc2","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc40","type":"bipolar","range":{"min":52,"max":76},"default":64,"display":{"mode":"number","unit":"","shortLabel":"pitchbend","min":-12,"max":12},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"osc3.wave","name":"Osc3 Wave","group":"Osc3","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc41","type":"choice","default":"sine","choices":[{"id":"sine","label":"Sine","value":0},{"id":"triangle","label":"Triangle","value":1},{"id":"sawtooth","label":"Sawtooth","value":2},{"id":"saw91pw","label":"Saw9:1PW","value":3},{"id":"saw82pw","label":"Saw8:2PW","value":4},{"id":"saw73pw","label":"Saw7:3PW","value":5},{"id":"saw64pw","label":"Saw6:4PW","value":6},{"id":"saw55pw","label":"Saw5:5PW","value":7},{"id":"saw46pw","label":"Saw4:6PW","value":8},{"id":"saw37pw","label":"Saw3:7PW","value":9},{"id":"saw28pw","label":"Saw2:8PW","value":10},{"id":"saw19pw","label":"Saw1:9PW","value":11},{"id":"pw","label":"PW","value":12},{"id":"square","label":"Square","value":13},{"id":"basscamp","label":"BassCamp","value":14},{"id":"bassfm","label":"Bass_FM","value":15},{"id":"epdull","label":"EP_Dull","value":16},{"id":"epbell","label":"EP_Bell","value":17},{"id":"clav","label":"Clav","value":18},{"id":"doubreed","label":"DoubReed","value":19},{"id":"retro","label":"Retro","value":20},{"id":"strnmch1","label":"StrnMch1","value":21},{"id":"strnmch2","label":"StrnMch2","value":22},{"id":"organ1","label":"Organ_1","value":23},{"id":"organ2","label":"Organ_2","value":24},{"id":"evilorg","label":"EvilOrg","value":25},{"id":"histuff","label":"HiStuff","value":26},{"id":"bellfm1","label":"Bell_FM1","value":27},{"id":"bellfm2","label":"Bell_FM2","value":28},{"id":"digbell1","label":"DigBell1","value":29},{"id":"digbell2","label":"DigBell2","value":30},{"id":"digbell3","label":"DigBell3","value":31},{"id":"digbell4","label":"DigBell4","value":32},{"id":"digipad","label":"DigiPad","value":33},{"id":"wtable1","label":"Wtable 1","value":34},{"id":"wtable2","label":"Wtable 2","value":35},{"id":"wtable3","label":"Wtable 3","value":36},{"id":"wtable4","label":"Wtable 4","value":37},{"id":"wtable5","label":"Wtable 5","value":38},{"id":"wtable6","label":"Wtable 6","value":39},{"id":"wtable7","label":"Wtable 7","value":40},{"id":"wtable8","label":"Wtable 8","value":41},{"id":"wtable9","label":"Wtable 9","value":42},{"id":"wtable10","label":"Wtable10","value":43},{"id":"wtable11","label":"Wtable11","value":44},{"id":"wtable12","label":"Wtable12","value":45},{"id":"wtable13","label":"Wtable13","value":46},{"id":"wtable14","label":"Wtable14","value":47},{"id":"wtable15","label":"Wtable15","value":48},{"id":"wtable16","label":"Wtable16","value":49},{"id":"wtable17","label":"Wtable17","value":50},{"id":"wtable18","label":"Wtable18","value":51},{"id":"wtable19","label":"Wtable19","value":52},{"id":"wtable20","label":"Wtable20","value":53},{"id":"wtable21","label":"Wtable21","value":54},{"id":"wtable22","label":"Wtable22","value":55},{"id":"wtable23","label":"Wtable23","value":56},{"id":"wtable24","label":"Wtable24","value":57},{"id":"wtable25","label":"Wtable25","value":58},{"id":"wtable26","label":"Wtable26","value":59},{"id":"wtable27","label":"Wtable27","value":60},{"id":"wtable28","label":"Wtable28","value":61},{"id":"wtable29","label":"Wtable29","value":62},{"id":"wtable30","label":"Wtable30","value":63},{"id":"wtable31","label":"Wtable31","value":64},{"id":"wtable32","label":"Wtable32","value":65},{"id":"wtable33","label":"Wtable33","value":66},{"id":"wtable34","label":"Wtable34","value":67},{"id":"wtable35","label":"Wtable35","value":68},{"id":"wtable36","label":"Wtable36","value":69},{"id":"audinlm","label":"AudInL/M","value":70},{"id":"audioinr","label":"AudioInR","value":71}],"display":{"mode":"choice","shortLabel":"wave"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"Combobox"}},
@@ -3313,7 +3247,6 @@
     {"id":"filter.routing","name":"Filter Routing","group":"Filter","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc60","type":"choice","default":"bypass","choices":[{"id":"bypass","label":"Bypass","value":0},{"id":"single","label":"Single","value":1},{"id":"series","label":"Series","value":2},{"id":"parallel","label":"Parallel","value":3},{"id":"parall2","label":"Parall 2","value":4},{"id":"drum","label":"Drum","value":5}],"display":{"mode":"choice","shortLabel":"routing"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"Combobox"}},
     {"id":"filter.balance","name":"Filter Balance","group":"Filter","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc61","type":"bipolar","range":{"min":0,"max":127},"default":64,"display":{"mode":"number","unit":"","shortLabel":"balance","min":-64,"max":63},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"filter1.drive","name":"Filter1 Drive","group":"Filter1","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc63","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"drive"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"midi.sustainPedal","name":"MIDI Sustain Pedal","group":"MIDI","description":"0-63=Off, 64-127=On.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc64","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"sustainPedal"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
     {"id":"filter.freqlink","name":"Filter FreqLink","group":"Filter","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"nrpn007A","type":"choice","default":"freqlinkoff","choices":[{"id":"freqlinkoff","label":"FreqLink Off","value":42},{"id":"freqlinkon","label":"FreqLink On","value":43}],"display":{"mode":"choice","shortLabel":"freqlink"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"ToggleButton"}},
     {"id":"filter.reslink","name":"Filter ResLink","group":"Filter","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"nrpn007A","type":"choice","default":"off","choices":[{"id":"off","label":"Off","value":44},{"id":"on","label":"On","value":45}],"display":{"mode":"choice","shortLabel":"reslink"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"ToggleButton"}},
     {"id":"filter1.drivetype","name":"Filter1 DriveType","group":"Filter1","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc65","type":"choice","default":"diode","choices":[{"id":"diode","label":"Diode","value":0},{"id":"valve","label":"Valve","value":1},{"id":"clipper","label":"Clipper","value":2},{"id":"xover","label":"XOver","value":3},{"id":"rectify","label":"Rectify","value":4},{"id":"bitsdown","label":"BitsDown","value":5},{"id":"ratedown","label":"RateDown","value":6}],"display":{"mode":"choice","shortLabel":"drivetype"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"Combobox"}},
@@ -3362,8 +3295,6 @@
     {"id":"fx5.level","name":"FX5 Level","group":"FX5","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc95","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"level"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
     {"id":"midi.dataIncrement","name":"MIDI Data Increment","group":"MIDI","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc96","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"dataIncrement"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"midi.dataDecrement","name":"MIDI Data Decrement","group":"MIDI","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc97","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"dataDecrement"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"midi.nprnLsb","name":"MIDI NPRN LSB","group":"MIDI","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc98","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"nprnLsb"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"midi.nprnMsb","name":"MIDI NPRN MSB","group":"MIDI","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc99","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"nprnMsb"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"envelope.trackcentre","name":"Envelope TrackCentre","group":"Envelope","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc106","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"trackcentre"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"envelope1.velocity","name":"Envelope1 Velocity","group":"Envelope1","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc108","type":"bipolar","range":{"min":0,"max":127},"default":64,"display":{"mode":"number","unit":"","shortLabel":"velocity","min":-64,"max":63},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"envelope1.sustainrate","name":"Envelope1 SustainRate","group":"Envelope1","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc109","type":"bipolar","range":{"min":0,"max":127},"default":64,"display":{"mode":"number","unit":"","shortLabel":"sustainrate","min":-64,"max":63},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
@@ -3628,7 +3559,6 @@
     {"id":"global.audioInputfx","name":"Global Audio InputFX","group":"Global","description":"(*1).","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"nrpn401E","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"audioInputfx"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}}
   ],
   "tests": [
-    {"name":"MIDI Modulation = 100 (CC 1)","parameter":"midi.modulation","value":100,"expectedHex":"B0 01 64"},
     {"name":"Voice PolyphonyMode = Mono 2 (CC 3)","parameter":"voice.polyphonymode","value":"mono2","expectedHex":"B0 03 04"},
     {"name":"Envelope2 Velocity = 100 (NRPN 0:0)","parameter":"envelope2.velocity","value":100,"expectedHex":"B0 63 00\nB0 62 00\nB0 06 64"},
     {"name":"Patch Category = Voc/Tune (NRPN 2:64)","parameter":"patch.category","value":"voctune","expectedHex":"B0 63 02\nB0 62 40\nB0 06 0E"},

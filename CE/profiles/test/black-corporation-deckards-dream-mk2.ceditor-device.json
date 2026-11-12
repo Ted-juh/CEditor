@@ -23,6 +23,7 @@
     "The chart prints six bands for FEET 1, FEET 2 and the sub-oscillator's FUNCTION, and the manual lists their settings from the top of the slider to the bottom (16' to 2'; sine, saw, reverse saw, square, random, sample & hold, the MK1's external input not on the MK2). The profile takes the first band, 0 - 21, as the top setting, which neither says: check it on the instrument. SUSTAIN SWITCH's two bands are taken as I and II, the switch's own order, likewise.",
     "The two-band switches (SQUARE, SAW) are taken as off and on; the chart prints only the bands.",
     "The manual's MOD WHEEL DESTINATION list gives DETUNE as CC 95; the chart gives SLIDER DETUNE as CC 32 and has no CC 95. The profile follows the chart.",
+    "The chart orders the two layers' wave switches differently: layer A's SQUARE on CC 43 and SAW on CC 44, layer B's SAW on CC 70 and SQUARE on CC 71. The profile follows the chart; an independent transcription (MIDI Guide) has layer B in layer A's order, so one of the two layers may be misprinted. Check it on the instrument.",
     "Left out, the wheel, the pedal, bank select and CC 74, the MPE controllers' slide (whose destination the CC74 REPLACE setting chooses): CC 0 BANK SELECT, CC 1 MODULATION WHEEL, CC 64 SUSTAIN PEDAL, CC 74 BRILLIANCE."
   ],
   "variables": {

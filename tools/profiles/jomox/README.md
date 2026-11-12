@@ -58,7 +58,7 @@ what is committed is what was read from them, with each file's name, SHA-256 and
 | `jomox-xbase-888` | 92 | 92 |
 | `jomox-mod-fm` | 90 | 89 |
 | `jomox-airbase-99` | 52 | 52 |
-| `jomox-sunsyn-mk2` | 50 | 50 |
+| `jomox-sunsyn-mk2` | 50 | 49 |
 | `jomox-mbrane-11` | 36 | 27 |
 | `jomox-moonwind-mk2`, `jomox-moonwind` | 32, 30 | 30, 28 |
 | `jomox-modbrane-11` | 25 | 25 |

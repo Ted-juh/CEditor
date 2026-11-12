@@ -50,6 +50,6 @@
     {"page":2,"section":null,"name":"lfo2switch","cc":90,"range":"0..127"},
     {"page":2,"section":null,"name":"rco1wave","cc":102,"range":"0..127"},
     {"page":2,"section":null,"name":"rco2wave","cc":103,"range":"0..127"},
-    {"page":2,"section":null,"name":"AllNoteOff swctrl0 swctrl1 swctrl2 swctrl3 swctrl4 swctrl5 swctrl6 swctrl7","cc":123,"range":"0..64"}
+    {"page":2,"section":null,"name":"AllNoteOff","cc":123,"range":"0..64"}
   ]
 }

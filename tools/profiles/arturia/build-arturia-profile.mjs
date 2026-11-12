@@ -21,17 +21,21 @@ export function buildArturiaProfile(data, layout) {
   const notes = [];
   const left = [];
   const regrouped = [];
+  const corrected = [];
   const ids = new Set();
   const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
   const recipes = new Map();
   const parameters = [];
   const fourteen = [];
   for (const r of data.rows) {
-    const name = r.name;
+    // A row the chart misprints, which the layout corrects from the manual's own text.
+    const fix = layout.corrections?.[r.cc];
+    const name = fix?.name ?? r.name;
     if (performance(r)) { left.push(`CC ${r.cc} ${name}`); continue; }
     // The block a row is printed under, or the layout's group for a chart that has none (the
     // MicroFreak's), or for a row it puts under the wrong one.
-    let group = r.title || layout.groupOf?.(name) || 'Sound';
+    let group = fix?.title ?? (r.title || layout.groupOf?.(name) || 'Sound');
+    if (fix) corrected.push(`CC ${r.cc} (printed ${r.title ? `${r.title}: ` : ''}${r.name}; ${fix.because})`);
     if (layout.regroup?.[r.cc]) { regrouped.push(`CC ${r.cc} ${name} (printed under ${group})`); group = layout.regroup[r.cc]; }
     const recipe = { id: `cc${r.cc}`, kind: 'cc', channel: '$channel', controller: r.cc, value: '$encodedValue' };
     recipes.set(recipe.id, recipe);
@@ -64,6 +68,7 @@ export function buildArturiaProfile(data, layout) {
   const withPedal = data.rows.filter((r) => performance(r) && byCc.has(r.cc)).map((r) => `CC ${r.cc} (${r.name}; ${byCc.get(r.cc).map((p) => `${p.group} ${p.name}`).join(', ')})`);
   if (withPedal.length) notes.push(`Controllers the chart gives to a pedal or wheel and to a knob, laid out as the knob: ${withPedal.join(', ')}.`);
   if (regrouped.length) notes.push(`Rows grouped by the layout, not where the chart prints them: ${regrouped.join(', ')}.`);
+  if (corrected.length) notes.push(`Rows the chart misprints, corrected by the layout from the manual's own text: ${corrected.join('; ')}.`);
   if (fourteen.length) notes.push(`The chart gives ${fourteen.sort((a, b) => Number(a.slice(3)) - Number(b.slice(3))).join(', ')} as 7-bit/14-bit and prints no fine controller for them; they are sent as 7 bits.`);
   if (left.length) notes.push(`Left out, the wheels, ribbon and pedals: ${left.join(', ')}.`);
 

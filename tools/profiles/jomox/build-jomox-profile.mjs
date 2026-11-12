@@ -17,7 +17,8 @@
 import { camel, stringifyProfile } from '../roland/build-profile.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
-const ACTION = /\b(?:Store|Load|Dump)\b/i;
+// (AllNoteOff is MIDI's channel mode message, an action too.)
+const ACTION = /\b(?:Store|Load|Dump)\b|^All ?Notes? ?Off\b/i;
 
 /** A printed range -> its values: { min, max } for a range, { values } for a list. */
 export function rangeOf(text) {

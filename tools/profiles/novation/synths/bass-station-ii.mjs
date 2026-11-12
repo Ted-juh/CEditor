@@ -11,4 +11,7 @@ export default {
   ],
   // The section names the controller the rows below it assign (`Mod Wh`, as printed, and Aftertouch).
   prefixSection: /^(Mod Wh|Aftertouch|Velocity)$/,
+  // The Other section's `mod  cc 0  0 to 127` and `sustain  cc 64`: CC 0 is MIDI's bank select (the
+  // mod wheel is CC 1), so sending it would change banks; the sustain pedal is played, not set.
+  skip: [[/^mod$/, 'the guide\'s `mod  cc 0`, which would be sent as MIDI\'s bank select (the mod wheel is CC 1; a misprint)'], [/^sustain$/, 'the sustain pedal']],
 };
