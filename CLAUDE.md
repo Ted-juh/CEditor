@@ -413,6 +413,7 @@ node tools/profiles/vermona/make-profiles.mjs --check
 node tools/profiles/modor/make-profiles.mjs --check
 node tools/profiles/gotharman/make-profiles.mjs --check
 node tools/profiles/radikal/make-profiles.mjs --check
+node tools/profiles/kodamo/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
 ```
 
