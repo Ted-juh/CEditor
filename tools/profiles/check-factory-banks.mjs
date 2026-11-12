@@ -2,7 +2,7 @@
 // check-factory-banks.mjs — a maker's own factory sounds, read through a profile's dump definitions,
 // as a check that the profile reads a real dump the way the instrument wrote it.
 //
-//   node tools/profiles/check-factory-banks.mjs <profile id or file> <bank file>... [--detail] [--as <adapter>]
+//   node tools/profiles/check-factory-banks.mjs <profile id or file> <bank file>... [--detail] [--as <adapter> | --payload]
 //
 // A profile's Pull was written from a document and never shown a dump the instrument made. A factory
 // bank is a few hundred such dumps, made by the instrument (or the maker's own tools) and checked by
@@ -17,7 +17,8 @@
 // downloaded. It understands raw SysEx (.syx, or any file of F0 … F7 messages) and Standard MIDI Files
 // (SysEx events in any track). Some banks address each sound to its memory, where the profile reads
 // the edit buffer; --as names an adapter (ADAPTERS below) that readdresses them, each saying from
-// which document it knows the two are the same message.
+// which document it knows the two are the same message. --payload reads each file as a dump's data as
+// a maker's library stores it (Korg's prog_bin, unpacked) and frames it as the profile's dump.
 
 import { readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -93,12 +94,37 @@ export function bankMessages(bytes) {
   return sysexMessages(bytes);
 }
 
-// Banks whose sounds are addressed to their memories where the profile reads the edit buffer. Each
-// rewrites a message to the edit buffer's address and says why the rest of the message is the same.
+// Banks whose sounds are addressed to their memories, or sent as a bank, where the profile reads the
+// edit buffer. Each turns a message into the message(s) the profile reads and says from which
+// document it knows the sound data is the same. A message an adapter does not recognise is passed on
+// unchanged; a checksum it would have to recompute it first verifies, and leaves wrong when wrong.
 export const ADAPTERS = {
   // Blofeld SysEx spec 1.04, Sound Dump (SNDD): F0 3E 13 dev 10 bb nn <383 bytes> ck F7, bank 00-07
   // a memory and 7F 00 the edit buffer; the checksum is the sound data's alone, so it does not change.
   'blofeld-sound': (m) => (m.length === 392 && m[1] === 0x3e && m[2] === 0x13 && m[4] === 0x10 && m[5] < 0x08 ? withBytes(m, { 5: 0x7f, 6: 0x00 }) : m),
+  // Microwave II/XT SysEx spec, Sound Dump (SNDD): F0 3E 0E dev 10 bb nn <256 bytes> ck F7, bank 00-01
+  // a memory and 20 00 the edit buffer. Its general section leaves the location out of the checksum,
+  // as Waldorf's own dumps do (docs/device-profile-factory-banks.md), so it does not change.
+  'microwave2-sound': (m) => (m.length === 265 && m[1] === 0x3e && m[2] === 0x0e && m[4] === 0x10 && m[5] < 0x02 ? withBytes(m, { 5: 0x20, 6: 0x00 }) : m),
+  // Microwave SysEx documentation 2.0: a Sound Program Bank Dump (BPBD, 50h) is 64 sound programs of
+  // 180 bytes from byte 5, each "as explained under BPRD" (42h), whose checksum is its data's sum; a
+  // Cartridge Dump (CRTD, 54h) starts with the same 64. Each becomes a Sound Dump.
+  'microwave-bank': (m) => {
+    if (m[1] !== 0x3e || m[2] !== 0x00 || (m[4] !== 0x50 && m[4] !== 0x54) || m.length < 5 + 64 * 180 + 2) return m;
+    if (m[4] === 0x50 && !sumOk(m, 5, 11524, 11525)) return m;
+    return Array.from({ length: 64 }, (_, k) => {
+      const data = m.subarray(5 + 180 * k, 5 + 180 * (k + 1));
+      const sum = data.reduce((a, b) => a + b, 0) & 0x7f;
+      return Uint8Array.from([0xf0, 0x3e, 0x00, m[3], 0x42, ...data, sum, 0xf7]);
+    });
+  },
+  // Pulse manual 2.0, p. 63: the Program Bulk Dump ($01) is the Program Dump ($00) under another
+  // function code, the same bytes after it; its checksum starts after the program number.
+  'pulse-bulk': (m) => (m.length === 77 && m[1] === 0x3e && m[2] === 0x0b && m[4] === 0x01 ? withBytes(m, { 4: 0x00 }) : m),
+  // DeepMind 12 manual, MIDI SysEx section: a Program Dump Response (02) is the Edit Buffer Dump
+  // Response (04) with a bank and a program number after the protocol version. The protocol version
+  // the bank carries is kept, so a profile that names another one does not read it.
+  'deepmind-program': (m) => (m[1] === 0x00 && m[2] === 0x20 && m[3] === 0x32 && m[4] === 0x20 && m[6] === 0x02 ? Uint8Array.from([...m.subarray(0, 6), 0x04, m[7], ...m.subarray(10)]) : m),
 };
 
 function withBytes(m, at) {
@@ -107,7 +133,39 @@ function withBytes(m, at) {
   return copy;
 }
 
-const hexOf = (m) => [...m].map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+function sumOk(m, from, to, at) {
+  let sum = 0;
+  for (let i = from; i <= to; i += 1) sum += m[i];
+  return (sum & 0x7f) === m[at];
+}
+
+
+/** Korg's 8-in-7 packing, the inverse of the engine's unpack: each group of seven bytes after a byte holding their top bits. */
+export function pack8to7(bytes, order = 'msb-low-first') {
+  const out = [];
+  for (let g = 0; g < bytes.length; g += 7) {
+    const group = bytes.slice(g, g + 7);
+    let msb = 0;
+    group.forEach((b, i) => { if (b & 0x80) msb |= 1 << (order === 'msb-low-first' ? i : 6 - i); });
+    out.push(msb, ...group.map((b) => b & 0x7f));
+  }
+  return out;
+}
+
+/**
+ * Program data as a maker's own library file stores it (a Korg `prog_bin`: the dump's data, unpacked)
+ * framed as the profile's first dump: its prefix with the profile's variables, the data packed as the
+ * dump says, F7. Whether the file is that data is what reading it tests.
+ */
+export function payloadMessage(profile, data) {
+  const dump = profile.dumpDefinitions[0];
+  const vars = { channel: 1, deviceId: 16, ...(profile.variables ?? {}) };
+  const prefix = dump.matcher.prefix.map((b) => (String(b).startsWith('$') ? Number(vars[b.slice(1)] ?? 0) : parseInt(b, 16)));
+  const body = dump.payload.pack ? pack8to7([...data], dump.payload.pack.packOrder) : [...data];
+  return Uint8Array.from([...prefix, ...body, 0xf7]);
+}
+
+const hexOf = (m) =>[...m].map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
 /** Whether a decoded value is one the parameter allows; the reason when not. */
 export function valueProblem(parameter, value) {
@@ -124,8 +182,9 @@ export async function checkBank(profile, messages, { adapter } = {}) {
   const { localParseDumpMessage } = await import(join(repo, 'CE/web/src/CE_Application/stores/deviceProfileLocalEngine.js'));
   const params = new Map(profile.parameters.map((p) => [p.id, p]));
   const result = { messages: messages.length, matched: 0, byDump: {}, checksums: {}, failures: {}, problems: {}, names: [] };
-  for (const raw of messages) {
-    const m = adapter ? adapter(raw) : raw;
+  const adapted = adapter ? messages.flatMap((raw) => adapter(raw)) : messages;
+  result.messages = adapted.length;
+  for (const m of adapted) {
     const parsed = localParseDumpMessage(profile, hexOf(m));
     if (!parsed.ok) {
       const key = `${parsed.matchStatus}: ${parsed.error}`;
@@ -152,16 +211,17 @@ function loadProfile(arg) {
 
 async function main(argv) {
   const detail = argv.includes('--detail');
+  const payload = argv.includes('--payload');
   const as = argv.includes('--as') ? argv[argv.indexOf('--as') + 1] : null;
-  const rest = argv.filter((a, k) => a !== '--detail' && a !== '--as' && argv[k - 1] !== '--as');
+  const rest = argv.filter((a, k) => !['--detail', '--payload', '--as'].includes(a) && argv[k - 1] !== '--as');
   const [profileArg, ...files] = rest;
   if (!profileArg || !files.length) {
-    console.error('usage: check-factory-banks.mjs <profile id or file> <bank file>... [--detail] [--as <adapter>]');
+    console.error('usage: check-factory-banks.mjs <profile id or file> <bank file>... [--detail] [--as <adapter> | --payload]');
     process.exit(2);
   }
   if (as && !ADAPTERS[as]) throw new Error(`no adapter ${as}; there are ${Object.keys(ADAPTERS).join(', ')}`);
   const profile = loadProfile(profileArg);
-  const messages = files.flatMap((f) => bankMessages(new Uint8Array(readFileSync(f))));
+  const messages = files.flatMap((f) => (payload ? [payloadMessage(profile, new Uint8Array(readFileSync(f)))] : bankMessages(new Uint8Array(readFileSync(f)))));
   const r = await checkBank(profile, messages, { adapter: as ? ADAPTERS[as] : null });
   console.log(`${profile.id}: ${files.map((f) => basename(f)).join(', ')}`);
   console.log(`  ${r.messages} SysEx messages, ${r.matched} read by a dump definition (${Object.entries(r.byDump).map(([k, v]) => `${k} ${v}`).join(', ') || 'none'}); checksums ${Object.entries(r.checksums).map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);

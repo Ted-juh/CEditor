@@ -36,4 +36,7 @@ export default {
     ['Arpeggiator', /^ARP\s+/],
     ['Global', /^MASTER VOLUME$/],
   ],
+  // Korg's own sample programs for the instrument (NTS-1_digital_kit_mkII_sample_programs.nts1mkii,
+  // from its download page) hold twelve programs of 504 bytes, 'PROG' at 0 and 'PRED' at 500 - 503.
+  sizeEvidence: 'Korg\'s own sample programs for the instrument agree: each is 504 bytes, \'PRED\' at 500 - 503 where the table prints 501 - 504.',
 };

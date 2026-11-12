@@ -54,6 +54,9 @@ system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the res
 - [Checking the profiles against MIDI Guide](device-profile-crosscheck.md) — the profiles' controller
   and NRPN numbers compared with an independent transcription, and what each disagreement turned
   out to be in the maker's own document.
+- [Reading the makers' own sounds through the profiles](device-profile-factory-banks.md) — factory
+  banks run through the profiles' dump definitions: what read, what did not, and the four defects
+  they found.
 - [CLAP export](clap-export.md) — the format map: CLAP, LV2, AU and VST3, and which are gated.
 - [Validating exported plug-ins](plugin-validation.md) — pluginval and clap-validator over an
   export: how to run them, where to get them, and the five defects the first run found.

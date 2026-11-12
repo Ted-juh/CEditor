@@ -204,8 +204,9 @@ export function buildWaldorfProfile(data, layout) {
   const location = data.format.editBuffer;
   const prefix = ['F0', '3E', equipment, '$deviceId', '10', ...location];
   // The checksum: over the data (the Blofeld's `SDATA & 7Fh`) or over the location and data (the
-  // Microwave 2's `(BB+NN+SDATA)&7Fh`), at the index the spec prints.
-  const over = data.format.checksum.over;
+  // Microwave 2's `(BB+NN+SDATA)&7Fh`), at the index the spec prints, unless the layout says otherwise
+  // and why (layout.checksum: { over, request, because }).
+  const over = layout.checksum?.over ?? data.format.checksum.over;
   const dump = {
     id: 'soundEditBuffer',
     name: 'Sound Mode Edit Buffer',
@@ -217,8 +218,9 @@ export function buildWaldorfProfile(data, layout) {
     mappings: placed.map((x) => ({ parameter: x.parameter.id, offset: x.index })),
   };
   for (const x of placed) { x.parameter.access.canRead = true; if (x.parameter.access.source !== 'bulkDump') x.parameter.access.source = 'singleParameter'; }
-  // The request's checksum, (BB+NN) & 7F (the Microwave 2's; see the layout's notes).
-  const requestSum = hex((parseInt(location[0], 16) + parseInt(location[1], 16)) & 0x7f);
+  // The request's checksum, (BB+NN) & 7F as the spec prints it, or the layout's.
+  const requestSum = layout.checksum?.request ?? hex((parseInt(location[0], 16) + parseInt(location[1], 16)) & 0x7f);
+  if (layout.checksum?.because) notes.push(layout.checksum.because);
   const requests = [{ id: 'requestSoundEditBuffer', name: 'Sound request (Sound Mode Edit Buffer)', kind: 'sysex', template: ['F0', '3E', equipment, '$deviceId', '00', ...location, requestSum, 'F7'], response: { dump: dump.id }, timeoutMs: 3000, retries: 1 }];
 
   if (corrected.length) notes.push(`Rows the reader could not split, given by the layout: ${corrected.join(', ')}.`);
@@ -390,7 +392,12 @@ export function buildWaldorfCcProfile(data, layout) {
   let dumpDefinitions = null;
   let requests = null;
   if (data.dump && pd) {
-    const at = new Map(data.dump.filter((r) => r.number >= pd.from && r.number <= pd.to).map((r) => [r.name, r.number]));
+    // Bytes the table names otherwise than the instrument writes them, corrected by the layout with
+    // its evidence (layout.dumpCorrections: { byte: { name, printed } }, layout.dumpCorrectionsBecause).
+    const fixes = layout.dumpCorrections ?? {};
+    const rows = data.dump.map((r) => (fixes[r.number] ? { ...r, name: fixes[r.number].name } : r));
+    if (Object.keys(fixes).length) notes.push(`Program dump bytes the manual's table names otherwise, corrected by the layout: ${Object.entries(fixes).map(([b, f]) => `byte ${b} is ${f.name} (printed ${f.printed})`).join(', ')}. ${layout.dumpCorrectionsBecause ?? ''}`.trim());
+    const at = new Map(rows.filter((r) => r.number >= pd.from && r.number <= pd.to).map((r) => [r.name, r.number]));
     const mappings = [];
     const unmatched = [];
     for (const p of parameters) {

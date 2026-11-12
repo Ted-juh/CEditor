@@ -40,5 +40,6 @@ export default {
     'The Blofeld\'s spec prints the sound request\'s checksum byte in its format line and leaves it out of the table beneath; the Microwave 2\'s, its ancestor, prints it as (BB+NN) & 7F, which for the edit buffer (7F 00) is 7F, the value the spec says is always accepted. The request carries it.',
     'In Multi mode the same parameter change reaches instrument 1\'s sound (location 00); the other instruments (01 - 0F) are not laid out.',
     'The global parameters (GLBD) have no parameter change, and are not laid out.',
+    'Read through this profile, Waldorf\'s Blofeld factory sounds (2008 and 2012, 2,048 sounds) all match the sound dump and pass its checksum. A few hold values neither the spec nor the manual lists: modulation destinations 54 - 57 (29 times, in slots 9 - 16 only; both documents stop at 53, M4 Amount), oscillator octaves between the steps of 12 (e.g. 47, 102), and envelope mode bytes 64 and 47 (8 times). A Pull of such a sound shows the number. Two of the 2012 sounds have a 02 byte in their names, read as ?.',
   ],
 };

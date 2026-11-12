@@ -80,6 +80,11 @@ None of these checks depends on trusting the code that wrote the profile:
   Since then every profile with a matching device has been compared the same way, by
   `tools/profiles/crosscheck-midi-guide.mjs`; [the cross-check page](device-profile-crosscheck.md)
   has the method and what each disagreement turned out to be.
+- **The makers' own sounds.** Factory banks and sound sets the makers publish, read through the Pull
+  profiles' dump definitions by `tools/profiles/check-factory-banks.mjs`: each must match, pass its
+  checksum and give every parameter a value the profile allows. [The factory-bank page](device-profile-factory-banks.md)
+  has what they showed, among it a checksum, a size and two swapped bytes that every Pull would have
+  got wrong.
 
 The tests are `CE/web/test/rolandManualProfiles.test.js`, `rolandCcProfiles.test.js`,
 `sequentialProfiles.test.js`,

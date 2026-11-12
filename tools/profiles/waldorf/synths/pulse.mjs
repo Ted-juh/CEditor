@@ -36,9 +36,19 @@ export default {
     [/^CV 2/, 'CV'],
     [/^Arpeggiator/, 'Arpeggiator'],
   ],
+  // The table prints Cutoff Mod Source at byte 65 and Cutoff Mod Amount at 66. In the 125 programs of
+  // the sound sets Waldorf publishes for the Pulse, byte 66 is 0 - 15 in every one and byte 65 is
+  // spread around 64, as an amount is; and the dump puts an amount before its source everywhere else
+  // (Pitch Mod Amount 39, Source 40). The two are the other way round.
+  dumpCorrections: {
+    65: { name: 'Cutoff Mod Amount', printed: 'Cutoff Mod Source' },
+    66: { name: 'Cutoff Mod Source', printed: 'Cutoff Mod Amount' },
+  },
+  dumpCorrectionsBecause: 'In all 125 programs of the sound sets Waldorf publishes for the Pulse, byte 66 holds 0 - 15 and byte 65 values spread around 64, as an amount does; and the dump puts an amount before its source everywhere else (Pitch Mod Amount 39, Pitch Mod Source 40).',
   notes: [
     'The Pulse has no request for its edit buffer: Pull asks for a stored program, the program variable (0 for P.1 … 98 for P.99, 99 for P.rn), so what comes back is that program as stored. A program dump sent from the panel (Shift + Dump, Program Dump) is the current program, edits and all, and is read back as it arrives.',
     'The panel\'s Controller Dump, and its request ($4B), send the current program as these control changes, which CEditor follows as they come.',
+    'Read through this profile, Waldorf\'s published Pulse sound sets hold a few values the manual does not list: Portamento Mode 2 or 3 in 12 of 125 programs (it names normal and fingered), Arpeggiator Range above 9 in 5, Arpeggiator Mode 15 in 4. A Pull of such a program shows the number.',
   ],
   variables: { program: 0 },
 };

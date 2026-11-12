@@ -25,6 +25,7 @@
     "The document is for system software 2.00. A Microwave on an earlier version has the same sound dump, but the parameters marked + have narrower ranges there and those marked * do nothing.",
     "The Microwave answers the sound request with the sound playing, edits and all, which in Multi mode is the last instrument's selected: the document says to switch to Single (MIDI-Poly) mode before requesting. The edit goes to instrument 1's sound (instrument 0), which in Single mode is the sound playing.",
     "The Microwave sends the same edit message (RTBP) when its Overflow Mode is Link and a sound parameter is changed on its panel; CEditor reads those by byte.",
+    "Read through this profile, the factory sound sets Waldorf publishes (mwsset1 - 4, 256 sounds from cartridge dumps) predate system software 2.00: bytes 144 and 169 - 174, unused before it, hold what was left there, so the LFO 2 phase shift and the wave and noise level modifiers read as values outside their lists in most of them. 60 of the 256 have characters below 20h in their names (0Ch, 19h - 1Fh), outside the 20h - 7Fh the document gives, read as ?.",
     "Rows the document prints wrongly, given by the layout: 13 Osc 1 Modifier 2 Source, 14 Osc 1 Modifier 2 Amount.",
     "Pull: Sound Dump Request (BPRR), the sound playing. 151 of 151 parameters are read back."
   ],

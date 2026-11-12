@@ -216,6 +216,13 @@ export function addPull(profile, data, layout, notes) {
     p.access = { ...p.access, canRead: true };
   }
   const prefixLength = prefix.length;
+  // What the packed bytes hold: seven for every eight, and one fewer than a short last group. The
+  // NTS-1 mkII's document prints 505 bytes from 576 packed, which hold 504, and Korg's own program
+  // files agree with the packed size ('PRED' at 500 - 503, where the table prints 501 - 504): the
+  // engines refuse a payload larger than the message carries, so the printed size failed every Pull.
+  const held = Math.floor(dump.size.packed / 8) * 7 + Math.max(0, (dump.size.packed % 8) - 1);
+  const unpacked = held === dump.size.unpacked ? dump.size.unpacked : held;
+  if (unpacked !== dump.size.unpacked) notes.push(`The document prints the program as ${dump.size.printed}; ${dump.size.packed} packed bytes hold ${unpacked}, the size read here.${layout.sizeEvidence ? ` ${layout.sizeEvidence}` : ''}`);
   profile.variables = { ...profile.variables, deviceId: 0x30 };
   profile.requests = [
     ...(profile.requests ?? []),
@@ -226,7 +233,7 @@ export function addPull(profile, data, layout, notes) {
     name: 'Current Program Data Dump',
     kind: 'sysex',
     matcher: { prefix, suffix: ['F7'] },
-    payload: { offset: prefixLength, size: dump.size.unpacked, pack: { type: 'packed8to7', packOrder: 'msb-low-first', groupSize: 7 } },
+    payload: { offset: prefixLength, size: unpacked, pack: { type: 'packed8to7', packOrder: 'msb-low-first', groupSize: 7 } },
     completion: { expectedMessages: 1, expectedBytes: prefixLength + dump.size.packed + 1 },
     mappings: mappings.map(({ parameter, offset, codec }) => ({ parameter, offset, codec })),
   }];
@@ -240,7 +247,7 @@ export function addPull(profile, data, layout, notes) {
   // A dump to read back: a few settings at values chosen to touch every part of them, packed as the
   // instrument packs it. What they must read as is worked out here from the same parts; the tests
   // beside the profiles check a minilogue dump placed by hand against the document.
-  const payload = new Array(dump.size.unpacked).fill(0);
+  const payload = new Array(unpacked).fill(0);
   // Every listed setting holds a value its list names, as a real program would; one that holds a
   // value its list does not name fails the whole read, in both engines.
   for (const m of mappings) if (m.codec.map) place(payload, m.offset, m.setting.parts, m.codec.map[0][0]);

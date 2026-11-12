@@ -225,7 +225,7 @@ test('the Blofeld: an index in two 7-bit bytes, the edit buffer\'s dump, and the
   assert.deepEqual([profile.identity.manufacturerId, profile.identity.familyCode, profile.identity.modelNumber], [['3E'], ['13', '00'], ['00', '00']]);
 });
 
-test('the Microwave II/XT: the Blofeld\'s ancestor, its checksum over the location as well, no identity', { skip: !builtProfile('waldorf-microwave-2') }, () => {
+test('the Microwave II/XT: the Blofeld\'s ancestor, its checksum the data\'s as Waldorf\'s own dumps have it, no identity', { skip: !builtProfile('waldorf-microwave-2') }, () => {
   const profile = builtProfile('waldorf-microwave-2');
   const at = (name) => profile.parameters.find((p) => p.name === name);
   const send = (name, value) => localCompileParameter(profile, { parameterId: at(name).id, value }).hex;
@@ -238,8 +238,11 @@ test('the Microwave II/XT: the Blofeld\'s ancestor, its checksum over the locati
   assert.equal(at('Modifier 4 Type').address, '01 3E', 'printed `Modifier 3 Type` a second time');
   const [dump] = profile.dumpDefinitions;
   assert.deepEqual([dump.payload.offset, dump.payload.size, dump.completion.expectedBytes], [7, 256, 265]);
-  assert.deepEqual([dump.checksum.fromOffset, dump.checksum.byteOffset], [5, 263], '`(BB+NN+SDATA)&7Fh`: from the location');
-  assert.equal(profile.requests[0].template.join(' '), 'F0 3E 0E $deviceId 00 20 00 20 F7', 'the request\'s checksum, (BB+NN) & 7F');
+  // The spec's tables print (BB+NN+SDATA)&7Fh; Waldorf's own factory dumps, edit buffer dumps among
+  // them, carry the data's sum alone (docs/device-profile-factory-banks.md).
+  assert.deepEqual([dump.checksum.fromOffset, dump.checksum.byteOffset], [7, 263], 'the data\'s sum, the location not counted');
+  assert.equal(profile.requests[0].template.join(' '), 'F0 3E 0E $deviceId 00 20 00 7F F7', 'the request\'s checksum 7F, always accepted');
+  assert.ok(profile.authoringNotes.some((n) => /2,000 of 2,017 sound dumps/.test(n)), 'the evidence, in the profile');
   assert.equal(profile.identity, undefined, 'a member code for each hardware combination: no identity check');
 });
 
@@ -285,6 +288,11 @@ test('the Pulse: its controller assignments and program dump, tables by number, 
   dump[5] = '2A';
   assert.ok(localParseDumpMessage(pulse, dump.join(' ')).ok, 'any program number: the checksum starts at byte 6');
   assert.equal(pulse.parameters.some((p) => /Mod Wheel|Main Volume|Sustain Switch|Breath Control/.test(p.name)), false, 'no performance controllers');
+  // The table prints Cutoff Mod Source at byte 65 and its Amount at 66; Waldorf's published programs
+  // have them the other way round (docs/device-profile-factory-banks.md).
+  const byteOf = (name) => 6 + pulse.dumpDefinitions[0].mappings.find((m) => m.parameter === at(name).id).offset;
+  assert.deepEqual([byteOf('Cutoff Mod Amount'), byteOf('Cutoff Mod Source')], [65, 66]);
+  assert.deepEqual([byteOf('Pitch Mod Amount'), byteOf('Pitch Mod Source')], [39, 40], 'an amount before its source, as everywhere else');
 });
 
 test('the Microwave (1989): a real-time edit by nibbles with its checksum, rows that repeat others, the sound playing', { skip: !builtProfile('waldorf-microwave') }, () => {

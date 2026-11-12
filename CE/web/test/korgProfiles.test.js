@@ -391,6 +391,12 @@ test('the NTS-1 mkII: the coarse half of each pair, a comma put back, its 14-bit
   assert.ok(profile.authoringNotes.some((n) => /an NRPN or RPN selector.*CC 98, 99/.test(n)), 'NRPN (LSB) is plumbing, not a fine half');
   assert.equal(by('DELAY TYPE').choices.length, 13);
   assert.deepEqual([recipe(by('OSC EDIT PARAM1')).lowBitsController, recipe(by('OSC EDIT PARAM1')).lowBits], [38, 7]);
+  // The document prints 505 bytes from 576 packed; 576 hold 504, the size a dump from the instrument
+  // carries, and Korg's own sample programs agree ('PRED' at 500 - 503).
+  assert.equal(profile.dumpDefinitions[0].payload.size, 504);
+  assert.equal(profile.dumpDefinitions[0].completion.expectedBytes, 7 + 576 + 1);
+  const t = profile.tests.find((x) => x.kind === 'dumpParse');
+  assert.equal(t.inputHex.split(' ').length, 584, 'the dump the profile tests is the size the instrument sends');
 });
 
 test('the miniKORG 700Sm prints its two-byte values L first, and reads them low byte first like the rest', { skip: !builtProfile('korg-minikorg-700sm') }, () => {

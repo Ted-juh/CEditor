@@ -50,8 +50,19 @@ export default {
     [/^Play Parameter/, 'Play Parameters'],
     [/^(Name|Sound Name|Category)/, 'Sound'],
   ],
+  // The spec's dump tables print the checksum as (BB+NN+SDATA)&7Fh, its general section says the IDs
+  // are not counted, and Waldorf's own factory sounds settle it: of 2,017 sound dumps in the Microwave
+  // II/XT downloads (fact9712, fact9806, fact2000-08 and the user sets), 2,000 carry the data's sum
+  // alone and none (BB+NN+SDATA) where the two differ; the 7 edit buffer dumps among them, BB 20h, too
+  // (tools/profiles/check-factory-banks.mjs; docs/device-profile-factory-banks.md).
+  checksum: {
+    over: ['SDATA'],
+    request: '7F',
+    because: 'The dump\'s checksum is the sound data\'s sum alone. The spec\'s dump tables print (BB+NN+SDATA)&7Fh, but its general section says the IDs are not counted, and Waldorf\'s own factory sounds have the data\'s sum: 2,000 of 2,017 sound dumps in the Microwave II/XT downloads, the edit buffer dumps among them, and none with the location counted where the two differ. The request sends 7F, which the spec says is always accepted, rather than choose between its (BB+NN) and the 00h its general section gives for a request with no data.',
+  },
   notes: [
     'In Multi mode the same parameter change reaches instrument 1\'s sound (location 00); the other instruments (01 - 07) are not laid out.',
     'The multi, wave, wavetable, global and display messages are not laid out.',
+    'Read through this profile, the sound sets Waldorf publishes for the Microwave II/XT (2,024 sound dumps: factory sets 9712, 9806 and 2000-08, and the user sets beside them) all match the sound dump and pass its checksum. Some hold values the spec does not list, presumably from later system software: modulation destinations 34 and 35 (525 times; the list stops at 33, Mod #4 Amount), Arpeggiator Tempo 0 (469; printed 1 - 127, extern and 50 - 300 BpM), oscillator octaves between the listed steps (136), filter types 10 - 12 (71) and chorus 2 and 3 (48). A Pull of such a sound shows the number.',
   ],
 };

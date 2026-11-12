@@ -8,10 +8,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { ADAPTERS, bankMessages, checkBank, smfSysex, sysexMessages, valueProblem } from '../../../tools/profiles/check-factory-banks.mjs';
+import { ADAPTERS, bankMessages, checkBank, pack8to7, payloadMessage, smfSysex, sysexMessages, valueProblem } from '../../../tools/profiles/check-factory-banks.mjs';
 import { localBuildDumpMessage } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
-const blofeld = JSON.parse(readFileSync(new URL('../../profiles/test/waldorf-blofeld.ceditor-device.json', import.meta.url), 'utf8'));
+const profileOf = (id) => JSON.parse(readFileSync(new URL(`../../profiles/test/${id}.ceditor-device.json`, import.meta.url), 'utf8'));
+const blofeld = profileOf('waldorf-blofeld');
 const bytesOf = (hex) => Uint8Array.from(hex.split(' ').map((h) => parseInt(h, 16)));
 
 test('raw SysEx: each F0 … F7, what lies between ignored, a message broken by a status byte dropped', () => {
@@ -72,4 +73,49 @@ test('a stored Blofeld sound read as the edit buffer, its name and every value a
   const flagged = await checkBank(blofeld, [bad], { adapter: ADAPTERS['blofeld-sound'] });
   assert.equal(flagged.matched, 1);
   assert.deepEqual(Object.keys(flagged.problems), [choice.id]);
+});
+
+test('a Microwave bank dump: 64 sounds of 180 bytes, each framed as the Sound Dump with its own sum', async () => {
+  const microwave = profileOf('waldorf-microwave');
+  const built = localBuildDumpMessage(microwave, 'soundDump', Object.fromEntries(microwave.parameters.map((p) => [p.id, p.default])));
+  assert.ok(built.ok, built.error);
+  const sound = bytesOf(built.hex).subarray(5, 185);
+  const data = Array.from({ length: 64 }, () => [...sound]).flat();
+  const bank = Uint8Array.from([0xf0, 0x3e, 0x00, 0x00, 0x50, ...data, data.reduce((a, b) => a + b, 0) & 0x7f, 0xf7]);
+  const sounds = ADAPTERS['microwave-bank'](bank);
+  assert.equal(sounds.length, 64);
+  assert.deepEqual([...sounds[63]], [...bytesOf(built.hex)], 'each the Sound Dump the profile builds');
+  const read = await checkBank(microwave, [bank], { adapter: ADAPTERS['microwave-bank'] });
+  assert.equal(read.matched, 64);
+  assert.deepEqual(read.checksums, { ok: 64 });
+  // A bank whose own checksum is wrong is not cut up.
+  const broken = Uint8Array.from(bank);
+  broken[bank.length - 2] ^= 1;
+  assert.equal(ADAPTERS['microwave-bank'](broken), broken);
+});
+
+test('a Pulse Program Bulk Dump ($01) is read as the Program Dump ($00) it repeats', async () => {
+  const pulse = profileOf('waldorf-pulse');
+  const t = pulse.tests.find((x) => x.kind === 'dumpParse');
+  const bulk = bytesOf(t.inputHex);
+  bulk[4] = 0x01;
+  const read = await checkBank(pulse, [bulk], { adapter: ADAPTERS['pulse-bulk'] });
+  assert.equal(read.matched, 1);
+  assert.deepEqual((await checkBank(pulse, [bulk])).matched, 0, 'not without the adapter');
+});
+
+test("program data as Korg's library stores it, packed and framed, is the dump the profile reads", () => {
+  const monologue = profileOf('korg-monologue');
+  const t = monologue.tests.find((x) => x.kind === 'dumpParse');
+  const wire = bytesOf(t.inputHex);
+  const head = monologue.dumpDefinitions[0].matcher.prefix.length;
+  // Unpack the profile's own test dump by Korg's rule, then pack it again from the raw bytes.
+  const raw = [];
+  for (let g = head; g < wire.length - 1; g += 8) {
+    const msb = wire[g];
+    for (let i = 0; i < 7 && g + 1 + i < wire.length - 1; i += 1) raw.push(wire[g + 1 + i] | (((msb >> i) & 1) << 7));
+  }
+  assert.equal(raw.length, monologue.dumpDefinitions[0].payload.size);
+  assert.deepEqual([...payloadMessage(monologue, Uint8Array.from(raw))], [...wire]);
+  assert.deepEqual(pack8to7([0x80, 1, 2, 3, 4, 5, 0x86, 7]), [0x41, 0, 1, 2, 3, 4, 5, 6, 0, 7]);
 });

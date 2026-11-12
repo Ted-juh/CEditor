@@ -47,4 +47,11 @@ export default {
   // packed MS bit, the top bits of seven bytes first, in the eighth.
   sysex: { header: ['F0', '00', '20', '32', '20', '$deviceId'], request: ['03'], dump: ['04', '06'], size: 242, packedBytes: 278 },
   variables: { deviceId: 0 },
+  // What Behringer's own sound banks for the instrument (Retro Electro, Synth Wizards, linked from its
+  // product page) show when read through this profile (tools/profiles/check-factory-banks.mjs,
+  // docs/device-profile-factory-banks.md).
+  notes: [
+    'Behringer\'s own sound banks for the DeepMind 12 (Retro Electro and Synth Wizards, linked from its product page) are program dumps with Comms Protocol Version 07 and 245 bytes packed into 280, where the manual (2022) prints 06 and 242 into 278. Read with the version set to 06, all 256 sounds line up with this layout: every name reads and almost every value is in its range. A DeepMind on the firmware that wrote them likely answers the edit buffer request with version 07 too, and this profile does not match that answer; if Pull never completes, that is the likely reason.',
+    'The banks hold values the manual does not list: Pitch Bend Up and Down Depth 234 in about 190 of the 256 sounds (printed 0 - 24), FX types 34 and 35 (printed 0 - 33), modulation destination 130 and source 24, and Ctrl Sequencer Clock Divider 16 - 18. A Pull of such a sound shows the number. 122 of the 256 pad their names with 00, read as the end of the name.',
+  ],
 };
