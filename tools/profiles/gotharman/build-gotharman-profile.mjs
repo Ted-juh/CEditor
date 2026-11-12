@@ -90,7 +90,7 @@ export function buildGotharmanProfile(data, layout) {
     recipes.set(id, { id, kind: 'cc', channel, controller: row.cc });
     const group = ccGroupOf(row);
     parameters.push({
-      id: unique(`${camel(group)}.${camel(row.name)}`), name: row.name, group,
+      id: unique(`${camel(group)}.${camel(row.name)}`), name: row.name, group, ...(row.page ? { source: { page: row.page } } : {}),
       description: `CC ${row.cc}: ${row.name}${row.parts ? `, on the part's channel (parts 1 - ${row.parts}, MIDI channels 1 - ${row.parts})` : ', on the global channel'}.`,
       access, messageRecipe: id, type: 'integer', range: { min: 0, max: 127 }, default: 0,
       display: { mode: 'number', unit: '', shortLabel: camel(row.name) }, normalization: { mode: 'linear' }, encoding: { type: 'u7' }, sendPolicy: continuous, ui: { preferredComponent: 'Knob' },

@@ -6,13 +6,17 @@
 // remark that does not fit going on below. Read from `pdftotext -layout`; the list of controllers
 // ends at `Other CCs`.
 
-/** The controllers in this text: [{ cc, name, remark }]. */
-export function readControllers(text) {
+/**
+ * The controllers in this text: [{ cc, name, remark, page }], `page` the PDF page of the row
+ * (`firstPage`, the text's first, counted on at each form feed pdftotext ends a page with).
+ */
+export function readControllers(text, firstPage = 1) {
   const rows = [];
-  for (const line of text.replace(/\f/g, '\n').split('\n')) {
+  const lines = text.split('\f').flatMap((pageText, i) => pageText.split('\n').map((line) => ({ line, page: firstPage + i })));
+  for (const { line, page } of lines) {
     if (/^Other CCs\b/.test(line)) break;
     const m = /^CC (\d{1,3}) (.+?)\s{2,}(\S.*?)\s*$/.exec(line);
-    if (m) { rows.push({ cc: Number(m[1]), name: m[2].trim(), remark: m[3] }); continue; }
+    if (m) { rows.push({ cc: Number(m[1]), name: m[2].trim(), remark: m[3], page }); continue; }
     // A remark going on below its row: set under the remark column, nothing at the margin.
     if (rows.length && /^\s{20,}\S/.test(line) && !/^\s*\d{1,3}\s*$/.test(line)) rows.at(-1).remark = `${rows.at(-1).remark} ${line.trim()}`;
   }

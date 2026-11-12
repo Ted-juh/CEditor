@@ -22,6 +22,8 @@ const COLUMNS = ['Group', 'CC', 'Parameter', 'Values', 'Direction'];
  */
 export function readControlRows(lines, title) {
   const rows = [];
+  // The PDF page of each row (beside them, as the rows are the web tables' columns).
+  const pages = [];
   let resultX = null;
   let rangeX = null;
   const RANGE = /^\d+(?:-\d+)?(?:=\S+)?$/;
@@ -39,6 +41,7 @@ export function readControlRows(lines, title) {
       resultX = result[0]?.x0 ?? null;
       rangeX = range[0]?.x0 ?? null;
       rows.push(['', w[1].text.slice(3), text(result), text(range), direction?.text ?? '']);
+      pages.push(l.page);
       continue;
     }
     const last = rows.at(-1);
@@ -51,23 +54,29 @@ export function readControlRows(lines, title) {
     if (before.length) last[3] = `${last[3]} ${text(before)}`.trim();
     if (after.length) last[2] = `${last[2]} ${text(after)}`.trim();
   }
-  return { title, columns: COLUMNS, rows };
+  return { title, columns: COLUMNS, rows, pages };
 }
 
-/** MEGAfm's `Parameter  MIDI CC  Range` rows in pdftotext -layout text, under their sections. */
-export function readParameterRows(layoutText, title) {
+/**
+ * MEGAfm's `Parameter  MIDI CC  Range` rows in pdftotext -layout text, under their sections, with
+ * the PDF page of each (`firstPage`, the text's first, counted on at each form feed).
+ */
+export function readParameterRows(layoutText, title, firstPage = 1) {
   const rows = [];
+  const pages = [];
   let section = '';
   let on = false;
+  let page = firstPage;
   for (const raw of layoutText.split(/\r?\n/)) {
+    page += raw.match(/\f/g)?.length ?? 0;
     const line = raw.replace(/\f/g, '').trimEnd();
     const t = line.trim();
     if (/^Parameter\s{2,}MIDI CC\s{2,}Range$/.test(t)) { on = true; continue; }
     if (!on || !t) continue;
     const m = /^(.+?)\s{2,}(\S.*?)\s{2,}(\d+-\d+)$/.exec(t);
-    if (m) { rows.push([section, m[2], m[1], m[3], '']); continue; }
+    if (m) { rows.push([section, m[2], m[1], m[3], '']); pages.push(page); continue; }
     if (/^[A-Z][A-Z0-9 ]*$/.test(t)) { section = t; continue; }
     if (rows.length) on = false;      // the table's end: prose follows
   }
-  return { title, columns: COLUMNS, rows };
+  return { title, columns: COLUMNS, rows, pages };
 }

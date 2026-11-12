@@ -19,14 +19,15 @@ test('the implementation: a controller a line, a remark going on below, the list
     '                                       unless you reset it with CC 121',
     'CC 14 Osc1 tuning                      Mapped to Osc1 > TUNE (middle is 64)',
     '                                                                                  41',
-    'CC 115 Osc1 envelope release                      Mapped to Osc1 (Env) > R',
+    '\fCC 115 Osc1 envelope release                      Mapped to Osc1 (Env) > R',
     'Other CCs                                         Ignored',
     'CC 1 Not a row                          after the list',
-  ].join('\n'));
+  ].join('\n'), 41);
+  // Each row with its PDF page: the text's first (41), and the next after a form feed.
   assert.deepEqual(rows, [
-    { cc: 10, name: 'Pan', remark: 'Not accessible through the interface, panning will remain unless you reset it with CC 121' },
-    { cc: 14, name: 'Osc1 tuning', remark: 'Mapped to Osc1 > TUNE (middle is 64)' },
-    { cc: 115, name: 'Osc1 envelope release', remark: 'Mapped to Osc1 (Env) > R' },
+    { cc: 10, name: 'Pan', remark: 'Not accessible through the interface, panning will remain unless you reset it with CC 121', page: 41 },
+    { cc: 14, name: 'Osc1 tuning', remark: 'Mapped to Osc1 > TUNE (middle is 64)', page: 41 },
+    { cc: 115, name: 'Osc1 envelope release', remark: 'Mapped to Osc1 (Env) > R', page: 42 },
   ]);
   assert.deepEqual([pageOf('Mapped to OSC1 > START'), pageOf('Mapped to Filter (Env) > A'), pageOf('Received and transmitted')], ['Osc1', 'Filter (Env)', null]);
 });

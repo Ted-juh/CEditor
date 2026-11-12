@@ -33,7 +33,7 @@ export function buildKodamoProfile(data, layout) {
     const id = `cc${hex(row.cc)}`;
     recipes.set(id, { id, kind: 'cc', channel: '$channel', controller: row.cc });
     parameters.push({
-      id: `${camel(group)}.${camel(row.name)}`, name: row.name, group,
+      id: `${camel(group)}.${camel(row.name)}`, name: row.name, group, ...(row.page ? { source: { page: row.page } } : {}),
       description: `CC ${row.cc}: ${row.name}; ${row.remark}.`.replace(/\.\.$/, '.'),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id,
       type: 'integer', range: { min: 0, max: 127 }, default: /middle is 64/.test(row.remark) ? 64 : 0,

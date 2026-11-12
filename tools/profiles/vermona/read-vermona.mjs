@@ -30,14 +30,20 @@ export function readSwitchTable(text) {
   return { meaning, rows };
 }
 
-/** The Kick Lancet's form: [{ jack, cc, values: [{ value, label, description }] }]. */
-export function readValueTables(text) {
+/**
+ * The Kick Lancet's form: [{ jack, cc, values: [{ value, label, description }], page }], `page` the
+ * PDF page of the sentence that names the controller (`firstPage`, the text's first, counted on at
+ * each form feed pdftotext ends a page with).
+ */
+export function readValueTables(text, firstPage = 1) {
   const out = [];
   const lines = text.split(/\r?\n/);
+  const pageAt = [];
+  lines.reduce((page, line, k) => { const here = page + (line.match(/\f/g)?.length ?? 0); pageAt[k] = here; return here; }, firstPage);
   lines.forEach((line, k) => {
     const head = /The function of the (\S+) jack can be specified by MIDI control command #(\d+)/.exec(lines.slice(k, k + 2).join(' ').replace(/\s+/g, ' '));
     if (!head || out.some((o) => o.cc === Number(head[2]))) return;
-    const table = { jack: head[1], cc: Number(head[2]), values: [] };
+    const table = { jack: head[1], cc: Number(head[2]), values: [], page: pageAt[k] };
     const start = lines.findIndex((l, j) => j > k && /^\s*CC#\s*\d+\s+Value\s+Description/.test(l));
     for (const l of lines.slice(start + 1)) {
       if (/^\s*(?:\d{1,2}\s*$|[A-Z][A-Za-z ]+$)/.test(l) && !/^\s*\d\s{2,}/.test(l) && table.values.length) break;

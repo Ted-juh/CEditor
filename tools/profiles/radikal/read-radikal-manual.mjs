@@ -8,11 +8,15 @@
 // lack a neutral value. The PDF's text layer loses the `ff` ligature (`VCF Cuto`), set apart at the
 // page's foot; the layout names the words it breaks.
 
-/** The table in this text: [{ cc, range, neutral, parameter }]. */
-export function readControllerTable(text, { ligatures = {} } = {}) {
+/**
+ * The table in this text: [{ cc, range, neutral, parameter, page }], `page` the PDF page of the row
+ * (`firstPage`, the text's first, counted on at each form feed pdftotext ends a page with).
+ */
+export function readControllerTable(text, { ligatures = {}, firstPage = 1 } = {}) {
   const rows = [];
   let cols = null;
-  for (const line of text.replace(/\f/g, '\n').split('\n')) {
+  const lines = text.split('\f').flatMap((pageText, i) => pageText.split('\n').map((line) => ({ line, page: firstPage + i })));
+  for (const { line, page } of lines) {
     const head = /^(\s*)CC(\s+)Bereich(\s+)Neutral(\s+)Parameter/.exec(line);
     if (head) {
       const at = (word) => line.indexOf(word);
@@ -26,7 +30,7 @@ export function readControllerTable(text, { ligatures = {} } = {}) {
     const cell = (from, to) => line.slice(Math.max(0, from - 2), to === undefined ? undefined : to - 2).trim();
     let parameter = cell(cols.parameter);
     for (const [broken, whole] of Object.entries(ligatures)) parameter = parameter.replace(new RegExp(`\\b${broken}\\b`, 'g'), whole);
-    rows.push({ cc: Number(cc[1]), range: cell(cols.range, cols.neutral) || null, neutral: cell(cols.neutral, cols.parameter) ? Number(cell(cols.neutral, cols.parameter)) : null, parameter });
+    rows.push({ cc: Number(cc[1]), range: cell(cols.range, cols.neutral) || null, neutral: cell(cols.neutral, cols.parameter) ? Number(cell(cols.neutral, cols.parameter)) : null, parameter, page });
   }
   return rows;
 }

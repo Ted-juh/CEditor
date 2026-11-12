@@ -25,7 +25,7 @@ export function importGuide(layout, file) {
   const text = execFileSync('pdftotext', ['-layout', ...(doc.pages ? ['-f', String(doc.pages[0]), '-l', String(doc.pages[1])] : []), file, '-'], { encoding: 'utf8' });
   return {
     source: { title: doc.title, file: doc.file, sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url, linkedFrom: doc.linkedFrom, ...(doc.pages ? { pages: doc.pages } : {}) },
-    ...(layout.form === 'switches' ? { switches: readSwitchTable(text) } : { values: readValueTables(text) }),
+    ...(layout.form === 'switches' ? { switches: readSwitchTable(text) } : { values: readValueTables(text, doc.pages?.[0] ?? 1) }),
   };
 }
 

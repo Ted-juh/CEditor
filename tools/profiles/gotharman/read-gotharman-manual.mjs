@@ -75,17 +75,19 @@ export function readParameterList(lines) {
  * `pdftotext -layout` text: `PARAMETER  CC#  PART NUMBER`, a row a line, the part column `MIDI
  * channel 1-16` (a part's parameter, on the part's channel) or `-` (the instrument's), a name that
  * does not fit going on below (`Oscillator1 Wave/Sampler` / `Start`): [{ name, cc, parts }], parts
- * the number of part channels or 0.
+ * the number of part channels or 0, and `page`, the PDF page of the row (`firstPage`, the text's
+ * first page, counted on at each form feed).
  */
-export function readCcList(text) {
+export function readCcList(text, firstPage = 1) {
   const rows = [];
   let on = false;
-  // (pdftotext starts each page with a form feed.)
-  for (const line of text.replace(/\f/g, '\n').split('\n')) {
+  // (pdftotext ends each page with a form feed: the lines after one are on the next page.)
+  const lines = text.split('\f').flatMap((pageText, i) => pageText.split('\n').map((line) => ({ line, page: firstPage + i })));
+  for (const { line, page } of lines) {
     if (/^PARAMETER\s+CC#\s+PART NUMBER/.test(line)) { on = true; continue; }
     if (!on || !line.trim() || /^\s*\d{1,4}\s*$/.test(line)) continue;
     const m = /^(\S.*?)\s{2,}(\d{1,3})\s{2,}(?:MIDI channel 1-(\d+)|-)\s*$/.exec(line);
-    if (m) { rows.push({ name: m[1].trim(), cc: Number(m[2]), parts: m[3] ? Number(m[3]) : 0 }); continue; }
+    if (m) { rows.push({ name: m[1].trim(), cc: Number(m[2]), parts: m[3] ? Number(m[3]) : 0, page }); continue; }
     // A name going on below its row (set at the margin, nothing else on the line); prose ends the list.
     if (/^\S/.test(line) && !/\s{2,}/.test(line.trim()) && line.trim().split(' ').length <= 3 && rows.length) rows.at(-1).name = `${rows.at(-1).name} ${line.trim()}`;
     else on = false;

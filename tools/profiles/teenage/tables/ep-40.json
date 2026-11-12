@@ -3,9 +3,9 @@
     {"title":"EP-40 Riddim guide: system","file":"ep-40-system.html","saved":"2026-11-10","sha256":"d71631e95a661124fb21cf94c19ac74f2d59b591c5c30180d331ccde85fc3de6","url":"https://teenage.engineering/guides/ep-40/system"}
   ],
   "rows": [
-    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","cc":"1","range":"1-27","name":"vibrato"},
-    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","cc":"12","range":"1-27","name":"fx parameter (knobx)"},
-    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","cc":"13","range":"1-27","name":"fx parameter (knobY)"},
-    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","cc":"64","range":"1-27","name":"sustain pedal for key and legato voices"}
+    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","heading":"14.3 midi cc map","cc":"1","range":"1-27","name":"vibrato"},
+    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","heading":"14.3 midi cc map","cc":"12","range":"1-27","name":"fx parameter (knobx)"},
+    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","heading":"14.3 midi cc map","cc":"13","range":"1-27","name":"fx parameter (knobY)"},
+    {"table":"below is a list of all the parameters that can be adjusted with midi control changes.","heading":"14.3 midi cc map","cc":"64","range":"1-27","name":"sustain pedal for key and legato voices"}
   ]
 }

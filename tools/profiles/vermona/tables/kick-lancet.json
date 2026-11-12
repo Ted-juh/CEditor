@@ -31,7 +31,8 @@
           "label": "dynamic",
           "description": "KICK LANCET will be dynamically triggered, depending on the trigger voltages, ranging between 0.5 and 10 volts."
         }
-      ]
+      ],
+      "page": 12
     },
     {
       "jack": "AUDIO",
@@ -47,7 +48,8 @@
           "label": "dynamic (factory default)",
           "description": "KICK LANCET will be triggered dynamically, depending on the volume of the input signal."
         }
-      ]
+      ],
+      "page": 13
     }
   ]
 }

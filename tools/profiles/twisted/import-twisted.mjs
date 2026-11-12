@@ -32,7 +32,7 @@ export function importPage(layout, file) {
     const title = layout.controllerTables[0];
     const table = form === 'control'
       ? readControlRows(documentLines(file, pages), title)
-      : readParameterRows(execFileSync('pdftotext', ['-layout', '-f', String(pages[0]), '-l', String(pages[1]), file, '-'], { encoding: 'utf8' }), title);
+      : readParameterRows(execFileSync('pdftotext', ['-layout', '-f', String(pages[0]), '-l', String(pages[1]), file, '-'], { encoding: 'utf8' }), title, pages[0]);
     return { source: { title: doc.title, file: doc.file, sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url, pages }, tables: [table] };
   }
   const html = readFileSync(file, 'utf8');
@@ -55,7 +55,8 @@ export function importPage(layout, file) {
 export function stringifyTranscription(data) {
   const { tables, ...rest } = data;
   const head = JSON.stringify(rest, null, 2).replace(/\n}$/, '');
-  const table = (t) => `    {"title":${JSON.stringify(t.title)},${t.note ? `"note":${JSON.stringify(t.note)},` : ''}"columns":${JSON.stringify(t.columns)},"rows":[\n${t.rows.map((r) => `      ${JSON.stringify(r)}`).join(',\n')}\n    ]}`;
+  // A PDF table's rows' pages, one per row, after the rows.
+  const table = (t) => `    {"title":${JSON.stringify(t.title)},${t.note ? `"note":${JSON.stringify(t.note)},` : ''}"columns":${JSON.stringify(t.columns)},"rows":[\n${t.rows.map((r) => `      ${JSON.stringify(r)}`).join(',\n')}\n    ]${t.pages ? `,"pages":${JSON.stringify(t.pages)}` : ''}}`;
   return `${head},\n  "tables": [\n${tables.map(table).join(',\n')}\n  ]\n}\n`;
 }
 

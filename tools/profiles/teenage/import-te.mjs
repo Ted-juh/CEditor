@@ -25,7 +25,7 @@ export function importDocument(layout, file) {
   const tables = readTables(pageCells(readFileSync(file, 'utf8'))).filter((t) => layout.tables.test(t.caption));
   return {
     sources: [{ title: doc.title, file: path.basename(file), saved: doc.saved, sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url }],
-    rows: tables.flatMap((t) => t.rows.map((r) => ({ table: t.caption, ...r }))),
+    rows: tables.flatMap((t) => t.rows.map((r) => ({ table: t.caption, ...(t.heading ? { heading: t.heading } : {}), ...r }))),
   };
 }
 

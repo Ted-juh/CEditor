@@ -12,12 +12,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { readText } from './support/readText.mjs';
-import { pageCells, readTables } from '../../../tools/profiles/teenage/read-te-guide.mjs';
+import { pageCells, readTables, headingOf } from '../../../tools/profiles/teenage/read-te-guide.mjs';
 import { controllersOf, readRange } from '../../../tools/profiles/teenage/build-te-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/teenage/make-profiles.mjs';
 import { localCompileParameter, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
 const cell = (t) => `<div class="box c3"><div class="txt _txt_1"><span>${t}</span></div></div>`;
+
+
+test('where a page prints a table: the short sentence above it, or its numbered section and part', () => {
+  // The TX-6's: a sentence of its own over the table.
+  assert.equal(headingOf(['midi reference', 'incoming midi control messages.', 'control', 'cc'], 2), 'incoming midi control messages.');
+  // The EP-133's: a long sentence, so the section, its number a cell of its own.
+  assert.equal(headingOf(['14.5', 'midi cc map', 'return to index', 'below is a list of all the parameters that can be adjusted with midi control changes.', 'MIDI cc number'], 4), '14.5 midi cc map');
+  // The OP-Z's: the section, and the part of it the table is under, before its spacer cells.
+  assert.equal(headingOf(['21.6 incoming midi table', '1', 'system', '/', '/', 'name'], 5), '21.6 incoming midi table: system');
+});
 
 test('a guide page: its cells in order, a table from its header, rows while the controller column holds one', () => {
   const html = ['incoming midi control change messages.', 'cc', 'channel', 'function', 'value', '7', '1 - 4 *', 'mixer volume', '0 - 127', '46', 'any', 'synth: parameter 1<br/>drum: active key pitch', '0 - 127', '54 - 57', 'any', 'patch fx parameters 1 - 4', '0 - 127', 'newsletter', 'retailers'].map(cell).join('') + '<script>window.__reactRouterContext = {}</script>';

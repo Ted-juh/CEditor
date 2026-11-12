@@ -77,7 +77,9 @@ export function buildTwistedProfile(data, layout) {
     const table = data.tables.find((t) => t.title === title);
     const [ccAt, nameAt, valueAt, groupAt] = [col(table, /^(?:MIDI )?CC#?$/), col(table, /^(?:Parameter|Message)$/), col(table, /^(?:Values|Range)/), col(table, /^(?:Group|Panel area)$/)];
     const directionAt = col(table, /^Direction$/);
-    for (const row of table.rows) {
+    for (const [rowIndex, row] of table.rows.entries()) {
+      // A PDF table's rows keep their pages beside them (read-twisted-pdf.mjs).
+      const rowPage = table.pages?.[rowIndex];
       const ccText = row[ccAt];
       // (A row the instrument only sends is no setting; a controller printed as `32+59`, `Velocity`
       // or `1 (mod wheel)` is not one controller.)
@@ -98,9 +100,9 @@ export function buildTwistedProfile(data, layout) {
           const id = `cc${hex(cc)}${channel ? `ch${channel}` : ''}`;
           recipes.set(id, { id, kind: 'cc', channel: channel ?? '$channel', controller: cc });
           const base = {
-            // Where a web page prints it: its table, by the heading it is set under. (A PDF's rows keep no
-            // page, and its table's title is the layout's, not read from the manual: none is given.)
-            id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(layout.pdf ? {} : { source: { table: title } }),
+            // Where a web page prints it: its table, by the heading it is set under; a PDF manual, the
+            // page of its row (the table's title there is the layout's, not read from the manual).
+            id: unique(`${camel(group)}.${camel(name)}`), name, group, ...(layout.pdf ? (rowPage ? { source: { page: rowPage } } : {}) : { source: { table: title } }),
             description: `${title}: CC ${cc}${channel ? ` on channel ${channel} (${label})` : ''}; ${row[nameAt]}${valueAt >= 0 ? `; values ${row[valueAt] || 'not printed'}` : ''}${values.printed ? '; sent as 0 - 127' : ''}.`,
             access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id,
           };

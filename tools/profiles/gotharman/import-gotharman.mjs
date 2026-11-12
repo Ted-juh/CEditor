@@ -27,7 +27,7 @@ export function importManual(layout, file) {
   const doc = layout.document;
   const rows = layout.form === 'nrpn'
     ? readParameterList(documentLines(file, doc.pages))
-    : readCcList(execFileSync('pdftotext', ['-layout', '-f', String(doc.pages[0]), '-l', String(doc.pages[1]), file, '-'], { encoding: 'utf8' }));
+    : readCcList(execFileSync('pdftotext', ['-layout', '-f', String(doc.pages[0]), '-l', String(doc.pages[1]), file, '-'], { encoding: 'utf8' }), doc.pages[0]);
   return { source: { title: doc.title, file: doc.file, sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url, linkedFrom: doc.linkedFrom, pages: doc.pages }, rows };
 }
 

@@ -24,9 +24,10 @@ export function buildVermonaProfile(data, layout) {
   const recipes = [];
   const choice = (base, choices, def) => ({ ...base, type: 'choice', default: def, choices, display: { mode: 'choice', shortLabel: base.id.split('.').pop() }, normalization: { mode: 'choiceIndex' }, encoding: { type: 'u7' }, sendPolicy: { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: choices.length === 2 ? 'ToggleButton' : 'RadioButtonGroup' } });
   // Where the guide prints a parameter: its page, where the table was read from one page alone (the
-  // Kick Lancet's guide is read whole, and its rows keep no page).
+  // Mono Lancet's), or the page the reader found it on (the Kick Lancet's, its guide read whole).
   const pages = data.source.pages;
   const source = pages && pages[0] === pages[1] ? { source: { page: pages[0] } } : {};
+  const sourceOf = (t) => (t.page ? { source: { page: t.page } } : source);
   if (data.switches) {
     const bands = bandsOf(data.switches.meaning);
     if (bands.length !== 2) throw new Error(`the switches' meaning is not read: ${data.switches.meaning}`);
@@ -42,7 +43,7 @@ export function buildVermonaProfile(data, layout) {
     recipes.push({ id, kind: 'cc', channel: '$channel', controller: t.cc });
     const choices = t.values.map((v) => ({ id: camel(v.label.replace(/\s*\(factory default\)/, '')), label: v.label.replace(/\s*\(factory default\)/, ''), value: v.value }));
     const def = t.values.find((v) => /\(factory default\)/.test(v.label));
-    parameters.push(choice({ id: `inputs.${camel(t.jack)}`, name: `${t.jack} input`, group: 'Inputs', ...source, description: `CC ${t.cc}: what the ${t.jack} jack does. ${t.values.map((v) => `${v.value}: ${v.label} — ${v.description}`).join(' ')}`, access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id }, choices, def ? choices[t.values.indexOf(def)].id : choices[0].id));
+    parameters.push(choice({ id: `inputs.${camel(t.jack)}`, name: `${t.jack} input`, group: 'Inputs', ...sourceOf(t), description: `CC ${t.cc}: what the ${t.jack} jack does. ${t.values.map((v) => `${v.value}: ${v.label} — ${v.description}`).join(' ')}`, access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id }, choices, def ? choices[t.values.indexOf(def)].id : choices[0].id));
   }
   const tests = parameters.map((p) => ({ name: `${p.name} = ${p.choices.at(-1).id}`, parameter: p.id, value: p.choices.at(-1).id, expectedHex: ['B0', hex(recipes.find((r) => r.id === p.messageRecipe).controller), hex(p.choices.at(-1).value)].join(' ') }));
   const doc = data.source;

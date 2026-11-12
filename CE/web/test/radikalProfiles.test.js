@@ -25,18 +25,19 @@ test('the table: the header moving between pages, a row without a range, the pag
     '     3         0-127                      VCF Cuto',
     '                                                                                              54 of 71',
     'ff',
-    '     CC      Bereich        Neutral    Parameter',
+    '\f     CC      Bereich        Neutral    Parameter',
     '     90                                Delay Time LSB (lower 3 Bits, send before coarse value)',
     '     27      0-2            0          Paraphonic OFF/ON1/ON2',
     '           8.1.      MIDI program changes',
     '     64 and 103 call up ROM memories',
-  ].join('\n'), { ligatures: { Cuto: 'Cutoff' } });
+  ].join('\n'), { ligatures: { Cuto: 'Cutoff' }, firstPage: 54 });
+  // Each row with its PDF page: 54, and 55 after the form feed that ends it.
   assert.deepEqual(rows, [
-    { cc: 29, range: '0-127', neutral: null, parameter: 'LFO Speed' },
-    { cc: 30, range: '0-127', neutral: 64, parameter: 'LFO Modulation Depth' },
-    { cc: 3, range: '0-127', neutral: null, parameter: 'VCF Cutoff' },
-    { cc: 90, range: null, neutral: null, parameter: 'Delay Time LSB (lower 3 Bits, send before coarse value)' },
-    { cc: 27, range: '0-2', neutral: 0, parameter: 'Paraphonic OFF/ON1/ON2' },
+    { cc: 29, range: '0-127', neutral: null, parameter: 'LFO Speed', page: 54 },
+    { cc: 30, range: '0-127', neutral: 64, parameter: 'LFO Modulation Depth', page: 54 },
+    { cc: 3, range: '0-127', neutral: null, parameter: 'VCF Cutoff', page: 54 },
+    { cc: 90, range: null, neutral: null, parameter: 'Delay Time LSB (lower 3 Bits, send before coarse value)', page: 55 },
+    { cc: 27, range: '0-2', neutral: 0, parameter: 'Paraphonic OFF/ON1/ON2', page: 55 },
   ]);
   assert.deepEqual(namedValues('FX Type (0:TapeDly, 1:TapDly)', { min: 0, max: 1 }), { name: 'FX Type', values: [{ value: 0, label: 'TapeDly' }, { value: 1, label: 'TapDly' }] });
   assert.equal(namedValues('VCF Filter Band (Bit[0]=LP, Bit[1]=BP, Bit[2]=HP)', { min: 0, max: 7 }), null);

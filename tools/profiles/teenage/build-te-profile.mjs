@@ -77,7 +77,8 @@ export function buildTeProfile(data, layout) {
       const group = layout.groupOf?.(label) ?? 'Global';
       const describe = [`CC ${cc}${r.channel ? `, channel ${r.channel}` : ''}${printed ? `: ${printed}` : ''}.`];
       if (range.action) describe.push('An action: sent as 127.');
-      const base = { id: unique(`${camel(group)}.${camel(label)}`), name: label, group, description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id };
+      // Where the page prints it: the table, by the heading a reader finds it under (read-te-guide.mjs).
+      const base = { id: unique(`${camel(group)}.${camel(label)}`), name: label, group, ...(r.heading ? { source: { table: r.heading } } : {}), description: describe.join(' '), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: id };
       if (range.choices || range.action) {
         const choices = range.action ? [{ id: 'trigger', label: 'trigger', value: 127 }] : range.choices.map((c) => ({ id: camel(c.label) || `v${c.value}`, label: c.label, value: c.value }));
         parameters.push({ ...base, type: 'choice', default: choices[0].id, choices, display: { mode: 'choice', shortLabel: camel(label) }, normalization: { mode: 'choiceIndex' }, encoding: { type: 'u7' }, sendPolicy: { mode: 'onCommit', coalesce: false }, ui: { preferredComponent: range.action ? 'Button' : 'ToggleButton' } });

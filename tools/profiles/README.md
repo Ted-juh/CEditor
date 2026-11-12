@@ -185,10 +185,13 @@ They exist because each one was broken once, and the breakage looked like a work
    document prints it (`Drawbar Data List 2`, `§7.4`, a web page's heading); with a page, where only
    the table's first page was recorded, it is the page the table starts on (Roland's address maps:
    `Program Common`, p. 44, the row perhaps overleaf). A parameter read from no one row (a KRONOS
-   effect slot's pid, which stands for its row in every effect type) names its document alone. A
-   generator whose reader keeps no page, line or printed heading gives none rather than a guess: the
-   Gotharman LD lists, the Kodamo, the Radikal, Teenage Engineering's pages, three Twisted Electrons
-   manuals and the Kick Lancet, until their readers keep one.
+   effect slot's pid, which stands for its row in every effect type) names its document alone. A web
+   page has no pages: its table is named by the heading a reader finds it under (Teenage
+   Engineering's `14.5 midi cc map`, the OP-Z's `21.6 incoming midi table: system`). Every generator
+   here gives one. The profiles without are the ones no reader made: the hand-made DPD models
+   (`generic-cc-dpd`, `roland-gaia-dpd`, `yamaha-an1x-dpd`), the test fixtures, and the GAIA and
+   SH-201 profiles transcribed by hand (tools/scripts/qa/roland-gaia, tools/scripts/sh201-panel),
+   whose maps keep no pages.
 
 ## Adding a brand
 

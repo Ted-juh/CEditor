@@ -56,8 +56,9 @@ test('the Anamono\'s values: a range from 0, one counted from its low end, sourc
 });
 
 test('an LD list: part rows, the instrument\'s, a name going on below, a page break', () => {
-  const rows = readCcList(['PARAMETER                       CC#         PART NUMBER', 'Oscillator1 Wave/Sampler        19          MIDI channel 1-8', 'Start', '                                     617', '\fPARAMETER                 CC#         PART NUMBER', 'VCF1 Reso                 56          -', 'The effects parameters are on the effects pages:'].join('\n'));
-  assert.deepEqual(rows, [{ name: 'Oscillator1 Wave/Sampler Start', cc: 19, parts: 8 }, { name: 'VCF1 Reso', cc: 56, parts: 0 }]);
+  const rows = readCcList(['PARAMETER                       CC#         PART NUMBER', 'Oscillator1 Wave/Sampler        19          MIDI channel 1-8', 'Start', '                                     617', '\fPARAMETER                 CC#         PART NUMBER', 'VCF1 Reso                 56          -', 'The effects parameters are on the effects pages:'].join('\n'), 617);
+  // Each row with its PDF page, counted from the text's first at each form feed.
+  assert.deepEqual(rows, [{ name: 'Oscillator1 Wave/Sampler Start', cc: 19, parts: 8, page: 617 }, { name: 'VCF1 Reso', cc: 56, parts: 0, page: 618 }]);
 });
 
 const BUILT = await Promise.all(SYNTHS.map((name) => build(name)));

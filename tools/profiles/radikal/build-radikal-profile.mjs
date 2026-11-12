@@ -40,7 +40,8 @@ export function buildRadikalProfile(data, layout) {
     const m = /^(\d+)-(\d+)$/.exec(row.range ?? '');
     let range = m ? { min: Number(m[1]), max: Number(m[2]) } : null;
     const group = GROUPS[row.parameter.split(' ')[0]] ?? row.parameter.split(' ')[0];
-    const base = { group, access, description: `CC ${row.cc}: ${row.parameter}; ${row.range ?? 'no range printed'}${row.neutral != null ? `, neutral ${row.neutral}` : ''}.` };
+    // Where the table prints it: its row's page (a 14-bit pair's, its MSB row's).
+    const base = { group, access, ...(row.page ? { source: { page: row.page } } : {}), description: `CC ${row.cc}: ${row.parameter}; ${row.range ?? 'no range printed'}${row.neutral != null ? `, neutral ${row.neutral}` : ''}.` };
     // `SWARM Tune MSB` and `SWARM Tune LSB` on the next controller: one 14-bit value.
     const msbOf = /^(.*) MSB$/.exec(row.parameter)?.[1];
     const lsb = msbOf && data.rows.find((r) => r.parameter === `${msbOf} LSB` && r.cc === row.cc + 1);
