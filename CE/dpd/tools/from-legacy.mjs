@@ -1,333 +1,70 @@
-// from-legacy.mjs — an engine profile (.ceditor-device.json) -> a DPD model the Designer opens, the
-// inverse of emit-legacy-core.mjs, proven by emitting it again.
+// from-legacy.mjs — the DPD conversion of the generated device profiles, run from the command line.
 //
-//   node CE/dpd/tools/from-legacy.mjs <engine profile id>...     convert these
-//   node CE/dpd/tools/from-legacy.mjs --all                      every profile that converts
-//   node CE/dpd/tools/from-legacy.mjs --check                    the library is what conversion gives
+//   node CE/dpd/tools/from-legacy.mjs --check                          every profile converts and emits back
+//   node CE/dpd/tools/from-legacy.mjs <profile id>... [--out <dir>]    write those models, to look at
 //
-// The device profiles generated from the makers' documents (tools/profiles/) were written in the
-// engine's format, which the Designer cannot open. This writes each as a DPD model in
-// CE/dpd/converted/<maker>.<model>.json (the hand-made library, CE/dpd/library, is bundled into the
-// app whole; these are loaded one at a time), and indexes them in generated/dpdConvertedIndex.json:
-//
-//   - the DPD's own fields carry the device: every parameter's id, name, group, value type, range,
-//     default, encoding, choices, display, and its wire (the controller it is sent on, its low-bits
-//     controller when it is a 14-bit pair, its channel when not the profile's);
-//   - `engine`, on a parameter or the model, carries what the DPD does not model and the emitter
-//     cannot derive (a send policy, a short label, the profile's sources, notes and tests), computed
-//     as exactly the difference between the engine profile and what the emitter derives.
-//
-// THE GATE. A model is written only if emitting it gives the engine profile back: every field equal,
-// but the message recipes, which are compared by what they send: every parameter compiled at the
-// ends and middle of its range and at every choice, through both profiles, must give the same
-// bytes. A profile that does not convert (a message kind the converter does not carry yet) is named
-// with the reason, and nothing is written for it.
+// The Device Profile Designer converts a generated profile when it opens one
+// (../from-legacy-core.mjs, which says what the conversion is and what its gate checks), so no
+// converted model is stored: the profile stays the one source. This runs that gate over every
+// profile, as CE/web/test/dpdConvertedModels.test.js does, and fails if any profile does not convert,
+// its model does not validate, or it emits anything else.
 
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isDeepStrictEqual } from 'node:util';
-import { resolveModel } from '../resolve.mjs';
-import { buildLegacyProfile } from '../emit-legacy-core.mjs';
+import { legacyToDpd, compareEmission } from '../from-legacy-core.mjs';
+import { validateProfile } from './validate.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO = join(HERE, '..', '..', '..');
-const PROFILES = join(REPO, 'CE', 'profiles', 'test');
-const CONVERTED = join(HERE, '..', 'converted');
-// Engine profile id -> its converted model's DPD id: what the Designer opens for a profile. Not
-// dpdProfileMap.json, which marks a profile whose bindings come from a generated runtime map.
-const INDEX = join(REPO, 'CE', 'web', 'src', 'CE_Application', 'generated', 'dpdConvertedIndex.json');
+const PROFILES = join(HERE, '..', '..', 'profiles', 'test');
+const LIBRARY = join(HERE, '..', 'library');
 
-const slug = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+/** The hand-made models' ids, which a converted model must not take. */
+export const handMadeIds = () => new Set(readdirSync(LIBRARY).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)));
 
-// The hand-made models' ids (CE/dpd/library), which a converted one must never take: the older
-// hand-written roland-gaia profile would otherwise convert to roland.gaia, the GAIA's own model.
-const HAND_MADE = new Set(readdirSync(join(HERE, '..', 'library')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)));
-
-/** The DPD id for an engine profile: `<maker>.<model>` (arturia-microfreak -> arturia.microfreak), `-converted` after it when a hand-made model has that id. */
-export function dpdIdOf(legacy) {
-  const maker = slug(legacy.manufacturer) || 'generic';
-  const rest = legacy.id.startsWith(`${maker}-`) ? legacy.id.slice(maker.length + 1) : legacy.id;
-  const id = `${maker}.${rest}`;
-  return HAND_MADE.has(id) ? `${id}-converted` : id;
+/** Every engine profile but those made from a DPD model in the first place. */
+export function generatedProfiles() {
+  return readdirSync(PROFILES).filter((f) => f.endsWith('.ceditor-device.json')).sort()
+    .map((f) => JSON.parse(readFileSync(join(PROFILES, f), 'utf8')))
+    .filter((p) => !p.dpdSource);
 }
 
-const VALUE_TYPES = { integer: 'continuous', bipolar: 'signed', choice: 'enum', enum: 'enum', text: 'text', boolean: 'toggle', action: 'trigger', momentary: 'trigger' };
-const ENCODINGS = { 'u14-msb-lsb': 'u14', 'u14-lsb-msb': 'u14-lsb', nibbled: 'nibbles', enum: 'u7' };
-const DISPLAY_KEYS = ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC', 'mode', 'shortLabel'];
-
-const HEX = /^[0-9A-Fa-f]{2}$/;
-
-/** A recipe as a DPD messageShape: its template, checksum and delay (null: none, as it had none). */
-const shapeOf = (r, id = r.id, template = r.template) => ({
-  id, kind: 'sysex', template: [...template],
-  ...(r.checksum ? { checksum: structuredClone(r.checksum) } : {}),
-  delayAfterMs: r.delayAfterMs ?? null,
-});
-
-/**
- * How a profile's SysEx recipes become DPD message shapes, and what each parameter sent with one
- * carries: { shapes, plan: recipe id -> { shape, address? } }.
- *
- *   - A recipe with `$address` (Roland's DT1, Yamaha's and Waldorf's parameter changes) is a shape
- *     as it stands; each parameter keeps its own address.
- *   - Recipes written out in full for every parameter (a KRONOS, an Andromeda) are grouped by their
- *     form (length, placeholders, checksum, delay); within a group the bytes that differ from one
- *     recipe to the next are the parameter's address, and the rest the shape, `$address` in their
- *     place. A recipe alone in its form, or one with a checksum, stays a shape of its own.
- */
-function sysexPlan(recipes) {
-  const shapes = [];
-  const plan = new Map();
-  const sx = recipes.filter((r) => r.kind === 'sysex');
-  const used = new Set(sx.map((r) => r.id));
-  const groups = new Map();
-  for (const r of sx) {
-    if (r.template.includes('$address') || r.checksum) { shapes.push(shapeOf(r)); plan.set(r.id, { shape: r.id }); continue; }
-    const key = JSON.stringify([r.template.map((t) => (HEX.test(t) ? 'h' : t)), r.delayAfterMs ?? null]);
-    (groups.get(key) ?? groups.set(key, []).get(key)).push(r);
-  }
-  for (const group of groups.values()) {
-    const varying = [];
-    for (let i = 0; i < group[0].template.length; i += 1) if (new Set(group.map((r) => r.template[i])).size > 1) varying.push(i);
-    if (group.length < 2 || !varying.length) {
-      for (const r of group) { shapes.push(shapeOf(r)); plan.set(r.id, { shape: r.id }); }
-      continue;
-    }
-    const [a, b] = [varying[0], varying.at(-1)];
-    const prefix = group.map((r) => r.id).reduce((p, id) => { let i = 0; while (i < p.length && p[i] === id[i]) i += 1; return p.slice(0, i); }).replace(/[^A-Za-z]+$/, '') || 'sysex';
-    let id = prefix;
-    for (let n = 2; used.has(id) || shapes.some((x) => x.id === id); n += 1) id = `${prefix}${n}`;
-    used.add(id);
-    shapes.push(shapeOf(group[0], id, [...group[0].template.slice(0, a), '$address', ...group[0].template.slice(b + 1)]));
-    for (const r of group) plan.set(r.id, { shape: id, address: r.template.slice(a, b + 1).join(' ') });
-  }
-  return { shapes, plan };
-}
-
-/** A parameter's wire from the recipe it is sent with, or the reason it cannot be carried yet. */
-function wireOf(recipe, sysex) {
-  if (!recipe) return { why: 'no message recipe' };
-  if (recipe.kind === 'sysex') {
-    const how = sysex.plan.get(recipe.id);
-    return { wire: { dir: 'write', msg: 'dt1', shape: how.shape }, address: how.address };
-  }
-  if (recipe.kind === 'cc') {
-    if (recipe.value != null && recipe.value !== '$encodedValue') return { why: `cc recipe value ${recipe.value}` };
-    return {
-      wire: {
-        dir: 'write', msg: 'cc', cc: recipe.controller,
-        ...(recipe.lsbController != null ? { lsbCc: recipe.lsbController } : {}),
-        ...(recipe.channel != null && recipe.channel !== '$channel' ? { channel: recipe.channel } : {}),
-      },
-    };
-  }
-  if (recipe.kind === 'nrpn' || recipe.kind === 'rpn') {
-    if (recipe.value != null && recipe.value !== '$encodedValue') return { why: `${recipe.kind} recipe value ${recipe.value}` };
-    const hex2 = (n) => n.toString(16).toUpperCase().padStart(2, '0');
-    return {
-      wire: {
-        dir: 'write', msg: recipe.kind, [recipe.kind]: `${hex2(recipe.parameterMsb)} ${hex2(recipe.parameterLsb)}`,
-        size: recipe.valueResolution === 14 ? 2 : 1,
-        ...(recipe.channel != null && recipe.channel !== '$channel' ? { channel: recipe.channel } : {}),
-        ...(recipe.nullAfterSend != null ? { nullAfterSend: recipe.nullAfterSend } : {}),
-        ...(recipe.lowBits != null ? { lowBits: recipe.lowBits, lowBitsController: recipe.lowBitsController } : {}),
-        ...(recipe.messageDelayAfterMs != null ? { delayAfterMs: recipe.messageDelayAfterMs } : {}),
-      },
-    };
-  }
-  return { why: `${recipe.kind} recipes are not converted yet` };
-}
-
-/** A parameter's own DPD fields (no `engine`), or the reason it cannot be carried yet. */
-function nativeParam(q, recipes, sysex) {
-  const { wire, why, address } = wireOf(recipes.get(q.messageRecipe), sysex);
-  if (!wire) return { why };
-  const valueType = VALUE_TYPES[q.type];
-  if (!valueType) return { why: `type ${q.type}` };
-  const p = { id: q.id, name: q.name, ...(q.group != null ? { group: q.group } : {}), valueType };
-  if (q.range) p.range = structuredClone(q.range);
-  if (q.default !== undefined) p.default = structuredClone(q.default);
-  const enc = q.encoding?.type ?? 'u7';
-  p.encoding = { ...structuredClone(q.encoding ?? {}), type: ENCODINGS[enc] ?? enc };
-  p.access = { read: q.access?.canRead !== false, write: q.access?.canWrite !== false };
-  if (Array.isArray(q.choices)) p.enum = q.choices.map((c) => ({ id: c.id, ...(c.label != null ? { label: c.label } : {}), wire: c.value }));
-  if (q.ui) p.ui = structuredClone(q.ui);
-  const display = Object.fromEntries(DISPLAY_KEYS.filter((k) => q.display?.[k] !== undefined).map((k) => [k, structuredClone(q.display[k])]));
-  if (Object.keys(display).length) p.display = display;
-  if (q.description != null) p.description = q.description;
-  // The parameter's address: its own (`$address` recipes), or the bytes of its written-out recipe
-  // that differ from its neighbours'.
-  if (address ?? q.address) p.address = address ?? q.address;
-  p.wires = [wire];
-  return { param: p };
-}
-
-/** What `derived` lacks or has otherwise than `original`, key by key: the overlay that turns one into the other. */
-function overlay(original, derived, skip) {
-  const out = {};
-  for (const key of new Set([...Object.keys(original), ...Object.keys(derived)])) {
-    if (skip.has(key) || isDeepStrictEqual(original[key], derived[key])) continue;
-    out[key] = key in original ? structuredClone(original[key]) : null;
-  }
-  return out;
-}
-
-// The recipe a parameter names, and the address it fills in, are how its message is put together,
-// which the gate compares by what it sends.
-const PARAM_SKIP = new Set(['messageRecipe', 'address']);
-const PROFILE_SKIP = new Set(['parameters', 'messageRecipes', 'dpdSource']);
-
-export function emitModel(model) {
-  return buildLegacyProfile(resolveModel(model, {}));
-}
-
-/** An engine profile -> { model } or { why }: the DPD model whose emission gives that profile back. */
-export function legacyToDpd(legacy) {
-  if (legacy.dpdSource) return { why: 'already a DPD profile' };
-  if (legacy.dumpDefinitions?.length) return { why: 'dumps are not converted yet' };
-  const recipes = new Map((legacy.messageRecipes ?? []).map((r) => [r.id, r]));
-  const sysex = sysexPlan(legacy.messageRecipes ?? []);
-  const params = [];
-  for (const q of legacy.parameters ?? []) {
-    const { param, why } = nativeParam(q, recipes, sysex);
-    if (!param) return { why };
-    params.push(param);
-  }
-  const model = {
-    schemaVersion: 1,
-    id: dpdIdOf(legacy),
-    version: legacy.profileVersion ?? '0.1.0',
-    kind: 'model',
-    label: legacy.name,
-    manufacturer: legacy.manufacturer,
-    ...(legacy.family != null ? { family: legacy.family } : {}),
-    ...(sysex.shapes.length ? { messageShapes: sysex.shapes } : {}),
-    // A one-byte base leaves every address as it is, whatever its length (add7 keeps the longer).
-    scopes: { global: { kind: 'global', label: 'Parameters', instances: 1, ...(params.some((p) => p.address) ? { base: '00', stride: '00' } : {}), parameters: params } },
-    provenance: {
-      source: 'official',
-      verifiedRoundTrip: true,
-      verifiedOnHardware: null,
-      confirmations: 0,
-      contributors: [],
-      note: `Converted by CE/dpd/tools/from-legacy.mjs from the engine profile ${legacy.id}, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back.`,
-    },
-    completeness: 'partial',
-  };
-  if (legacy.presets && !legacy.presets.nameRequest) model.presets = structuredClone(legacy.presets);
-
-  // What the emitter derives from the DPD fields alone, and what it must be told besides.
-  const derived = emitModel(model);
-  const byId = new Map(derived.parameters.map((p) => [p.id, p]));
-  for (const [i, q] of (legacy.parameters ?? []).entries()) {
-    const extra = overlay(q, byId.get(q.id) ?? {}, PARAM_SKIP);
-    if (Object.keys(extra).length) params[i].engine = extra;
-  }
-  const extra = overlay(legacy, emitModel(model), PROFILE_SKIP);
-  if (Object.keys(extra).length) model.engine = extra;
-  return { model };
-}
-
-/** The values a parameter is checked at: the ends and middle of its range, or every choice. */
-function probeValues(q) {
-  if (Array.isArray(q.choices)) return q.choices.map((c) => c.id);
-  if (q.range) return [...new Set([q.range.min, q.range.max, Math.round((q.range.min + q.range.max) / 2), q.default].filter((v) => typeof v === 'number'))];
-  return [q.default ?? 0];
-}
-
-/** Every difference between an engine profile and its model's emission: [] when the conversion holds. */
-export async function compareEmission(legacy, model) {
+/** One profile through the conversion and the gate: [] when it holds, else what does not. */
+export async function checkProfile(legacy, handMade = handMadeIds()) {
   const { localCompileParameter } = await import('../../web/src/CE_Application/stores/deviceProfileLocalEngine.js');
-  const emitted = emitModel(model);
-  const problems = [];
-  for (const key of new Set([...Object.keys(legacy), ...Object.keys(emitted)])) {
-    if (PROFILE_SKIP.has(key)) continue;
-    if (!isDeepStrictEqual(legacy[key], emitted[key])) problems.push(`profile field ${key} differs`);
-  }
-  const ids = (legacy.parameters ?? []).map((p) => p.id);
-  if (!isDeepStrictEqual(ids, emitted.parameters.map((p) => p.id))) problems.push('the parameter ids or their order differ');
-  const byId = new Map(emitted.parameters.map((p) => [p.id, p]));
-  const recipeA = new Map((legacy.messageRecipes ?? []).map((r) => [r.id, r]));
-  const recipeB = new Map((emitted.messageRecipes ?? []).map((r) => [r.id, r]));
-  // A recipe's fields but its id and template (the bytes say whether those agree); a controller
-  // recipe with no value sends $encodedValue, as the engine reads it.
-  const fieldsOf = (r) => {
-    if (!r) return null;
-    const { id, template, ...rest } = r;
-    if (rest.kind !== 'sysex' && rest.value === undefined) rest.value = '$encodedValue';
-    return rest;
-  };
-  for (const q of legacy.parameters ?? []) {
-    const e = byId.get(q.id);
-    if (!e) continue;
-    if (q.messageRecipe && !isDeepStrictEqual(fieldsOf(recipeA.get(q.messageRecipe)), fieldsOf(recipeB.get(e.messageRecipe)))) {
-      problems.push(`${q.id}: its recipe differs (${JSON.stringify(fieldsOf(recipeB.get(e.messageRecipe)))}, the engine profile ${JSON.stringify(fieldsOf(recipeA.get(q.messageRecipe)))})`);
-    }
-    for (const key of new Set([...Object.keys(q), ...Object.keys(e)])) {
-      if (!PARAM_SKIP.has(key) && !isDeepStrictEqual(q[key], e[key])) problems.push(`${q.id}: ${key} differs`);
-    }
-    if (!q.messageRecipe) continue;
-    for (const value of probeValues(q)) {
-      const a = localCompileParameter(legacy, { parameterId: q.id, value });
-      const b = localCompileParameter(emitted, { parameterId: q.id, value });
-      // The whole message, every byte of it: the value alone (transaction.encodedValueHex) would let
-      // a parameter sent on the wrong controller or address through.
-      const hexA = a.ok ? a.hex : `error: ${a.error}`;
-      const hexB = b.ok ? b.hex : `error: ${b.error}`;
-      if (hexA !== hexB) problems.push(`${q.id} = ${value}: sends ${hexB}, the engine profile ${hexA}`);
-    }
-  }
+  const { model, why } = legacyToDpd(legacy, { handMade });
+  if (!model) return [`does not convert: ${why}`];
+  const problems = compareEmission(legacy, model, localCompileParameter);
+  const validation = validateProfile(model);
+  for (const e of Array.isArray(validation) ? validation : (validation.errors ?? [])) problems.push(`validation: ${e}`);
   return problems;
 }
 
-function profileFiles() {
-  return readdirSync(PROFILES).filter((f) => f.endsWith('.ceditor-device.json')).sort();
-}
-
-function readLegacy(id) {
-  return JSON.parse(readFileSync(join(PROFILES, `${id}.ceditor-device.json`), 'utf8'));
-}
-
 async function main(argv) {
-  const check = argv.includes('--check');
-  const ids = argv.includes('--all') || check ? profileFiles().map((f) => f.replace(/\.ceditor-device\.json$/, '')) : argv.filter((a) => !a.startsWith('--'));
-  if (!ids.length) { console.error('usage: from-legacy.mjs <engine profile id>... | --all | --check'); process.exit(2); }
-  const index = {};
-  const skipped = new Map();
-  let written = 0;
-  let stale = 0;
-  for (const id of ids) {
-    const legacy = readLegacy(id);
-    const { model, why } = legacyToDpd(legacy);
-    if (!model) { if (why !== 'already a DPD profile') (skipped.get(why) ?? skipped.set(why, []).get(why)).push(id); continue; }
-    const problems = await compareEmission(legacy, model);
-    if (problems.length) { (skipped.get('emission differs') ?? skipped.set('emission differs', []).get('emission differs')).push(`${id} (${problems.slice(0, 3).join('; ')})`); continue; }
-    const file = join(CONVERTED, `${model.id}.json`);
-    // One line: they are generated, and indented they were twice the size (31 MB for 244 models).
-    const text = `${JSON.stringify(model)}\n`;
-    index[legacy.id] = model.id;
-    if (check) {
-      if (!existsSync(file) || readFileSync(file, 'utf8') !== text) { stale += 1; console.log(`stale: ${model.id}`); }
-      continue;
+  const handMade = handMadeIds();
+  if (argv.includes('--check')) {
+    let failed = 0;
+    const profiles = generatedProfiles();
+    for (const legacy of profiles) {
+      const problems = await checkProfile(legacy, handMade);
+      if (problems.length) { failed += 1; console.log(`${legacy.id}: ${problems.slice(0, 3).join('; ')}${problems.length > 3 ? ` (+${problems.length - 3})` : ''}`); }
     }
-    writeFileSync(file, text);
-    written += 1;
+    console.log(failed ? `${failed} of ${profiles.length} profiles do not convert to a DPD model that emits them back.` : `All ${profiles.length} generated profiles convert to DPD models that emit them back.`);
+    if (failed) process.exit(1);
+    return;
   }
-  const indexText = `${JSON.stringify(Object.fromEntries(Object.entries(index).sort()), null, 2)}\n`;
-  if (check) {
-    if (!existsSync(INDEX) || readFileSync(INDEX, 'utf8') !== indexText) { stale += 1; console.log('stale: dpdConvertedIndex.json'); }
-    const kept = new Set(Object.values(index).map((id) => `${id}.json`));
-    for (const f of readdirSync(CONVERTED)) if (!kept.has(f)) { stale += 1; console.log(`stale: ${f} converts from no profile`); }
-  } else {
-    writeFileSync(INDEX, indexText);
-  }
-  for (const [why, list] of skipped) console.log(`not converted, ${why}: ${list.length}${list.length <= 8 ? ` (${list.join(', ')})` : ` (${list.slice(0, 8).join(', ')}, …)`}`);
-  if (check) {
-    console.log(stale ? `${stale} model(s) are not what conversion gives: run node CE/dpd/tools/from-legacy.mjs --all` : 'The DPD library is what conversion gives.');
-    if (stale) process.exit(1);
-  } else {
-    console.log(`Wrote ${written} DPD model(s) to CE/dpd/converted, each emitting its engine profile back.`);
+  const outAt = argv.indexOf('--out');
+  const out = outAt >= 0 ? argv[outAt + 1] : '.';
+  const ids = argv.filter((a, k) => !a.startsWith('--') && argv[k - 1] !== '--out');
+  if (!ids.length) { console.error('usage: from-legacy.mjs --check | <profile id>... [--out <dir>]'); process.exit(2); }
+  mkdirSync(out, { recursive: true });
+  for (const id of ids) {
+    const legacy = JSON.parse(readFileSync(join(PROFILES, `${id}.ceditor-device.json`), 'utf8'));
+    const { model, why } = legacyToDpd(legacy, { handMade });
+    if (!model) { console.log(`${id}: does not convert: ${why}`); continue; }
+    const file = join(out, `${model.id}.json`);
+    writeFileSync(file, `${JSON.stringify(model, null, 2)}\n`);
+    console.log(`${id} -> ${file}`);
   }
 }
 

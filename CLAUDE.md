@@ -415,7 +415,7 @@ node tools/profiles/gotharman/make-profiles.mjs --check
 node tools/profiles/radikal/make-profiles.mjs --check
 node tools/profiles/kodamo/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
-node CE/dpd/tools/from-legacy.mjs --check     # the Designer's DPD models of the profiles; if stale, run it with --all
+node CE/dpd/tools/from-legacy.mjs --check     # every profile converts to the DPD model the Designer opens, and emits back
 ```
 
 and build `CEditorDeviceProfileTests` **in Release** (`cmake --build build/native --config Release

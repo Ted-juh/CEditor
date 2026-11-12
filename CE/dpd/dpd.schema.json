@@ -305,7 +305,7 @@
       "description": "How a logical value maps to/from wire bytes. The same primitive expresses simple u7 through Korg 8->7 block packing; round-trip (encode then decode) must be identity across the full range.",
       "properties": {
         "type": {
-          "enum": ["u7", "u8", "s7", "u14", "u14-lsb", "nibbles", "packed8to7", "bitslice", "text-ascii", "text-nibbled-ascii"],
+          "enum": ["u7", "u8", "s7", "u14", "u14-lsb", "nibbles", "packed8to7", "bitslice", "text-ascii", "text-nibbled-ascii", "s14-lsb-msb", "s17-msb-lsb", "s21-lsb-msb", "s21-msb-lsb", "boolean-u7"],
           "description": "u7=1 byte 0-127. u8=1 byte 0-255. s7=signed centered. u14=14-bit value over two 7-bit bytes, MSB first (Yamaha/Roland 2-byte fields); u14-lsb=LSB first. nibbles=value split across N nibble bytes (high nibble first). packed8to7=Korg block packing. bitslice=value assembled from declared bit-slices. text-ascii=`length` ASCII bytes, padded with `pad`; text-nibbled-ascii=the same, each character split across two nibble bytes."
         },
         "bytes": { "type": "integer", "minimum": 1, "description": "Wire byte count for nibbles/u8." },
@@ -525,19 +525,24 @@
     "dumpLayoutEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["param", "offset"],
-      "description": "One parameter's place in a dump's byte payload. Explicit - a device's dump byte order is NOT derivable from scope addresses.",
+      "required": ["param"],
+      "anyOf": [{ "required": ["offset"] }, { "required": ["record"] }],
+      "description": "One parameter's place in a dump's byte payload, by offset, or by record in a dump of key/value records. Explicit - a device's dump byte order is NOT derivable from scope addresses.",
       "properties": {
         "param": { "type": "string", "description": "Parameter reference: a resolved id (e.g. 'tone1.filter.cutoff') or scope-relative 'scopeId.paramId'." },
         "offset": { "type": "integer", "minimum": 0, "description": "Byte offset within the (unpacked) payload." },
         "size": { "type": "integer", "minimum": 1, "description": "Byte count; defaults to the codec's natural size." },
+        "record": { "type": "integer", "minimum": 0, "description": "In a dump of key/value records (payload.records): the key of the record holding the value, instead of an offset." },
+        "scope": { "type": "object", "description": "With record: the record of another key it must follow, and that record's value (the part being edited)." },
+        "when": { "type": "object", "description": "Read only when the payload byte at `offset` holds `value` (a field whose meaning another byte selects)." },
+        "engine": { "type": "object", "description": "Engine-only mapping details the emitter lays over what it derives (a codec the DPD does not name, such as bitfields); written by tools/from-legacy.mjs." },
         "codec": {
           "type": "object",
           "additionalProperties": true,
           "required": ["type"],
           "description": "Per-dump codec; defaults to the parameter's own encoding. Superset of $defs.encoding: also u14 (two-byte MSB-first) and text (patch names).",
           "properties": {
-            "type": { "enum": ["u7", "u8", "s7", "nibbles", "packed8to7", "bitslice", "u14", "text-ascii", "text-nibbled-ascii"] },
+            "type": { "enum": ["u7", "u8", "s7", "nibbles", "packed8to7", "bitslice", "u14", "u14-lsb", "text-ascii", "text-nibbled-ascii"] },
             "length": { "type": "integer", "minimum": 1, "description": "For text codecs: character count." },
             "pad": { "type": "integer", "description": "For text codecs: pad byte (default 32 = space)." }
           }
@@ -554,6 +559,7 @@
         "name": { "type": "string" },
         "kind": { "enum": ["patch", "performance", "bank"] },
         "spans": { "type": "array", "items": { "type": "string" }, "description": "Scope ids this dump covers (a performance spans global + all parts)." },
+        "frameOnly": { "type": "boolean", "description": "A message that frames a collection and maps nothing (a Yamaha bulk header or footer): emitted all the same, with no mappings." },
         "requestShape": { "type": "string", "description": "messageShape id used to request this dump." },
         "message": {
           "type": "object",

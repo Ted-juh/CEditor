@@ -87,8 +87,11 @@ export function buildDumpDefinitions(resolved) {
   // Only dumps with real byte framing (a matcher + a layout) become engine dumpDefinitions. A dump
   // declared with just spans/requestShape is an unmapped placeholder (e.g. the GAIA, whose layout needs
   // its manual) — emit nothing for it so the legacy file stays clean, and flag it.
-  const dumps = all.filter((d) => d.message?.matcher && (d.layout?.length));
-  for (const d of all) if (!(d.message?.matcher && d.layout?.length))
+  // A dump marked frameOnly is emitted with an empty layout too: a Yamaha bulk header or footer frames
+  // the collection and maps nothing.
+  const framed = (d) => d.message?.matcher && (d.layout?.length || d.frameOnly === true);
+  const dumps = all.filter(framed);
+  for (const d of all) if (!framed(d))
     notes.push(`dump ${d.id}: declared without a byte layout (message.matcher + layout) — no engine dumpDefinition emitted; supply its byte map from the device manual/capture`);
   if (!dumps.length) return { dumpDefinitions: undefined, notes };
 
@@ -119,17 +122,23 @@ export function buildDumpDefinitions(resolved) {
     // roland-7bit / sum-7bit / xor are all computed by the engine's dump decoder.
     if (m.checksum && m.checksum.type !== 'none')
       def.checksum = { type: m.checksum.type, fromOffset: m.checksum.fromOffset, toOffset: m.checksum.toOffset, byteOffset: m.checksum.byteOffset };
-    def.completion = {
-      expectedMessages: m.completion?.messages ?? 1,
-      expectedBytes: m.completion?.bytes ?? assembleDump(d, {}, resolved).length,
-    };
+    // A count given as null is left out (a collection the instrument sizes, ended by its footer).
+    def.completion = {};
+    if (m.completion?.messages !== null) def.completion.expectedMessages = m.completion?.messages ?? 1;
+    if (m.completion?.bytes !== null) def.completion.expectedBytes = m.completion?.bytes ?? assembleDump(d, {}, resolved).length;
     def.mappings = (d.layout ?? []).map((e) => {
       const p = paramMap[e.param];
       const codec = legacyDumpCodec(e.codec, note);
-      return { parameter: p ? legacyParamId(p) : e.param, offset: e.offset, ...(codec ? { codec } : {}) };
+      // A record's mapping names its record, not an offset; `engine` carries what else it has.
+      const mapping = {
+        parameter: p ? legacyParamId(p) : e.param, ...(e.offset != null ? { offset: e.offset } : {}), ...(codec ? { codec } : {}),
+        // A record's key (and the record it follows), and a condition on another payload byte.
+        ...Object.fromEntries(['record', 'scope', 'when'].filter((k) => e[k] != null).map((k) => [k, structuredClone(e[k])])),
+      };
+      return applyEngine(mapping, e.engine);
     });
     if (d.requestShape) def.requestRecipe = d.requestShape;
-    return def;
+    return applyEngine(def, d.engine);
   });
   return { dumpDefinitions, notes };
 }
@@ -247,7 +256,10 @@ function legacyParam(p) {
   // A name is committed, not dragged.
   out.sendPolicy = { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
-  out.messageRecipe = p.wires?.write?.msg === 'cc' ? ccRecipeId(p.wires.write)
+  // A parameter only read back (from a dump) has no write wire and is sent with nothing; a converted
+  // one says so with `wires: []`. One with no wires list at all keeps the DT1 it always defaulted to.
+  out.messageRecipe = p.wiresDeclaredEmpty ? undefined
+    : p.wires?.write?.msg === 'cc' ? ccRecipeId(p.wires.write)
     : p.wires?.write?.msg === 'nrpn' ? numberRecipeId('nrpn', p.wires.write)
     : p.wires?.write?.msg === 'rpn' ? numberRecipeId('rpn', p.wires.write)
     : (p.wires?.write?.shape ?? p.wires?.write?.msg ?? 'dt1');
@@ -260,6 +272,7 @@ function legacyParam(p) {
   const rx = p.wires?.rxLive;
   const writeCc = p.wires?.write?.msg === 'cc' ? p.wires.write.cc : null;
   if (rx?.msg === 'cc' && rx.cc != null && rx.cc !== writeCc) out.inbound = [{ kind: 'cc', controller: rx.cc }];
+  if (out.messageRecipe === undefined) delete out.messageRecipe;
   out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
   if (p.description != null) out.description = p.description;
   return applyEngine(out, p.engine);

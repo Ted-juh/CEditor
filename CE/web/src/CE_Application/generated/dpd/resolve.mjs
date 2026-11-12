@@ -58,6 +58,8 @@ export function resolveParams(resolved) {
           // its description, and `engine`, the engine-only details the emitter lays over what it
           // derives (tools/from-legacy.mjs computes it as exactly that difference).
           ...(p.description != null ? { description: p.description } : {}),
+          // `wires: []`: a parameter sent with nothing, only read back (from a dump).
+          ...(Array.isArray(p.wires) && p.wires.length === 0 ? { wiresDeclaredEmpty: true } : {}),
           ...(p.engine ? { engine: p.engine } : {}),
           wires: resolveWires(p, absAddr, idx, (rel) => bytesToHex(resolveAddress(base, stride, idx, hexToBytes(rel)))),
         });

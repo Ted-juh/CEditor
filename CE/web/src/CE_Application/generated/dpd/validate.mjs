@@ -14,7 +14,10 @@ const DUMP_KINDS = ['patch', 'performance', 'bank'];
 // ten bytes of ASCII at one address — and modelling it as ten one-byte parameters gives you ten
 // knobs where a name field belongs, and a librarian with nothing to read.
 const TEXT_CODEC_TYPES = ['text-ascii', 'text-nibbled-ascii'];
-const PARAM_ENCODING_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
+// The engine's wider signed values (an Andromeda's s17, a KRONOS's s21) and its boolean with wire
+// values of its own, which profiles converted from the engine's format carry (tools/from-legacy.mjs).
+const ENGINE_ENCODING_TYPES = ['s14-lsb-msb', 's17-msb-lsb', 's21-lsb-msb', 's21-msb-lsb', 'boolean-u7'];
+const PARAM_ENCODING_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES, ...ENGINE_ENCODING_TYPES];
 // per-offset dump codecs: the value-encoding set plus the two text (patch-name) codecs.
 const DUMP_CODEC_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
 const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
@@ -146,7 +149,8 @@ export function validateProfile(profile) {
     }
     (d.layout ?? []).forEach((e, i) => {
       if (!e.param || typeof e.param !== 'string') E(`dump ${d.id}: layout[${i}] needs a param ref`);
-      if (!Number.isInteger(e.offset) || e.offset < 0) E(`dump ${d.id}: layout[${i}] needs an integer offset >= 0`);
+      // An entry is placed by its offset, or in a dump of records by its record's key.
+      if (e.record != null ? !Number.isInteger(e.record) || e.record < 0 : !Number.isInteger(e.offset) || e.offset < 0) E(`dump ${d.id}: layout[${i}] needs an integer offset >= 0, or a record`);
       if (e.codec && !DUMP_CODEC_TYPES.includes(e.codec.type)) E(`dump ${d.id}: layout[${i}] bad codec.type ${e.codec.type}`);
     });
   }

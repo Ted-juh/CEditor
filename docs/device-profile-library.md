@@ -647,24 +647,25 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **Reading controllers back ignores the channel.** When a synth sends a controller, CEditor finds
   the parameter by its message with the channel masked out. For a profile with two parts on two
   channels (the JP-08), a knob turned on the Lower part is read as the Upper part's.
-- **The Device Profile Designer** opens the profiles it was built with and the 244 converted from
-  the profiles here (see [In the Device Profile Designer](#in-the-device-profile-designer)). The
-  116 that read a dump back open empty there until they are converted; they work in the Device tool
-  and in bindings.
+- **The Device Profile Designer is slow on the largest profiles.** It draws every parameter and
+  every field of a dump: a FANTOM opens in about 7 seconds, a KRONOS drum kit (20,000 parameters)
+  in about 30.
 
 ## In the Device Profile Designer
 
-The profiles are written in the format the engine reads. Each is also converted into a model of the
-Device Profile Designer (`CE/dpd/converted/`, by `CE/dpd/tools/from-legacy.mjs`), which the Designer
-opens when its profile is: the parameters with their names, groups, ranges and choices, and the
-message each is sent with. A model is kept only if emitting it gives its profile back, every field
-equal and every parameter sending the same bytes at the ends and middle of its range and at every
-choice.
+The profiles are written in the format the engine reads. The Device Profile Designer opens each as a
+DPD model, converted from the profile when it opens (`CE/dpd/from-legacy-core.mjs`): the parameters
+with their names, groups, ranges and choices and the message each is sent with, the message shapes,
+and the dumps with their framing, checksum and layout. SysEx written out in full for each parameter
+(a KRONOS, an Andromeda) becomes one message shape with an address for each parameter, the bytes
+that differ between their messages. What the DPD does not describe, a send policy or a KRONOS's
+bit-field codecs, is carried for the engine as it is.
 
-So far 244 are converted: every profile sent as control changes, NRPNs or SysEx that does not read a
-dump back. SysEx written out in full for each parameter (a KRONOS, an Andromeda) becomes one message
-shape with an address for each parameter, the bytes that differ between their messages. The 116
-that read a dump back have not been converted yet, and the Designer opens them empty.
+Every one of the 360 converts, and emitting the model gives the profile back: every field equal, and
+every parameter sending the same bytes at the ends and middle of its range and at every choice
+(`node CE/dpd/tools/from-legacy.mjs --check`, and a test). So a profile saved from the Designer
+without edits sends and reads exactly what it did; it also carries the model it was saved from, so
+the Designer opens that next time.
 
 ## Adding to it
 

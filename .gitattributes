@@ -15,9 +15,6 @@
 *.cepanel                     text eol=lf
 *.ceditor-device.json         text eol=lf
 CE/web/test/golden/*.txt      text eol=lf
-# The DPD models converted from the device profiles (CE/dpd/tools/from-legacy.mjs): one line of JSON
-# each, regenerated rather than edited, so their diffs say nothing a reviewer can use.
-CE/dpd/converted/*.json       text eol=lf -diff linguist-generated
 
 # Binaries, so nothing tries to normalize them.
 *.png    binary

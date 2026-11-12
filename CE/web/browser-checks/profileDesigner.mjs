@@ -1,9 +1,9 @@
 /**
  * The Device Profile Designer, driven in Chromium. Run with the rest: `npm run test:browser`.
  *
- *   - a profile generated from its maker's document (arturia-microfreak) opens the DPD model
- *     converted from it: its label in the title, its parameters on the Parameters screen, the CC
- *     each is sent on — fetched as a chunk of its own, not bundled with the editor
+ *   - a profile generated from its maker's document (arturia-microfreak) opens as the DPD model
+ *     converted from it when its source arrives (the page hands it over as the engine would): its
+ *     label in the title, its parameters on the Parameters screen, the CC each is sent on
  *   - a 14-bit pair and an NRPN profile open the same way (moog-sub-37, sequential-prophet-6), every
  *     parameter counted as addressed: an NRPN wire is an address as much as a CC
  *   - a hand-made DPD profile (roland-gaia-dpd) still opens from the bundled library
@@ -17,11 +17,14 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../dist-scenery');
+// The engine profiles, served where the page asks for them (./profiles/<id>.ceditor-device.json).
+const PROFILES = join(dirname(fileURLToPath(import.meta.url)), '../../profiles/test');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
 const server = createServer(async (req, res) => {
   try {
-    const body = await readFile(join(ROOT, decodeURIComponent(req.url.split('?')[0])));
+    const path = decodeURIComponent(req.url.split('?')[0]);
+    const body = await readFile(path.startsWith('/profiles/') ? join(PROFILES, path.slice('/profiles/'.length)) : join(ROOT, path));
     res.writeHead(200, { 'content-type': TYPES[extname(req.url.split('?')[0])] ?? 'application/octet-stream' });
     res.end(body);
   } catch { res.writeHead(404); res.end('not found'); }
@@ -53,19 +56,39 @@ for (const [profile, label, param, wire] of [
   ['arturia-microfreak', 'Arturia MicroFreak', 'Spice', 'CC 2'],
   ['moog-sub-37', null, null, null],
   ['sequential-prophet-6', null, null, null],
+  ['waldorf-blofeld', 'Waldorf Blofeld', null, null],
+  ['roland-jd-xi', null, null, null],
 ]) {
   await check(`${profile}: opens its converted DPD model`, async () => {
-    const { page, errors, requested } = await open(profile);
+    const { page, errors } = await open(profile);
     await page.waitForFunction(() => !/No profile/.test(document.querySelector('.crumb')?.textContent ?? 'No profile'), null, { timeout: 15000 });
     const crumb = await page.textContent('.crumb');
     if (label) assert.match(crumb, new RegExp(label), 'its label in the title');
     const text = await page.textContent('.dpd-app');
     if (param) assert.match(text, new RegExp(param), `${param} on the Parameters screen`);
     if (wire) assert.match(text.replace(/\s+/g, ' '), new RegExp(wire.replace(' ', '\\s*')), `${param} sent on ${wire}`);
-    assert.ok(requested.some((u) => /\/assets\/.+\.js/.test(u) && !/profileDesigner/.test(u)), 'the model arrives as a chunk of its own');
     // Every parameter has a write wire the Designer counts (CC, CC pair, NRPN): none "needs a write address".
     const [, clean, all] = /(\d+) of (\d+)\s*round-trip cleanly/.exec(text.replace(/\s+/g, ' ')) ?? [];
     assert.ok(all && clean === all, `${clean} of ${all} round-trip cleanly`);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+}
+
+// Profiles that read a dump back: the Bulk dumps screen shows their layouts, without an error, even a
+// KRONOS's (1,662 fields of 2,862 parameters, bit fields carried for the engine) and a Yamaha's
+// collection. Its rows once each held a <select> of every parameter, which hung the designer.
+for (const [profile, dumps] of [['waldorf-blofeld', 1], ['korg-kronos', 1], ['yamaha-reface-dx', 2]]) {
+  await check(`${profile}: its dumps on the Bulk dumps screen`, async () => {
+    const { page, errors } = await open(profile);
+    await page.waitForFunction(() => !/No profile/.test(document.querySelector('.crumb')?.textContent ?? 'No profile'), null, { timeout: 20000 });
+    const summary = await page.textContent('.dpd-app');
+    const [, count] = /(\d+)\s*dumps?/.exec(summary.replace(/\s+/g, ' ')) ?? [];
+    assert.ok(Number(count) >= dumps, `${count} dumps listed`);
+    // On the Bulk dumps screen itself: the first dump's layout, a row a field.
+    await page.locator('.tnode', { hasText: 'Bulk dumps' }).click();
+    await page.waitForSelector('.screen.active .dlrow', { timeout: 20000 });
+    assert.ok(await page.locator('.screen.active .dlrow').count() >= 1, 'its layout rows');
     assert.deepEqual(errors, []);
     await page.close();
   });

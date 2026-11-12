@@ -160,9 +160,6 @@ export default defineConfig(({ command }) => ({
         fileURLToPath(new URL('../../tools/ctrl49', import.meta.url)),
         // The XML reader the SVG panel importer shares with the Ctrlr importer.
         fileURLToPath(new URL('../../tools/ctrlr-import', import.meta.url)),
-        // The DPD models converted from the generated device profiles, which the Device Profile
-        // Designer loads one at a time (editor/dpd/convertedModels.js).
-        fileURLToPath(new URL('../dpd/converted', import.meta.url)),
       ],
     },
     headers: {

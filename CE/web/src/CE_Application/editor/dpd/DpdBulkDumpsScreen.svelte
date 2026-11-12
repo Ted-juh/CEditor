@@ -19,7 +19,14 @@
   let active = $derived(dumps[Math.min(selected, Math.max(0, dumps.length - 1))] ?? null);
   let isMapped = $derived(!!(active?.message?.matcher && active?.layout?.length));
 
-  let paramOptions = $derived(merged ? resolveParams(merged).map((p) => ({ id: p.resolvedId, name: p.name ?? p.paramId })) : []);
+  let paramOptions = $derived(merged ? resolveParams(merged).map((p) => ({ id: p.resolvedId, name: p.name ?? p.paramId, paramId: p.paramId })) : []);
+  // A layout entry names its parameter by resolved id, or (a model converted from an engine profile)
+  // by the parameter's own id: either finds its name.
+  let nameOf = $derived(new Map(paramOptions.flatMap((o) => [[o.paramId, o.name], [o.id, o.name]])));
+  // One list of parameters for every row to choose from. A <select> of every parameter in every row
+  // was rows x parameters elements: a KRONOS program dump (1,662 rows, 2,862 parameters) built 4.7
+  // million <option>s and hung the designer, which mounts this screen when it opens.
+  const listId = `dpd-dump-params-${Math.random().toString(36).slice(2, 8)}`;
 
   // resolved byte map + probe wire (zero values → shows framing + checksum) + live round-trip
   let map = $derived(isMapped ? safe(() => dumpByteMap(active, merged)) : null);
@@ -119,10 +126,8 @@
         {@const fail = fieldFails.has(entry.param)}
         <div class="dlrow">
           <span class="nc-wrap"><NumberCell min={0} value={entry.offset} onchange={(v) => entry.offset = v} /></span>
-          <select class="psel" bind:value={entry.param}>
-            {#each paramOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
-            {#if !paramOptions.some((o) => o.id === entry.param)}<option value={entry.param}>{entry.param} (name)</option>{/if}
-          </select>
+          <input class="psel" list={listId} value={entry.param} title={nameOf.get(entry.param) ?? entry.param}
+            onchange={(e) => { entry.param = e.currentTarget.value; }} />
           <select class="csel" value={entry.codec?.type ?? 'u7'} onchange={(e) => setCodec(entry, e.target.value)}>
             {#each CODECS as c (c)}<option value={c}>{c}</option>{/each}
           </select>
@@ -137,6 +142,7 @@
           <button class="xbtn" title="remove" onclick={() => removeField(active, i)}>✕</button>
         </div>
       {/each}
+      <datalist id={listId}>{#each paramOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}</datalist>
       <button class="addslot asbtn" onclick={() => addField(active)}>+ Add parameter</button>
     </div>
   {:else if active}
