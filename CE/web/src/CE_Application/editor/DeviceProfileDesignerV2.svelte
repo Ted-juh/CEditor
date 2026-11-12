@@ -322,7 +322,7 @@
           <DpdOverviewScreen {model} {merged} shown={activeScreen === 'overview'} />
         </div>
         <div class={['screen', activeScreen === 'device' && 'active']}>
-          <DpdDeviceStructureScreen {model} {merged} />
+          <DpdDeviceStructureScreen {model} {merged} shown={activeScreen === 'device'} />
         </div>
         <div class={['screen', activeScreen === 'messages' && 'active']}>
           <DpdMessageShapesScreen {merged} />

@@ -22,7 +22,7 @@
 
 import { resolveModel, copyJson } from './resolve.mjs';
 import { hexToBytes, bytesToHex, resolveAddress } from './codecs.mjs';
-import { buildLegacyProfile } from './emit-legacy-core.mjs';
+import { buildLegacyProfile, fillShape } from './emit-legacy-core.mjs';
 
 /** Structural equality of JSON values: what node's isDeepStrictEqual is for parsed JSON, in a browser too. */
 export function deepEqual(a, b) {
@@ -205,7 +205,7 @@ function nativeDump(d) {
     id: d.id,
     name: d.name ?? d.id,
     kind: 'patch',
-    ...(d.requestRecipe ? { requestShape: d.requestRecipe } : {}),
+    ...(d.requestRecipe ? { request: d.requestRecipe } : {}),
     ...(d.mappings?.length ? {} : { frameOnly: true }),
     message: {
       matcher: copyJson(d.matcher),
@@ -391,7 +391,12 @@ function foldScopes(params, base, innermost, skip = new Set()) {
   const scopes = {};
   const key = (k) => { let out = k; for (let n = 2; out in scopes; n += 1) out = `${k}_${n}`; return out; };
   let flat = [];
-  const flush = () => { if (flat.length) { scopes[key('global')] = { kind: 'global', label: 'Parameters', instances: 1, ...base, parameters: flat }; flat = []; } };
+  // The parameters between two folded blocks, named after the groups they hold.
+  const groupsOf = (ps) => {
+    const groups = [...new Set(ps.map((p) => p.group).filter((g) => typeof g === 'string' && g))];
+    return groups.length ? groups.slice(0, 2).join(', ') + (groups.length > 2 ? ` +${groups.length - 2} more` : '') : 'Parameters';
+  };
+  const flush = () => { if (flat.length) { scopes[key('global')] = { kind: 'global', label: groupsOf(flat), instances: 1, ...base, parameters: flat }; flat = []; } };
   for (let b = 0; b < blocks.length;) {
     const first = blocks[b];
     let e = b + 1;
@@ -426,8 +431,13 @@ function foldRun(run, params) {
     if (!p) return null;
     folded.push(p);
   }
+  // Named after its group as a person reads it ('Digital {n} · Part' -> 'Digital · Part'), with the
+  // repeated segment when the group does not number it ('Delay' and parameter{n} -> 'Delay · Parameter').
   const groupTemplate = folded[0].group;
-  const label = typeof groupTemplate === 'string' && groupTemplate.includes('{n}') ? groupTemplate.replace(/\s*\{n\}\s*/, ' ').trim() : prefix;
+  const word = prefix.replace(/^./, (c) => c.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2');
+  const label = typeof groupTemplate !== 'string' || !groupTemplate.trim() ? word
+    : groupTemplate.includes('{n}') ? groupTemplate.replace(/\s*\{n\}\s*/, ' ').replace(/\s{2,}/g, ' ').trim()
+    : groupTemplate.toLowerCase().includes(prefix.toLowerCase()) ? groupTemplate : `${groupTemplate} · ${word}`;
   return {
     kind: /fx|effect|eq|reverb|chorus|delay|insert/i.test(prefix) ? 'effect' : /tone|partial|osc|voice|layer|timbre/i.test(prefix) ? 'tone' : 'part',
     label, instances: run.length, first: ns[0], base: '00', stride: bytesToHex(stride),
@@ -472,6 +482,62 @@ function withScopes(model) {
 
 export function emitModel(model) {
   return buildLegacyProfile(resolveModel(model, {}));
+}
+
+const hexOf = (bytes) => (Array.isArray(bytes) ? bytes.join(' ') : bytes);
+const mostCommon = (values) => {
+  const counts = new Map();
+  for (const v of values) { const k = JSON.stringify(v); counts.set(k, (counts.get(k) ?? 0) + 1); }
+  const [top] = [...counts].sort((a, b) => b[1] - a[1]);
+  return top ? JSON.parse(top[0]) : undefined;
+};
+
+/**
+ * The device's conversation as the DPD's own fields: its device id and variables, the pause between
+ * messages, its identity, what it can be asked (`requests`) and what is asked when it connects
+ * (`startup`). A request written out per address (a Roland RQ1, address and size and checksum) names
+ * its message shape and the address and size it asks for, when the shape fills to exactly its bytes.
+ */
+function nativeConversation(legacy, model) {
+  const { deviceId, ...variables } = legacy.variables ?? {};
+  if (Number.isInteger(deviceId)) model.deviceId = deviceId.toString(16).toUpperCase().padStart(2, '0');
+  else if (deviceId !== undefined) variables.deviceId = deviceId;
+  if (Object.keys(variables).length) model.variables = variables;
+  if (legacy.timing) model.timing = copyJson(legacy.timing);
+  if (legacy.identity) {
+    const { manufacturerId, familyCode, modelNumber, requestDeviceId, revision } = legacy.identity;
+    model.identity = {
+      ...(manufacturerId ? { manufacturerId: hexOf(manufacturerId) } : {}),
+      ...(familyCode ? { family: hexOf(familyCode) } : {}),
+      ...(modelNumber ? { member: hexOf(modelNumber) } : {}),
+      ...(requestDeviceId != null ? { requestDeviceId } : {}),
+      ...(revision ? { revision: hexOf(revision) } : {}),
+    };
+  }
+  const requests = legacy.requests ?? [];
+  if (requests.length) {
+    const defaults = mostCommon(requests.map((r) => ({ timeoutMs: r.timeoutMs, retries: r.retries })));
+    model.defaults = { ...(model.defaults ?? {}), request: defaults };
+    const shapes = model.messageShapes ?? [];
+    model.requests = requests.map((r) => {
+      const { id, name, kind, template, address, size, response, timeoutMs, retries, ...rest } = r;
+      const q = { id, ...(name !== undefined && name !== id ? { name } : {}) };
+      const shape = address && size
+        ? shapes.find((s) => (s.template ?? []).includes('$size') && JSON.stringify(fillShape(s, { address, size })) === JSON.stringify(template))
+        : null;
+      if (shape) Object.assign(q, { shape: shape.id, address, size });
+      else Object.assign(q, { template: copyJson(template ?? []), ...(address ? { address } : {}), ...(size ? { size } : {}), ...(kind && kind !== 'sysex' ? { kind } : {}) });
+      if (response !== undefined) q.response = copyJson(response);
+      if (timeoutMs !== defaults.timeoutMs) q.timeoutMs = timeoutMs;
+      if (retries !== defaults.retries) q.retries = retries;
+      if (Object.keys(rest).length) q.engine = copyJson(rest);
+      return q;
+    });
+  }
+  if (legacy.startup) {
+    const { sync, ...rest } = legacy.startup;
+    model.startup = { ...copyJson(rest), ...(sync ? { sync: sync.map((s) => (Object.keys(s).length === 1 && typeof s.request === 'string' ? s.request : copyJson(s))) } : {}) };
+  }
 }
 
 /** An engine profile -> { model } or { why }: the DPD model whose emission gives that profile back. */
@@ -523,6 +589,7 @@ export function legacyToDpd(legacy, { handMade = new Set() } = {}) {
   for (const p of params) if (defaults[p.valueType] && JSON.stringify(p.sendPolicy) === JSON.stringify(defaults[p.valueType])) delete p.sendPolicy;
   if (Object.keys(defaults).length) model.defaults = { sendPolicy: defaults };
   if (legacy.presets && !legacy.presets.nameRequest) model.presets = copyJson(legacy.presets);
+  nativeConversation(legacy, model);
   if (legacy.dumpDefinitions?.length) model.dumps = legacy.dumpDefinitions.map(nativeDump);
 
   // What the emitter derives from the DPD fields alone, and what it must be told besides.

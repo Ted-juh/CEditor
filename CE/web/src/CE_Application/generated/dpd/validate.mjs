@@ -156,6 +156,7 @@ export function validateProfile(profile) {
   }
 
   if (profile.presets) validatePresets(profile.presets, E);
+  validateConversation(profile, E);
 
   if (profile.provenance && !['official', 'community', 'imported', 'learn'].includes(profile.provenance.source))
     E('bad provenance.source');
@@ -163,6 +164,42 @@ export function validateProfile(profile) {
     E('bad completeness');
 
   return { ok: errs.length === 0, errors: errs };
+}
+
+// The device's conversation: its variables, the pause between messages, what it can be asked
+// (`requests`, each by a message shape with an address and size, or written out) and what is asked
+// when it connects (`startup.sync`, request ids in order). Kept in step with dpd.schema.json.
+function validateConversation(profile, E) {
+  for (const [name, value] of Object.entries(profile.variables ?? {})) {
+    if (!Number.isInteger(value)) E(`variables.${name}: must be an integer`);
+  }
+  if (profile.deviceId != null && !/^[0-9A-Fa-f]{2}$/.test(profile.deviceId)) E('deviceId must be one hex byte');
+  const delay = profile.timing?.minDelayBetweenMessagesMs;
+  if (profile.timing && !(Number.isInteger(delay) && delay >= 0)) E('timing.minDelayBetweenMessagesMs must be an integer >= 0');
+  const shapes = new Map((profile.messageShapes ?? []).map((s) => [s.id, s]));
+  const dumpIds = new Set((profile.dumps ?? []).map((d) => d.id));
+  const requestIds = new Set();
+  for (const [i, r] of (profile.requests ?? []).entries()) {
+    const id = r.id ?? `[${i}]`;
+    if (!r.id) E(`requests[${i}]: needs an id`);
+    else if (requestIds.has(r.id)) E(`requests: duplicate id ${r.id}`);
+    requestIds.add(r.id);
+    if (r.shape) {
+      const shape = shapes.get(r.shape);
+      if (!shape) E(`request ${id}: unknown message shape ${r.shape}`);
+      else for (const [token, field] of [['$address', 'address'], ['$size', 'size']]) {
+        if (shape.template.includes(token) && !r[field]) E(`request ${id}: shape ${r.shape} needs its ${field}`);
+      }
+    } else if (!(Array.isArray(r.template) && r.template.length)) E(`request ${id}: needs a message shape or a template`);
+    for (const field of ['address', 'size']) if (r[field] && !ADDRESS_RE.test(r[field])) E(`request ${id}: bad ${field}`);
+    if (r.response?.dump && !dumpIds.has(r.response.dump)) E(`request ${id}: answered by an unknown dump ${r.response.dump}`);
+    for (const field of ['timeoutMs', 'retries']) if (r[field] != null && !(Number.isInteger(r[field]) && r[field] >= 0)) E(`request ${id}: ${field} must be an integer >= 0`);
+  }
+  for (const d of profile.dumps ?? []) if (d.request && !requestIds.has(d.request)) E(`dump ${d.id}: asked for by an unknown request ${d.request}`);
+  for (const [i, s] of (profile.startup?.sync ?? []).entries()) {
+    const rid = typeof s === 'string' ? s : s?.request;
+    if (!requestIds.has(rid)) E(`startup.sync[${i}]: unknown request ${rid}`);
+  }
 }
 
 // The preset model: slot map (banks), recall action, name request, init patch. Kept in step with

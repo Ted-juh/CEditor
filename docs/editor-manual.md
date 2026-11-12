@@ -873,10 +873,15 @@ Open it with **Designer** in the Device tool, **DPD** under the context bar's **
 Device Profile**. Its screens are listed on the left:
 
 - **Overview** — what the profile is based on, and how complete it is.
-- **Parameters** — every parameter, its message and its range. **+ Add parameter** adds one; the lists
-  of choices of a parameter can be edited in the drawer on the right.
+- **Parameters** — every parameter, its message and its range. A parameter of a repeated block (a
+  part, a drum key) is listed once, marked with how many there are (×37). Type in the search box to
+  find one by name, group, message or address (`cutoff`, `CC 74`, `19 01 00`). **+ Add parameter**
+  adds one; the lists of choices of a parameter can be edited in the drawer on the right.
 - **Bulk dumps** — the dumps the synth sends, with a map of which byte holds which parameter.
-- **Device structure** and **Message shapes** — how the synth's SysEx messages are built.
+- **Device structure** — how CEditor talks to the synth: its device ID and channel, the pause between
+  messages, how it answers a device inquiry, its parameters' blocks and how often each repeats, what
+  it can be asked (each request, and the dump that answers it) and what is asked when it connects.
+- **Message shapes** — how the synth's SysEx messages are built.
 - **Advanced** — the whole profile as text, to edit anything the other screens cannot, with
   **Validate** and **Apply**.
 - **Share & impact** — what a change would break in panels that already use the profile.

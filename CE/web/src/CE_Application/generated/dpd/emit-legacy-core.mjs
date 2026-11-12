@@ -4,7 +4,7 @@
 // file. DEVICE-AGNOSTIC: manufacturer / family / identity / message recipes / CC controllers are all
 // derived from the resolved profile — no device is special-cased. Imports only browser-safe siblings.
 import { resolveParams, copyJson } from './resolve.mjs';
-import { hexToBytes } from './codecs.mjs';
+import { hexToBytes, checksumOf } from './codecs.mjs';
 import { assembleDump } from './dumps.mjs';
 
 const flat = (rid) => rid.replace(/^[^.]+\./, '');
@@ -143,7 +143,9 @@ export function buildDumpDefinitions(resolved) {
       };
       return applyEngine(mapping, e.engine);
     });
-    if (d.requestShape) def.requestRecipe = d.requestShape;
+    // The request that asks for it: one of the model's `requests` by id (`request`), or, in a model
+    // written before requests were its own, the id under `requestShape`.
+    if (d.request ?? d.requestShape) def.requestRecipe = d.request ?? d.requestShape;
     return applyEngine(def, d.engine);
   });
   return { dumpDefinitions, notes };
@@ -180,6 +182,58 @@ export function buildDumpRequests(resolved, modelBytes, emittedDumpIds = null) {
     });
   }
   return out;
+}
+
+/**
+ * A message shape's template with a request's own values in place: `$address` and `$size` its bytes,
+ * `$modelId` the model's, and `$checksum` computed over the shape's checksum range once those are
+ * filled. Any other `$name` ($deviceId) stays for the engine to fill when it sends. Null when the
+ * checksum's range still holds a `$name`, which only the engine knows.
+ */
+export function fillShape(shape, { address, size } = {}, modelBytes = []) {
+  const parts = (shape.template ?? []).map((tok) => (tok === '$address' && address ? toBytes(address)
+    : tok === '$size' && size ? toBytes(size)
+    : tok === '$modelId' ? modelBytes : [tok]));
+  const out = parts.flat();
+  const at = (shape.template ?? []).indexOf('$checksum');
+  if (at < 0 || !shape.checksum || shape.checksum.type === 'none') return out;
+  const from = shape.template.indexOf(shape.checksum.from), to = shape.template.indexOf(shape.checksum.to);
+  if (from < 0 || to < from) return null;
+  const range = parts.slice(from, to + 1).flat();
+  if (range.some((b) => !/^[0-9A-Fa-f]{2}$/.test(b))) return null;
+  const sum = checksumOf(shape.checksum.type, range.map((b) => parseInt(b, 16)));
+  const before = parts.slice(0, at).flat().length;
+  out[before] = sum.toString(16).toUpperCase().padStart(2, '0');
+  return out;
+}
+
+/**
+ * The model's own `requests`: what the device can be asked and what answers. A request names a
+ * message shape and the address and size it asks for (a Roland RQ1: the bytes and checksum are the
+ * shape's), or writes its message out (`template`: an identity request, a Korg dump request).
+ * `response` says what answers it (a bulk dump by id, an identity reply); a timeout and retries
+ * left out are the model's `defaults.request`.
+ */
+export function buildRequests(resolved, modelBytes) {
+  const shapes = resolved.messageShapes ?? [];
+  const defaults = resolved.defaults?.request ?? {};
+  return (resolved.requests ?? []).map((r) => {
+    const shape = r.shape ? shapes.find((s) => s.id === r.shape) : null;
+    const template = shape ? fillShape(shape, r, modelBytes) : copyJson(r.template ?? []);
+    if (r.shape && !template) throw new Error(`request ${r.id}: shape ${r.shape} cannot be filled`);
+    return {
+      id: r.id,
+      name: r.name ?? r.id,
+      kind: r.kind ?? shape?.kind ?? 'sysex',
+      template,
+      ...(r.address ? { address: r.address } : {}),
+      ...(r.size ? { size: r.size } : {}),
+      ...(r.response ? { response: copyJson(r.response) } : {}),
+      timeoutMs: r.timeoutMs ?? defaults.timeoutMs ?? 1000,
+      retries: r.retries ?? defaults.retries ?? 0,
+      ...(r.engine ?? {}),
+    };
+  });
 }
 
 /** Every `$name` a shape or matcher uses, so the emitted `variables` block can define them all. */
@@ -375,14 +429,18 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
     trust: 'local',
     // Every $name a template or matcher uses gets a home here. The engine resolves an undeclared
     // one to nothing, so a request whose address carries a $slot silently addressed byte 0.
+    // The model's own `variables` (a part's channel, an FX channel) with their values, over every
+    // other name at 0; its device id; and the channel, 1 unless it says otherwise.
     variables: {
       ...Object.fromEntries([...templateVariables(resolved)]
         .filter((n) => !['deviceId', 'modelId', 'manufacturerId', 'address', 'encodedValue', 'size', 'checksum', 'channel'].includes(n))
         .map((n) => [n, 0])),
+      ...copyJson(resolved.variables ?? {}),
       ...(resolved.deviceId != null ? { deviceId: hexToBytes(resolved.deviceId)[0] } : {}),
-      channel: 1,
+      channel: resolved.variables?.channel ?? 1,
     },
-    timing: { minDelayBetweenMessagesMs: 20 },
+    // How long the engine waits between two messages to this device.
+    timing: copyJson(resolved.timing ?? { minDelayBetweenMessagesMs: 20 }),
     parameters: params.map((p) => legacyParam(p, resolved.defaults)),
     messageRecipes,
   };
@@ -420,6 +478,10 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
         manufacturerId: toBytes(resolved.identity.manufacturerId ?? resolved.manufacturerId),
         ...(family ? { familyCode: toBytes(family) } : {}),
         ...(member ? { modelNumber: toBytes(member) } : {}),
+        // Only where the model asks: an inquiry addressed to one device id rather than all (the
+        // makers' documents that say so), and a firmware revision to match.
+        ...(resolved.identity.requestDeviceId ? { requestDeviceId: resolved.identity.requestDeviceId } : {}),
+        ...(resolved.identity.revision ? { revision: toBytes(resolved.identity.revision) } : {}),
         timeoutMs: 1000, retries: 0,
       };
     }
@@ -433,8 +495,17 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   // Gated on what dumpDefinitions actually emitted — a request whose response names a dump the
   // profile does not carry makes the engine refuse the profile outright.
   const emittedDumpIds = new Set((dumpDefinitions ?? []).map((d) => d.id));
-  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId), emittedDumpIds);
+  // The model's own requests first, then one for each dump that names only a request shape.
+  const ownRequests = buildRequests(resolved, toBytes(resolved.modelId));
+  if (ownRequests.length) legacy.requests = ownRequests;
+  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId), emittedDumpIds)
+    .filter((r) => !ownRequests.some((o) => o.id === r.id));
   if (dumpRequests.length) (legacy.requests ??= []).push(...dumpRequests);
+  // What the engine asks the device when it connects, in order: request ids.
+  if (resolved.startup) {
+    const { sync, ...rest } = resolved.startup;
+    legacy.startup = { ...copyJson(rest), ...(sync ? { sync: sync.map((s) => (typeof s === 'string' ? { request: s } : copyJson(s))) } : {}) };
+  }
 
   // Preset model: carried through verbatim (the librarian/selector reads it), plus the legacy
   // engine's scan plumbing derived from it — a `requests` entry synthesized from the referenced

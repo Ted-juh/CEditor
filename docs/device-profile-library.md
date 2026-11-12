@@ -674,7 +674,15 @@ Each parameter's kind is one of the DPD's own value types (continuous, signed, e
 trigger, momentary, text), and how it is sent as it moves (its send policy) is a DPD field: the
 model names it once per value type under `defaults.sendPolicy`, and a parameter only when it
 differs. What the DPD still does not describe, a KRONOS's bit-field codecs or the profile's notes
-and tests, is carried for the engine as it is, on fewer than 2 parameters in 100.
+and tests, is carried for the engine as it is, on fewer than 2 parameters in 100. (The KRONOS's
+bit fields are why a KRONOS dump's round trip shows as failing in the Designer: its own dump code
+does not read them yet.)
+
+How the program talks to the device is the model's own too: its device id and variables (a part's
+channel), the pause between messages, its identity, what it can be asked (`requests`) and what is
+asked when it connects (`startup`). A Roland request is its RQ1 shape and the address and size it
+asks for; the bytes and the checksum are the shape's, and the gate checks them against the profile's.
+The Device structure screen shows all of it.
 
 The Parameters screen lists each parameter once, a scope's with how many instances it stands for
 (`×37`), draws only the rows in view, and finds them by name, id, group, message or address: `cutoff`,

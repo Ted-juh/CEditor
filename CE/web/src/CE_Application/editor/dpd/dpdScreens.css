@@ -51,6 +51,16 @@
 .dpd-app .field .fin input{background:none;border:none;outline:none;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:14px;width:100%}
 .dpd-app .field .fin .unit{font-size:11px;color:var(--txt-faint);white-space:nowrap;margin-left:8px}
 .dpd-app .field .fhint{font-size:11px;color:var(--txt-faint);margin-top:8px;line-height:1.45}
+.dpd-app .dshead{display:flex;align-items:baseline;gap:14px;margin:6px 0 12px}
+.dpd-app .dshead h2{font-size:15px;font-weight:700}
+.dpd-app .dshead .lm{font-size:12px;color:var(--txt-faint)}
+.dpd-app .dstable{table-layout:fixed}
+.dpd-app .dstable td .cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dpd-app .dstable .addr{overflow:hidden;text-overflow:ellipsis}
+.dpd-app .dstable .shp{color:var(--accent);font-weight:600;margin-right:4px}
+.dpd-app .dstable .inst{font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:9px;color:var(--violet);border:1px solid rgba(169,140,240,.35);background:var(--bg-2)}
+.dpd-app .dssync{margin:0;padding-left:22px;columns:2;column-gap:28px;font-size:13px;color:var(--txt-dim)}
+.dpd-app .dssync li{margin-bottom:4px;break-inside:avoid}
 .dpd-app .reqbox{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:18px;max-width:760px}
 .dpd-app .reqbox .rl{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--txt-faint);margin-bottom:12px}
 .dpd-app .reqfield{display:flex;align-items:center;gap:12px;margin-bottom:10px}

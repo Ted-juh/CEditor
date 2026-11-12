@@ -103,3 +103,28 @@ test('a parameter names its own send policy only when its model\'s default for i
   assert.deepEqual(model.defaults.sendPolicy, { continuous: { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true } });
   assert.ok(Object.values(model.scopes).flatMap((s) => s.parameters).every((p) => p.sendPolicy === undefined && !p.engine?.sendPolicy));
 });
+
+test('the device\'s conversation is the model\'s own: requests, startup, identity, variables, timing', () => {
+  const legacy = legacyOf('roland-jd-xi');
+  const { model } = legacyToDpd(legacy, { handMade });
+  // A Roland request is its RQ1 shape and the address and size it asks for, not 18 bytes written out.
+  const setup = model.requests.find((r) => r.id === 'requestSetup');
+  assert.deepEqual(setup, { id: 'requestSetup', name: 'Request Setup', shape: 'rq1', address: '01 00 00 00', size: '00 00 00 3B', response: { kind: 'bulkDump', dump: 'setup' } });
+  assert.deepEqual(model.defaults.request, { timeoutMs: 1000, retries: 1 });
+  // The identity request is written out; it answers with an identity, once.
+  assert.deepEqual(model.requests[0], { id: 'identityRequest', name: 'Identity Request', template: ['F0', '7E', '7F', '06', '01', 'F7'], response: { kind: 'identity' }, retries: 0 });
+  assert.equal(model.startup.policy, 'pull');
+  assert.deepEqual(model.startup.sync.slice(0, 2), ['identityRequest', 'requestProgram']);
+  assert.equal(model.dumps.find((d) => d.id === 'setup').request, 'requestSetup');
+  assert.deepEqual(model.identity, { manufacturerId: '41', family: '0E 03', member: '00 00' });
+  assert.equal(model.deviceId, '10');
+  assert.deepEqual(model.timing, { minDelayBetweenMessagesMs: legacy.timing.minDelayBetweenMessagesMs });
+  for (const key of ['requests', 'startup', 'identity', 'timing', 'variables']) assert.equal(model.engine?.[key], undefined, `engine.${key}`);
+  // The shape fills to the profile's own bytes, Roland's checksum (44) included.
+  const emitted = emitModel(model).requests.find((r) => r.id === 'requestSetup');
+  assert.deepEqual(emitted.template, legacy.requests.find((r) => r.id === 'requestSetup').template);
+  // And a request that asks for the wrong address is caught.
+  setup.address = '01 00 00 01';
+  const problems = compareEmission(legacy, model, localCompileParameter);
+  assert.ok(problems.includes('profile field requests differs'), problems.join('\n'));
+});

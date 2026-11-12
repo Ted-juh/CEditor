@@ -58,7 +58,39 @@
         "family": { "type": "string", "description": "Device family code (2 bytes LSB MSB), space-hex." },
         "member": { "type": "string", "description": "Device family member code (2 bytes LSB MSB), space-hex." },
         "firmware": { "type": "string", "description": "Firmware/version match for variant resolution." },
-        "capturedReply": { "type": "string", "description": "An Identity Reply captured from the real instrument, as space-hex — the evidence behind family/member. Never matched against; kept so a measured code can be told from an authored guess." }
+        "capturedReply": { "type": "string", "description": "An Identity Reply captured from the real instrument, as space-hex — the evidence behind family/member. Never matched against; kept so a measured code can be told from an authored guess." },
+        "requestDeviceId": { "type": "string", "description": "The device id the inquiry is sent to, when the maker's document says to address it ('$deviceId', or a byte such as '7F'). Absent: 7F, all call, which every instrument answers." },
+        "revision": { "type": "string", "description": "Software revision bytes to match, space-hex. Only where the maker's document pins one; a revision pinned without cause makes a firmware update look like another instrument." }
+      }
+    },
+    "variables": {
+      "type": "object",
+      "description": "The values the device's messages are filled with unless the person sets their own: a part's channel, an FX channel, a bank. 'channel' is 1 when absent; the device id is `deviceId`.",
+      "additionalProperties": { "type": "integer" }
+    },
+    "timing": {
+      "type": "object",
+      "description": "How messages to the device are paced.",
+      "properties": {
+        "minDelayBetweenMessagesMs": { "type": "integer", "minimum": 0, "description": "The least time between two messages sent to the device. 20 when absent." }
+      }
+    },
+    "requests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/request" },
+      "description": "What the device can be asked, and what answers each: a bulk dump, an identity reply. Dumps name the request that asks for them; `startup` names those asked when the device connects."
+    },
+    "startup": {
+      "type": "object",
+      "description": "What happens when the device connects.",
+      "properties": {
+        "policy": { "type": "string", "description": "'pull': read the device's state into the panel. 'push': send the panel's to the device." },
+        "syncDirection": { "type": "string", "description": "Which side wins when they differ: 'pull' or 'push'." },
+        "sync": {
+          "type": "array",
+          "description": "The requests asked, in order, by id (or { request: id } with options of its own).",
+          "items": { "oneOf": [{ "type": "string" }, { "type": "object", "required": ["request"], "properties": { "request": { "type": "string" } } }] }
+        }
       }
     },
     "checksum": { "$ref": "#/$defs/checksum" },
@@ -114,10 +146,15 @@
       "type": "object",
       "description": "What a parameter has unless it says otherwise.",
       "properties": {
-        "sendPolicy": { "type": "object", "description": "By value type (continuous, signed, enum, toggle, trigger, momentary, text): the send policy a parameter of that type has unless it names one." }
+        "sendPolicy": { "type": "object", "description": "By value type (continuous, signed, enum, toggle, trigger, momentary, text): the send policy a parameter of that type has unless it names one." },
+        "request": {
+          "type": "object",
+          "description": "The timeout and retries a request has unless it names its own. 1000 ms and no retry when absent.",
+          "properties": { "timeoutMs": { "type": "integer", "minimum": 0 }, "retries": { "type": "integer", "minimum": 0 } }
+        }
       }
     },
-    "engine": { "type": "object", "description": "Engine-only profile fields the emitter lays over what it derives (the engine id and name, description, sources, notes, tests, coverage, timing, identity, requests, ...); a key set to null is left out. Written by tools/from-legacy.mjs." },
+    "engine": { "type": "object", "description": "Engine-only profile fields the emitter lays over what it derives (the engine id and name, description, sources, notes, tests, coverage, ...); a key set to null is left out. Written by tools/from-legacy.mjs." },
     "completeness": {
       "enum": ["full", "partial", "structural-only"],
       "description": "How finished the profile is. Imported profiles that lack bit-level detail land as partial/structural-only."
@@ -136,6 +173,28 @@
   ],
 
   "$defs": {
+    "request": {
+      "type": "object",
+      "required": ["id"],
+      "description": "One thing the device can be asked. Either a message shape and the address and size it asks for (a Roland RQ1: the emitter fills the bytes and computes the checksum), or the message written out (`template`).",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "As a person reads it; the id when absent." },
+        "shape": { "type": "string", "description": "The id of a message shape whose $address and $size this request fills." },
+        "address": { "$ref": "#/$defs/hexBytes" },
+        "size": { "$ref": "#/$defs/hexBytes" },
+        "template": { "type": "array", "items": { "type": "string" }, "description": "The message written out: hex bytes, or $names the engine fills ($deviceId)." },
+        "kind": { "enum": ["sysex"], "description": "sysex when absent." },
+        "response": {
+          "type": "object",
+          "description": "What answers: { kind: 'bulkDump', dump: <dump id> }, { kind: 'identity' }, ...",
+          "properties": { "kind": { "type": "string" }, "dump": { "type": "string" }, "collectionId": { "type": "string" } }
+        },
+        "timeoutMs": { "type": "integer", "minimum": 0, "description": "defaults.request.timeoutMs when absent." },
+        "retries": { "type": "integer", "minimum": 0, "description": "defaults.request.retries when absent." },
+        "engine": { "type": "object", "description": "Engine-only request fields the emitter lays over what it derives." }
+      }
+    },
     "hexBytes": {
       "type": "string",
       "pattern": "^([0-9A-Fa-f]{2})(\\s[0-9A-Fa-f]{2})*$",
@@ -574,7 +633,8 @@
         "kind": { "enum": ["patch", "performance", "bank"] },
         "spans": { "type": "array", "items": { "type": "string" }, "description": "Scope ids this dump covers (a performance spans global + all parts)." },
         "frameOnly": { "type": "boolean", "description": "A message that frames a collection and maps nothing (a Yamaha bulk header or footer): emitted all the same, with no mappings." },
-        "requestShape": { "type": "string", "description": "messageShape id used to request this dump." },
+        "request": { "type": "string", "description": "The id of the request (in `requests`) that asks the device for this dump." },
+        "requestShape": { "type": "string", "description": "A message shape that asks for this dump, the emitter making a request of it. A model with `requests` names one with `request` instead." },
         "message": {
           "type": "object",
           "additionalProperties": false,

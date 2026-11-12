@@ -8,6 +8,9 @@
  *     parameter counted as addressed: an NRPN wire is an address as much as a CC
  *   - the Parameters screen draws only the rows in view (a FANTOM's 7,710), scrolls to the last, and
  *     finds parameters by search; a row standing for a scope's instances says how many (JD-Xi ×37)
+ *   - the Device structure screen shows how the device is talked to: its device id, identity, its
+ *     parameters' blocks, the requests (a Roland RQ1 filled to its bytes, checksum and all) and what
+ *     is asked when it connects
  *   - a hand-made DPD profile (roland-gaia-dpd) still opens from the bundled library
  *   - a profile with no model opens empty and says so, without an error
  */
@@ -134,6 +137,25 @@ await check('roland-jd-xi: search finds a drum key\'s parameters, a row standing
   assert.ok(tags.includes('×37'), `instance tags: ${tags.join(', ')}`);
   await page.fill('.screen.active .psearch', 'no parameter is called this');
   await page.waitForSelector('.screen.active tr.vnone');
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+await check('roland-jd-xi: the Device structure screen shows its requests, its blocks and what it asks on connecting', async () => {
+  const { page, errors } = await open('roland-jd-xi');
+  await shown(page, 20000);
+  await page.locator('.tnode', { hasText: 'Device structure' }).click();
+  await page.waitForSelector('.screen.active tr.dsreq');
+  const text = (await page.textContent('.screen.active')).replace(/\s+/g, ' ');
+  // Request Setup: the RQ1 shape at 01 00 00 00, 3B bytes, answered by the setup dump; its bytes, with
+  // Roland's checksum (44) computed from the shape, in the tooltip.
+  const setup = page.locator('.screen.active tr.dsreq', { hasText: 'Request Setup' });
+  assert.match((await setup.textContent()).replace(/\s+/g, ' '), /rq1 01 00 00 00 · 00 00 00 3B\s*dump · Setup/);
+  assert.equal(await setup.locator('.rqmsg').getAttribute('title'), 'F0 41 10 00 00 00 0E 11 01 00 00 00 00 00 00 3B 44 F7');
+  assert.match(text, /Drums · Key\s*145\s*×37/, 'the drum keys as one block of 37');
+  assert.match(text, /When it connects · Reads the device into the panel/);
+  assert.equal(await page.inputValue('.screen.active .field:has-text("Identity") input'), '41 · 0E 03 · 00 00', 'its identity');
+  assert.equal(await page.inputValue('.screen.active .field:has-text("Device ID") input'), '10', 'its device id');
   assert.deepEqual(errors, []);
   await page.close();
 });
