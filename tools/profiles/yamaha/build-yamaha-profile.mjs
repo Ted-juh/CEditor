@@ -316,6 +316,8 @@ export function readPlaceholders(notes) {
 const UNUSED = /^(reserved|not used)$/i;
 
 export function buildYamahaProfile(data, layout) {
+  // Where the data list prints a parameter: its page, in the document the tables are read from.
+  const sourced = (p, row) => { p.source = { ...(layout.read.doc ? { doc: layout.read.doc } : {}), page: row.page }; return p; };
   const notes = [];
   const parameters = [];
   const ids = new Set();
@@ -529,7 +531,7 @@ export function buildYamahaProfile(data, layout) {
             messageRecipe: recipe.id,
             ui: { preferredComponent: 'TextInput' },
           };
-          parameters.push(p);
+          parameters.push(sourced(p, row));
           placed.push({ parameter: p, address: address.map((b) => parseInt(b, 16)), width: n });
           continue;
         }
@@ -644,7 +646,7 @@ export function buildYamahaProfile(data, layout) {
             ui: { preferredComponent: /Level|Attack|Decay|Sustain|Release|Rate|Depth|Time|Volume/i.test(name) ? 'Slider' : 'Knob' },
           };
         }
-        parameters.push(p);
+        parameters.push(sourced(p, row));
         // A two-byte choice is read from its low byte.
         placed.push({ parameter: p, address: address.map((b) => parseInt(b, 16)), width, ...(pairChoice ? { valueAt: 1 } : {}) });
       }

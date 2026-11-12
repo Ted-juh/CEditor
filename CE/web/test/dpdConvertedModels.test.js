@@ -188,3 +188,19 @@ test('every dump of every generated profile round-trips in the Designer\'s own d
   }
   assert.ok(results.size > 11000, `${results.size} dumps`);
 });
+
+test('a parameter says where its maker\'s document prints it, and the model lists the documents', async () => {
+  const legacy = legacyOf('korg-kronos-exi');
+  const { model } = legacyToDpd(legacy, { handMade });
+  assert.deepEqual(model.sources, legacy.sources, 'the documents are the model\'s own, not `engine`\'s');
+  assert.equal(model.engine?.sources, undefined);
+  const params = Object.values(model.scopes).flatMap((s) => s.parameters);
+  // An EXi engine's setting is a row of Prog_EXi.txt, one of the archive's files after the table.
+  const exi = params.find((p) => p.source?.doc && p.source.line);
+  assert.match(model.sources[exi.source.doc].title, /Prog_EXi\.txt/);
+  assert.equal(emitModel(model).parameters.find((p) => p.source?.doc === exi.source.doc)?.source.line != null, true);
+  // A source naming a document the model does not list is refused.
+  const { validateProfile } = await import('../../dpd/tools/validate.mjs');
+  exi.source = { doc: model.sources.length, line: 1 };
+  assert.ok(validateProfile(model).errors.some((e) => /source names document/.test(e)));
+});

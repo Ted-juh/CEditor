@@ -141,6 +141,11 @@ export function validateProfile(profile) {
         E(`${sk}.${id}: text size ${p.size} does not match its encoding length`);
       }
       if (p.address && !ADDRESS_RE.test(p.address)) E(`${sk}.${id}: bad address`);
+      if (p.source) {
+        const doc = p.source.doc ?? 0;
+        if (!Number.isInteger(doc) || doc < 0 || doc >= (profile.sources?.length ?? 0)) E(`${sk}.${id}: source names document ${doc}, and the model lists ${profile.sources?.length ?? 0}`);
+        for (const k of ['page', 'line']) if (p.source[k] != null && !(Number.isInteger(p.source[k]) && p.source[k] > 0)) E(`${sk}.${id}: source.${k} must be a positive integer`);
+      }
       checkDisplay(p.display, `${sk}.${id}`, E);
       for (const w of [p.rxLive, ...(p.wires ?? [])].filter(Boolean)) {
         if (!WIRE_DIRS.includes(w.dir)) E(`${sk}.${id}: bad wire dir ${w.dir}`);

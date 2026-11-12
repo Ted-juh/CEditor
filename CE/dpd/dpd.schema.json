@@ -63,6 +63,21 @@
         "revision": { "type": "string", "description": "Software revision bytes to match, space-hex. Only where the maker's document pins one; a revision pinned without cause makes a firmware update look like another instrument." }
       }
     },
+    "sources": {
+      "type": "array",
+      "description": "The maker's documents the profile is read from, in order: a parameter's source.doc is an index into this list.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "description": "'manual', 'midi-implementation', 'data-list', 'webpage', ..." },
+          "title": { "type": "string" },
+          "url": { "type": "string" },
+          "file": { "type": "string" },
+          "sha256": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
     "variables": {
       "type": "object",
       "description": "The values the device's messages are filled with unless the person sets their own: a part's channel, an FX channel, a bank. 'channel' is 1 when absent; the device id is `deviceId`.",
@@ -322,6 +337,16 @@
         "display": { "$ref": "#/$defs/parameterDisplay" },
         "provenance": { "$ref": "#/$defs/provenance" },
         "description": { "type": "string", "description": "What the parameter is, as its document gives it." },
+        "source": {
+          "type": "object",
+          "description": "Where the maker's document prints it: which of the model's sources (doc, 0 when absent) and where in it.",
+          "properties": {
+            "doc": { "type": "integer", "minimum": 0 },
+            "page": { "type": "integer", "minimum": 1 },
+            "line": { "type": "integer", "minimum": 1 },
+            "table": { "type": "string", "description": "The table or chart that holds it, as the document names it." }
+          }
+        },
         "addressStride": { "$ref": "#/$defs/hexBytes", "description": "In a scope of several instances: this parameter's address step between instances, when not the scope's stride." },
         "perInstance": { "type": "object", "description": "In a scope that names its instances (idTemplate): a field whose value differs per instance in a way {n} does not express, as one value per instance." },
         "sendPolicy": { "type": ["object", "null"], "description": "When its value is sent: mode continuous (while it moves) or onCommit (once it is set), coalesce, minIntervalMs, sendFinalOnRelease. Defaults to the model's defaults.sendPolicy for its value type; null for none." },

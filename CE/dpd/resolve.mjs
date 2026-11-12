@@ -104,6 +104,8 @@ export function resolveParams(resolved) {
           // its description, and `engine`, the engine-only details the emitter lays over what it
           // derives (tools/from-legacy.mjs computes it as exactly that difference).
           ...(p.description != null ? { description: p.description } : {}),
+          // Where the maker's document prints it: { doc: index into the model's sources, page | line }.
+          ...(p.source ? { source: p.source } : {}),
           ...(p.sendPolicy !== undefined ? { sendPolicy: p.sendPolicy } : {}),
           // `wires: []`: a parameter sent with nothing, only read back (from a dump).
           ...(Array.isArray(p.wires) && p.wires.length === 0 ? { wiresDeclaredEmpty: true } : {}),

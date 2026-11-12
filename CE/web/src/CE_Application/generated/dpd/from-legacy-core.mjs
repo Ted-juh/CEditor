@@ -162,6 +162,7 @@ function nativeParam(q, recipes, sysex) {
   const display = Object.fromEntries(DISPLAY_KEYS.filter((k) => q.display?.[k] !== undefined).map((k) => [k, copyJson(q.display[k])]));
   if (Object.keys(display).length) p.display = display;
   if (q.description != null) p.description = q.description;
+  if (q.source) p.source = copyJson(q.source);
   // The parameter's address: its own (`$address` recipes), or the bytes of its written-out recipe
   // that differ from its neighbours'.
   if (address ?? q.address) p.address = address ?? q.address;
@@ -599,6 +600,7 @@ export function legacyToDpd(legacy, { handMade = new Set() } = {}) {
   if (Object.keys(defaults).length) model.defaults = { sendPolicy: defaults };
   if (legacy.presets && !legacy.presets.nameRequest) model.presets = copyJson(legacy.presets);
   nativeConversation(legacy, model);
+  if (Array.isArray(legacy.sources)) model.sources = copyJson(legacy.sources);
   if (legacy.dumpDefinitions?.length) model.dumps = legacy.dumpDefinitions.map(nativeDump);
 
   // What the emitter derives from the DPD fields alone, and what it must be told besides.

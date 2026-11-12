@@ -352,6 +352,7 @@ function legacyParam(p, defaults = {}) {
   if (out.messageRecipe === undefined) delete out.messageRecipe;
   out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
   if (p.description != null) out.description = p.description;
+  if (p.source) out.source = copyJson(p.source);
   return applyEngine(out, p.engine);
 }
 
@@ -548,6 +549,8 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   if (resolved.display && typeof resolved.display === 'object') legacy.display = copyJson(resolved.display);
   // What a patch of this synth is (ce.patch): read from the document as the author wrote it.
   if (resolved.patch && typeof resolved.patch === 'object') legacy.patch = copyJson(resolved.patch);
+  // The maker's documents the profile was read from; a parameter's `source.doc` is an index into them.
+  if (Array.isArray(resolved.sources)) legacy.sources = copyJson(resolved.sources);
 
   // The engine-only fields of a converted profile, laid over the rest; an id or name the caller
   // asked for still stands.

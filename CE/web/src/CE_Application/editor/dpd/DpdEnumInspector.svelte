@@ -2,7 +2,8 @@
   // The 380px inspector drawer — faithful to dpd-mockup-v2.html's enum editor + "same enum,
   // any component" preview. Edits mutate the selected parameter's source enum (shared model proxy),
   // so the table badge ("Enum · N") and the previews update live.
-  let { param = null } = $props();
+  // `sources`: the model's documents, which the parameter's `source.doc` indexes.
+  let { param = null, sources = [] } = $props();
 
   let customValues = $state(true);
   let previewSel = $state(0);
@@ -62,6 +63,9 @@
   );
   let vtypeCls = $derived(param?.valueType === 'enum' ? 'enum' : param?.valueType === 'toggle' ? 'toggle' : 'cont');
   let selLabel = $derived(entries[previewSel]?.label ?? entries[0]?.label ?? '—');
+  // Where the maker's document prints it: its title, and the page or line.
+  let sourceDoc = $derived(param?.source ? sources?.[param.source.doc ?? 0] ?? null : null);
+  let sourceWhere = $derived(!param?.source ? '' : [param.source.table, param.source.page ? `p. ${param.source.page}` : param.source.line ? `line ${param.source.line}` : null].filter(Boolean).join(', '));
 </script>
 
 <div class="enumdrawer">
@@ -69,12 +73,14 @@
     <div class="drawer-empty">Select a parameter to edit its details.</div>
   {:else if !isEnum}
     <div class="eh"><span class={['vtype', vtypeCls]} style="cursor:default">{vtypeLabel}</span><span class="ehname">{param.name ?? param.id}</span></div>
+    {#if sourceDoc}<div class="esrc">From {#if sourceDoc.url}<a href={sourceDoc.url} target="_blank" rel="noreferrer">{sourceDoc.title}</a>{:else}<b>{sourceDoc.title}</b>{/if}{#if sourceWhere}, {sourceWhere}{/if}</div>{/if}
     <div class="esub">
       {#if param.range}This parameter spans {param.range.min} – {param.range.max}.{:else}A {param.valueType} parameter.{/if}
       Range &amp; encoding editing arrive with this inspector in a later step.
     </div>
   {:else}
     <div class="eh"><span class="vtype enum" style="cursor:default">◆ Enum</span><span class="ehname">{param.name ?? param.id}</span></div>
+    {#if sourceDoc}<div class="esrc">From {#if sourceDoc.url}<a href={sourceDoc.url} target="_blank" rel="noreferrer">{sourceDoc.title}</a>{:else}<b>{sourceDoc.title}</b>{/if}{#if sourceWhere}, {sourceWhere}{/if}</div>{/if}
     <div class="esub">Describe the parameter's legal values. Reorder with the arrows; the device value stays pinned to each option.</div>
 
     <div

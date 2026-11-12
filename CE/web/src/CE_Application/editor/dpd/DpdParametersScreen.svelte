@@ -196,5 +196,5 @@
     {/if}
   </div>
 
-  <DpdEnumInspector param={selectedParam} />
+  <DpdEnumInspector param={selectedParam} sources={model?.sources ?? []} />
 </div>

@@ -118,6 +118,10 @@ export function buildKronosProfile(data, layout) {
   // Global's group cells print `USB    Input L`: runs of spaces are one.
   const tidy = (r) => (/\s{2,}/.test(r.group ?? '') || /\s{2,}/.test(r.name ?? '') ? { ...r, group: r.group.replace(/\s+/g, ' '), name: r.name.replace(/\s+/g, ' ') } : r);
   const rows = [...data.rows.map(tidy), ...engineRows.rows];
+  // Where the archive prints a parameter: the line of its row, in the object's table (the profile's
+  // first document) or, for an EXi engine's setting, in Prog_EXi.txt (one of its files after it).
+  const engineDoc = data.files.findIndex((f) => /Prog_EXi\.txt$/.test(f.file)) + 1;
+  const sourceOf = (row) => ({ ...(row.engine && engineDoc > 0 ? { doc: engineDoc } : {}), line: row.line });
   const named = (row) => {
     const rename = (layout.renames ?? []).find((r) => r.group.test(row.group) && r.name === row.name && r.pid === row.id?.[3]);
     return rename ? rename.to : row.name;
@@ -158,6 +162,7 @@ export function buildKronosProfile(data, layout) {
       id,
       name: label,
       group: row.group,
+      source: sourceOf(row),
       description: `Offset ${row.ofs}. Read from the dump; the table prints no parameter id for it, so it is not sent.`,
       access: { canRead: true, canWrite: false, realtimeSafe: false, source: 'bulkDump' },
       ...(choices
@@ -234,7 +239,7 @@ export function buildKronosProfile(data, layout) {
     let id = `${camel(row.group)}.${camel(leaf) || 'value'}`;
     for (let n = 2; ids.has(id); n++) id = `${camel(row.group)}.${camel(leaf) || 'value'}${n}`;
     ids.add(id);
-    const base = { id, name: label, group: row.group, description, access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipeId };
+    const base = { id, name: label, group: row.group, description, source: sourceOf(row), access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' }, messageRecipe: recipeId };
     const wideChoice = choices?.some((c) => c.value > 127);
     const parameter = choices
       ? {
@@ -450,6 +455,8 @@ function effectParameters(data, layout, { header, ids, parameters, recipes }) {
         id,
         name: `${slot.group} Parameter ${pid}`,
         group: slot.group,
+        // Effect.txt, the document after the archive's files: a pid stands for its row in every type.
+        ...(data.effectsSource ? { source: { doc: data.files.length + 1 } } : {}),
         description: `Parameter id ${idBytes.map(hex).join(' ')}. Effect.txt's pid ${pid} of the slot's effect type, which ${uses.length} of its ${types.length} types have (${examples}${uses.length > 3 ? '; …' : ''}); its range here is the widest of theirs, ${min}~${max}.`,
         access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
         messageRecipe: recipeId,

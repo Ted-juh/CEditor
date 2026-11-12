@@ -176,6 +176,12 @@ They exist because each one was broken once, and the breakage looked like a work
 7. **Honest about what was not checked.** `status: experimental` and
    `coverage.verifiedOnHardware: false` until a real instrument has answered. What a profile
    leaves out goes in its `coverage`, with addresses where there are some.
+8. **Each parameter says where it is printed.** `source: { doc, page }` (or `line`, for a text
+   file): `doc` the index of its document in the profile's `sources`, left out for the first. The
+   generator takes it from the row the parameter was read from, so anyone can open the page and
+   check one parameter without reading the generator. The Device Profile Designer shows it beside
+   the parameter. A parameter read from no one row (a KRONOS effect slot's pid, which stands for
+   its row in every effect type) names its document alone.
 
 ## Adding a brand
 
