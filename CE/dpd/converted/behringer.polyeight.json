@@ -1,0 +1,4801 @@
+{
+  "schemaVersion": 1,
+  "id": "behringer.polyeight",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Behringer PolyEight",
+  "manufacturer": "Behringer",
+  "family": "PolyEight",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "voice.portamentoSpeedTimeValue",
+          "name": "Portamento speed/time value",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamentoSpeedTimeValue"
+          },
+          "description": "Printed: Portamento speed/time value, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 00",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.portamentoMode",
+          "name": "Portamento mode",
+          "group": "Voice",
+          "valueType": "enum",
+          "default": "speed",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "speed",
+              "label": "speed",
+              "wire": 0
+            },
+            {
+              "id": "time",
+              "label": "time",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "portamentoMode"
+          },
+          "description": "Printed: Portamento mode (0=speed, 1=time), 0–1.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 01",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "voice.unisonVoiceDetuneAmount",
+          "name": "Unison voice detune amount",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 100
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "unisonVoiceDetuneAmount"
+          },
+          "description": "Printed: Unison voice detune amount (0-100, 0-90=random spread, 90-100=Szabo morphing in 8-voice mode only), 0–100.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 02",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.voiceDriftIntensity0100ControlsAmplitudeRateAndSmoothing",
+          "name": "Voice drift intensity (0-100, controls amplitude, rate, and smoothing)",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 100
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "voiceDriftIntensity0100ControlsAmplitudeRateAndSmoothing"
+          },
+          "description": "Printed: Voice drift intensity (0-100, controls amplitude, rate, and smoothing), 0–100.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 03",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.unisonVoiceCount",
+          "name": "Unison voice count",
+          "group": "Voice",
+          "valueType": "enum",
+          "default": "2voices",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "2voices",
+              "label": "2voices",
+              "wire": 0
+            },
+            {
+              "id": "4voices",
+              "label": "4voices",
+              "wire": 1
+            },
+            {
+              "id": "8voices",
+              "label": "8voices",
+              "wire": 2
+            },
+            {
+              "id": "1voicemonolead",
+              "label": "1voice mono lead",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "unisonVoiceCount"
+          },
+          "description": "Printed: Unison voice count (0=2voices, 1=4voices, 2=8voices, 3=1voice mono lead), 0–3.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 04",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "voice.portamentoCurveType",
+          "name": "Portamento curve type",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamentoCurveType"
+          },
+          "description": "Printed: Portamento curve type (0-3), 0–3.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 05",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "voice.portamentoQuantizationMode",
+          "name": "Portamento quantization mode",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamentoQuantizationMode"
+          },
+          "description": "Printed: Portamento quantization mode (0-3), 0–3.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 08",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mixer.noiseGeneratorOutputLevel",
+          "name": "Noise generator output level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noiseGeneratorOutputLevel"
+          },
+          "description": "Printed: Noise generator output level, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 09",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "effect.effectSpeedDepthParameter",
+          "name": "Effect speed/depth parameter",
+          "group": "Effect",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "effectSpeedDepthParameter"
+          },
+          "description": "Printed: Effect speed/depth parameter, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0C",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vco.vcoPulseWidthModulationDepth",
+          "name": "VCO pulse width modulation depth",
+          "group": "VCO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoPulseWidthModulationDepth"
+          },
+          "description": "Printed: VCO pulse width modulation depth, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0E",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vco.vcoPulseWidthModulationSpeed",
+          "name": "VCO pulse width modulation speed",
+          "group": "VCO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoPulseWidthModulationSpeed"
+          },
+          "description": "Printed: VCO pulse width modulation speed, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0F",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eg.envelopeGeneratorAttackTime",
+          "name": "Envelope generator attack time",
+          "group": "EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envelopeGeneratorAttackTime"
+          },
+          "description": "Printed: Envelope generator attack time, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 10",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eg.envelopeGeneratorDecayTime",
+          "name": "Envelope generator decay time",
+          "group": "EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envelopeGeneratorDecayTime"
+          },
+          "description": "Printed: Envelope generator decay time, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 11",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eg.envelopeGeneratorSustainLevel",
+          "name": "Envelope generator sustain level",
+          "group": "EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envelopeGeneratorSustainLevel"
+          },
+          "description": "Printed: Envelope generator sustain level, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 12",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eg.envelopeGeneratorReleaseTime",
+          "name": "Envelope generator release time",
+          "group": "EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envelopeGeneratorReleaseTime"
+          },
+          "description": "Printed: Envelope generator release time, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 13",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mg.modulationGeneratorFrequency",
+          "name": "Modulation generator frequency",
+          "group": "MG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationGeneratorFrequency"
+          },
+          "description": "Printed: Modulation generator frequency, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 15",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mg.modulationGeneratorDelayTime",
+          "name": "Modulation generator delay time",
+          "group": "MG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationGeneratorDelayTime"
+          },
+          "description": "Printed: Modulation generator delay time, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 16",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mg.modulationGeneratorOutputLevel",
+          "name": "Modulation generator output level",
+          "group": "MG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationGeneratorOutputLevel"
+          },
+          "description": "Printed: Modulation generator output level, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 17",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vcf.filterCutoffFrequency",
+          "name": "Filter cutoff frequency",
+          "group": "VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterCutoffFrequency"
+          },
+          "description": "Printed: Filter cutoff frequency, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 18",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vcf.filterResonanceQFactor",
+          "name": "Filter resonance/Q factor",
+          "group": "VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterResonanceQFactor"
+          },
+          "description": "Printed: Filter resonance/Q factor, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 19",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vcf.filterEnvelopeIntensity",
+          "name": "Filter envelope intensity",
+          "group": "VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEnvelopeIntensity"
+          },
+          "description": "Printed: Filter envelope intensity, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1A",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vcf.filterKeyboardTrackingAmount",
+          "name": "Filter keyboard tracking amount",
+          "group": "VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterKeyboardTrackingAmount"
+          },
+          "description": "Printed: Filter keyboard tracking amount, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1B",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eg.envelopeGeneratorDelayTime",
+          "name": "Envelope generator delay time",
+          "group": "EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envelopeGeneratorDelayTime"
+          },
+          "description": "Printed: Envelope generator delay time (0=no delay, 65535=~3s), 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1C",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "gateEg.gateEnvelopeAttackTime",
+          "name": "Gate envelope attack time",
+          "group": "Gate EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "gateEnvelopeAttackTime"
+          },
+          "description": "Printed: Gate envelope attack time (shares EG attack table, 0=2ms), 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1D",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "gateEg.gateEnvelopeDecayTime",
+          "name": "Gate envelope decay time",
+          "group": "Gate EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "gateEnvelopeDecayTime"
+          },
+          "description": "Printed: Gate envelope decay time (shares EG decay table, 0=2ms), 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1E",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "gateEg.gateEnvelopeSustainLevel",
+          "name": "Gate envelope sustain level",
+          "group": "Gate EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "gateEnvelopeSustainLevel"
+          },
+          "description": "Printed: Gate envelope sustain level (0=0%, 65535=100%), 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1F",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "gateEg.gateEnvelopeReleaseTime",
+          "name": "Gate envelope release time",
+          "group": "Gate EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "gateEnvelopeReleaseTime"
+          },
+          "description": "Printed: Gate envelope release time (shares EG release table, 2304=~20ms), 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 20",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "control.bendWheelIntensityProportionalToBendRange",
+          "name": "Bend wheel intensity proportional to bend range",
+          "group": "Control",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bendWheelIntensityProportionalToBendRange"
+          },
+          "description": "Printed: Bend wheel intensity proportional to bend range, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 21",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vco.vcoPulseWidthModulationLfoWaveform",
+          "name": "VCO pulse width modulation LFO waveform",
+          "group": "VCO",
+          "valueType": "enum",
+          "default": "triangle",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "triangle",
+              "label": "TRIANGLE",
+              "wire": 0
+            },
+            {
+              "id": "sawtooth",
+              "label": "SAWTOOTH",
+              "wire": 1
+            },
+            {
+              "id": "reversesawtooth",
+              "label": "REVERSE SAWTOOTH",
+              "wire": 2
+            },
+            {
+              "id": "square",
+              "label": "SQUARE",
+              "wire": 3
+            },
+            {
+              "id": "sine",
+              "label": "SINE",
+              "wire": 4
+            },
+            {
+              "id": "sampleandhold",
+              "label": "SAMPLE AND HOLD",
+              "wire": 5
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vcoPulseWidthModulationLfoWaveform"
+          },
+          "description": "Printed: VCO pulse width modulation LFO waveform, —.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 22",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mg.mgRetriggerModeSelection",
+          "name": "MG retrigger mode selection",
+          "group": "MG",
+          "valueType": "enum",
+          "default": "disabled",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "disabled",
+              "label": "DISABLED",
+              "wire": 0
+            },
+            {
+              "id": "enabled",
+              "label": "ENABLED",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "mgRetriggerModeSelection"
+          },
+          "description": "Printed: MG retrigger mode selection, —.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 23",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.doublePresetBankSelection",
+          "name": "Double preset bank selection",
+          "group": "Keyboard",
+          "valueType": "enum",
+          "default": "banka",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "banka",
+              "label": "Bank A",
+              "wire": 0
+            },
+            {
+              "id": "bankb",
+              "label": "Bank B",
+              "wire": 1
+            },
+            {
+              "id": "bankc",
+              "label": "Bank C",
+              "wire": 2
+            },
+            {
+              "id": "bankd",
+              "label": "Bank D",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "doublePresetBankSelection"
+          },
+          "description": "Printed: Double preset bank selection (0=Bank A, 1=Bank B, 2=Bank C, 3=Bank D), —.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 24",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.doublePresetIndexSelection",
+          "name": "Double preset index selection",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "doublePresetIndexSelection"
+          },
+          "description": "Printed: Double preset index selection (0-127), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 25",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.chordNote0",
+          "name": "Chord note 0",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chordNote0"
+          },
+          "description": "Printed: Chord note 0 (0=None, 1-127=MIDI note), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 26",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.chordNote1",
+          "name": "Chord note 1",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chordNote1"
+          },
+          "description": "Printed: Chord note 1 (0=None, 1-127=MIDI note), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 27",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.chordNote2",
+          "name": "Chord note 2",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chordNote2"
+          },
+          "description": "Printed: Chord note 2 (0=None, 1-127=MIDI note), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 28",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.chordNote3",
+          "name": "Chord note 3",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chordNote3"
+          },
+          "description": "Printed: Chord note 3 (0=None, 1-127=MIDI note), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 29",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.chordNote4",
+          "name": "Chord note 4",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chordNote4"
+          },
+          "description": "Printed: Chord note 4 (0=None, 1-127=MIDI note), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2A",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.chordNote5",
+          "name": "Chord note 5",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chordNote5"
+          },
+          "description": "Printed: Chord note 5 (0=None, 1-127=MIDI note), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2B",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.chordNote6",
+          "name": "Chord note 6",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chordNote6"
+          },
+          "description": "Printed: Chord note 6 (0=None, 1-127=MIDI note), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2C",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.chordNote7",
+          "name": "Chord note 7",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chordNote7"
+          },
+          "description": "Printed: Chord note 7 (0=None, 1-127=MIDI note), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2D",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.portamentoLegatoMode",
+          "name": "Portamento legato mode",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamentoLegatoMode"
+          },
+          "description": "Printed: Portamento legato mode. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2E",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.unisonVoiceAllocationMode",
+          "name": "Unison voice allocation mode",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "unisonVoiceAllocationMode"
+          },
+          "description": "Printed: Unison voice allocation mode (0-3), 0–3.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2F",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "voice.unisonEnvelopeRetriggerMode",
+          "name": "Unison envelope retrigger mode",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "unisonEnvelopeRetriggerMode"
+          },
+          "description": "Printed: Unison envelope retrigger mode. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 30",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.keyboardTransposeSettingPreset",
+          "name": "Keyboard transpose setting preset",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "keyboardTransposeSettingPreset"
+          },
+          "description": "Printed: Keyboard transpose setting preset. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 31",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.lowerPresetKeyboardSplitPoint",
+          "name": "Lower preset keyboard split point",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lowerPresetKeyboardSplitPoint"
+          },
+          "description": "Printed: Lower preset keyboard split point (highest note, MIDI note number, 0=off), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 32",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.upperPresetKeyboardSplitPoint",
+          "name": "Upper preset keyboard split point",
+          "group": "Keyboard",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "upperPresetKeyboardSplitPoint"
+          },
+          "description": "Printed: Upper preset keyboard split point (lowest note, MIDI note number, 0=off), 0–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 33",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vco.vcoOctaveSelection",
+          "name": "VCO octave selection",
+          "group": "VCO",
+          "valueType": "enum",
+          "default": "low",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "low",
+              "label": "LOW",
+              "wire": 0
+            },
+            {
+              "id": "mid",
+              "label": "MID",
+              "wire": 1
+            },
+            {
+              "id": "high",
+              "label": "HIGH",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vcoOctaveSelection"
+          },
+          "description": "Printed: VCO octave selection.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 47",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "vco.vcoWaveformSelection",
+          "name": "VCO waveform selection",
+          "group": "VCO",
+          "valueType": "enum",
+          "default": "sawtooth",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sawtooth",
+              "label": "SAWTOOTH",
+              "wire": 0
+            },
+            {
+              "id": "pulse",
+              "label": "PULSE",
+              "wire": 1
+            },
+            {
+              "id": "pwm",
+              "label": "PWM",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vcoWaveformSelection"
+          },
+          "description": "Printed: VCO waveform selection.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 48",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "vco.vcoSubOscillatorModeSelection",
+          "name": "VCO sub-oscillator mode selection",
+          "group": "VCO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoSubOscillatorModeSelection"
+          },
+          "description": "Printed: VCO sub-oscillator mode selection, 0–2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 49",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mg.modulationGeneratorWaveformSelection",
+          "name": "Modulation generator waveform selection",
+          "group": "MG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationGeneratorWaveformSelection"
+          },
+          "description": "Printed: Modulation generator waveform selection, 0–2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4A",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mg.modulationGeneratorRoutingDestination",
+          "name": "Modulation generator routing/ destination",
+          "group": "MG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationGeneratorRoutingDestination"
+          },
+          "description": "Printed: Modulation generator routing/ destination, 0–2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4B",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "vca.vcaModeSelection",
+          "name": "VCA mode selection",
+          "group": "VCA",
+          "valueType": "enum",
+          "default": "gate",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "gate",
+              "label": "GATE",
+              "wire": 0
+            },
+            {
+              "id": "eg",
+              "label": "EG",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vcaModeSelection"
+          },
+          "description": "Printed: VCA mode selection.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4C",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "vca.vcaAttenuationLevel",
+          "name": "VCA attenuation level",
+          "group": "VCA",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 10
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaAttenuationLevel"
+          },
+          "description": "Printed: VCA attenuation level, 0–10.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4D",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "effect.effectModeSelection",
+          "name": "Effect mode selection",
+          "group": "Effect",
+          "valueType": "enum",
+          "default": "false",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "false",
+              "label": "False",
+              "wire": 0
+            },
+            {
+              "id": "chorus",
+              "label": "CHORUS",
+              "wire": 1
+            },
+            {
+              "id": "delay",
+              "label": "DELAY",
+              "wire": 2
+            },
+            {
+              "id": "reverb",
+              "label": "REVERB",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "effectModeSelection"
+          },
+          "description": "Printed: Effect mode selection.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4E",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus1Amount",
+          "name": "Modulation matrix bus 1 amount",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus1Amount"
+          },
+          "description": "Printed: Modulation matrix bus 1 amount, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 59",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus1SourceSelection",
+          "name": "Modulation matrix bus 1 source selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus1SourceSelection"
+          },
+          "description": "Printed: Modulation matrix bus 1 source selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 5A",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus1DestinationSelection",
+          "name": "Modulation matrix bus 1 destination selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus1DestinationSelection"
+          },
+          "description": "Printed: Modulation matrix bus 1 destination selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 5B",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus2Amount",
+          "name": "Modulation matrix bus 2 amount",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus2Amount"
+          },
+          "description": "Printed: Modulation matrix bus 2 amount, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 5C",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus2SourceSelection",
+          "name": "Modulation matrix bus 2 source selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus2SourceSelection"
+          },
+          "description": "Printed: Modulation matrix bus 2 source selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 5D",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus2DestinationSelection",
+          "name": "Modulation matrix bus 2 destination selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus2DestinationSelection"
+          },
+          "description": "Printed: Modulation matrix bus 2 destination selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 5E",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus3Amount",
+          "name": "Modulation matrix bus 3 amount",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus3Amount"
+          },
+          "description": "Printed: Modulation matrix bus 3 amount, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 5F",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus3SourceSelection",
+          "name": "Modulation matrix bus 3 source selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus3SourceSelection"
+          },
+          "description": "Printed: Modulation matrix bus 3 source selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 60",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus3DestinationSelection",
+          "name": "Modulation matrix bus 3 destination selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus3DestinationSelection"
+          },
+          "description": "Printed: Modulation matrix bus 3 destination selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 61",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus4Amount",
+          "name": "Modulation matrix bus 4 amount",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus4Amount"
+          },
+          "description": "Printed: Modulation matrix bus 4 amount, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 62",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus4SourceSelection",
+          "name": "Modulation matrix bus 4 source selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus4SourceSelection"
+          },
+          "description": "Printed: Modulation matrix bus 4 source selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 63",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus4DestinationSelection",
+          "name": "Modulation matrix bus 4 destination selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus4DestinationSelection"
+          },
+          "description": "Printed: Modulation matrix bus 4 destination selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 64",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus5Amount",
+          "name": "Modulation matrix bus 5 amount",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus5Amount"
+          },
+          "description": "Printed: Modulation matrix bus 5 amount, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 65",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus5SourceSelection",
+          "name": "Modulation matrix bus 5 source selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus5SourceSelection"
+          },
+          "description": "Printed: Modulation matrix bus 5 source selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 66",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus5DestinationSelection",
+          "name": "Modulation matrix bus 5 destination selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus5DestinationSelection"
+          },
+          "description": "Printed: Modulation matrix bus 5 destination selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 67",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus6Amount",
+          "name": "Modulation matrix bus 6 amount",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus6Amount"
+          },
+          "description": "Printed: Modulation matrix bus 6 amount, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 68",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus6SourceSelection",
+          "name": "Modulation matrix bus 6 source selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus6SourceSelection"
+          },
+          "description": "Printed: Modulation matrix bus 6 source selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 69",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus6DestinationSelection",
+          "name": "Modulation matrix bus 6 destination selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus6DestinationSelection"
+          },
+          "description": "Printed: Modulation matrix bus 6 destination selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 6A",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus7Amount",
+          "name": "Modulation matrix bus 7 amount",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus7Amount"
+          },
+          "description": "Printed: Modulation matrix bus 7 amount, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 6B",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus7SourceSelection",
+          "name": "Modulation matrix bus 7 source selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus7SourceSelection"
+          },
+          "description": "Printed: Modulation matrix bus 7 source selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 6C",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus7DestinationSelection",
+          "name": "Modulation matrix bus 7 destination selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus7DestinationSelection"
+          },
+          "description": "Printed: Modulation matrix bus 7 destination selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 6D",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus8Amount",
+          "name": "Modulation matrix bus 8 amount",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus8Amount"
+          },
+          "description": "Printed: Modulation matrix bus 8 amount, -32767–32767. Signed; the manual does not say how a negative value is carried in the 14 bits, so this is the 14 bits as sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 6E",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus8SourceSelection",
+          "name": "Modulation matrix bus 8 source selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus8SourceSelection"
+          },
+          "description": "Printed: Modulation matrix bus 8 source selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 6F",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modMatrix.modulationMatrixBus8DestinationSelection",
+          "name": "Modulation matrix bus 8 destination selection",
+          "group": "Mod Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationMatrixBus8DestinationSelection"
+          },
+          "description": "Printed: Modulation matrix bus 8 destination selection. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 70",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorEnabledState",
+          "name": "Arpeggiator enabled state",
+          "group": "Arp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggiatorEnabledState"
+          },
+          "description": "Printed: Arpeggiator enabled state. The NRPN table prints no range: the data byte's 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 00",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorMode",
+          "name": "Arpeggiator mode",
+          "group": "Arp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 7
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggiatorMode"
+          },
+          "description": "Printed: Arpeggiator mode (0=Up, 1=Down, 2=UpDown), 0–7.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 01",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorLatchMode",
+          "name": "Arpeggiator latch mode",
+          "group": "Arp",
+          "valueType": "enum",
+          "default": "on",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "on",
+              "label": "on",
+              "wire": 0
+            },
+            {
+              "id": "off",
+              "label": "off",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpeggiatorLatchMode"
+          },
+          "description": "Printed: Arpeggiator latch mode (0=on, 1=off).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 02",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorRange",
+          "name": "Arpeggiator range",
+          "group": "Arp",
+          "valueType": "enum",
+          "default": "full",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "full",
+              "label": "Full",
+              "wire": 0
+            },
+            {
+              "id": "2octaves",
+              "label": "2 Octaves",
+              "wire": 1
+            },
+            {
+              "id": "1octave",
+              "label": "1 Octave",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpeggiatorRange"
+          },
+          "description": "Printed: Arpeggiator range (0=Full, 1=2 Octaves, 2=1 Octave), 0–2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 07",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorSwingAmount",
+          "name": "Arpeggiator swing amount",
+          "group": "Arp",
+          "valueType": "continuous",
+          "range": {
+            "min": 50,
+            "max": 80
+          },
+          "default": 50,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggiatorSwingAmount"
+          },
+          "description": "Printed: Arpeggiator swing amount (50-80), 50–80.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 08",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorRetriggerMode",
+          "name": "Arpeggiator retrigger mode",
+          "group": "Arp",
+          "valueType": "enum",
+          "default": "legato",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "legato",
+              "label": "Legato",
+              "wire": 0
+            },
+            {
+              "id": "retrigger",
+              "label": "Retrigger",
+              "wire": 1
+            },
+            {
+              "id": "stacked",
+              "label": "Stacked",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpeggiatorRetriggerMode"
+          },
+          "description": "Printed: Arpeggiator retrigger mode (0=Legato, 1=Retrigger, 2=Stacked), 0–2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 09",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorVelocityPattern",
+          "name": "Arpeggiator velocity pattern",
+          "group": "Arp",
+          "valueType": "enum",
+          "default": "flat",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "flat",
+              "label": "Flat",
+              "wire": 0
+            },
+            {
+              "id": "accent2",
+              "label": "Accent2",
+              "wire": 1
+            },
+            {
+              "id": "accent4",
+              "label": "Accent4",
+              "wire": 2
+            },
+            {
+              "id": "pulse",
+              "label": "Pulse",
+              "wire": 3
+            },
+            {
+              "id": "rampup",
+              "label": "RampUp",
+              "wire": 4
+            },
+            {
+              "id": "rampdown",
+              "label": "RampDown",
+              "wire": 5
+            },
+            {
+              "id": "random",
+              "label": "Random",
+              "wire": 6
+            },
+            {
+              "id": "custom",
+              "label": "Custom",
+              "wire": 7
+            },
+            {
+              "id": "key",
+              "label": "Key",
+              "wire": 8
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpeggiatorVelocityPattern"
+          },
+          "description": "Printed: Arpeggiator velocity pattern (0=Flat, 1=Accent2, 2=Accent4, 3=Pulse, 4=RampUp, 5=RampDown, 6=Random, 7=Custom, 8=Key), 0–8.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 0A",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorRatchetTrigger",
+          "name": "Arpeggiator ratchet trigger",
+          "group": "Arp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 10
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggiatorRatchetTrigger"
+          },
+          "description": "Printed: Arpeggiator ratchet trigger (0=Off, 1=KeyVelocity, 2=Aftertouch, 3=EveryNote, 4-10=NthNote), 0–10.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 0B",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorRatchetCount",
+          "name": "Arpeggiator ratchet count",
+          "group": "Arp",
+          "valueType": "continuous",
+          "range": {
+            "min": 1,
+            "max": 4
+          },
+          "default": 1,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggiatorRatchetCount"
+          },
+          "description": "Printed: Arpeggiator ratchet count (1-4), 1–4.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 0C",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorRatchetThreshold",
+          "name": "Arpeggiator ratchet threshold",
+          "group": "Arp",
+          "valueType": "continuous",
+          "range": {
+            "min": 1,
+            "max": 127
+          },
+          "default": 1,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggiatorRatchetThreshold"
+          },
+          "description": "Printed: Arpeggiator ratchet threshold (1-127), 1–127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 0D",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorEndNoteBehavior",
+          "name": "Arpeggiator end note behavior",
+          "group": "Arp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggiatorEndNoteBehavior"
+          },
+          "description": "Printed: Arpeggiator end note behavior (0-3), 0–3.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 0E",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorMaximumRange",
+          "name": "Arpeggiator maximum range",
+          "group": "Arp",
+          "valueType": "enum",
+          "default": "3oct",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "3oct",
+              "label": "3 Oct",
+              "wire": 0
+            },
+            {
+              "id": "4oct",
+              "label": "4 Oct",
+              "wire": 1
+            },
+            {
+              "id": "5oct",
+              "label": "5 Oct",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpeggiatorMaximumRange"
+          },
+          "description": "Printed: Arpeggiator maximum range (0=3 Oct, 1=4 Oct, 2=5 Oct), 0–2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 0F",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorStepLength",
+          "name": "Arpeggiator step length",
+          "group": "Arp",
+          "valueType": "enum",
+          "default": "11",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "11",
+              "label": "1/1",
+              "wire": 0
+            },
+            {
+              "id": "12",
+              "label": "1/2",
+              "wire": 1
+            },
+            {
+              "id": "14dot",
+              "label": "1/4dot",
+              "wire": 2
+            },
+            {
+              "id": "14",
+              "label": "1/4",
+              "wire": 3
+            },
+            {
+              "id": "18dot",
+              "label": "1/8dot",
+              "wire": 4
+            },
+            {
+              "id": "14trip",
+              "label": "1/4trip",
+              "wire": 5
+            },
+            {
+              "id": "18",
+              "label": "1/8",
+              "wire": 6
+            },
+            {
+              "id": "116dot",
+              "label": "1/16dot",
+              "wire": 7
+            },
+            {
+              "id": "18trip",
+              "label": "1/8trip",
+              "wire": 8
+            },
+            {
+              "id": "116",
+              "label": "1/16",
+              "wire": 9
+            },
+            {
+              "id": "116trip",
+              "label": "1/16trip",
+              "wire": 10
+            },
+            {
+              "id": "132",
+              "label": "1/32",
+              "wire": 11
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpeggiatorStepLength"
+          },
+          "description": "Printed: Arpeggiator step length (0=1/1, 1=1/2, 2=1/4dot, 3=1/4, 4=1/8dot, 5=1/4trip, 6=1/8, 7=1/16dot, 8=1/8trip, 9=1/16, 10=1/16trip, 11=1/32), 0–11.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 10",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorGateTimePercentage",
+          "name": "Arpeggiator gate time percentage",
+          "group": "Arp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 100
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggiatorGateTimePercentage"
+          },
+          "description": "Printed: Arpeggiator gate time percentage (0-100), 0–100.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 11",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arp.arpeggiatorNoteOrder",
+          "name": "Arpeggiator note order",
+          "group": "Arp",
+          "valueType": "enum",
+          "default": "normal",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "normal",
+              "label": "Normal",
+              "wire": 0
+            },
+            {
+              "id": "played",
+              "label": "Played",
+              "wire": 1
+            },
+            {
+              "id": "random",
+              "label": "Random",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpeggiatorNoteOrder"
+          },
+          "description": "Printed: Arpeggiator note order (0=Normal, 1=Played, 2=Random), 0–2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "0E 12",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "keyboard.keyAssignMode",
+          "name": "Key assign mode",
+          "group": "Keyboard",
+          "valueType": "enum",
+          "default": "poly",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "poly",
+              "label": "Poly",
+              "wire": 0
+            },
+            {
+              "id": "double",
+              "label": "Double",
+              "wire": 1
+            },
+            {
+              "id": "unison",
+              "label": "Unison",
+              "wire": 2
+            },
+            {
+              "id": "chord",
+              "label": "Chord",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "keyAssignMode"
+          },
+          "description": "Printed: Key assign mode (0=Poly, 1=Double, 2=Unison, 3=Chord).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "12 00",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mg.modulationGeneratorFrequencyNrpn2307",
+          "name": "Modulation generator frequency (NRPN 2307)",
+          "group": "MG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationGeneratorFrequencyNrpn2307"
+          },
+          "description": "Printed: Modulation generator frequency, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "12 03",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mg.mgAdditionalWaveformSelectionInsteadOfSH",
+          "name": "MG additional waveform selection instead of S&H",
+          "group": "MG",
+          "valueType": "enum",
+          "default": "sampleandhold",
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sampleandhold",
+              "label": "SAMPLE AND HOLD",
+              "wire": 0
+            },
+            {
+              "id": "sine",
+              "label": "SINE",
+              "wire": 1
+            },
+            {
+              "id": "square",
+              "label": "SQUARE",
+              "wire": 2
+            },
+            {
+              "id": "reversesawtooth",
+              "label": "REVERSE SAWTOOTH",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "mgAdditionalWaveformSelectionInsteadOfSH"
+          },
+          "description": "Printed: MG additional waveform selection instead of S&H.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "12 04",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mg.modulationGeneratorOutputLevelNrpn2309",
+          "name": "Modulation generator output level (NRPN 2309)",
+          "group": "MG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationGeneratorOutputLevelNrpn2309"
+          },
+          "description": "Printed: Modulation generator output leve, 0–65535. Sent as 14 bits, 0 - 16383, as data entry carries and the preset table gives it.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "12 05",
+              "size": 2
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u14"
+            },
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile behringer-polyeight, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "behringer-polyeight",
+    "name": "Behringer PolyEight",
+    "description": "Behringer PolyEight 8-voice analog polysynth: every parameter of its manual's NRPN mappings, sent as 14-bit NRPNs, with the value lists the manual prints.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "PolyEight User Manual, Rev. 3 (2026-08-25)",
+        "notes": "NRPN mappings and SysEx preset parameters (PDF pages 17 - 21) read by tools/profiles/behringer/read-behringer-tables.mjs from Manual_BE_0722-ABA_POLYEIGHT_A4_WW_2026-08-25_Rev.3.pdf (sha256 7ae50ee0e0134e49b8bdec4051095e8b1c86be0e0dc890612c55f1e5e4eccca9), https://cdn-media.empowertribe.com/2613103449a6763dc1be198e419d1e80/Manual_BE_0722-ABA_POLYEIGHT_A4_WW_2026-08-25_Rev.3.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/behringer/make-profiles.mjs; edit the layout in tools/profiles/behringer/synths/, not this file.",
+      "Every parameter is a row of the manual's NRPN mappings, sent as that NRPN with a 14-bit value (CC 6, then CC 38). Nothing here has been sent to a real instrument yet.",
+      "Nothing is read back: the manual prints the preset dump's structure but no request for it, and gives the PolyEight's device ID bytes only as `Device-specific`.",
+      "Value lists taken from the preset parameter table, the NRPN table printing none: VCO pulse width modulation LFO waveform, MG retrigger mode selection, VCO octave selection, VCO waveform selection, VCA mode selection, Effect mode selection, MG additional waveform selection instead of S&H.",
+      "Printed 0–65535 and sent as 14 bits (0 - 16383), which is what data entry carries and what the preset table gives for them: Portamento speed/time value, Noise generator output level, Effect speed/depth parameter, VCO pulse width modulation depth, VCO pulse width modulation speed, Envelope generator attack time, Envelope generator decay time, Envelope generator sustain level, Envelope generator release time, Modulation generator frequency, Modulation generator delay time, Modulation generator output level, Filter cutoff frequency, Filter resonance/Q factor, Filter keyboard tracking amount, Envelope generator delay time, Gate envelope attack time, Gate envelope decay time, Gate envelope sustain level, Gate envelope release time, Bend wheel intensity proportional to bend range, Modulation generator frequency (NRPN 2307), Modulation generator output level (NRPN 2309).",
+      "Printed -32767–32767 (the preset table: -8192–8191), and laid out as the 14 bits sent, the manual not saying how a negative value is carried: Filter envelope intensity, Modulation matrix bus 1 amount, Modulation matrix bus 2 amount, Modulation matrix bus 3 amount, Modulation matrix bus 4 amount, Modulation matrix bus 5 amount, Modulation matrix bus 6 amount, Modulation matrix bus 7 amount, Modulation matrix bus 8 amount.",
+      "No range printed, and no value list found: the data byte's 0 - 127: Portamento legato mode, Unison envelope retrigger mode, Keyboard transpose setting preset, Modulation matrix bus 1 source selection, Modulation matrix bus 1 destination selection, Modulation matrix bus 2 source selection, Modulation matrix bus 2 destination selection, Modulation matrix bus 3 source selection, Modulation matrix bus 3 destination selection, Modulation matrix bus 4 source selection, Modulation matrix bus 4 destination selection, Modulation matrix bus 5 source selection, Modulation matrix bus 5 destination selection, Modulation matrix bus 6 source selection, Modulation matrix bus 6 destination selection, Modulation matrix bus 7 source selection, Modulation matrix bus 7 destination selection, Modulation matrix bus 8 source selection, Modulation matrix bus 8 destination selection, Arpeggiator enabled state.",
+      "Descriptions the table gives two NRPNs, both laid out: Modulation generator frequency (NRPN 2307), Modulation generator output level (NRPN 2309)."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-NRPN-mappings: 97 parameters",
+      "realtimeEditing": "complete-for-the-manual's-NRPN-mappings",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the instrument sends these NRPNs when its MIDI settings send NRPN",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "VCF Filter cutoff frequency = 8192",
+        "parameter": "vcf.filterCutoffFrequency",
+        "value": 8192,
+        "expectedHex": "B0 63 00\nB0 62 18\nB0 06 40\nB0 26 00"
+      },
+      {
+        "name": "VCO VCO waveform selection = PWM",
+        "parameter": "vco.vcoWaveformSelection",
+        "value": "pwm",
+        "expectedHex": "B0 63 00\nB0 62 48\nB0 06 00\nB0 26 02"
+      },
+      {
+        "name": "Arp Arpeggiator step length = 1/16",
+        "parameter": "arp.arpeggiatorStepLength",
+        "value": "116",
+        "expectedHex": "B0 63 0E\nB0 62 10\nB0 06 00\nB0 26 09"
+      }
+    ]
+  }
+}

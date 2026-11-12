@@ -1,0 +1,4230 @@
+{
+  "schemaVersion": 1,
+  "id": "modor.nf-1",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Modor NF-1 / NF-1m",
+  "manufacturer": "Modor",
+  "family": "NF-1",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "patch.portamento",
+          "name": "Portamento",
+          "group": "Patch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamento"
+          },
+          "description": "CC 5 (page 72): Portamento. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 5
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "patch.volume",
+          "name": "Volume",
+          "group": "Patch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volume"
+          },
+          "description": "CC 7 (page 72): Volume; Digital patch volume.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 7
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "patch.pan",
+          "name": "Pan",
+          "group": "Patch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pan"
+          },
+          "description": "CC 10 (page 72): Pan.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc1.osc1ModLfo1",
+          "name": "Osc 1 mod LFO1",
+          "group": "Osc 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1ModLfo1"
+          },
+          "description": "CC 13 (page 72): Osc 1 mod LFO1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 13
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc2.osc2ModLfo1",
+          "name": "Osc 2 mod LFO1",
+          "group": "Osc 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2ModLfo1"
+          },
+          "description": "CC 14 (page 72): Osc 2 mod LFO1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 14
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc3.osc3ModLfo1",
+          "name": "Osc 3 mod LFO1",
+          "group": "Osc 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc3ModLfo1"
+          },
+          "description": "CC 15 (page 72): Osc 3 mod LFO1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc1.osc1ModEnv2",
+          "name": "Osc 1 mod ENV2",
+          "group": "Osc 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1ModEnv2"
+          },
+          "description": "CC 16 (page 72): Osc 1 mod ENV2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc2.osc2ModEnv3",
+          "name": "Osc 2 mod ENV3",
+          "group": "Osc 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2ModEnv3"
+          },
+          "description": "CC 17 (page 72): Osc 2 mod ENV3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc3.osc3ModEnv4",
+          "name": "Osc 3 mod ENV4",
+          "group": "Osc 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc3ModEnv4"
+          },
+          "description": "CC 18 (page 72): Osc 3 mod ENV4. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "pitch.pitchEnv1",
+          "name": "Pitch ENV1",
+          "group": "Pitch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchEnv1"
+          },
+          "description": "CC 19 (page 72): Pitch ENV1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "pitch.pitchLfoSH",
+          "name": "Pitch LFO-S&H",
+          "group": "Pitch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchLfoSH"
+          },
+          "description": "CC 20 (page 72): Pitch LFO-S&H; Source can be selected. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "combFilter.combFilterDepth",
+          "name": "Comb filter depth",
+          "group": "Comb filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "combFilterDepth"
+          },
+          "description": "CC 21 (page 72): Comb filter depth. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "combFilter.combFilterDelay",
+          "name": "Comb filter delay",
+          "group": "Comb filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "combFilterDelay"
+          },
+          "description": "CC 22 (page 72): Comb filter delay. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfos.lfo2Speed",
+          "name": "LFO 2 speed",
+          "group": "LFOs",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo2Speed"
+          },
+          "description": "CC 23 (page 72): LFO 2 speed. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "combFilter.combFilterFeedback",
+          "name": "Comb filter feedback",
+          "group": "Comb filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "combFilterFeedback"
+          },
+          "description": "CC 24 (page 72): Comb filter feedback. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "combFilter.combFilterSpeed",
+          "name": "Comb filter speed",
+          "group": "Comb filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "combFilterSpeed"
+          },
+          "description": "CC 26 (page 72): Comb filter speed. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "combFilter.combFilterMix",
+          "name": "Comb filter mix",
+          "group": "Comb filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "combFilterMix"
+          },
+          "description": "CC 27 (page 72): Comb filter mix. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayTime",
+          "name": "Delay time",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayTime"
+          },
+          "description": "CC 28 (page 72): Delay time. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayFilter",
+          "name": "Delay filter",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayFilter"
+          },
+          "description": "CC 29 (page 72): Delay filter. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayMix",
+          "name": "Delay mix",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayMix"
+          },
+          "description": "CC 30 (page 72): Delay mix. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterEnv2",
+          "name": "Filter ENV2",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEnv2"
+          },
+          "description": "CC 31 (page 72): Filter ENV2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterLfo2",
+          "name": "Filter LFO2",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterLfo2"
+          },
+          "description": "CC 37 (page 72): Filter LFO2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterKeyb",
+          "name": "Filter KEYB",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterKeyb"
+          },
+          "description": "CC 38 (page 72): Filter KEYB. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "formant.formantEnv3",
+          "name": "Formant ENV3",
+          "group": "Formant",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "formantEnv3"
+          },
+          "description": "CC 39 (page 72): Formant ENV3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "formant.formantLfo2",
+          "name": "Formant LFO2",
+          "group": "Formant",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "formantLfo2"
+          },
+          "description": "CC 40 (page 72): Formant LFO2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel1.vowel1Volume",
+          "name": "Vowel 1 volume",
+          "group": "Vowel 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel1Volume"
+          },
+          "description": "CC 41 (page 73): Vowel 1 volume; the preset vowels (§4.4): A 52, E 125, O 32, I 127, OE 11, EI 103, EU 39, AO 25, U 35, UI 43.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel2.vowel2Volume",
+          "name": "Vowel 2 volume",
+          "group": "Vowel 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel2Volume"
+          },
+          "description": "CC 42 (page 73): Vowel 2 volume; the preset vowels (§4.4): A 52, E 125, O 32, I 127, OE 11, EI 103, EU 39, AO 25, U 35, UI 43.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel3.vowel3Volume",
+          "name": "Vowel 3 volume",
+          "group": "Vowel 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel3Volume"
+          },
+          "description": "CC 43 (page 73): Vowel 3 volume; the preset vowels (§4.4): A 52, E 125, O 32, I 127, OE 11, EI 103, EU 39, AO 25, U 35, UI 43.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationWires.wire1Amount",
+          "name": "Wire 1 amount",
+          "group": "Modulation wires",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "wire1Amount"
+          },
+          "description": "CC 44 (page 73): Wire 1 amount. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationWires.wire2Amount",
+          "name": "Wire 2 amount",
+          "group": "Modulation wires",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "wire2Amount"
+          },
+          "description": "CC 45 (page 73): Wire 2 amount. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationWires.wire3Amount",
+          "name": "Wire 3 amount",
+          "group": "Modulation wires",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "wire3Amount"
+          },
+          "description": "CC 46 (page 73): Wire 3 amount. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationWires.wire4Amount",
+          "name": "Wire 4 amount",
+          "group": "Modulation wires",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "wire4Amount"
+          },
+          "description": "CC 47 (page 73): Wire 4 amount. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationWires.wire5Amount",
+          "name": "Wire 5 amount",
+          "group": "Modulation wires",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "wire5Amount"
+          },
+          "description": "CC 48 (page 73): Wire 5 amount. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 48
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationWires.wire6Amount",
+          "name": "Wire 6 amount",
+          "group": "Modulation wires",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "wire6Amount"
+          },
+          "description": "CC 49 (page 73): Wire 6 amount. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 49
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationWires.wire7Amount",
+          "name": "Wire 7 amount",
+          "group": "Modulation wires",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "wire7Amount"
+          },
+          "description": "CC 50 (page 73): Wire 7 amount. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 50
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayFeedback",
+          "name": "Delay feedback",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayFeedback"
+          },
+          "description": "CC 51 (page 73): Delay feedback. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 51
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "patch.lfo3Speed",
+          "name": "LFO3 speed",
+          "group": "Patch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo3Speed"
+          },
+          "description": "CC 52 (page 73): LFO3 speed. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 52
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfos.sHSpeed",
+          "name": "S&H speed",
+          "group": "LFOs",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sHSpeed"
+          },
+          "description": "CC 53 (page 73): S&H speed. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 53
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc1.osc1CoarseTuning",
+          "name": "Osc 1 coarse tuning",
+          "group": "Osc 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1CoarseTuning"
+          },
+          "description": "CC 55 (page 73): Osc 1 coarse tuning. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 55
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc2.osc2CoarseTuning",
+          "name": "Osc 2 coarse tuning",
+          "group": "Osc 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2CoarseTuning"
+          },
+          "description": "CC 56 (page 73): Osc 2 coarse tuning. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 56
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc3.osc3CoarseTuning",
+          "name": "Osc 3 coarse tuning",
+          "group": "Osc 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc3CoarseTuning"
+          },
+          "description": "CC 57 (page 73): Osc 3 coarse tuning. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 57
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc1.osc1FineTuning",
+          "name": "Osc 1 fine tuning",
+          "group": "Osc 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1FineTuning"
+          },
+          "description": "CC 58 (page 73): Osc 1 fine tuning. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 58
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc2.osc2FineTuning",
+          "name": "Osc 2 fine tuning",
+          "group": "Osc 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2FineTuning"
+          },
+          "description": "CC 59 (page 73): Osc 2 fine tuning. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 59
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc3.osc3FineTuning",
+          "name": "Osc 3 fine tuning",
+          "group": "Osc 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc3FineTuning"
+          },
+          "description": "CC 60 (page 73): Osc 3 fine tuning. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 60
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc1.osc1Volume",
+          "name": "Osc 1 volume",
+          "group": "Osc 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1Volume"
+          },
+          "description": "CC 61 (page 73): Osc 1 volume. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 61
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc2.osc2Volume",
+          "name": "Osc 2 volume",
+          "group": "Osc 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2Volume"
+          },
+          "description": "CC 62 (page 73): Osc 2 volume. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc3.osc3Volume",
+          "name": "Osc 3 volume",
+          "group": "Osc 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc3Volume"
+          },
+          "description": "CC 63 (page 73): Osc 3 volume. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 63
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc1.osc1Mod",
+          "name": "Osc 1 mod",
+          "group": "Osc 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1Mod"
+          },
+          "description": "CC 65 (page 73): Osc 1 mod. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 65
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc2.osc2Mod",
+          "name": "Osc 2 mod",
+          "group": "Osc 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2Mod"
+          },
+          "description": "CC 66 (page 73): Osc 2 mod. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 66
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc3.osc3Mod",
+          "name": "Osc 3 mod",
+          "group": "Osc 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc3Mod"
+          },
+          "description": "CC 67 (page 73): Osc 3 mod. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 67
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterMix",
+          "name": "Filter mix",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterMix"
+          },
+          "description": "CC 68 (page 73): Filter mix; BP=0,LP=32, BS=64,HP=96. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 68
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "patch.noiseLevel",
+          "name": "Noise level",
+          "group": "Patch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noiseLevel"
+          },
+          "description": "CC 70 (page 73): Noise level. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 70
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterFrequency",
+          "name": "Filter frequency",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterFrequency"
+          },
+          "description": "CC 71 (page 73): Filter frequency. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 71
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "formant.formantMorph",
+          "name": "Formant morph",
+          "group": "Formant",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "formantMorph"
+          },
+          "description": "CC 72 (page 73): Formant morph. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 72
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "formant.formantMix",
+          "name": "Formant mix",
+          "group": "Formant",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "formantMix"
+          },
+          "description": "CC 73 (page 73): Formant mix. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 73
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterResonance",
+          "name": "Filter resonance",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterResonance"
+          },
+          "description": "CC 74 (page 73): Filter resonance. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 74
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfos.lfo1Speed",
+          "name": "LFO 1 speed",
+          "group": "LFOs",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo1Speed"
+          },
+          "description": "CC 75 (page 73): LFO 1 speed. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "patch.drive",
+          "name": "Drive",
+          "group": "Patch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drive"
+          },
+          "description": "CC 76 (page 73): Drive. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 76
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "patch.ringVolume",
+          "name": "Ring volume",
+          "group": "Patch",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ringVolume"
+          },
+          "description": "CC 77 (page 73): Ring volume. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 77
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env1.env1T1",
+          "name": "ENV 1 T1",
+          "group": "ENV 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1T1"
+          },
+          "description": "CC 78 (page 73): ENV 1 T1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 78
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env2.env2T1",
+          "name": "ENV 2 T1",
+          "group": "ENV 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2T1"
+          },
+          "description": "CC 79 (page 73): ENV 2 T1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 79
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env3.env3T1",
+          "name": "ENV 3 T1",
+          "group": "ENV 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env3T1"
+          },
+          "description": "CC 80 (page 73): ENV 3 T1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env4.env4T1",
+          "name": "ENV 4 T1",
+          "group": "ENV 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env4T1"
+          },
+          "description": "CC 81 (page 73): ENV 4 T1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env1.env1T2",
+          "name": "ENV 1 T2",
+          "group": "ENV 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1T2"
+          },
+          "description": "CC 82 (page 73): ENV 1 T2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 82
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env2.env2T2",
+          "name": "ENV 2 T2",
+          "group": "ENV 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2T2"
+          },
+          "description": "CC 83 (page 73): ENV 2 T2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 83
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env3.env3T2",
+          "name": "ENV 3 T2",
+          "group": "ENV 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env3T2"
+          },
+          "description": "CC 84 (page 73): ENV 3 T2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 84
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env4.env4T2",
+          "name": "ENV 4 T2",
+          "group": "ENV 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env4T2"
+          },
+          "description": "CC 85 (page 73): ENV 4 T2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 85
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env1.env1T3",
+          "name": "ENV 1 T3",
+          "group": "ENV 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1T3"
+          },
+          "description": "CC 86 (page 73): ENV 1 T3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 86
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env2.env2T3",
+          "name": "ENV 2 T3",
+          "group": "ENV 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2T3"
+          },
+          "description": "CC 87 (page 74): ENV 2 T3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 87
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env3.env3T3",
+          "name": "ENV 3 T3",
+          "group": "ENV 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env3T3"
+          },
+          "description": "CC 88 (page 74): ENV 3 T3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 88
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env4.env4T3",
+          "name": "ENV 4 T3",
+          "group": "ENV 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env4T3"
+          },
+          "description": "CC 89 (page 74): ENV 4 T3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 89
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env1.env1T4",
+          "name": "ENV 1 T4",
+          "group": "ENV 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1T4"
+          },
+          "description": "CC 90 (page 74): ENV 1 T4. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 90
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env2.env2T4",
+          "name": "ENV 2 T4",
+          "group": "ENV 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2T4"
+          },
+          "description": "CC 91 (page 74): ENV 2 T4. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 91
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env3.env3T4",
+          "name": "ENV 3 T4",
+          "group": "ENV 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env3T4"
+          },
+          "description": "CC 92 (page 74): ENV 3 T4. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 92
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env4.env4T4",
+          "name": "ENV 4 T4",
+          "group": "ENV 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env4T4"
+          },
+          "description": "CC 93 (page 74): ENV 4 T4. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env1.env1L1",
+          "name": "ENV 1 L1",
+          "group": "ENV 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1L1"
+          },
+          "description": "CC 94 (page 74): ENV 1 L1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 94
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env2.env2L1",
+          "name": "ENV 2 L1",
+          "group": "ENV 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2L1"
+          },
+          "description": "CC 95 (page 74): ENV 2 L1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 95
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env3.env3L1",
+          "name": "ENV 3 L1",
+          "group": "ENV 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env3L1"
+          },
+          "description": "CC 96 (page 74): ENV 3 L1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 96
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env4.env4L1",
+          "name": "ENV 4 L1",
+          "group": "ENV 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env4L1"
+          },
+          "description": "CC 97 (page 74): ENV 4 L1. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 97
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env1.env1L2",
+          "name": "ENV 1 L2",
+          "group": "ENV 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1L2"
+          },
+          "description": "CC 98 (page 74): ENV 1 L2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 98
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env2.env2L2",
+          "name": "ENV 2 L2",
+          "group": "ENV 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2L2"
+          },
+          "description": "CC 99 (page 74): ENV 2 L2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 99
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env3.env3L2",
+          "name": "ENV 3 L2",
+          "group": "ENV 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env3L2"
+          },
+          "description": "CC 100 (page 74): ENV 3 L2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 100
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env4.env4L2",
+          "name": "ENV 4 L2",
+          "group": "ENV 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env4L2"
+          },
+          "description": "CC 101 (page 74): ENV 4 L2. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 101
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env1.env1L3",
+          "name": "ENV 1 L3",
+          "group": "ENV 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1L3"
+          },
+          "description": "CC 102 (page 74): ENV 1 L3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env2.env2L3",
+          "name": "ENV 2 L3",
+          "group": "ENV 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2L3"
+          },
+          "description": "CC 103 (page 74): ENV 2 L3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env3.env3L3",
+          "name": "ENV 3 L3",
+          "group": "ENV 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env3L3"
+          },
+          "description": "CC 104 (page 74): ENV 3 L3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "env4.env4L3",
+          "name": "ENV 4 L3",
+          "group": "ENV 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env4L3"
+          },
+          "description": "CC 105 (page 74): ENV 4 L3. Also transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 105
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel1.vowel1Formant1",
+          "name": "Vowel 1 formant 1",
+          "group": "Vowel 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel1Formant1"
+          },
+          "description": "CC 106 (page 74): Vowel 1 formant 1; the preset vowels (§4.4): A 49, E 32, O 35, I 28, OE 24, EI 49, EU 34, AO 41, U 26, UI 43.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 106
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel1.vowel1Formant2",
+          "name": "Vowel 1 formant 2",
+          "group": "Vowel 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel1Formant2"
+          },
+          "description": "CC 107 (page 74): Vowel 1 formant 2; the preset vowels (§4.4): A 58, E 77, O 49, I 80, OE 53, EI 79, EU 58, AO 49, U 77, UI 62.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel1.vowel1Formant3",
+          "name": "Vowel 1 formant 3",
+          "group": "Vowel 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel1Formant3"
+          },
+          "description": "CC 108 (page 74): Vowel 1 formant 3; the preset vowels (§4.4): A 92, E 90, O 90, I 94, OE 85, EI 92, EU 77, AO 85, U 69, UI 81.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel1.vowel1Formant4",
+          "name": "Vowel 1 formant 4",
+          "group": "Vowel 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel1Formant4"
+          },
+          "description": "CC 109 (page 74): Vowel 1 formant 4; the preset vowels (§4.4): A 107, E 107, O 120, I 99, OE 99, EI 107, EU 114, AO 118, U 102, UI 106.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel2.vowel2Formant1",
+          "name": "Vowel 2 formant 1",
+          "group": "Vowel 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel2Formant1"
+          },
+          "description": "CC 110 (page 74): Vowel 2 formant 1; the preset vowels (§4.4): A 49, E 32, O 35, I 28, OE 24, EI 49, EU 34, AO 41, U 26, UI 43.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 110
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel2.vowel2Formant2",
+          "name": "Vowel 2 formant 2",
+          "group": "Vowel 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel2Formant2"
+          },
+          "description": "CC 111 (page 74): Vowel 2 formant 2; the preset vowels (§4.4): A 58, E 77, O 49, I 80, OE 53, EI 79, EU 58, AO 49, U 77, UI 62.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 111
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel2.vowel2Formant3",
+          "name": "Vowel 2 formant 3",
+          "group": "Vowel 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel2Formant3"
+          },
+          "description": "CC 112 (page 74): Vowel 2 formant 3; the preset vowels (§4.4): A 92, E 90, O 90, I 94, OE 85, EI 92, EU 77, AO 85, U 69, UI 81.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel2.vowel2Formant4",
+          "name": "Vowel 2 formant 4",
+          "group": "Vowel 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel2Formant4"
+          },
+          "description": "CC 113 (page 74): Vowel 2 formant 4; the preset vowels (§4.4): A 107, E 107, O 120, I 99, OE 99, EI 107, EU 114, AO 118, U 102, UI 106.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel3.vowel3Formant1",
+          "name": "Vowel 3 formant 1",
+          "group": "Vowel 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel3Formant1"
+          },
+          "description": "CC 114 (page 74): Vowel 3 formant 1; the preset vowels (§4.4): A 49, E 32, O 35, I 28, OE 24, EI 49, EU 34, AO 41, U 26, UI 43.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 114
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel3.vowel3Formant2",
+          "name": "Vowel 3 formant 2",
+          "group": "Vowel 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel3Formant2"
+          },
+          "description": "CC 115 (page 74): Vowel 3 formant 2; the preset vowels (§4.4): A 58, E 77, O 49, I 80, OE 53, EI 79, EU 58, AO 49, U 77, UI 62.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 115
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel3.vowel3Formant3",
+          "name": "Vowel 3 formant 3",
+          "group": "Vowel 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel3Formant3"
+          },
+          "description": "CC 116 (page 74): Vowel 3 formant 3; the preset vowels (§4.4): A 92, E 90, O 90, I 94, OE 85, EI 92, EU 77, AO 85, U 69, UI 81.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 116
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vowel3.vowel3Formant4",
+          "name": "Vowel 3 formant 4",
+          "group": "Vowel 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vowel3Formant4"
+          },
+          "description": "CC 117 (page 74): Vowel 3 formant 4; the preset vowels (§4.4): A 107, E 107, O 120, I 99, OE 99, EI 107, EU 114, AO 118, U 102, UI 106.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 117
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile modor-nf-1, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "modor-nf-1",
+    "name": "Modor NF-1 / NF-1m",
+    "description": "Modor NF-1 and NF-1m polyphonic synthesizers: every setting of the manual's MIDI controller list, with the preset vowels on the formant controllers.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Modor NF-1 user manual, version 6 for firmware OS017",
+        "notes": "The MIDI controller list (PDF pages 71 - 74) and the formant table, read by tools/profiles/modor/read-modor-manual.mjs from UsersManualNF-1_v6.pdf (sha256 4f4700fb9272d2969b28b9ba5ba85dce7d9a055def61d6e3482f773a0f95e4d6), https://modormusic.com/downloads/UsersManualNF-1_v6.pdf, linked from https://modormusic.com/downloads.html. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/modor/make-profiles.mjs; edit the layout in tools/profiles/modor/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI controller list that it marks Received, sent as its controller on the channel variable. Nothing here has been sent to a real instrument yet.",
+      "Each is sent 0 - 127: the manual gives the panel's ranges (`[0,127]`, `[-64,+63]`, coarse tuning `[-32,+31]`) but not how a controller's value maps onto them.",
+      "Left out, and named: the performance controllers, Modulation wheel (CC 1), Breath Controller (MSB) (CC 2), Modulation CC3 (MSB) (CC 3), Expression Pedal (CC 4), Sustain pedal (CC 64); MIDI's own, Bank select (CC 32), All notes off (CC 123); the rows the list prints as not received, Breath Controller (LSB) (CC 34), Modulation CC3 (LSB) (CC 35)."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-controller-list: 99 parameters",
+      "realtimeEditing": "complete-for-the-controller-list",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented: the manual describes SysEx dumps without their format",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the instrument sends the controllers the list marks Transmitted when its knobs turn; not mapped",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Portamento = 100",
+        "parameter": "patch.portamento",
+        "value": 100,
+        "expectedHex": "B0 05 64"
+      },
+      {
+        "name": "Vowel 1 volume = 100",
+        "parameter": "vowel1.vowel1Volume",
+        "value": 100,
+        "expectedHex": "B0 29 64"
+      }
+    ]
+  }
+}

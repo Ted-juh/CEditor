@@ -1,0 +1,4188 @@
+{
+  "schemaVersion": 1,
+  "id": "elektron.analog-rytm",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Elektron Analog Rytm",
+  "manufacturer": "Elektron",
+  "family": "Analog Rytm",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "trig.note",
+          "name": "Note",
+          "group": "Trig",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "note"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "trig.velocity",
+          "name": "Velocity",
+          "group": "Trig",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocity"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "trig.length",
+          "name": "Length",
+          "group": "Trig",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "length"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 5
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "trig.synthTrig",
+          "name": "Synth Trig",
+          "group": "Trig",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthTrig"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 11
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "trig.sampleTrig",
+          "name": "Sample Trig",
+          "group": "Trig",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleTrig"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 12
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "trig.envTrig",
+          "name": "ENV Trig",
+          "group": "Trig",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envTrig"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 13
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "trig.lfoTrig",
+          "name": "LFO TRIG",
+          "group": "Trig",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoTrig"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 14
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "euclidean.pulseGenerator1",
+          "name": "Pulse Generator 1",
+          "group": "Euclidean",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pulseGenerator1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 86
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "euclidean.pulseGenerator2",
+          "name": "Pulse Generator 2",
+          "group": "Euclidean",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pulseGenerator2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 87
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "euclidean.euclideanOnOff",
+          "name": "Euclidean on/off",
+          "group": "Euclidean",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "euclideanOnOff"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 117
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "euclidean.rotationGenerator1",
+          "name": "Rotation Generator 1",
+          "group": "Euclidean",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "rotationGenerator1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 89
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "euclidean.rotationGenerator2",
+          "name": "Rotation Generator 2",
+          "group": "Euclidean",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "rotationGenerator2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 90
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "euclidean.trackRotation",
+          "name": "Track Rotation",
+          "group": "Euclidean",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackRotation"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 91
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "euclidean.booleanOperator",
+          "name": "Boolean Operator",
+          "group": "Euclidean",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "booleanOperator"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 88
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "common.trackLevel",
+          "name": "Track Level",
+          "group": "Common",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 95
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "common.trackMuteSeqMute",
+          "name": "Track Mute (seq. mute)",
+          "group": "Common",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackMuteSeqMute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 94
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "common.trackSoloSeqMute",
+          "name": "Track Solo (seq. mute)",
+          "group": "Common",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackSoloSeqMute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "common.trackMachineType",
+          "name": "Track Machine Type",
+          "group": "Common",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackMachineType"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "common.activeScene",
+          "name": "Active Scene",
+          "group": "Common",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "activeScene"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 92
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter1",
+          "name": "Performance Parameter 1",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter2",
+          "name": "Performance Parameter 2",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter3",
+          "name": "Performance Parameter 3",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter4",
+          "name": "Performance Parameter 4",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter4"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter5",
+          "name": "Performance Parameter 5",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter5"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter6",
+          "name": "Performance Parameter 6",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter6"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter7",
+          "name": "Performance Parameter 7",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter7"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter8",
+          "name": "Performance Parameter 8",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter8"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter9",
+          "name": "Performance Parameter 9",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter9"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter10",
+          "name": "Performance Parameter 10",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter10"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter11",
+          "name": "Performance Parameter 11",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter11"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "performance.performanceParameter12",
+          "name": "Performance Parameter 12",
+          "group": "Performance",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "performanceParameter12"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47,
+              "channel": "$perfChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth.synthParameter1",
+          "name": "Synth Parameter 1",
+          "group": "Synth",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthParameter1"
+          },
+          "description": "What it sets depends on the machine: BD PLASTIC: Level; BD SHARP: Level; BD HARD: Level; BD CLASSIC: Level; BD FM: Level; BD SILKY: Level; BD ACOUSTIC: Level; SD NATURAL: Level; SD HARD: Level; SD CLASSIC: Level; SD FM: Level; SD ACOUSTIC: Level; RS HARD: Level; RS CLASSIC: Level; CP CLASSIC: Level; SY DUAL VCO: Level; SY CHIP: Level; SY RAW: Level; BT CLASSIC: Level; LT, MT, HT CLASSIC: Level; CH CLASSIC: Level; CH METALLIC: Level; OH CLASSIC: Level; OH METALLIC: Level; HH BASIC: Level; HH LAB: Level; CY METALLIC: Level; CY CLASSIC: Level; CY RIDE: Level; CB CLASSIC & METALLIC: Level; UT NOISE: Level; UT IMPULSE: Level.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth.synthParameter2",
+          "name": "Synth Parameter 2",
+          "group": "Synth",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthParameter2"
+          },
+          "description": "What it sets depends on the machine: BD PLASTIC: Tune; BD SHARP: Tune; BD HARD: Tune; BD CLASSIC: Tune; BD FM: Tune; BD SILKY: Tune; BD ACOUSTIC: Tune; SD NATURAL: Tune; SD HARD: Tune; SD CLASSIC: Tune; SD FM: Tune; SD ACOUSTIC: Tune; RS HARD: Tune; RS CLASSIC: Tune Osc 1; CP CLASSIC: Noise Tone; SY DUAL VCO: Osc 1 Tune; SY CHIP: Tune; SY RAW: Tune; BT CLASSIC: Tune; LT, MT, HT CLASSIC: Tune; CH CLASSIC: Tune; CH METALLIC: Tune; OH CLASSIC: Tune; OH METALLIC: Tune; HH BASIC: Tune; HH LAB: Tune 1; CY METALLIC: Tune; CY CLASSIC: Tune; CY RIDE: Tune; CB CLASSIC & METALLIC: Tune; UT NOISE: LP Frequency; UT IMPULSE: Attack.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth.synthParameter3",
+          "name": "Synth Parameter 3",
+          "group": "Synth",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthParameter3"
+          },
+          "description": "What it sets depends on the machine: BD PLASTIC: Decay Time; BD SHARP: Decay; BD HARD: Decay; BD CLASSIC: Decay; BD FM: Decay; BD SILKY: Decay; BD ACOUSTIC: Decay; SD NATURAL: Body Decay; SD HARD: Decay; SD CLASSIC: Decay; SD FM: Decay; SD ACOUSTIC: Decay; RS HARD: Decay; RS CLASSIC: Decay; CP CLASSIC: Noise Decay; SY DUAL VCO: Osc 1 Decay; SY CHIP: Decay; SY RAW: Decay; BT CLASSIC: Decay; LT, MT, HT CLASSIC: Decay; CH CLASSIC: Decay; CH METALLIC: Decay Time; OH CLASSIC: Decay; OH METALLIC: Decay Time; HH BASIC: Decay Time; HH LAB: Decay Time; CY METALLIC: Decay Time; CY CLASSIC: Decay; CY RIDE: Tail Decay; CB CLASSIC & METALLIC: Decay Time; UT NOISE: Decay; UT IMPULSE: Decay.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth.synthParameter4",
+          "name": "Synth Parameter 4",
+          "group": "Synth",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthParameter4"
+          },
+          "description": "What it sets depends on the machine: BD PLASTIC: Sweep Depth; BD SHARP: Sweep Depth; BD HARD: Hold; BD CLASSIC: Hold; BD FM: FM Amount; BD SILKY: Sweep Depth; BD ACOUSTIC: Sweep Depth; SD NATURAL: Noise Decay; SD HARD: Sweep Depth; SD CLASSIC: Detune; SD FM: FM Tune; SD ACOUSTIC: Noise Decay; RS HARD: Sweep Depth; RS CLASSIC: Osc Balance; CP CLASSIC: Clap Number; SY DUAL VCO: Balance; SY CHIP: Waveform; SY RAW: Noise Level; BT CLASSIC: Sweep Depth; LT, MT, HT CLASSIC: Sweep Depth; CH CLASSIC: Color; OH CLASSIC: Color; HH BASIC: Tone; HH LAB: Tune 2; CY METALLIC: Tone; CY CLASSIC: Color; CY RIDE: Hit Decay; CB CLASSIC & METALLIC: Detune; UT NOISE: Sweep Depth; UT IMPULSE: Polarity.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth.synthParameter5",
+          "name": "Synth Parameter 5",
+          "group": "Synth",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthParameter5"
+          },
+          "description": "What it sets depends on the machine: BD PLASTIC: Sweep Time; BD SHARP: Sweep Time; BD HARD: Sweep Time; BD CLASSIC: Sweep Time; BD FM: Sweep Time; BD SILKY: Sweep Time; BD ACOUSTIC: Sweep Time; SD NATURAL: Noise LPF; SD HARD: Tick Level; SD CLASSIC: Snap Amount; SD FM: FM Decay Time; SD ACOUSTIC: Hold Time; RS HARD: Tick Level; RS CLASSIC: Tune Osc 2; CP CLASSIC: Clap Rate; SY DUAL VCO: Osc 2 Detune; SY CHIP: Speed; SY RAW: Osc 2 Detune; BT CLASSIC: Noise Level; LT, MT, HT CLASSIC: Sweep Time; HH BASIC: Transient Decay; HH LAB: Tune 3; CY METALLIC: Transient Decay; CY CLASSIC: Tone; CY RIDE: Cymbal Type; UT NOISE: Sweep Time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth.synthParameter6",
+          "name": "Synth Parameter 6",
+          "group": "Synth",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthParameter6"
+          },
+          "description": "What it sets depends on the machine: BD PLASTIC: Hold Time; BD SHARP: Hold Time; BD HARD: Sweep Depth; BD CLASSIC: Sweep Depth; BD FM: FM Sweep Time; BD SILKY: Hold; BD ACOUSTIC: Hold Time; SD NATURAL: Noise Balance; SD HARD: Noise Decay; SD CLASSIC: Noise Decay; SD FM: Noise Decay; SD ACOUSTIC: Noise Level; RS HARD: Noise Level; RS CLASSIC: Symmetry; CP CLASSIC: Noise Level; SY DUAL VCO: Osc Config; SY CHIP: Offset 2; SY RAW: Waveform 1; BT CLASSIC: Snap Type; LT, MT, HT CLASSIC: Noise Decay; HH BASIC: Osc Reset; HH LAB: Tune 4; CY RIDE: Component 1; UT NOISE: LP Resonance.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth.synthParameter7",
+          "name": "Synth Parameter 7",
+          "group": "Synth",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthParameter7"
+          },
+          "description": "What it sets depends on the machine: BD PLASTIC: VCO Click; BD SHARP: Tick Level; BD HARD: Waveform; BD CLASSIC: Waveform; BD FM: FM Decay Time; BD SILKY: VCO Click; BD ACOUSTIC: Impact; SD NATURAL: Noise Resonance; SD HARD: Noise Level; SD CLASSIC: Noise Level; SD FM: Noise Level; SD ACOUSTIC: Impact; RS HARD: Symmetry; RS CLASSIC: Noise Level; CP CLASSIC: Random Claps; SY DUAL VCO: Osc 2 Decay; SY CHIP: Offset 3; SY RAW: Waveform 2; LT, MT, HT CLASSIC: Noise Level; HH LAB: Tune 5; CY RIDE: Component 2; UT NOISE: HP Frequency.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth.synthParameter8",
+          "name": "Synth Parameter 8",
+          "group": "Synth",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "synthParameter8"
+          },
+          "description": "What it sets depends on the machine: BD PLASTIC: Dust Level; BD SHARP: Waveform; BD HARD: Transient Tick; BD CLASSIC: Transient Tick; BD FM: FM Tune; BD SILKY: Dust Level; BD ACOUSTIC: Waveform; SD NATURAL: Noise HPF; SD HARD: Sweep Time; SD CLASSIC: Osc Balance; SD FM: FM Amount; SD ACOUSTIC: Sweep Depth; RS HARD: Sweep Time; RS CLASSIC: Tick Level; CP CLASSIC: Clap Decay; SY DUAL VCO: Bend; SY CHIP: Offset 4; SY RAW: Balance; LT, MT, HT CLASSIC: Noise Tone; HH LAB: Tune 6; CY RIDE: Component 3; UT NOISE: Attack.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "sample.sampleTune",
+          "name": "Sample Tune",
+          "group": "Sample",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleTune"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "sample.sampleFineTune",
+          "name": "Sample Fine tune",
+          "group": "Sample",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleFineTune"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "sample.sampleBitReduction",
+          "name": "Sample Bit Reduction",
+          "group": "Sample",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleBitReduction"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "sample.sampleSlot",
+          "name": "Sample Slot",
+          "group": "Sample",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleSlot"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "sample.sampleStart",
+          "name": "Sample Start",
+          "group": "Sample",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleStart"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "sample.sampleEnd",
+          "name": "Sample End",
+          "group": "Sample",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleEnd"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "sample.sampleLoop",
+          "name": "Sample Loop",
+          "group": "Sample",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleLoop"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "sample.sampleLevel",
+          "name": "Sample Level",
+          "group": "Sample",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterAttackTime",
+          "name": "Filter Attack Time",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterAttackTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 70
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterDecayTime",
+          "name": "Filter Decay Time",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterDecayTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 71
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterSustainLevel",
+          "name": "Filter Sustain Level",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterSustainLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 72
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterReleaseTime",
+          "name": "Filter Release Time",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterReleaseTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 73
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterFrequency",
+          "name": "Filter Frequency",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterFrequency"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 74
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterResonance",
+          "name": "Filter Resonance",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterResonance"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterMode",
+          "name": "Filter Mode",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterMode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 76
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterEnvDepth",
+          "name": "Filter Env Depth",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEnvDepth"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 77
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampAttackTime",
+          "name": "Amp Attack Time",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampAttackTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 78
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampHoldTime",
+          "name": "Amp Hold Time",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampHoldTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 79
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampDecayTime",
+          "name": "Amp Decay Time",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampDecayTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampOverdrive",
+          "name": "Amp Overdrive",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampOverdrive"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampDelaySend",
+          "name": "Amp Delay Send",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampDelaySend"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 82
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampReverbSend",
+          "name": "Amp Reverb Send",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampReverbSend"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 83
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampPan",
+          "name": "Amp Pan",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampPan"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampVolume",
+          "name": "Amp Volume",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampVolume"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 7
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoSpeed",
+          "name": "LFO Speed",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoSpeed"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoMultiplier",
+          "name": "LFO Multiplier",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoMultiplier"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoFadeInOut",
+          "name": "LFO Fade In/Out",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoFadeInOut"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoDestination",
+          "name": "LFO Destination",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoDestination"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 105
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoWaveform",
+          "name": "LFO Waveform",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoWaveform"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 106
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoStartPhase",
+          "name": "LFO Start Phase",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoStartPhase"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoTrigMode",
+          "name": "LFO Trig Mode",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoTrigMode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoDepth",
+          "name": "LFO Depth",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoDepth"
+          },
+          "description": "14 bits: the MSB on CC 109, then the LSB on CC 118.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109,
+              "lsbCc": 118
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayTime",
+          "name": "Delay Time",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayPingpong",
+          "name": "Delay Pingpong",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayPingpong"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayStereoWidth",
+          "name": "Delay Stereo Width",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayStereoWidth"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayFeedback",
+          "name": "Delay Feedback",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayFeedback"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayHighpassFilter",
+          "name": "Delay Highpass Filter",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayHighpassFilter"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayLowpassFilter",
+          "name": "Delay Lowpass Filter",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayLowpassFilter"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayReverbSend",
+          "name": "Delay Reverb Send",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayReverbSend"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayMixVolume",
+          "name": "Delay Mix Volume",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayMixVolume"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbPredelay",
+          "name": "Reverb Predelay",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbPredelay"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbDecayTime",
+          "name": "Reverb Decay Time",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbDecayTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbShelvingFreq",
+          "name": "Reverb Shelving Freq",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbShelvingFreq"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbShelvingGain",
+          "name": "Reverb Shelving Gain",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbShelvingGain"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbHighpassFilter",
+          "name": "Reverb Highpass Filter",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbHighpassFilter"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbLowpassFilter",
+          "name": "Reverb Lowpass Filter",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbLowpassFilter"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbMixVolume",
+          "name": "Reverb Mix Volume",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbMixVolume"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "distortion.distAmount",
+          "name": "Dist Amount",
+          "group": "Distortion",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "distAmount"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 70,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "distortion.distSymmetry",
+          "name": "Dist Symmetry",
+          "group": "Distortion",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "distSymmetry"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 71,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "distortion.delayOverdrive",
+          "name": "Delay Overdrive",
+          "group": "Distortion",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayOverdrive"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 72,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "distortion.delayDistCompRoutingPrePost",
+          "name": "Delay Dist/Comp Routing (pre/post)",
+          "group": "Distortion",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayDistCompRoutingPrePost"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 76,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "distortion.reverbDistCompRoutingPrePost",
+          "name": "Reverb Dist/Comp Routing (pre/post)",
+          "group": "Distortion",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbDistCompRoutingPrePost"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 77,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "compressor.compressorThreshold",
+          "name": "Compressor Threshold",
+          "group": "Compressor",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorThreshold"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 78,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "compressor.compressorAttackTime",
+          "name": "Compressor Attack Time",
+          "group": "Compressor",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorAttackTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 79,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "compressor.compressorReleaseTime",
+          "name": "Compressor Release Time",
+          "group": "Compressor",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorReleaseTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "compressor.compressorMakeupGain",
+          "name": "Compressor Makeup Gain",
+          "group": "Compressor",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorMakeupGain"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "compressor.compressorRatio",
+          "name": "Compressor Ratio",
+          "group": "Compressor",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorRatio"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 82,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "compressor.compressorSidechainEq",
+          "name": "Compressor Sidechain EQ",
+          "group": "Compressor",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorSidechainEq"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 83,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "compressor.compressorDryWetMix",
+          "name": "Compressor Dry/Wet Mix",
+          "group": "Compressor",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorDryWetMix"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 84,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "compressor.compressorOutputVolume",
+          "name": "Compressor Output Volume",
+          "group": "Compressor",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorOutputVolume"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 85,
+              "channel": "$fxChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile elektron-analog-rytm, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "elektron-analog-rytm",
+    "name": "Elektron Analog Rytm",
+    "description": "Elektron Analog Rytm drum machine (MKI): every parameter of its manual's MIDI appendix, as the controllers and NRPNs it prints, on the track, FX and performance channels, the machines' parameters described on the synth parameters they set.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Analog Rytm User Manual, OS 1.74",
+        "notes": "MIDI appendix read by tools/profiles/elektron/read-elektron-midi.mjs from Analog-Rytm-User-Manual_ENG_OS1.74_260930.pdf (sha256 c2889b07dd17e8ff042d03730ec7a052ed6c466c4cf0d55cce51d1f22c1f0828), https://www.elektron.se/wp-content/uploads/2026/10/Analog-Rytm-User-Manual_ENG_OS1.74_260930.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/elektron/make-profiles.mjs; edit the layout in tools/profiles/elektron/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI appendix, with its printed name, sent on the CC it prints (a 14-bit pair where it prints an LSB), or its NRPN where it prints no CC. Nothing here has been sent to a real instrument yet.",
+      "The appendix prints no ranges: each parameter takes what its controller carries, 0 - 127 (0 - 16383 for a pair). What a value shows, and the values of a setting chosen from a list, are in the parameter's chapter of the manual.",
+      "The channel variable is a track's channel (track 1's by default): the parameters go to that track. Set it to the AUTO channel to edit whichever track is active.",
+      "The fxChannel variable is 16 here: the manual prints no default for it; set it to the instrument's FX track channel (SETTINGS > MIDI CONFIG > CHANNELS, TRACK 1–12, FX) setting.",
+      "The perfChannel variable is 15 here: the manual prints no default for it; set it to the instrument's PERF CHANNEL (SETTINGS > MIDI CONFIG > CHANNELS) setting."
+    ],
+    "variables": {
+      "channel": 1,
+      "fxChannel": 16,
+      "perfChannel": 15
+    },
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-midi-appendix",
+      "realtimeEditing": "complete-for-the-manual's-midi-appendix",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the instrument sends these same controllers (or NRPNs, as its PARAM OUTPUT setting says) when its knobs are turned",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "LFO: LFO Depth = 1000 (CC 109, channel 1)",
+        "parameter": "lfo.lfoDepth",
+        "value": 1000,
+        "expectedHex": "B0 6D 07\nB0 76 68"
+      },
+      {
+        "name": "Trig: Note = 100 (CC 3, channel 1)",
+        "parameter": "trig.note",
+        "value": 100,
+        "expectedHex": "B0 03 64"
+      }
+    ]
+  }
+}

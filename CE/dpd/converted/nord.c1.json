@@ -1,0 +1,2235 @@
+{
+  "schemaVersion": 1,
+  "id": "nord.c1",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Nord C1",
+  "manufacturer": "Nord",
+  "family": "Organ",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "upper.presetFocus",
+          "name": "Preset Focus",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "presetFocus"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.presetFocus",
+          "name": "Preset Focus",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "presetFocus"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 3,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "organ.organModel",
+          "name": "Organ Model",
+          "group": "Organ",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "organModel"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 9
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar1",
+          "name": "Drawbar1",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar1"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar1",
+          "name": "Drawbar1",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar1"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bass.drawbar1",
+          "name": "Drawbar1",
+          "group": "Bass",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar1"
+          },
+          "description": "On the Bass manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16,
+              "channel": "$bassChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar2",
+          "name": "Drawbar2",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar2"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar2",
+          "name": "Drawbar2",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar2"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bass.drawbar2",
+          "name": "Drawbar2",
+          "group": "Bass",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar2"
+          },
+          "description": "On the Bass manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17,
+              "channel": "$bassChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar3",
+          "name": "Drawbar3",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar3"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar3",
+          "name": "Drawbar3",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar3"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar4",
+          "name": "Drawbar4",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar4"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar4",
+          "name": "Drawbar4",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar4"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar5",
+          "name": "Drawbar5",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar5"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar5",
+          "name": "Drawbar5",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar5"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar6",
+          "name": "Drawbar6",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar6"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar6",
+          "name": "Drawbar6",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar6"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar7",
+          "name": "Drawbar7",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar7"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar7",
+          "name": "Drawbar7",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar7"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar8",
+          "name": "Drawbar8",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar8"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar8",
+          "name": "Drawbar8",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar8"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.drawbar9",
+          "name": "Drawbar9",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar9"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.drawbar9",
+          "name": "Drawbar9",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "drawbar9"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bass.bassPluck",
+          "name": "Bass Pluck",
+          "group": "Bass",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassPluck"
+          },
+          "description": "On the Bass manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18,
+              "channel": "$bassChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bass.bassRelease",
+          "name": "Bass Release",
+          "group": "Bass",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassRelease"
+          },
+          "description": "On the Bass manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19,
+              "channel": "$bassChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "perc.percDecay",
+          "name": "Perc Decay",
+          "group": "Perc",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "percDecay"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "perc.percLevel",
+          "name": "Perc Level",
+          "group": "Perc",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "percLevel"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayUpper",
+          "name": "Delay Upper",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayUpper"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayAmount",
+          "name": "Delay Amount",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayAmount"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 76
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayTempo",
+          "name": "Delay Tempo",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayTempo"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 77
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayFeedback",
+          "name": "Delay Feedback",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayFeedback"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 78
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayOnOff",
+          "name": "Delay On/Off",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayOnOff"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.speakerType",
+          "name": "Speaker Type",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "speakerType"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "rotary.rotarySpeed",
+          "name": "Rotary speed",
+          "group": "Rotary",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "rotarySpeed"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 82
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "vibrato.vibratoMode",
+          "name": "Vibrato Mode",
+          "group": "Vibrato",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibratoMode"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 84
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upper.vibratoOnOff",
+          "name": "Vibrato On/Off",
+          "group": "Upper",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibratoOnOff"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 85
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lower.vibratoOnOff",
+          "name": "Vibrato On/Off",
+          "group": "Lower",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibratoOnOff"
+          },
+          "description": "On the Lower manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 85,
+              "channel": "$lowerChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.percstateOnOff",
+          "name": "PercState On/Off",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "percstateOnOff"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 87
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "perc.percHarmonic",
+          "name": "Perc Harmonic",
+          "group": "Perc",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "percHarmonic"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 95
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbType",
+          "name": "Reverb Type",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbType"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 96
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbOnOff",
+          "name": "Reverb On/Off",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbOnOff"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 97
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "reverb.reverbAmount",
+          "name": "Reverb Amount",
+          "group": "Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbAmount"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.unisonMode",
+          "name": "Unison Mode",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "unisonMode"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bass.bassModel",
+          "name": "Bass Model",
+          "group": "Bass",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassModel"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 110
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drive.driveAmount",
+          "name": "Drive Amount",
+          "group": "Drive",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "driveAmount"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 111
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drive.driveOnOff",
+          "name": "Drive On/Off",
+          "group": "Drive",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "driveOnOff"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eq.eqTreble",
+          "name": "Eq Treble",
+          "group": "EQ",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "eqTreble"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eq.eqBass",
+          "name": "Eq Bass",
+          "group": "EQ",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "eqBass"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 114
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eq.eqOnOff",
+          "name": "Eq On/Off",
+          "group": "EQ",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "eqOnOff"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 115
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "eq.eqMid",
+          "name": "Eq Mid",
+          "group": "EQ",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "eqMid"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 116
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.basslmanual",
+          "name": "BassLManual",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "basslmanual"
+          },
+          "description": "On the Upper manual's channel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 117
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile nord-c1, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "nord-c1",
+    "name": "Nord C1",
+    "description": "Nord C1 combo organ: every control of its manual's MIDI controller list, each on the channels its comment column names.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Nord C1 User Manual, OS v1.0x",
+        "notes": "MIDI controller list (page 17 of the PDF) read by tools/profiles/nord/read-nord-cc.mjs from Nord C1 English User Manual v1.0x Edition 1.x.pdf (sha256 d5434cb567eaa61ef3fbcd20c7c16b7f9b220ab3b0bfa6315f1b2e3e437a4dea), https://www.nordkeyboards.com/wt/documents/180/Nord%20C1%20English%20User%20Manual%20v1.0x%20Edition%201.x.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/nord/make-profiles.mjs; edit the layout in tools/profiles/nord/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI controller list, with its printed name, sent as the control change it prints on the channel of each manual it is on. Nothing here has been sent to a real instrument yet.",
+      "The list prints controller numbers only: every value is 0 - 127, and a setting chosen from a list (a model, a waveform, an effect type) is a number here, not a choice.",
+      "The channel variables are the Upper, Lower and Bass MIDI channels (the System menu); 1, 2 and 3 here, which may not be the instrument's.",
+      "Left out, the pedals, the wheel and bank select: 4 Swell pedal, 64 Sustain pedal."
+    ],
+    "variables": {
+      "channel": 1,
+      "lowerChannel": 2,
+      "bassChannel": 3
+    },
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-MIDI-controller-list",
+      "realtimeEditing": "complete-for-the-manual's-MIDI-controller-list",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the instrument sends these same messages when its panel is used, where its MIDI settings allow",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Upper Preset Focus = 100 (CC 3)",
+        "parameter": "upper.presetFocus",
+        "value": 100,
+        "expectedHex": "B0 03 64"
+      },
+      {
+        "name": "Global BassLManual = 100 (CC 117)",
+        "parameter": "global.basslmanual",
+        "value": 100,
+        "expectedHex": "B0 75 64"
+      }
+    ]
+  }
+}

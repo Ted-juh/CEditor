@@ -54,6 +54,11 @@ export function resolveParams(resolved) {
           name: p.name, group: p.group, valueType: p.valueType, range: p.range, default: p.default,
           encoding: p.encoding ?? { type: 'u7' }, access: p.access ?? { read: true, write: true },
           enum: p.enum, ui: p.ui, display: p.display, size: p.size ?? 1, absAddress: absAddr,
+          // What a profile converted from the engine's format carries beyond the DPD's own fields:
+          // its description, and `engine`, the engine-only details the emitter lays over what it
+          // derives (tools/from-legacy.mjs computes it as exactly that difference).
+          ...(p.description != null ? { description: p.description } : {}),
+          ...(p.engine ? { engine: p.engine } : {}),
           wires: resolveWires(p, absAddr, idx, (rel) => bytesToHex(resolveAddress(base, stride, idx, hexToBytes(rel)))),
         });
       }
@@ -67,10 +72,23 @@ export function resolveParams(resolved) {
 export function resolveWires(p, absAddr, idx, resolveAddr) {
   const addrOf = (wire) => (wire.address && resolveAddr ? resolveAddr(wire.address) : absAddr);
   // one wire -> its resolved form. cc strides per instance; nrpn carries its MSB/LSB; sysex its address.
+  // A cc wire may name the controller carrying its low seven bits (a 14-bit pair, MSB first) and a
+  // channel of its own (a variable such as $partChannel, or a fixed channel), as the engine's cc
+  // recipes do; both stride with the instance like the controller itself.
   const wireOut = (wire) => wire.msg === 'cc'
-    ? { msg: 'cc', cc: wire.cc + (wire.ccStride ?? 0) * idx }
-    : wire.msg === 'nrpn'
-      ? { msg: 'nrpn', nrpn: wire.nrpn, size: wire.size ?? p.size ?? 1 }
+    ? {
+      msg: 'cc', cc: wire.cc + (wire.ccStride ?? 0) * idx,
+      ...(wire.lsbCc != null ? { lsbCc: wire.lsbCc + (wire.ccStride ?? 0) * idx } : {}),
+      ...(wire.channel != null ? { channel: wire.channel } : {}),
+    }
+    : wire.msg === 'nrpn' || wire.msg === 'rpn'
+      // Its number, and how the engine sends it: a channel of its own, a null (7F 7F) after the
+      // value, Korg's low bits first on another controller, a pause after the message.
+      ? {
+        msg: wire.msg, [wire.msg]: wire[wire.msg], size: wire.size ?? p.size ?? 1,
+        ...Object.fromEntries(['channel', 'nullAfterSend', 'lowBits', 'lowBitsController', 'delayAfterMs']
+          .filter((k) => wire[k] != null).map((k) => [k, wire[k]])),
+      }
       : { msg: wire.msg, address: addrOf(wire), size: wire.size ?? p.size ?? 1 };
 
   if (Array.isArray(p.wires)) {

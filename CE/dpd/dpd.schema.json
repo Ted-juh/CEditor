@@ -110,6 +110,7 @@
     },
 
     "provenance": { "$ref": "#/$defs/provenance" },
+    "engine": { "type": "object", "description": "Engine-only profile fields the emitter lays over what it derives (the engine id and name, description, sources, notes, tests, coverage, timing, identity, requests, ...); a key set to null is left out. Written by tools/from-legacy.mjs." },
     "completeness": {
       "enum": ["full", "partial", "structural-only"],
       "description": "How finished the profile is. Imported profiles that lack bit-level detail land as partial/structural-only."
@@ -249,7 +250,9 @@
           "properties": { "preferredComponent": { "type": "string" } }
         },
         "display": { "$ref": "#/$defs/parameterDisplay" },
-        "provenance": { "$ref": "#/$defs/provenance" }
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "description": { "type": "string", "description": "What the parameter is, as its document gives it." },
+        "engine": { "type": "object", "description": "Engine-only details the emitter lays over the legacy parameter it derives (send policy, short label, a type the DPD value types do not name, ...); a key set to null is left out. Written by tools/from-legacy.mjs as exactly the difference between the engine profile and what the emitter derives." }
       },
       "allOf": [
         {
@@ -271,6 +274,12 @@
         "size": { "type": "integer", "minimum": 1 },
         "cc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Controller number for msg=cc." },
         "ccStride": { "type": "integer", "description": "Per-instance increment added to cc (GAIA: tone1 CC102, tone2 103, tone3 104 -> ccStride 1)." },
+        "lsbCc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "For msg=cc: the controller carrying the value's low seven bits, the MSB going on `cc` first (a 14-bit pair)." },
+        "channel": { "type": ["string", "integer"], "description": "For msg=cc, nrpn or rpn: the channel, when not the profile's $channel: a variable ($partChannel) or a fixed channel 1-16." },
+        "nullAfterSend": { "type": "boolean", "description": "For msg=nrpn or rpn: whether the parameter number is set to null (7F 7F) after the value." },
+        "lowBits": { "type": "integer", "minimum": 1, "maximum": 7, "description": "For msg=nrpn or rpn: the value's low bits go first, this many, on lowBitsController (Korg's data entry), the rest on CC 6." },
+        "lowBitsController": { "type": "integer", "minimum": 0, "maximum": 127, "description": "For msg=nrpn or rpn with lowBits: the controller carrying the low bits." },
+        "delayAfterMs": { "type": "integer", "minimum": 0, "description": "For msg=nrpn or rpn: a pause after the message." },
         "nrpn": { "type": "string", "description": "NRPN MSB/LSB, space-hex, for msg=nrpn." },
         "rpn": { "type": "string", "description": "RPN MSB/LSB, space-hex, for msg=rpn. Selected with CC 101/100 rather than 99/98; the registered numbers the MIDI spec names (00 00 pitch bend range, 00 01 fine tune, 00 02 coarse tune) live here." },
         "channelRelative": { "type": "boolean", "description": "If true, the CC/NRPN/RPN channel follows the part/instance channel rather than a fixed one." }

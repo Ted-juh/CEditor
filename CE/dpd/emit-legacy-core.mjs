@@ -20,6 +20,36 @@ const flat = (rid) => rid.replace(/^[^.]+\./, '');
 // Scene 1's values into Scene 2. One helper, so the two cannot drift again.
 export const legacyParamId = (p) => (p.instance > 0 ? p.resolvedId : flat(p.resolvedId));
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined);
+
+// A cc recipe's id. A plain controller on the profile's channel keeps the id it always had
+// (`cc74`); one with a low-seven-bits controller (a 14-bit pair) or a channel of its own is a
+// different message and gets its own recipe.
+/** An nrpn or rpn recipe's id: the number, and what else makes it a message of its own. */
+export function numberRecipeId(flavour, wire) {
+  const number = String(wire[flavour] ?? '').replace(/\s+/g, '');
+  const ch = wire.channel != null ? `@${String(wire.channel).replace(/^\$/, '')}` : '';
+  const how = [wire.nullAfterSend != null ? `n${wire.nullAfterSend ? 1 : 0}` : '', wire.lowBits != null ? `l${wire.lowBits}c${wire.lowBitsController}` : '', wire.delayAfterMs != null ? `d${wire.delayAfterMs}` : '', (wire.size ?? 1) >= 2 ? '' : 'v7'].filter(Boolean).join('');
+  // The id the emitter always gave a plain number on the profile's channel stays the same.
+  return wire.channel == null && wire.nullAfterSend == null && wire.lowBits == null && wire.delayAfterMs == null ? flavour + number : `${flavour}${number}${ch}${how ? `_${how}` : ''}`;
+}
+
+export function ccRecipeId(wire) {
+  const lsb = wire.lsbCc != null ? `_${wire.lsbCc}` : '';
+  const ch = wire.channel != null ? `@${String(wire.channel).replace(/^\$/, '')}` : '';
+  return `cc${wire.cc}${lsb}${ch}`;
+}
+
+// The engine-only details a profile converted from the engine's format carries (`engine`, written by
+// tools/from-legacy.mjs as the difference between that profile and what is derived here), laid over
+// what was derived: a key set to null is left out. Without one, nothing changes.
+function applyEngine(out, engine) {
+  if (!engine || typeof engine !== 'object') return out;
+  for (const [key, value] of Object.entries(engine)) {
+    if (value === null) delete out[key];
+    else out[key] = structuredClone(value);
+  }
+  return out;
+}
 const toBytes = (hex) => (hex ? String(hex).trim().split(/\s+/) : []);
 
 // DPD per-offset dump codec -> the C++ engine's legacy dump codec vocabulary
@@ -186,7 +216,7 @@ function legacyParam(p) {
   // How the synth's own display writes it (dpd.schema.json parameterDisplay): ce.format.parameter
   // and the readouts read these from the descriptor. The two above are the emitter's and stay.
   if (p.display && typeof p.display === 'object') {
-    for (const key of ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC']) {
+    for (const key of ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC', 'mode', 'shortLabel']) {
       if (p.display[key] !== undefined) out.display[key] = structuredClone(p.display[key]);
     }
   }
@@ -217,9 +247,9 @@ function legacyParam(p) {
   // A name is committed, not dragged.
   out.sendPolicy = { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
-  out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc)
-    : p.wires?.write?.msg === 'nrpn' ? ('nrpn' + String(p.wires.write.nrpn ?? '').replace(/\s+/g, ''))
-    : p.wires?.write?.msg === 'rpn' ? ('rpn' + String(p.wires.write.rpn ?? '').replace(/\s+/g, ''))
+  out.messageRecipe = p.wires?.write?.msg === 'cc' ? ccRecipeId(p.wires.write)
+    : p.wires?.write?.msg === 'nrpn' ? numberRecipeId('nrpn', p.wires.write)
+    : p.wires?.write?.msg === 'rpn' ? numberRecipeId('rpn', p.wires.write)
     : (p.wires?.write?.msg ?? 'dt1');
   // An rxLive wire is the message the instrument SENDS when its own control moves, which need not be
   // the one the editor writes: a GAIA's filter knob is written as a DT1 to an address and transmitted
@@ -231,7 +261,8 @@ function legacyParam(p) {
   const writeCc = p.wires?.write?.msg === 'cc' ? p.wires.write.cc : null;
   if (rx?.msg === 'cc' && rx.cc != null && rx.cc !== writeCc) out.inbound = [{ kind: 'cc', controller: rx.cc }];
   out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
-  return out;
+  if (p.description != null) out.description = p.description;
+  return applyEngine(out, p.engine);
 }
 
 // Translate a new-schema messageShape into a legacy messageRecipe. The legacy engine resolves
@@ -257,13 +288,20 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   // scene can edit only half of any patch.
   const params = resolveParams(resolved);
 
-  // Sysex recipes from the manufacturer's message shapes, then one CC recipe per distinct controller.
+  // Sysex recipes from the manufacturer's message shapes, then one CC recipe per distinct controller
+  // (with its low-bits controller and channel, when it has them).
   const messageRecipes = (resolved.messageShapes ?? []).map((s) => shapeToRecipe(s, resolved));
-  const ccControllers = [...new Set(
-    params.filter((p) => p.wires?.write?.msg === 'cc' && p.wires.write.cc != null).map((p) => p.wires.write.cc)
-  )].sort((a, b) => a - b);
-  for (const cc of ccControllers) {
-    messageRecipes.push({ id: `cc${cc}`, kind: 'cc', channel: '$channel', controller: cc, value: '$encodedValue' });
+  const ccWires = new Map();
+  for (const p of params) {
+    const w = p.wires?.write;
+    if (w?.msg === 'cc' && w.cc != null && !ccWires.has(ccRecipeId(w))) ccWires.set(ccRecipeId(w), w);
+  }
+  for (const [id, w] of [...ccWires.entries()].sort((a, b) => a[1].cc - b[1].cc || a[0].localeCompare(b[0]))) {
+    messageRecipes.push({
+      id, kind: 'cc', channel: w.channel ?? '$channel', controller: w.cc,
+      ...(w.lsbCc != null ? { lsbController: w.lsbCc } : {}),
+      value: '$encodedValue',
+    });
   }
   // One recipe per distinct parameter number, for both flavours. NRPN and RPN differ only in the
   // controller pair that selects the number — 99/98 against 101/100 — which is the engine's business
@@ -273,27 +311,36 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
     for (const p of params) {
       const wr = p.wires?.write;
       const number = wr?.[flavour];
-      if (wr?.msg !== flavour || !number || seen.has(number)) continue;
-      seen.add(number);
+      if (wr?.msg !== flavour || !number) continue;
+      const id = numberRecipeId(flavour, wr);
+      if (seen.has(id)) continue;
+      seen.add(id);
       const [msb, lsb] = number.trim().split(/\s+/).map((h) => parseInt(h, 16));
       messageRecipes.push({
-        id: flavour + number.replace(/\s+/g, ''),
+        id,
         kind: flavour,
-        channel: '$channel',
+        channel: wr.channel ?? '$channel',
         parameterMsb: msb,
         parameterLsb: lsb,
-        valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7,
+        // Korg's low bits replace the resolution: the value is split where they say.
+        ...(wr.lowBits != null ? { lowBits: wr.lowBits, lowBitsController: wr.lowBitsController } : { valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7 }),
+        ...(wr.nullAfterSend != null ? { nullAfterSend: wr.nullAfterSend } : {}),
+        ...(wr.delayAfterMs != null ? { messageDelayAfterMs: wr.delayAfterMs } : {}),
         value: '$encodedValue',
       });
     }
   }
 
+  // A profile converted from the engine's format names its engine id and name in `engine`; asked
+  // for none, the emitter derives them (`<id>-dpd`, `<label> (from DPD)`).
+  const engineId = resolved.engine?.id;
+  const engineName = resolved.engine?.name;
   const legacy = {
     schemaVersion: 1,
     profileVersion: resolved.version,
     minCEditorVersion: '0.9.0',
-    id: legacyId ?? `${resolved.id}-dpd`,
-    name: name ?? ((resolved.label ?? 'Device') + ' (from DPD)'),
+    id: legacyId ?? engineId ?? `${resolved.id}-dpd`,
+    name: name ?? engineName ?? ((resolved.label ?? 'Device') + ' (from DPD)'),
     dpdSource: resolved.id,
     manufacturer: resolved.manufacturer ?? cap(resolved.inherits) ?? 'Generic',
     family: resolved.family ?? '',
@@ -393,6 +440,13 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   if (resolved.display && typeof resolved.display === 'object') legacy.display = structuredClone(resolved.display);
   // What a patch of this synth is (ce.patch): read from the document as the author wrote it.
   if (resolved.patch && typeof resolved.patch === 'object') legacy.patch = structuredClone(resolved.patch);
+
+  // The engine-only fields of a converted profile, laid over the rest; an id or name the caller
+  // asked for still stands.
+  applyEngine(legacy, resolved.engine);
+  if (legacyId) legacy.id = legacyId;
+  if (name) legacy.name = name;
+  legacy.dpdSource = resolved.id;
 
   if (embedDpdModel) legacy.dpdModel = embedDpdModel;
   return legacy;

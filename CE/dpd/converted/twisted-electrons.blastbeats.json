@@ -1,0 +1,6386 @@
+{
+  "schemaVersion": 1,
+  "id": "twisted-electrons.blastbeats",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Twisted Electrons BlastBeats",
+  "manufacturer": "Twisted Electrons",
+  "family": "BlastBeats",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "drum.bassDrumCarrierVolume",
+          "name": "Bass drum carrier volume",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumCarrierVolume"
+          },
+          "description": "Drum Voice MIDI CC: CC 20 on channel 10 (Drum); Bass drum carrier volume; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumCarrierWaveform",
+          "name": "Bass drum carrier waveform",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumCarrierWaveform"
+          },
+          "description": "Drum Voice MIDI CC: CC 21 on channel 10 (Drum); Bass drum carrier waveform; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumCarrierFeedback",
+          "name": "Bass drum carrier feedback",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumCarrierFeedback"
+          },
+          "description": "Drum Voice MIDI CC: CC 22 on channel 10 (Drum); Bass drum carrier feedback; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumCarrierMultiplier",
+          "name": "Bass drum carrier multiplier",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumCarrierMultiplier"
+          },
+          "description": "Drum Voice MIDI CC: CC 23 on channel 10 (Drum); Bass drum carrier multiplier; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumCarrierTune",
+          "name": "Bass drum carrier tune",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumCarrierTune"
+          },
+          "description": "Drum Voice MIDI CC: CC 24 on channel 10 (Drum); Bass drum carrier tune; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumCarrierFall",
+          "name": "Bass drum carrier fall",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumCarrierFall"
+          },
+          "description": "Drum Voice MIDI CC: CC 25 on channel 10 (Drum); Bass drum carrier fall; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumCarrierAttack",
+          "name": "Bass drum carrier attack",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumCarrierAttack"
+          },
+          "description": "Drum Voice MIDI CC: CC 26 on channel 10 (Drum); Bass drum carrier attack; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumCarrierDecay",
+          "name": "Bass drum carrier decay",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumCarrierDecay"
+          },
+          "description": "Drum Voice MIDI CC: CC 27 on channel 10 (Drum); Bass drum carrier decay; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumModulatorVolume",
+          "name": "Bass drum modulator volume",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumModulatorVolume"
+          },
+          "description": "Drum Voice MIDI CC: CC 28 on channel 10 (Drum); Bass drum modulator volume; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumModulatorWaveform",
+          "name": "Bass drum modulator waveform",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumModulatorWaveform"
+          },
+          "description": "Drum Voice MIDI CC: CC 29 on channel 10 (Drum); Bass drum modulator waveform; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumModulatorMultiplier",
+          "name": "Bass drum modulator multiplier",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumModulatorMultiplier"
+          },
+          "description": "Drum Voice MIDI CC: CC 30 on channel 10 (Drum); Bass drum modulator multiplier; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumModulatorMultiplierFall",
+          "name": "Bass drum modulator multiplier fall",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumModulatorMultiplierFall"
+          },
+          "description": "Drum Voice MIDI CC: CC 31 on channel 10 (Drum); Bass drum modulator multiplier fall; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumModulatorAttack",
+          "name": "Bass drum modulator attack",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumModulatorAttack"
+          },
+          "description": "Drum Voice MIDI CC: CC 32 on channel 10 (Drum); Bass drum modulator attack; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.bassDrumModulatorDecay",
+          "name": "Bass drum modulator decay",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bassDrumModulatorDecay"
+          },
+          "description": "Drum Voice MIDI CC: CC 33 on channel 10 (Drum); Bass drum modulator decay; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.snareVolume",
+          "name": "Snare volume",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snareVolume"
+          },
+          "description": "Drum Voice MIDI CC: CC 34 on channel 10 (Drum); Snare volume; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.snareWaveform",
+          "name": "Snare waveform",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snareWaveform"
+          },
+          "description": "Drum Voice MIDI CC: CC 35 on channel 10 (Drum); Snare waveform; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.snareMultiplier",
+          "name": "Snare multiplier",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snareMultiplier"
+          },
+          "description": "Drum Voice MIDI CC: CC 36 on channel 10 (Drum); Snare multiplier; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.snareTune",
+          "name": "Snare tune",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snareTune"
+          },
+          "description": "Drum Voice MIDI CC: CC 37 on channel 10 (Drum); Snare tune; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.snareTuneFall",
+          "name": "Snare tune fall",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snareTuneFall"
+          },
+          "description": "Drum Voice MIDI CC: CC 38 on channel 10 (Drum); Snare tune fall; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.snareAttack",
+          "name": "Snare attack",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snareAttack"
+          },
+          "description": "Drum Voice MIDI CC: CC 39 on channel 10 (Drum); Snare attack; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.snareDecay",
+          "name": "Snare decay",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snareDecay"
+          },
+          "description": "Drum Voice MIDI CC: CC 40 on channel 10 (Drum); Snare decay; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.hatsVolume",
+          "name": "Hats Volume",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hatsVolume"
+          },
+          "description": "Drum Voice MIDI CC: CC 43 on channel 10 (Drum); Hats Volume; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.hatsWaveform",
+          "name": "Hats waveform",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hatsWaveform"
+          },
+          "description": "Drum Voice MIDI CC: CC 45 on channel 10 (Drum); Hats waveform; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.hatsMultiplier",
+          "name": "Hats multiplier",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hatsMultiplier"
+          },
+          "description": "Drum Voice MIDI CC: CC 55 on channel 10 (Drum); Hats multiplier; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 55,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.hatsTune",
+          "name": "Hats tune",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hatsTune"
+          },
+          "description": "Drum Voice MIDI CC: CC 56 on channel 10 (Drum); Hats tune; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 56,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.hatsFall",
+          "name": "Hats fall",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hatsFall"
+          },
+          "description": "Drum Voice MIDI CC: CC 57 on channel 10 (Drum); Hats fall; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 57,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.hatsAttack",
+          "name": "Hats attack",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hatsAttack"
+          },
+          "description": "Drum Voice MIDI CC: CC 51 on channel 10 (Drum); Hats attack; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 51,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.hatsDecay",
+          "name": "Hats Decay",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hatsDecay"
+          },
+          "description": "Drum Voice MIDI CC: CC 54 on channel 10 (Drum); Hats Decay; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 54,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.tomVol",
+          "name": "Tom vol",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tomVol"
+          },
+          "description": "Drum Voice MIDI CC: CC 42 on channel 10 (Drum); Tom vol; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.tomWaveform",
+          "name": "Tom waveform",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tomWaveform"
+          },
+          "description": "Drum Voice MIDI CC: CC 44 on channel 10 (Drum); Tom waveform; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.tomMultiplier",
+          "name": "Tom multiplier",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tomMultiplier"
+          },
+          "description": "Drum Voice MIDI CC: CC 48 on channel 10 (Drum); Tom multiplier; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 48,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.tomTune",
+          "name": "Tom tune",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tomTune"
+          },
+          "description": "Drum Voice MIDI CC: CC 46 on channel 10 (Drum); Tom tune; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.tomFall",
+          "name": "Tom fall",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tomFall"
+          },
+          "description": "Drum Voice MIDI CC: CC 47 on channel 10 (Drum); Tom fall; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.tomAttack",
+          "name": "Tom attack",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tomAttack"
+          },
+          "description": "Drum Voice MIDI CC: CC 50 on channel 10 (Drum); Tom attack; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 50,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "drum.tomDecay",
+          "name": "Tom decay",
+          "group": "Drum",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tomDecay"
+          },
+          "description": "Drum Voice MIDI CC: CC 53 on channel 10 (Drum); Tom decay; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 53,
+              "channel": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.volumeOp1",
+          "name": "Volume OP1",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 20 on channel 1 (Synth 1); Volume OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.volumeOp1",
+          "name": "Volume OP1",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 20 on channel 2 (Synth 2); Volume OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.volumeOp1",
+          "name": "Volume OP1",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 20 on channel 3 (Synth 3); Volume OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.volumeOp1",
+          "name": "Volume OP1",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 20 on channel 4 (Synth 4); Volume OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.waveformOp1",
+          "name": "Waveform OP1",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 21 on channel 1 (Synth 1); Waveform OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.waveformOp1",
+          "name": "Waveform OP1",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 21 on channel 2 (Synth 2); Waveform OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.waveformOp1",
+          "name": "Waveform OP1",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 21 on channel 3 (Synth 3); Waveform OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.waveformOp1",
+          "name": "Waveform OP1",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 21 on channel 4 (Synth 4); Waveform OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.feedbackOp1",
+          "name": "Feedback OP1",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 22 on channel 1 (Synth 1); Feedback OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.feedbackOp1",
+          "name": "Feedback OP1",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 22 on channel 2 (Synth 2); Feedback OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.feedbackOp1",
+          "name": "Feedback OP1",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 22 on channel 3 (Synth 3); Feedback OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.feedbackOp1",
+          "name": "Feedback OP1",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 22 on channel 4 (Synth 4); Feedback OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.algorithmAllOperators",
+          "name": "Algorithm (all operators)",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "algorithmAllOperators"
+          },
+          "description": "Synth Voice MIDI CC: CC 23 on channel 1 (Synth 1); Algorithm (all operators); values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.algorithmAllOperators",
+          "name": "Algorithm (all operators)",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "algorithmAllOperators"
+          },
+          "description": "Synth Voice MIDI CC: CC 23 on channel 2 (Synth 2); Algorithm (all operators); values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.algorithmAllOperators",
+          "name": "Algorithm (all operators)",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "algorithmAllOperators"
+          },
+          "description": "Synth Voice MIDI CC: CC 23 on channel 3 (Synth 3); Algorithm (all operators); values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.algorithmAllOperators",
+          "name": "Algorithm (all operators)",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "algorithmAllOperators"
+          },
+          "description": "Synth Voice MIDI CC: CC 23 on channel 4 (Synth 4); Algorithm (all operators); values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.multipleOp1",
+          "name": "Multiple OP1",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multipleOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 24 on channel 1 (Synth 1); Multiple OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.multipleOp1",
+          "name": "Multiple OP1",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multipleOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 24 on channel 2 (Synth 2); Multiple OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.multipleOp1",
+          "name": "Multiple OP1",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multipleOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 24 on channel 3 (Synth 3); Multiple OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.multipleOp1",
+          "name": "Multiple OP1",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multipleOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 24 on channel 4 (Synth 4); Multiple OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.attackOp1",
+          "name": "Attack OP1",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 25 on channel 1 (Synth 1); Attack OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.attackOp1",
+          "name": "Attack OP1",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 25 on channel 2 (Synth 2); Attack OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.attackOp1",
+          "name": "Attack OP1",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 25 on channel 3 (Synth 3); Attack OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.attackOp1",
+          "name": "Attack OP1",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 25 on channel 4 (Synth 4); Attack OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.decayOp1",
+          "name": "Decay OP1",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 26 on channel 1 (Synth 1); Decay OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.decayOp1",
+          "name": "Decay OP1",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 26 on channel 2 (Synth 2); Decay OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.decayOp1",
+          "name": "Decay OP1",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 26 on channel 3 (Synth 3); Decay OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.decayOp1",
+          "name": "Decay OP1",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp1"
+          },
+          "description": "Synth Voice MIDI CC: CC 26 on channel 4 (Synth 4); Decay OP1; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.volumeOp2",
+          "name": "Volume OP2",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 27 on channel 1 (Synth 1); Volume OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.volumeOp2",
+          "name": "Volume OP2",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 27 on channel 2 (Synth 2); Volume OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.volumeOp2",
+          "name": "Volume OP2",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 27 on channel 3 (Synth 3); Volume OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.volumeOp2",
+          "name": "Volume OP2",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 27 on channel 4 (Synth 4); Volume OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.waveformOp2",
+          "name": "Waveform OP2",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 28 on channel 1 (Synth 1); Waveform OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.waveformOp2",
+          "name": "Waveform OP2",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 28 on channel 2 (Synth 2); Waveform OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.waveformOp2",
+          "name": "Waveform OP2",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 28 on channel 3 (Synth 3); Waveform OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.waveformOp2",
+          "name": "Waveform OP2",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 28 on channel 4 (Synth 4); Waveform OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.multiplierOp2",
+          "name": "Multiplier OP2",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 29 on channel 1 (Synth 1); Multiplier OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.multiplierOp2",
+          "name": "Multiplier OP2",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 29 on channel 2 (Synth 2); Multiplier OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.multiplierOp2",
+          "name": "Multiplier OP2",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 29 on channel 3 (Synth 3); Multiplier OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.multiplierOp2",
+          "name": "Multiplier OP2",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 29 on channel 4 (Synth 4); Multiplier OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.tremolo",
+          "name": "Tremolo",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tremolo"
+          },
+          "description": "Synth Voice MIDI CC: CC 30 on channel 1 (Synth 1); Tremolo; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.tremolo",
+          "name": "Tremolo",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tremolo"
+          },
+          "description": "Synth Voice MIDI CC: CC 30 on channel 2 (Synth 2); Tremolo; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.tremolo",
+          "name": "Tremolo",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tremolo"
+          },
+          "description": "Synth Voice MIDI CC: CC 30 on channel 3 (Synth 3); Tremolo; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.tremolo",
+          "name": "Tremolo",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tremolo"
+          },
+          "description": "Synth Voice MIDI CC: CC 30 on channel 4 (Synth 4); Tremolo; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.vibrato",
+          "name": "Vibrato",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibrato"
+          },
+          "description": "Synth Voice MIDI CC: CC 31 on channel 1 (Synth 1); Vibrato; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.vibrato",
+          "name": "Vibrato",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibrato"
+          },
+          "description": "Synth Voice MIDI CC: CC 31 on channel 2 (Synth 2); Vibrato; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.vibrato",
+          "name": "Vibrato",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibrato"
+          },
+          "description": "Synth Voice MIDI CC: CC 31 on channel 3 (Synth 3); Vibrato; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.vibrato",
+          "name": "Vibrato",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibrato"
+          },
+          "description": "Synth Voice MIDI CC: CC 31 on channel 4 (Synth 4); Vibrato; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.attackOp2",
+          "name": "Attack OP2",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 32 on channel 1 (Synth 1); Attack OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.attackOp2",
+          "name": "Attack OP2",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 32 on channel 2 (Synth 2); Attack OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.attackOp2",
+          "name": "Attack OP2",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 32 on channel 3 (Synth 3); Attack OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.attackOp2",
+          "name": "Attack OP2",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 32 on channel 4 (Synth 4); Attack OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.decayOp2",
+          "name": "Decay OP2",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 33 on channel 1 (Synth 1); Decay OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.decayOp2",
+          "name": "Decay OP2",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 33 on channel 2 (Synth 2); Decay OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.decayOp2",
+          "name": "Decay OP2",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 33 on channel 3 (Synth 3); Decay OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.decayOp2",
+          "name": "Decay OP2",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp2"
+          },
+          "description": "Synth Voice MIDI CC: CC 33 on channel 4 (Synth 4); Decay OP2; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.volumeOp3",
+          "name": "Volume OP3",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 34 on channel 1 (Synth 1); Volume OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.volumeOp3",
+          "name": "Volume OP3",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 34 on channel 2 (Synth 2); Volume OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.volumeOp3",
+          "name": "Volume OP3",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 34 on channel 3 (Synth 3); Volume OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.volumeOp3",
+          "name": "Volume OP3",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 34 on channel 4 (Synth 4); Volume OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.waveformOp3",
+          "name": "Waveform OP3",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 35 on channel 1 (Synth 1); Waveform OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.waveformOp3",
+          "name": "Waveform OP3",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 35 on channel 2 (Synth 2); Waveform OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.waveformOp3",
+          "name": "Waveform OP3",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 35 on channel 3 (Synth 3); Waveform OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.waveformOp3",
+          "name": "Waveform OP3",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 35 on channel 4 (Synth 4); Waveform OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.feedbackOp3",
+          "name": "Feedback OP3",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 36 on channel 1 (Synth 1); Feedback OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.feedbackOp3",
+          "name": "Feedback OP3",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 36 on channel 2 (Synth 2); Feedback OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.feedbackOp3",
+          "name": "Feedback OP3",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 36 on channel 3 (Synth 3); Feedback OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.feedbackOp3",
+          "name": "Feedback OP3",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 36 on channel 4 (Synth 4); Feedback OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.tune",
+          "name": "Tune",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "Synth Voice MIDI CC: CC 37 on channel 1 (Synth 1); Tune; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.tune",
+          "name": "Tune",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "Synth Voice MIDI CC: CC 37 on channel 2 (Synth 2); Tune; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.tune",
+          "name": "Tune",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "Synth Voice MIDI CC: CC 37 on channel 3 (Synth 3); Tune; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.tune",
+          "name": "Tune",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "Synth Voice MIDI CC: CC 37 on channel 4 (Synth 4); Tune; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.multiplierOp3",
+          "name": "Multiplier OP3",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 38 on channel 1 (Synth 1); Multiplier OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.multiplierOp3",
+          "name": "Multiplier OP3",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 38 on channel 2 (Synth 2); Multiplier OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.multiplierOp3",
+          "name": "Multiplier OP3",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 38 on channel 3 (Synth 3); Multiplier OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.multiplierOp3",
+          "name": "Multiplier OP3",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 38 on channel 4 (Synth 4); Multiplier OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.attackOp3",
+          "name": "Attack OP3",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 39 on channel 1 (Synth 1); Attack OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.attackOp3",
+          "name": "Attack OP3",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 39 on channel 2 (Synth 2); Attack OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.attackOp3",
+          "name": "Attack OP3",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 39 on channel 3 (Synth 3); Attack OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.attackOp3",
+          "name": "Attack OP3",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 39 on channel 4 (Synth 4); Attack OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.decayOp3",
+          "name": "Decay OP3",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 40 on channel 1 (Synth 1); Decay OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.decayOp3",
+          "name": "Decay OP3",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 40 on channel 2 (Synth 2); Decay OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.decayOp3",
+          "name": "Decay OP3",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 40 on channel 3 (Synth 3); Decay OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.decayOp3",
+          "name": "Decay OP3",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp3"
+          },
+          "description": "Synth Voice MIDI CC: CC 40 on channel 4 (Synth 4); Decay OP3; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.volumeOp4",
+          "name": "Volume OP4",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 41 on channel 1 (Synth 1); Volume OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.volumeOp4",
+          "name": "Volume OP4",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 41 on channel 2 (Synth 2); Volume OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.volumeOp4",
+          "name": "Volume OP4",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 41 on channel 3 (Synth 3); Volume OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.volumeOp4",
+          "name": "Volume OP4",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 41 on channel 4 (Synth 4); Volume OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.waveformOp4",
+          "name": "Waveform OP4",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 42 on channel 1 (Synth 1); Waveform OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.waveformOp4",
+          "name": "Waveform OP4",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 42 on channel 2 (Synth 2); Waveform OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.waveformOp4",
+          "name": "Waveform OP4",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 42 on channel 3 (Synth 3); Waveform OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.waveformOp4",
+          "name": "Waveform OP4",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "waveformOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 42 on channel 4 (Synth 4); Waveform OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.multiplierOp4",
+          "name": "Multiplier OP4",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 43 on channel 1 (Synth 1); Multiplier OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.multiplierOp4",
+          "name": "Multiplier OP4",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 43 on channel 2 (Synth 2); Multiplier OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.multiplierOp4",
+          "name": "Multiplier OP4",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 43 on channel 3 (Synth 3); Multiplier OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.multiplierOp4",
+          "name": "Multiplier OP4",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiplierOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 43 on channel 4 (Synth 4); Multiplier OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.tremolo2",
+          "name": "Tremolo",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tremolo2"
+          },
+          "description": "Synth Voice MIDI CC: CC 44 on channel 1 (Synth 1); Tremolo; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.tremolo2",
+          "name": "Tremolo",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tremolo2"
+          },
+          "description": "Synth Voice MIDI CC: CC 44 on channel 2 (Synth 2); Tremolo; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.tremolo2",
+          "name": "Tremolo",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tremolo2"
+          },
+          "description": "Synth Voice MIDI CC: CC 44 on channel 3 (Synth 3); Tremolo; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.tremolo2",
+          "name": "Tremolo",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tremolo2"
+          },
+          "description": "Synth Voice MIDI CC: CC 44 on channel 4 (Synth 4); Tremolo; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.vibrato2",
+          "name": "Vibrato",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibrato2"
+          },
+          "description": "Synth Voice MIDI CC: CC 45 on channel 1 (Synth 1); Vibrato; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.vibrato2",
+          "name": "Vibrato",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibrato2"
+          },
+          "description": "Synth Voice MIDI CC: CC 45 on channel 2 (Synth 2); Vibrato; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.vibrato2",
+          "name": "Vibrato",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibrato2"
+          },
+          "description": "Synth Voice MIDI CC: CC 45 on channel 3 (Synth 3); Vibrato; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.vibrato2",
+          "name": "Vibrato",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vibrato2"
+          },
+          "description": "Synth Voice MIDI CC: CC 45 on channel 4 (Synth 4); Vibrato; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.attackOp4",
+          "name": "Attack OP4",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 46 on channel 1 (Synth 1); Attack OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.attackOp4",
+          "name": "Attack OP4",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 46 on channel 2 (Synth 2); Attack OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.attackOp4",
+          "name": "Attack OP4",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 46 on channel 3 (Synth 3); Attack OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.attackOp4",
+          "name": "Attack OP4",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attackOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 46 on channel 4 (Synth 4); Attack OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth1.decayOp4",
+          "name": "Decay OP4",
+          "group": "Synth 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 47 on channel 1 (Synth 1); Decay OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47,
+              "channel": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth2.decayOp4",
+          "name": "Decay OP4",
+          "group": "Synth 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 47 on channel 2 (Synth 2); Decay OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47,
+              "channel": 2
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth3.decayOp4",
+          "name": "Decay OP4",
+          "group": "Synth 3",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 47 on channel 3 (Synth 3); Decay OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47,
+              "channel": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "synth4.decayOp4",
+          "name": "Decay OP4",
+          "group": "Synth 4",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decayOp4"
+          },
+          "description": "Synth Voice MIDI CC: CC 47 on channel 4 (Synth 4); Decay OP4; values 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47,
+              "channel": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile twisted-electrons-blastbeats, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "twisted-electrons-blastbeats",
+    "name": "Twisted Electrons BlastBeats",
+    "description": "Twisted Electrons BlastBeats FM drum machine and synth: every drum and synth voice controller of its manual, the drums on channel 10 and the four synths on 1 - 4.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "BlastBeats manual (web page)",
+        "notes": "The page's MIDI tables (Drum Voice MIDI CC, Synth Voice MIDI CC), read by tools/profiles/twisted/read-twisted-page.mjs from te-manual-blastbeats.html saved 2026-11-11 (sha256 1306f90d906faf0199b6ab90bb11b81e7440a8aa266f6b8342345e4314255fbc), https://www.twisted-electrons.com/pages/manual-blastbeats. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/twisted/make-profiles.mjs; edit the layout in tools/profiles/twisted/synths/, not this file.",
+      "Every controller is a row of the page's Drum Voice MIDI CC and Synth Voice MIDI CC, sent as the controller it prints, on the channel the page's MIDI Channel Routing gives its target (Drum CH10, Synth 1 CH1, Synth 2 CH2, Synth 3 CH3, Synth 4 CH4; changeable in the editor). Nothing here has been sent to a real instrument yet.",
+      "The page is a live document, saved on 2026-11-11; a later version may differ."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-page's-tables: 147 parameters",
+      "realtimeEditing": "complete-for-the-page's-tables",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the controllers the page marks In/Out are sent back by the instrument",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Drum Bass drum carrier volume = 127",
+        "parameter": "drum.bassDrumCarrierVolume",
+        "value": 127,
+        "expectedHex": "B9 14 7F"
+      }
+    ]
+  }
+}

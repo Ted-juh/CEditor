@@ -647,8 +647,23 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **Reading controllers back ignores the channel.** When a synth sends a controller, CEditor finds
   the parameter by its message with the channel masked out. For a profile with two parts on two
   channels (the JP-08), a knob turned on the Lower part is read as the Upper part's.
-- **The Device Profile Designer** can show and edit only the profiles it was built with (see the
-  manual's "Not finished yet" note). The others work in the Device tool and in bindings.
+- **The Device Profile Designer** opens the profiles it was built with and the 239 converted from
+  the control-change and NRPN profiles here (see [In the Device Profile Designer](#in-the-device-profile-designer)).
+  The SysEx and dump profiles open empty there until they are converted; they work in the Device
+  tool and in bindings.
+
+## In the Device Profile Designer
+
+The profiles are written in the format the engine reads. Each is also converted into a model of the
+Device Profile Designer (`CE/dpd/converted/`, by `CE/dpd/tools/from-legacy.mjs`), which the Designer
+opens when its profile is: the parameters with their names, groups, ranges and choices, and the
+message each is sent with. A model is kept only if emitting it gives its profile back, every field
+equal and every parameter sending the same bytes at the ends and middle of its range and at every
+choice.
+
+So far the profiles sent as control changes and NRPNs are converted, 239 of them. The rest, those
+written as SysEx and those that read a dump back, have not been converted yet, and the Designer
+opens them empty.
 
 ## Adding to it
 

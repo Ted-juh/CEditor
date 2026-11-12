@@ -1,0 +1,1860 @@
+{
+  "schemaVersion": 1,
+  "id": "moog.minitaur",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Moog Minitaur",
+  "manufacturer": "Moog",
+  "family": "Minitaur",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "modulation.lfoRate",
+          "name": "LFO RATE",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoRate"
+          },
+          "description": "14 bits: the MSB on CC 3, then the LSB on CC 35. Adjusts the LFO frequency.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 3,
+              "lsbCc": 35
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoVcoAmount",
+          "name": "LFO VCO AMOUNT",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoVcoAmount"
+          },
+          "description": "14 bits: the MSB on CC 13, then the LSB on CC 45. Adjusts the modulation amount to the VCOs.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 13,
+              "lsbCc": 45
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoVcfAmount",
+          "name": "LFO VCF AMOUNT",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoVcfAmount"
+          },
+          "description": "14 bits: the MSB on CC 12, then the LSB on CC 44. Adjusts the Modulation amount to the VCF.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 12,
+              "lsbCc": 44
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoMidiSync",
+          "name": "LFO MIDI SYNC",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "int",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "int",
+              "label": "INT",
+              "wire": 0
+            },
+            {
+              "id": "midiclock",
+              "label": "MIDI CLOCK",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "lfoMidiSync"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Enables or disables ability of LFO to sync with MIDI CLOCK messages.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 87
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoSyncClockDiv",
+          "name": "LFO SYNC CLOCK DIV",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "4wholenotes",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "4wholenotes",
+              "label": "4 Whole Notes",
+              "wire": 0
+            },
+            {
+              "id": "3wholenotes",
+              "label": "3 Whole Notes",
+              "wire": 7
+            },
+            {
+              "id": "2wholenotes",
+              "label": "2 Whole Notes",
+              "wire": 13
+            },
+            {
+              "id": "wholenoteplushalfnote",
+              "label": "Whole Note + Half Note",
+              "wire": 19
+            },
+            {
+              "id": "wholenote",
+              "label": "Whole Note",
+              "wire": 25
+            },
+            {
+              "id": "dotted12note",
+              "label": "Dotted 1/2 Note",
+              "wire": 31
+            },
+            {
+              "id": "wholenotetriplet",
+              "label": "Whole Note Triplet",
+              "wire": 37
+            },
+            {
+              "id": "12note",
+              "label": "1/2 Note",
+              "wire": 43
+            },
+            {
+              "id": "dotted14notetriplet",
+              "label": "Dotted 1/4 Note Triplet",
+              "wire": 49
+            },
+            {
+              "id": "12notetriplet",
+              "label": "1/2 Note Triplet",
+              "wire": 55
+            },
+            {
+              "id": "14note",
+              "label": "1/4 Note",
+              "wire": 61
+            },
+            {
+              "id": "dotted18note",
+              "label": "Dotted 1/8 Note",
+              "wire": 68
+            },
+            {
+              "id": "14notetriplet",
+              "label": "1/4 Note Triplet",
+              "wire": 74
+            },
+            {
+              "id": "18note",
+              "label": "1/8 Note",
+              "wire": 80
+            },
+            {
+              "id": "dotted116note",
+              "label": "Dotted 1/16 Note",
+              "wire": 86
+            },
+            {
+              "id": "18notetriplet",
+              "label": "1/8 Note Triplet",
+              "wire": 92
+            },
+            {
+              "id": "116note",
+              "label": "1/16 Note",
+              "wire": 98
+            },
+            {
+              "id": "116notetriplet",
+              "label": "1/16 Note Triplet",
+              "wire": 104
+            },
+            {
+              "id": "132note",
+              "label": "1/32 Note",
+              "wire": 110
+            },
+            {
+              "id": "132notetriplet",
+              "label": "1/32 Note Triplet",
+              "wire": 116
+            },
+            {
+              "id": "164notetriplet",
+              "label": "1/64 Note Triplet",
+              "wire": 122
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "lfoSyncClockDiv"
+          },
+          "description": "Values from MIDI CC values for the LFO clock divider (p. 13 of the PDF); the first value of each band is sent. Reached over MIDI only. Sets the LFO synchronization clock divider.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 86
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoKeyTrigger",
+          "name": "LFO KEY TRIGGER",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "lfoKeyTrigger"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Re-triggers the LFO to the start of the cycle (Default is OFF).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 82
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco1Wave",
+          "name": "VCO 1 WAVE",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "saw",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "saw",
+              "label": "SAW",
+              "wire": 0
+            },
+            {
+              "id": "sqr",
+              "label": "SQR",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vco1Wave"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Selects the waveform of VCO 1.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 70
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco2Wave",
+          "name": "VCO 2 WAVE",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "saw",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "saw",
+              "label": "SAW",
+              "wire": 0
+            },
+            {
+              "id": "sqr",
+              "label": "SQR",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vco2Wave"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Selects the waveform of VCO 2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 71
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco2Freq",
+          "name": "VCO 2 FREQ",
+          "group": "Oscillators",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Freq"
+          },
+          "description": "14 bits: the MSB on CC 17, then the LSB on CC 49. Adjusts the frequency of VCO 2. Printed: 0-127 (64 is center).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17,
+              "lsbCc": 49
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco2Beat",
+          "name": "VCO 2 BEAT",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Beat"
+          },
+          "description": "Reached over MIDI only. Adjusts the beat frequency of VCO 2 (Default is 64).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.noteSync",
+          "name": "NOTE SYNC",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "noteSync"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Enables/disables Note Sync (Default is off).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.glideRate",
+          "name": "GLIDE RATE",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "glideRate"
+          },
+          "description": "Adjusts the Glide (portamento) rate time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 5
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.glideSwitch",
+          "name": "GLIDE SWITCH",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "glideSwitch"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Sets the state of the GLIDE switch (Glide is enabled when LED is lit).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 65
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.glideType",
+          "name": "GLIDE TYPE",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "lcr",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "lcr",
+              "label": "LCR",
+              "wire": 0
+            },
+            {
+              "id": "lct",
+              "label": "LCT",
+              "wire": 43
+            },
+            {
+              "id": "exp",
+              "label": "EXP",
+              "wire": 85
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "glideType"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Selects the type of Glide; Linear Constant Rate, Linear Constant Time, or Exponential.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 92
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.legatoGlide",
+          "name": "LEGATO GLIDE",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "alwaysglide",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "alwaysglide",
+              "label": "Always Glide",
+              "wire": 0
+            },
+            {
+              "id": "glideonlegatonotesonly",
+              "label": "Glide on legato notes only",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "legatoGlide"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Sets the state of the Legato Glide parameter when GLIDE is enabled (Default is OFF).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 83
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mixer.vco1",
+          "name": "VCO 1",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco1"
+          },
+          "description": "14 bits: the MSB on CC 15, then the LSB on CC 47. Adjusts the level of VCO 1.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15,
+              "lsbCc": 47
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.vco2",
+          "name": "VCO 2",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2"
+          },
+          "description": "14 bits: the MSB on CC 16, then the LSB on CC 48. Adjusts the level of VC0 2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16,
+              "lsbCc": 48
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.externalInLevel",
+          "name": "EXTERNAL IN LEVEL",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "externalInLevel"
+          },
+          "description": "14 bits: the MSB on CC 27, then the LSB on CC 59. Reached over MIDI only. Adjusts the level of the External Audio Input (Default is 64 = 50% level).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27,
+              "lsbCc": 59
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.cutoff",
+          "name": "CUTOFF",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cutoff"
+          },
+          "description": "14 bits: the MSB on CC 19, then the LSB on CC 51. Adjusts the Filter Cutoff frequency.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19,
+              "lsbCc": 51
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.resonance",
+          "name": "RESONANCE",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "resonance"
+          },
+          "description": "14 bits: the MSB on CC 21, then the LSB on CC 53. Adjusts the Filter Resonance parameter.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "lsbCc": 53
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.egAmount",
+          "name": "EG AMOUNT",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "egAmount"
+          },
+          "description": "Adjusts the EG amount affecting the cutoff.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterKbTrack",
+          "name": "FILTER KB TRACK",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterKbTrack"
+          },
+          "description": "14 bits: the MSB on CC 20, then the LSB on CC 54. Reached over MIDI only. Sets the amount of keyboard tracking for the filter (Default is 32 - about 50%).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "lsbCc": 54
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterVelocitySensitivity",
+          "name": "FILTER VELOCITY SENSITIVITY",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterVelocitySensitivity"
+          },
+          "description": "Reached over MIDI only. Sets the amount of filter velocity sensitivity (Default is 64 - 50%).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 89
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopes.vcfAttack",
+          "name": "VCF ATTACK",
+          "group": "Envelopes",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfAttack"
+          },
+          "description": "14 bits: the MSB on CC 23, then the LSB on CC 55. Adjusts the filter envelope attack time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "lsbCc": 55
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopes.vcfDecayRelease",
+          "name": "VCF DECAY/ RELEASE",
+          "group": "Envelopes",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfDecayRelease"
+          },
+          "description": "14 bits: the MSB on CC 24, then the LSB on CC 56. Adjusts the filter envelope decay and release time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "lsbCc": 56
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopes.vcfSustain",
+          "name": "VCF SUSTAIN",
+          "group": "Envelopes",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfSustain"
+          },
+          "description": "14 bits: the MSB on CC 25, then the LSB on CC 57. Adjusts the filter envelope sustain level.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25,
+              "lsbCc": 57
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopes.vcaAttack",
+          "name": "VCA ATTACK",
+          "group": "Envelopes",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaAttack"
+          },
+          "description": "14 bits: the MSB on CC 28, then the LSB on CC 60. Adjusts the volume envelope attack time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "lsbCc": 60
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopes.vcaDecayRelease",
+          "name": "VCA DECAY/ RELEASE",
+          "group": "Envelopes",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaDecayRelease"
+          },
+          "description": "14 bits: the MSB on CC 29, then the LSB on CC 61. Adjusts the volume envelope decay and release time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "lsbCc": 61
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopes.vcaSustain",
+          "name": "VCA SUSTAIN",
+          "group": "Envelopes",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaSustain"
+          },
+          "description": "14 bits: the MSB on CC 30, then the LSB on CC 62. Adjusts the volume envelope sustain level.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30,
+              "lsbCc": 62
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopes.releaseSwitch",
+          "name": "RELEASE SWITCH",
+          "group": "Envelopes",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "releaseSwitch"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Sets the state of the Release parameter (enabled when LED is lit).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 72
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "envelopes.triggerMode",
+          "name": "TRIGGER MODE",
+          "group": "Envelopes",
+          "valueType": "enum",
+          "default": "legatoon",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "legatoon",
+              "label": "LEGATO ON",
+              "wire": 0
+            },
+            {
+              "id": "legatooff",
+              "label": "LEGATO OFF",
+              "wire": 43
+            },
+            {
+              "id": "egreset",
+              "label": "EG RESET",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "triggerMode"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Sets the state of the envelope trigger (Default is Legato ON).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 73
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "volume.vcaOutputLevel",
+          "name": "VCA (OUTPUT) LEVEL",
+          "group": "Volume",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaOutputLevel"
+          },
+          "description": "14 bits: the MSB on CC 7, then the LSB on CC 39. Reached over MIDI only. Adjusts the audio ouput and headphone volume.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 7,
+              "lsbCc": 39
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "volume.volumeVelocitySensitivity",
+          "name": "VOLUME VELOCITY SENSITIVITY",
+          "group": "Volume",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeVelocitySensitivity"
+          },
+          "description": "Reached over MIDI only. Sets the amount of volume velocity sensitivity (Default is 64 = 50%).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 90
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keybdResponse.keyPriority",
+          "name": "KEY PRIORITY",
+          "group": "Keybd Response",
+          "valueType": "enum",
+          "default": "low",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "low",
+              "label": "LOW",
+              "wire": 0
+            },
+            {
+              "id": "high",
+              "label": "HIGH",
+              "wire": 43
+            },
+            {
+              "id": "last",
+              "label": "LAST",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "keyPriority"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Sets the Note Priority (Default is last).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 91
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "pitchWheelResponse.bendUpAmount",
+          "name": "BEND UP AMOUNT",
+          "group": "Pitch Wheel Response",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "2semitones",
+              "label": "2 SEMITONES",
+              "wire": 16
+            },
+            {
+              "id": "3semitones",
+              "label": "3 SEMITONES",
+              "wire": 32
+            },
+            {
+              "id": "4semitones",
+              "label": "4 SEMITONES",
+              "wire": 48
+            },
+            {
+              "id": "5semitones",
+              "label": "5 SEMITONES",
+              "wire": 64
+            },
+            {
+              "id": "7semitones",
+              "label": "7 SEMITONES",
+              "wire": 80
+            },
+            {
+              "id": "12semitones",
+              "label": "12 SEMITONES",
+              "wire": 96
+            },
+            {
+              "id": "24semitones",
+              "label": "24 SEMITONES",
+              "wire": 112
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "bendUpAmount"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Pitch Wheel 'UP' performance control (Default = +3 semitones).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "pitchWheelResponse.bendDownAmount",
+          "name": "BEND DOWN AMOUNT",
+          "group": "Pitch Wheel Response",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "2semitones",
+              "label": "2 SEMITONES",
+              "wire": 16
+            },
+            {
+              "id": "3semitones",
+              "label": "3 SEMITONES",
+              "wire": 32
+            },
+            {
+              "id": "4semitones",
+              "label": "4 SEMITONES",
+              "wire": 48
+            },
+            {
+              "id": "5semitones",
+              "label": "5 SEMITONES",
+              "wire": 64
+            },
+            {
+              "id": "7semitones",
+              "label": "7 SEMITONES",
+              "wire": 80
+            },
+            {
+              "id": "12semitones",
+              "label": "12 SEMITONES",
+              "wire": 96
+            },
+            {
+              "id": "24semitones",
+              "label": "24 SEMITONES",
+              "wire": 112
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "bendDownAmount"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. Reached over MIDI only. Pitch Wheel 'UP' performance control (Default = -3 semitones).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile moog-minitaur, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "moog-minitaur",
+    "name": "Moog Minitaur",
+    "description": "Moog Minitaur analog bass synthesizer: the MIDI CC table of its manual, with the corrections its v2.1 addendum prints.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Minitaur Manual (with the Firmware v2.1 Addendum)",
+        "notes": "MIDI CC table (pages 12, 13) read by tools/profiles/moog/read-moog-pdf.mjs from Minitaur_Manual.pdf (sha256 794eb65a62de6fadc6785ae8cfd28b222813ca1fbef9600b1c3cba394fbcc566), https://cdn.inmusicbrands.com/Moog/Minitaur/Minitaur_Manual.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/moog/make-profiles.mjs; edit the layout in tools/profiles/moog/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI tables, with its printed name. Nothing here has been sent to a real instrument yet.",
+      "No identity check: the manual prints no Device Inquiry reply.",
+      "17 knob(s) are 14-bit, 0 - 16383: the MSB and the LSB the table prints, sent in that order: LFO RATE (CC 3, LSB 35); LFO VCO AMOUNT (CC 13, LSB 45); LFO VCF AMOUNT (CC 12, LSB 44); VCO 2 FREQ (CC 17, LSB 49); VCO 1 (CC 15, LSB 47); VCO 2 (CC 16, LSB 48); EXTERNAL IN LEVEL (CC 27, LSB 59); CUTOFF (CC 19, LSB 51); RESONANCE (CC 21, LSB 53); FILTER KB TRACK (CC 20, LSB 54); VCF ATTACK (CC 23, LSB 55); VCF DECAY/ RELEASE (CC 24, LSB 56); VCF SUSTAIN (CC 25, LSB 57); VCA ATTACK (CC 28, LSB 60); VCA DECAY/ RELEASE (CC 29, LSB 61); VCA SUSTAIN (CC 30, LSB 62); VCA (OUTPUT) LEVEL (CC 7, LSB 39).",
+      "The MSB alone, 0 - 127, where the table prints an LSB for two rows or one that is another row's controller: VCO 2 BEAT (CC 18, LSB 50); EG AMOUNT (CC 22, LSB 50).",
+      "Values as corrected after the manual: TRIGGER MODE (CC 73): the v2.1 addendum's correction: \"86-127(EG RESET) [was incorrectly given as 85-127 in manual]\"; KEY PRIORITY (CC 91): the v2.1 addendum's correction: \"86-127(LAST) [was incorrectly given as 87-127 in manual]\".",
+      "Left out, MIDI's own controller (a channel mode message), not a setting: LOCAL CONTROL OFF (CC 122), ALL SOUNDS OFF (CC 120), ALL NOTES OFF (CC 123).",
+      "Left out, printed without a range: MOD WHEEL (CC 1(MSB) 33(LSB)): -."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-midi-tables",
+      "realtimeEditing": "complete-for-the-manual's-midi-tables",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the panel sends these same messages when its MIDI settings allow",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "LFO RATE = 1000 (CC 3)",
+        "parameter": "modulation.lfoRate",
+        "value": 1000,
+        "expectedHex": "B0 03 07\nB0 23 68"
+      },
+      {
+        "name": "VCO 2 BEAT = 100 (CC 18)",
+        "parameter": "oscillators.vco2Beat",
+        "value": 100,
+        "expectedHex": "B0 12 64"
+      },
+      {
+        "name": "LFO MIDI SYNC = MIDI CLOCK (CC 87)",
+        "parameter": "modulation.lfoMidiSync",
+        "value": "midiclock",
+        "expectedHex": "B0 57 40"
+      },
+      {
+        "name": "BEND DOWN AMOUNT = 24 SEMITONES (CC 108)",
+        "parameter": "pitchWheelResponse.bendDownAmount",
+        "value": "24semitones",
+        "expectedHex": "B0 6C 70"
+      }
+    ]
+  }
+}

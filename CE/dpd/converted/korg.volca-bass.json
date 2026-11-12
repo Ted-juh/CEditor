@@ -1,0 +1,595 @@
+{
+  "schemaVersion": 1,
+  "id": "korg.volca-bass",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Korg volca bass",
+  "manufacturer": "Korg",
+  "family": "volca",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "controllers.slideTime",
+          "name": "SLIDE TIME",
+          "group": "Controllers",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "slideTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 5
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "controllers.expression",
+          "name": "EXPRESSION",
+          "group": "Controllers",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "expression"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 11
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.octave",
+          "name": "OCTAVE",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "oct1",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "oct1",
+              "label": "oct 1",
+              "wire": 0
+            },
+            {
+              "id": "oct2",
+              "label": "oct 2",
+              "wire": 22
+            },
+            {
+              "id": "oct3",
+              "label": "oct 3",
+              "wire": 44
+            },
+            {
+              "id": "oct4",
+              "label": "oct 4",
+              "wire": 66
+            },
+            {
+              "id": "oct5",
+              "label": "oct 5",
+              "wire": 88
+            },
+            {
+              "id": "oct6",
+              "label": "oct 6",
+              "wire": 110
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "octave"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo.rate",
+          "name": "LFO RATE",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "rate"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.int",
+          "name": "LFO INT",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "int"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.1",
+          "name": "VCO PITCH 1",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.2",
+          "name": "VCO PITCH 2",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.3",
+          "name": "VCO PITCH 3",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelope.attack",
+          "name": "EG ATTACK",
+          "group": "Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelope.decatRelease",
+          "name": "EG DECAT/RELEASE",
+          "group": "Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decatRelease"
+          },
+          "description": "Printed \"EG DECAT/RELEASE\"; the volca keys prints the same control as EG DECAY/RELEASE.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelope.int",
+          "name": "CUTOFF EG INT",
+          "group": "Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "int"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 48
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelope.gateTime",
+          "name": "GATE TIME",
+          "group": "Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "gateTime"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 49
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile korg-volca-bass, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "korg-volca-bass",
+    "name": "Korg volca bass",
+    "description": "Korg volca bass, every control change in its MIDI Implementation.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "volca bass MIDI Implementation (Revision 0.01, 2013.06.23)",
+        "notes": "Tables read by tools/profiles/korg/read-korg-text.mjs from volca_bass_MIDIimp.txt (sha256 45d01b374c11a12ea3f6ad5e00086837f661fadb8da9651b9dd48472bd0dfeaf), https://www.korg.com/us/support/download/manual/0/140/2737/. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/korg/make-profiles.mjs; edit the layout in tools/profiles/korg/synths/, not this file.",
+      "Every parameter is a control change the document says the instrument recognises, or a row of its NRPN table, with its printed name. Nothing here has been sent to a real instrument yet.",
+      "No identity check: the instrument has no MIDI Out, so it cannot answer a Device Inquiry."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-document's-control-changes-and-nrpns",
+      "realtimeEditing": "complete-for-the-document's-control-changes-and-nrpns",
+      "editBufferDumpRequest": "notImplemented: the program dump is described but not mapped yet",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the front panel sends these same control changes when its MIDI settings allow",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "SLIDE TIME = 100 (CC 5)",
+        "parameter": "controllers.slideTime",
+        "value": 100,
+        "expectedHex": "B0 05 64"
+      },
+      {
+        "name": "OCTAVE = oct 6 (CC 40)",
+        "parameter": "oscillators.octave",
+        "value": "oct6",
+        "expectedHex": "B0 28 6E"
+      },
+      {
+        "name": "GATE TIME = 100 (CC 49)",
+        "parameter": "envelope.gateTime",
+        "value": 100,
+        "expectedHex": "B0 31 64"
+      }
+    ]
+  }
+}

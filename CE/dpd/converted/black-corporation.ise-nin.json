@@ -1,0 +1,4020 @@
+{
+  "schemaVersion": 1,
+  "id": "black-corporation.ise-nin",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Black Corporation Ise-Nin",
+  "manufacturer": "Black Corporation",
+  "family": "Ise-Nin",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "upperPortamento.portamento",
+          "name": "PORTAMENTO",
+          "group": "Upper Portamento",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamento"
+          },
+          "description": "Printed: CC5  SLIDER PORTAMENTO  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 5
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.masterVolume",
+          "name": "MASTER VOLUME",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterVolume"
+          },
+          "description": "Printed: CC7  KNOB MASTER VOLUME. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 7
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.balance",
+          "name": "BALANCE",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "balance"
+          },
+          "description": "Printed: CC8  KNOB BALANCE. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 8
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerLfo.lfoWaveform",
+          "name": "LFO WAVEFORM",
+          "group": "Lower LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoWaveform"
+          },
+          "description": "Printed: CC9  BUTTON LFO WAVEFORM  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 9
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperLfo.lfoWaveform",
+          "name": "LFO WAVEFORM",
+          "group": "Upper LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoWaveform"
+          },
+          "description": "Printed: CC10  BUTTON LFO WAVEFORM  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerModulation.vcoMod",
+          "name": "VCO MOD",
+          "group": "Lower Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoMod"
+          },
+          "description": "Printed: CC11  BUTTON VCO MOD  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 11
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperModulation.vcoMod",
+          "name": "VCO MOD",
+          "group": "Upper Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoMod"
+          },
+          "description": "Printed: CC12  BUTTON VCO MOD  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 12
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerModulation.pwmMod",
+          "name": "PWM MOD",
+          "group": "Lower Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pwmMod"
+          },
+          "description": "Printed: CC13  BUTTON PWM MOD  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 13
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperModulation.pwmMod",
+          "name": "PWM MOD",
+          "group": "Upper Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pwmMod"
+          },
+          "description": "Printed: CC14  BUTTON PWM MOD  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 14
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperModulation.vcoModEnv",
+          "name": "VCO MOD ENV",
+          "group": "Upper Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoModEnv"
+          },
+          "description": "Printed: CC15  SLIDER VCO MOD ENV  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperModulation.vcoModPwm",
+          "name": "VCO MOD PWM",
+          "group": "Upper Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoModPwm"
+          },
+          "description": "Printed: CC16  SLIDER VCO MOD PWM  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVco1.vco1Crossmod",
+          "name": "VCO1 CROSSMOD",
+          "group": "Upper VCO 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco1Crossmod"
+          },
+          "description": "Printed: CC17  SLIDER VCO1 CROSSMOD  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVco2.vco2Range",
+          "name": "VCO2 RANGE",
+          "group": "Upper VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Range"
+          },
+          "description": "Printed: CC18  SLIDER VCO2 RANGE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerPortamento.portamento",
+          "name": "PORTAMENTO",
+          "group": "Lower Portamento",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamento"
+          },
+          "description": "Printed: CC19  SLIDER PORTAMENTO  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.keyMode",
+          "name": "KEY MODE",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "keyMode"
+          },
+          "description": "Printed: CC20  BUTTON KEY MODE. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerModulation.vcoModEnv",
+          "name": "VCO MOD ENV",
+          "group": "Lower Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoModEnv"
+          },
+          "description": "Printed: CC21  SLIDER VCO MOD ENV  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerModulation.vcoModPwm",
+          "name": "VCO MOD PWM",
+          "group": "Lower Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoModPwm"
+          },
+          "description": "Printed: CC22  SLIDER VCO MOD PWM  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVco1.vco1Crossmod",
+          "name": "VCO1 CROSSMOD",
+          "group": "Lower VCO 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco1Crossmod"
+          },
+          "description": "Printed: CC23  SLIDER VCO1 CROSSMOD  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVco2.vco2Range",
+          "name": "VCO2 RANGE",
+          "group": "Lower VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Range"
+          },
+          "description": "Printed: CC24  SLIDER VCO2 RANGE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVco2.vco2FineTune",
+          "name": "VCO2 FINE TUNE",
+          "group": "Lower VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2FineTune"
+          },
+          "description": "Printed: CC25  SLIDER VCO2 FINE TUNE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.hpfCutoff",
+          "name": "HPF CUTOFF",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hpfCutoff"
+          },
+          "description": "Printed: CC26  SLIDER HPF CUTOFF  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfCutoff",
+          "name": "VCF CUTOFF",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfCutoff"
+          },
+          "description": "Printed: CC27  SLIDER VCF CUTOFF  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfReso",
+          "name": "VCF RESO",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfReso"
+          },
+          "description": "Printed: CC28  SLIDER VCF RESO  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerMixer.mix",
+          "name": "MIX",
+          "group": "Lower Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "mix"
+          },
+          "description": "Printed: CC29  SLIDER MIX  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfA",
+          "name": "VCF A",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfA"
+          },
+          "description": "Printed: CC30  POT VCF A  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfB",
+          "name": "VCF B",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfB"
+          },
+          "description": "Printed: CC31  POT VCF B  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVco1.vco1Range",
+          "name": "VCO1 RANGE",
+          "group": "Lower VCO 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco1Range"
+          },
+          "description": "Printed: CC32  BUTTON VCO1 RANGE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVco1.vco1Range",
+          "name": "VCO1 RANGE",
+          "group": "Upper VCO 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco1Range"
+          },
+          "description": "Printed: CC33  BUTTON VCO1 RANGE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVco1.vco1Waveform",
+          "name": "VCO1 WAVEFORM",
+          "group": "Lower VCO 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco1Waveform"
+          },
+          "description": "Printed: CC34  BUTTON VCO1 WAVEFORM  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVco1.vco1Waveform",
+          "name": "VCO1 WAVEFORM",
+          "group": "Upper VCO 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco1Waveform"
+          },
+          "description": "Printed: CC35  BUTTON VCO1 WAVEFORM  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVco2.vco2Sync",
+          "name": "VCO2 SYNC",
+          "group": "Lower VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Sync"
+          },
+          "description": "Printed: CC36  BUTTON VCO2 SYNC  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVco2.vco2Sync",
+          "name": "VCO2 SYNC",
+          "group": "Upper VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Sync"
+          },
+          "description": "Printed: CC37  BUTTON VCO2 SYNC  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVco2.vco2VcoLfo",
+          "name": "VCO2 VCO/LFO",
+          "group": "Lower VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2VcoLfo"
+          },
+          "description": "Printed: CC38  BUTTON VCO2 VCO/LFO  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVco2.vco2VcoLfo",
+          "name": "VCO2 VCO/LFO",
+          "group": "Upper VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2VcoLfo"
+          },
+          "description": "Printed: CC39  BUTTON VCO2 VCO/LFO  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVco2.vco2FineTune",
+          "name": "VCO2 FINE TUNE",
+          "group": "Upper VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2FineTune"
+          },
+          "description": "Printed: CC40  SLIDER VCO2 FINE TUNE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVcf.hpfCutoff",
+          "name": "HPF CUTOFF",
+          "group": "Upper VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hpfCutoff"
+          },
+          "description": "Printed: CC41  SLIDER HPF CUTOFF  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVcf.vcfCutoff",
+          "name": "VCF CUTOFF",
+          "group": "Upper VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfCutoff"
+          },
+          "description": "Printed: CC42  SLIDER VCF CUTOFF  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVcf.vcfReso",
+          "name": "VCF RESO",
+          "group": "Upper VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfReso"
+          },
+          "description": "Printed: CC43  SLIDER VCF RESO  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperMixer.mix",
+          "name": "MIX",
+          "group": "Upper Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "mix"
+          },
+          "description": "Printed: CC44  SLIDER MIX  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVcf.vcfEnvMod",
+          "name": "VCF ENV MOD",
+          "group": "Upper VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfEnvMod"
+          },
+          "description": "Printed: CC47  SLIDER VCF ENV MOD  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVcf.vcfLfoMod",
+          "name": "VCF LFO MOD",
+          "group": "Upper VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfLfoMod"
+          },
+          "description": "Printed: CC48  SLIDER VCF LFO MOD  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 48
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVco2.vco2Waveform",
+          "name": "VCO2 WAVEFORM",
+          "group": "Lower VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Waveform"
+          },
+          "description": "Printed: CC49  BUTTON VCO2 WAVEFORM  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 49
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfEnvMod",
+          "name": "VCF ENV MOD",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfEnvMod"
+          },
+          "description": "Printed: CC52  SLIDER VCF ENV MOD  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 52
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfLfoMod",
+          "name": "VCF LFO MOD",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfLfoMod"
+          },
+          "description": "Printed: CC53  SLIDER VCF LFO MOD  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 53
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv1.env1Sustain",
+          "name": "ENV1 SUSTAIN",
+          "group": "Upper Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Sustain"
+          },
+          "description": "Printed: CC55  SLIDER ENV1 SUSTAIN  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 55
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv1.env1Release",
+          "name": "ENV1 RELEASE",
+          "group": "Upper Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Release"
+          },
+          "description": "Printed: CC56  SLIDER ENV1 RELEASE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 56
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVcf.vcfKeyFollow",
+          "name": "VCF KEY FOLLOW",
+          "group": "Upper VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfKeyFollow"
+          },
+          "description": "Printed: CC59  SLIDER VCF KEY FOLLOW  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 59
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVca.vcaLevel",
+          "name": "VCA LEVEL",
+          "group": "Upper VCA",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaLevel"
+          },
+          "description": "Printed: CC60  SLIDER VCA LEVEL  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 60
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv1.env1Attack",
+          "name": "ENV1 ATTACK",
+          "group": "Upper Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Attack"
+          },
+          "description": "Printed: CC61  SLIDER ENV1 ATTACK  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 61
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv1.env1Decay",
+          "name": "ENV1 DECAY",
+          "group": "Upper Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Decay"
+          },
+          "description": "Printed: CC62  SLIDER ENV1 DECAY  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperArpeggio.arpeggioRate",
+          "name": "ARPEGGIO RATE",
+          "group": "Upper Arpeggio",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggioRate"
+          },
+          "description": "Printed: CC65  SLIDER ARPEGGIO RATE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 65
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.uL",
+          "name": "U L",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "uL"
+          },
+          "description": "Printed: CC66  BUTTON U L. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 66
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerArpeggio.arpClock",
+          "name": "ARP CLOCK",
+          "group": "Lower Arpeggio",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpClock"
+          },
+          "description": "Printed: CC68  BUTTON ARP CLOCK  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 68
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv2.env2Sustain",
+          "name": "ENV2 SUSTAIN",
+          "group": "Upper Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Sustain"
+          },
+          "description": "Printed: CC71  SLIDER ENV2 SUSTAIN  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 71
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv2.env2Release",
+          "name": "ENV2 RELEASE",
+          "group": "Upper Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Release"
+          },
+          "description": "Printed: CC72  SLIDER ENV2 RELEASE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 72
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv2.env2Attack",
+          "name": "ENV2 ATTACK",
+          "group": "Upper Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Attack"
+          },
+          "description": "Printed: CC73  SLIDER ENV2 ATTACK  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 73
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv2.env2Decay",
+          "name": "ENV2 DECAY",
+          "group": "Upper Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Decay"
+          },
+          "description": "Printed: CC75  SLIDER ENV2 DECAY  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperLfo.lfoRate",
+          "name": "LFO RATE",
+          "group": "Upper LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoRate"
+          },
+          "description": "Printed: CC76  SLIDER LFO RATE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 76
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperModulation.vcoModLfo",
+          "name": "VCO MOD LFO",
+          "group": "Upper Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoModLfo"
+          },
+          "description": "Printed: CC77  SLIDER VCO MOD LFO  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 77
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperLfo.lfoDelay",
+          "name": "LFO DELAY",
+          "group": "Upper LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoDelay"
+          },
+          "description": "Printed: CC78  SLIDER LFO DELAY  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 78
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv1.env1Release",
+          "name": "ENV1 RELEASE",
+          "group": "Lower Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Release"
+          },
+          "description": "Printed: CC80  SLIDER ENV1 RELEASE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfKeyFollow",
+          "name": "VCF KEY FOLLOW",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfKeyFollow"
+          },
+          "description": "Printed: CC83  SLIDER VCF KEY FOLLOW  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 83
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVca.vcaLevel",
+          "name": "VCA LEVEL",
+          "group": "Lower VCA",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaLevel"
+          },
+          "description": "Printed: CC84  SLIDER VCA LEVEL  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 84
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv1.env1Attack",
+          "name": "ENV1 ATTACK",
+          "group": "Lower Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Attack"
+          },
+          "description": "Printed: CC85  SLIDER ENV1 ATTACK  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 85
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv1.env1Decay",
+          "name": "ENV1 DECAY",
+          "group": "Lower Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Decay"
+          },
+          "description": "Printed: CC86  SLIDER ENV1 DECAY  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 86
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerArpeggio.arpeggioRate",
+          "name": "ARPEGGIO RATE",
+          "group": "Lower Arpeggio",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpeggioRate"
+          },
+          "description": "Printed: CC87  SLIDER ARPEGGIO RATE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 87
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerTuning.masterTune",
+          "name": "MASTER TUNE",
+          "group": "Lower Tuning",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterTune"
+          },
+          "description": "Printed: CC88  KNOB MASTER TUNE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 88
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv2.env2Sustain",
+          "name": "ENV2 SUSTAIN",
+          "group": "Lower Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Sustain"
+          },
+          "description": "Printed: CC89  SLIDER ENV2 SUSTAIN  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 89
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv2.env2Release",
+          "name": "ENV2 RELEASE",
+          "group": "Lower Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Release"
+          },
+          "description": "Printed: CC90  SLIDER ENV2 RELEASE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 90
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerArpeggio.arpRange",
+          "name": "ARP RANGE",
+          "group": "Lower Arpeggio",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpRange"
+          },
+          "description": "Printed: CC91  BUTTON ARP RANGE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 91
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperArpeggio.arpRange",
+          "name": "ARP RANGE",
+          "group": "Upper Arpeggio",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpRange"
+          },
+          "description": "Printed: CC92  BUTTON ARP RANGE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 92
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerArpeggio.arpMode",
+          "name": "ARP MODE",
+          "group": "Lower Arpeggio",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpMode"
+          },
+          "description": "Printed: CC93  BUTTON ARP MODE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperArpeggio.arpMode",
+          "name": "ARP MODE",
+          "group": "Upper Arpeggio",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpMode"
+          },
+          "description": "Printed: CC94  BUTTON ARP MODE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 94
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerPortamento.portamento2",
+          "name": "PORTAMENTO",
+          "group": "Lower Portamento",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamento"
+          },
+          "description": "Printed: CC95  BUTTON PORTAMENTO  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 95
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperPortamento.portamento2",
+          "name": "PORTAMENTO",
+          "group": "Upper Portamento",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "portamento"
+          },
+          "description": "Printed: CC96  BUTTON PORTAMENTO  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 96
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfSlope",
+          "name": "VCF SLOPE",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfSlope"
+          },
+          "description": "Printed: CC97  BUTTON VCF SLOPE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 97
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVcf.vcfSlope",
+          "name": "VCF SLOPE",
+          "group": "Upper VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfSlope"
+          },
+          "description": "Printed: CC98  BUTTON VCF SLOPE  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 98
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVcf.vcfEnv",
+          "name": "VCF ENV",
+          "group": "Lower VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfEnv"
+          },
+          "description": "Printed: CC99  BUTTON VCF ENV  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 99
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVcf.vcfEnv",
+          "name": "VCF ENV",
+          "group": "Upper VCF",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfEnv"
+          },
+          "description": "Printed: CC100  BUTTON VCF ENV  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 100
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv2.env2Attack",
+          "name": "ENV2 ATTACK",
+          "group": "Lower Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Attack"
+          },
+          "description": "Printed: CC102  SLIDER ENV2 ATTACK  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv2.env2Decay",
+          "name": "ENV2 DECAY",
+          "group": "Lower Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Decay"
+          },
+          "description": "Printed: CC103  SLIDER ENV2 DECAY  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerLfo.lfoRate",
+          "name": "LFO RATE",
+          "group": "Lower LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoRate"
+          },
+          "description": "Printed: CC104  SLIDER LFO RATE  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerModulation.vcoModLfo",
+          "name": "VCO MOD LFO",
+          "group": "Lower Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcoModLfo"
+          },
+          "description": "Printed: CC105  SLIDER VCO MOD LFO  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 105
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerLfo.lfoDelay",
+          "name": "LFO DELAY",
+          "group": "Lower LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoDelay"
+          },
+          "description": "Printed: CC106  SLIDER LFO DELAY  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 106
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerVca.vcaLfo",
+          "name": "VCA LFO",
+          "group": "Lower VCA",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaLfo"
+          },
+          "description": "Printed: CC107  BUTTON VCA LFO  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVca.vcaLfo",
+          "name": "VCA LFO",
+          "group": "Upper VCA",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaLfo"
+          },
+          "description": "Printed: CC108  BUTTON VCA LFO  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv1.env1Kf",
+          "name": "ENV1 KF",
+          "group": "Lower Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Kf"
+          },
+          "description": "Printed: CC109  BUTTON ENV1 KF  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv1.env1Kf",
+          "name": "ENV1 KF",
+          "group": "Upper Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Kf"
+          },
+          "description": "Printed: CC110  BUTTON ENV1 KF  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 110
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv1.env1Inv",
+          "name": "ENV1 INV",
+          "group": "Lower Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Inv"
+          },
+          "description": "Printed: CC111  BUTTON ENV1 INV  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 111
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv1.env1Inv",
+          "name": "ENV1 INV",
+          "group": "Upper Env 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env1Inv"
+          },
+          "description": "Printed: CC112  BUTTON ENV1 INV  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowerEnv2.env2Kf",
+          "name": "ENV2 KF",
+          "group": "Lower Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Kf"
+          },
+          "description": "Printed: CC113  BUTTON ENV2 KF  LOWER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperEnv2.env2Kf",
+          "name": "ENV2 KF",
+          "group": "Upper Env 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "env2Kf"
+          },
+          "description": "Printed: CC114  BUTTON ENV2 KF  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 114
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "upperVco2.vco2Waveform",
+          "name": "VCO2 WAVEFORM",
+          "group": "Upper VCO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Waveform"
+          },
+          "description": "Printed: CC115  BUTTON VCO2 WAVEFORM  UPPER. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 115
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.assignMode",
+          "name": "ASSIGN MODE",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "assignMode"
+          },
+          "description": "Printed: CC116  BUTTON ASSIGN MODE. The chart prints no values for it: 0 - 127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 116
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile black-corporation-ise-nin, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "black-corporation-ise-nin",
+    "name": "Black Corporation Ise-Nin",
+    "description": "Black Corporation Ise-Nin eight-voice analog synthesizer: every controller of its manual's MIDI CC chart, its Upper and Lower layers each with its own.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "ISE-NIN Operation Manual 1.1.4",
+        "notes": "MIDI CC chart (pages 42, 43, 44, 45 of the PDF) read by tools/profiles/blackcorp/import-black.mjs from ise-nin_manual_1.1.4_eng_04dc875.pdf (sha256 b8d78a1b9bb664aa9b34c641b6b7ffc9380b9fca4484d769026968523dc23923), https://black-corporation.com/m/assets/support/3/ise-nin_manual_1.1.4_eng_04dc875.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/blackcorp/make-profiles.mjs; edit the layout in tools/profiles/blackcorp/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI CC chart, sent as a control change. Its name is the chart's less the kind of control (SLIDER, POT, KNOB, BUTTON, SWITCH), which its description keeps. Nothing here has been sent to a real instrument yet.",
+      "The chart prints no values: every controller is 0 - 127, the buttons included. The Upper and Lower layers answer on the one channel, each control of a layer on a controller of its own, as the chart's LAYER column says.",
+      "Left out, the wheel, the pedal, bank select and CC 74, the MPE controllers' slide (whose destination the CC74 REPLACE setting chooses): CC 0 BANK SELECT, CC 1 MODULATION WHEEL, CC 64 SUSTAIN PEDAL, CC 74 CC74 REPLACE (MPE)."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-MIDI-CC-chart",
+      "realtimeEditing": "complete-for-the-MIDI-CC-chart",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the instrument sends these same controllers when its panel is used, where its MIDI settings allow",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Upper Portamento PORTAMENTO = 127 (CC 5)",
+        "parameter": "upperPortamento.portamento",
+        "value": 127,
+        "expectedHex": "B0 05 7F"
+      },
+      {
+        "name": "Global ASSIGN MODE = 127 (CC 116)",
+        "parameter": "global.assignMode",
+        "value": 127,
+        "expectedHex": "B0 74 7F"
+      }
+    ]
+  }
+}

@@ -1,0 +1,2691 @@
+{
+  "schemaVersion": 1,
+  "id": "moog.slim-phatty",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Moog Slim Phatty",
+  "manufacturer": "Moog",
+  "family": "Phatty",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "interfacePanel.glideOnOff",
+          "name": "GLIDE ON/OFF",
+          "group": "Interface Panel",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "glideOnOff"
+          },
+          "description": "Turns Glide ON/OFF.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 65
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoRate",
+          "name": "LFO RATE",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoRate"
+          },
+          "description": "Adjusts the LFO frequency.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 3
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.amount",
+          "name": "AMOUNT",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "amount"
+          },
+          "description": "Adjusts the modulation amount.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 6
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.source",
+          "name": "SOURCE",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "tri",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "tri",
+              "label": "TRI",
+              "wire": 0
+            },
+            {
+              "id": "square",
+              "label": "SQUARE",
+              "wire": 16
+            },
+            {
+              "id": "saw",
+              "label": "SAW",
+              "wire": 32
+            },
+            {
+              "id": "ramp",
+              "label": "RAMP",
+              "wire": 48
+            },
+            {
+              "id": "filtenv",
+              "label": "FILT ENV",
+              "wire": 64
+            },
+            {
+              "id": "osc2",
+              "label": "OSC2",
+              "wire": 80
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "source"
+          },
+          "description": "Selects the modulation source.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 68
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.destination",
+          "name": "DESTINATION",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "pitch",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "pitch",
+              "label": "PITCH",
+              "wire": 0
+            },
+            {
+              "id": "filt",
+              "label": "FILT",
+              "wire": 16
+            },
+            {
+              "id": "wave",
+              "label": "WAVE",
+              "wire": 32
+            },
+            {
+              "id": "osc2",
+              "label": "OSC2",
+              "wire": 48
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "destination"
+          },
+          "description": "Selects the modulation destination.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 69
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoSyncSource",
+          "name": "LFO SYNC SOURCE",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "int",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "int",
+              "label": "INT",
+              "wire": 0
+            },
+            {
+              "id": "midiclk",
+              "label": "MIDI CLK",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "lfoSyncSource"
+          },
+          "description": "Selects the LFO synchronization source.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoSyncClockDiv",
+          "name": "LFO SYNC CLOCK DIV",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "132note",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "132note",
+              "label": "1/32 note",
+              "wire": 0
+            },
+            {
+              "id": "dotted132note",
+              "label": "Dotted 1/32 note",
+              "wire": 8
+            },
+            {
+              "id": "116note",
+              "label": "1/16 note",
+              "wire": 16
+            },
+            {
+              "id": "dotted116note",
+              "label": "Dotted 1/16 note",
+              "wire": 24
+            },
+            {
+              "id": "18note",
+              "label": "1/8 note",
+              "wire": 32
+            },
+            {
+              "id": "dotted18note",
+              "label": "Dotted 1/8 note",
+              "wire": 40
+            },
+            {
+              "id": "quarternote",
+              "label": "Quarter note",
+              "wire": 48
+            },
+            {
+              "id": "dottedquarternote",
+              "label": "Dotted quarter note",
+              "wire": 56
+            },
+            {
+              "id": "halfnote",
+              "label": "Half note",
+              "wire": 64
+            },
+            {
+              "id": "dottedhalfnote",
+              "label": "Dotted half note",
+              "wire": 72
+            },
+            {
+              "id": "wholenote",
+              "label": "Whole note",
+              "wire": 80
+            },
+            {
+              "id": "wholenoteplusquarternote",
+              "label": "Whole note + quarter note",
+              "wire": 88
+            },
+            {
+              "id": "wholenoteplushalfnote",
+              "label": "Whole note + half note",
+              "wire": 96
+            },
+            {
+              "id": "wholenoteplusdottedhalfnote",
+              "label": "Whole note + dotted half note",
+              "wire": 104
+            },
+            {
+              "id": "wholenotepluswholenote",
+              "label": "Whole note + whole note",
+              "wire": 112
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "lfoSyncClockDiv"
+          },
+          "description": "Values from MIDI CC values for the LFO and Arpeggiator Clock Divider (p. 55 of the PDF); the value printed beside each name is sent. Sets the LFO synchronization clock divider.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.modSource5",
+          "name": "MOD SOURCE 5",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "filt",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "filt",
+              "label": "FILT",
+              "wire": 0
+            },
+            {
+              "id": "sh",
+              "label": "S&H",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "modSource5"
+          },
+          "description": "Selects the Mod 5 Source.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.modSource6",
+          "name": "MOD SOURCE 6",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "osc2",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "osc2",
+              "label": "OSC2",
+              "wire": 0
+            },
+            {
+              "id": "noise",
+              "label": "NOISE",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "modSource6"
+          },
+          "description": "Selects the Mod 6 Source.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 105
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.modDest2",
+          "name": "MOD DEST 2",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "pitch",
+              "label": "PITCH",
+              "wire": 25
+            },
+            {
+              "id": "filt",
+              "label": "FILT",
+              "wire": 50
+            },
+            {
+              "id": "wave",
+              "label": "WAVE",
+              "wire": 75
+            },
+            {
+              "id": "osc2",
+              "label": "OSC2",
+              "wire": 100
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "modDest2"
+          },
+          "description": "Selects the second mod destination.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 106
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.osc1Octave",
+          "name": "OSC 1 OCTAVE",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "16",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "16",
+              "label": "16'",
+              "wire": 16
+            },
+            {
+              "id": "8",
+              "label": "8'",
+              "wire": 32
+            },
+            {
+              "id": "4",
+              "label": "4'",
+              "wire": 48
+            },
+            {
+              "id": "2",
+              "label": "2'",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "osc1Octave"
+          },
+          "description": "Sets the octave of oscillator 1.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 74
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.osc1Wave",
+          "name": "OSC 1 WAVE",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1Wave"
+          },
+          "description": "Sets the waveform of oscillator 1.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 9
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.osc1Level",
+          "name": "OSC 1 LEVEL",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1Level"
+          },
+          "description": "Adjusts the volume level of oscillator 1.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.glideRate",
+          "name": "GLIDE RATE",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "glideRate"
+          },
+          "description": "Sets the portamento rate time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 5
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.12Sync",
+          "name": "1-2 SYNC",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "12Sync"
+          },
+          "description": "Turns oscillator sync ON/OFF.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 77
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.osc2Octave",
+          "name": "OSC 2 OCTAVE",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "16",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "16",
+              "label": "16'",
+              "wire": 16
+            },
+            {
+              "id": "8",
+              "label": "8'",
+              "wire": 32
+            },
+            {
+              "id": "4",
+              "label": "4'",
+              "wire": 48
+            },
+            {
+              "id": "2",
+              "label": "2'",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "osc2Octave"
+          },
+          "description": "Sets the octave of oscillator 2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.osc2Freq",
+          "name": "OSC 2 FREQ",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2Freq"
+          },
+          "description": "Adjusts the frequency of oscillator 2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 10
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.osc2Wave",
+          "name": "OSC 2 WAVE",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2Wave"
+          },
+          "description": "Sets the waveform of oscillator 2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 11
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.osc2Level",
+          "name": "OSC 2 LEVEL",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2Level"
+          },
+          "description": "Adjusts the volume level of oscillator 2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.pitchBendUpAmt",
+          "name": "PITCH BEND UP AMT",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchBendUpAmt"
+          },
+          "description": "Selects the pitch end UP amount.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.pitchBendDnAmt",
+          "name": "PITCH BEND DN AMT",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchBendDnAmt"
+          },
+          "description": "Selects the pitch bend DOWN amount.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.cutoff",
+          "name": "CUTOFF",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cutoff"
+          },
+          "description": "14 bits: the MSB on CC 19, then the LSB on CC 51. Adjusts the filter cutoff frequency.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19,
+              "lsbCc": 51
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.resonance",
+          "name": "RESONANCE",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "resonance"
+          },
+          "description": "Adjusts the filter resonance parameter.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.kbAmount",
+          "name": "KB AMOUNT",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "kbAmount"
+          },
+          "description": "Adjusts the amount of pitch CV affecting the cutoff.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.egAmount",
+          "name": "EG AMOUNT",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "egAmount"
+          },
+          "description": "Adjusts the EG amount affecting the cutoff.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.overload",
+          "name": "OVERLOAD",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "overload"
+          },
+          "description": "Adjusts the amount of filter overdrive.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterPoles",
+          "name": "FILTER POLES",
+          "group": "Filter",
+          "valueType": "enum",
+          "default": "1",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "1",
+              "label": "1",
+              "wire": 0
+            },
+            {
+              "id": "2",
+              "label": "2",
+              "wire": 32
+            },
+            {
+              "id": "3",
+              "label": "3",
+              "wire": 64
+            },
+            {
+              "id": "4",
+              "label": "4",
+              "wire": 96
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "filterPoles"
+          },
+          "description": "Selects the number of filter poles.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterVelocitySens",
+          "name": "FILTER VELOCITY SENS",
+          "group": "Filter",
+          "valueType": "enum",
+          "default": "minus8",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "minus8",
+              "label": "-8",
+              "wire": 0
+            },
+            {
+              "id": "minus7",
+              "label": "-7",
+              "wire": 12
+            },
+            {
+              "id": "minus6",
+              "label": "-6",
+              "wire": 19
+            },
+            {
+              "id": "minus5",
+              "label": "-5",
+              "wire": 26
+            },
+            {
+              "id": "minus4",
+              "label": "-4",
+              "wire": 33
+            },
+            {
+              "id": "minus3",
+              "label": "-3",
+              "wire": 40
+            },
+            {
+              "id": "minus2",
+              "label": "-2",
+              "wire": 47
+            },
+            {
+              "id": "minus1",
+              "label": "-1",
+              "wire": 54
+            },
+            {
+              "id": "0",
+              "label": "0",
+              "wire": 61
+            },
+            {
+              "id": "plus1",
+              "label": "+1",
+              "wire": 68
+            },
+            {
+              "id": "plus2",
+              "label": "+2",
+              "wire": 75
+            },
+            {
+              "id": "plus3",
+              "label": "+3",
+              "wire": 82
+            },
+            {
+              "id": "plus4",
+              "label": "+4",
+              "wire": 89
+            },
+            {
+              "id": "plus5",
+              "label": "+5",
+              "wire": 96
+            },
+            {
+              "id": "plus6",
+              "label": "+6",
+              "wire": 103
+            },
+            {
+              "id": "plus7",
+              "label": "+7",
+              "wire": 110
+            },
+            {
+              "id": "plus8",
+              "label": "+8",
+              "wire": 117
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "filterVelocitySens"
+          },
+          "description": "Values from MIDI CC values for Filter Velocity Sensitivity (p. 55 of the PDF); the value printed beside each name is sent. Sets the amount of filter velocity sensitivity.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 110
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.filterEgAttack",
+          "name": "FILTER EG ATTACK",
+          "group": "Envelope Generator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEgAttack"
+          },
+          "description": "Adjusts the filter envelope attack time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.filterEgDecay",
+          "name": "FILTER EG DECAY",
+          "group": "Envelope Generator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEgDecay"
+          },
+          "description": "Adjusts the filter envelope decay time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.filterEgSustain",
+          "name": "FILTER EG SUSTAIN",
+          "group": "Envelope Generator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEgSustain"
+          },
+          "description": "Sets the filter envelope sustain level.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.filterEgRelease",
+          "name": "FILTER EG RELEASE",
+          "group": "Envelope Generator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEgRelease"
+          },
+          "description": "Adjusts the filter envelope release time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.volumeEgAttack",
+          "name": "VOLUME EG ATTACK",
+          "group": "Envelope Generator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeEgAttack"
+          },
+          "description": "Adjusts the volume envelope attack time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.volumeEgDecay",
+          "name": "VOLUME EG DECAY",
+          "group": "Envelope Generator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeEgDecay"
+          },
+          "description": "Adjusts the volume envelope decay time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.volumeEgSustain",
+          "name": "VOLUME EG SUSTAIN",
+          "group": "Envelope Generator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeEgSustain"
+          },
+          "description": "Sets the volume envelope sustain level.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.volumeEgRelease",
+          "name": "VOLUME EG RELEASE",
+          "group": "Envelope Generator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeEgRelease"
+          },
+          "description": "Adjusts the volume envelope release time.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.egrReleaseOnOff",
+          "name": "EGR RELEASE ON/OFF",
+          "group": "Envelope Generator",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "egrReleaseOnOff"
+          },
+          "description": "Sets the state of the EGR Release parameter.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 111
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "envelopeGenerator.egrLegato",
+          "name": "EGR LEGATO",
+          "group": "Envelope Generator",
+          "valueType": "enum",
+          "default": "on",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 0
+            },
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 43
+            },
+            {
+              "id": "reset",
+              "label": "RESET",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "egrLegato"
+          },
+          "description": "Sets the state of the EGR Legato parameter.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpeggiatorEnable",
+          "name": "ARPEGGIATOR ENABLE",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpeggiatorEnable"
+          },
+          "description": "Enables/disables the Arpeggiator.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpRunStop",
+          "name": "ARP RUN/STOP",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpRunStop"
+          },
+          "description": "Starts and stops the Arpeggiator.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 90
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpClockRate",
+          "name": "ARP CLOCK RATE",
+          "group": "Arpeggiator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "arpClockRate"
+          },
+          "description": "CC 36 is its fine controller, in units of its own. Sets the Arpeggiator Clock Rate.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 4
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpClockSource",
+          "name": "ARP CLOCK SOURCE",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "int",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "int",
+              "label": "INT",
+              "wire": 0
+            },
+            {
+              "id": "lfo",
+              "label": "LFO",
+              "wire": 43
+            },
+            {
+              "id": "midi",
+              "label": "MIDI",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpClockSource"
+          },
+          "description": "Sets the Arpeggiator Clock Source.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 114
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpClockDivisions",
+          "name": "ARP CLOCK DIVISIONS",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "132note",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "132note",
+              "label": "1/32 note",
+              "wire": 0
+            },
+            {
+              "id": "dotted132note",
+              "label": "Dotted 1/32 note",
+              "wire": 8
+            },
+            {
+              "id": "116note",
+              "label": "1/16 note",
+              "wire": 16
+            },
+            {
+              "id": "dotted116note",
+              "label": "Dotted 1/16 note",
+              "wire": 24
+            },
+            {
+              "id": "18note",
+              "label": "1/8 note",
+              "wire": 32
+            },
+            {
+              "id": "dotted18note",
+              "label": "Dotted 1/8 note",
+              "wire": 40
+            },
+            {
+              "id": "quarternote",
+              "label": "Quarter note",
+              "wire": 48
+            },
+            {
+              "id": "dottedquarternote",
+              "label": "Dotted quarter note",
+              "wire": 56
+            },
+            {
+              "id": "halfnote",
+              "label": "Half note",
+              "wire": 64
+            },
+            {
+              "id": "dottedhalfnote",
+              "label": "Dotted half note",
+              "wire": 72
+            },
+            {
+              "id": "wholenote",
+              "label": "Whole note",
+              "wire": 80
+            },
+            {
+              "id": "wholenoteplusquarternote",
+              "label": "Whole note + quarter note",
+              "wire": 88
+            },
+            {
+              "id": "wholenoteplushalfnote",
+              "label": "Whole note + half note",
+              "wire": 96
+            },
+            {
+              "id": "wholenoteplusdottedhalfnote",
+              "label": "Whole note + dotted half note",
+              "wire": 104
+            },
+            {
+              "id": "wholenotepluswholenote",
+              "label": "Whole note + whole note",
+              "wire": 112
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpClockDivisions"
+          },
+          "description": "Values from MIDI CC values for the LFO and Arpeggiator Clock Divider (p. 55 of the PDF); the value printed beside each name is sent. Sets the Arpeggiator Clock Divider.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 115
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpRangeOctaves",
+          "name": "ARP RANGE (OCTAVES)",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "minus3",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "minus3",
+              "label": "-3",
+              "wire": 0
+            },
+            {
+              "id": "minus2",
+              "label": "-2",
+              "wire": 19
+            },
+            {
+              "id": "minus1",
+              "label": "-1",
+              "wire": 38
+            },
+            {
+              "id": "0",
+              "label": "0",
+              "wire": 57
+            },
+            {
+              "id": "plus1",
+              "label": "+1",
+              "wire": 71
+            },
+            {
+              "id": "plus2",
+              "label": "+2",
+              "wire": 90
+            },
+            {
+              "id": "plus3",
+              "label": "+3",
+              "wire": 109
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpRangeOctaves"
+          },
+          "description": "Sets the Arpeggiator Octave Range.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 116
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpPattern",
+          "name": "ARP PATTERN",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "up",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "up",
+              "label": "UP",
+              "wire": 0
+            },
+            {
+              "id": "down",
+              "label": "DOWN",
+              "wire": 43
+            },
+            {
+              "id": "order",
+              "label": "ORDER",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpPattern"
+          },
+          "description": "Selects the Arpeggiator Pattern.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 117
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpMode",
+          "name": "ARP MODE",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "loop",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "loop",
+              "label": "LOOP",
+              "wire": 0
+            },
+            {
+              "id": "backforth",
+              "label": "BACK/FORTH",
+              "wire": 43
+            },
+            {
+              "id": "once",
+              "label": "ONCE",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpMode"
+          },
+          "description": "Selects the Arpeggiator Mode.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 118
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpLatchEnable",
+          "name": "ARP LATCH ENABLE",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpLatchEnable"
+          },
+          "description": "Enables/disables the Arpeggiator Latch.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 119
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.arpLatchUnlatch",
+          "name": "ARP LATCH/UNLATCH",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "ON",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "arpLatchUnlatch"
+          },
+          "description": "Sets the Latch/Unlatch status.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 91
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "output.volume",
+          "name": "VOLUME",
+          "group": "Output",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volume"
+          },
+          "description": "Volume Control.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 7
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "keybdResponse.keyboardNotePriority",
+          "name": "KEYBOARD NOTE PRIORITY",
+          "group": "Keybd Response",
+          "valueType": "enum",
+          "default": "glob",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "glob",
+              "label": "GLOB",
+              "wire": 0
+            },
+            {
+              "id": "low",
+              "label": "LOW",
+              "wire": 32
+            },
+            {
+              "id": "high",
+              "label": "HIGH",
+              "wire": 64
+            },
+            {
+              "id": "last",
+              "label": "LAST",
+              "wire": 96
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "keyboardNotePriority"
+          },
+          "description": "Selects the Keyboard Note Priority.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 88
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modWheelFunction.modWheel",
+          "name": "MOD WHEEL",
+          "group": "Mod Wheel Function",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modWheel"
+          },
+          "description": "14 bits: the MSB on CC 1, then the LSB on CC 33. Modulation Performance Control.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 1,
+              "lsbCc": 33
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile moog-slim-phatty, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "moog-slim-phatty",
+    "name": "Moog Slim Phatty",
+    "description": "Moog Slim Phatty analog synthesizer module: the MIDI CC table of its manual, with the value tables it points to.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Slim Phatty User's Manual",
+        "notes": "MIDI CC table (pages 53, 54) read by tools/profiles/moog/read-moog-pdf.mjs from Slim_Phatty_Manual.pdf (sha256 bb20e276b374676aae693f045b90cdba821224c60fb1e53809395a3e56607aca), https://cdn.inmusicbrands.com/Moog/SlimPhatty/Slim_Phatty_Manual.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/moog/make-profiles.mjs; edit the layout in tools/profiles/moog/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI tables, with its printed name. Nothing here has been sent to a real instrument yet.",
+      "No identity check: the manual prints no Device Inquiry reply.",
+      "Ten rows print a name another row of their section has (WAVE, OCTAVE, ATTACK …); each is named here from its function column (`Sets the waveform of oscillator 2`, `Adjusts the filter envelope attack time`).",
+      "The Arpeggiator Clock Rate is two controllers, CC 4 in steps of 3 BPM and CC 36 in tenths (the table's note 2); the profile has CC 4.",
+      "2 knob(s) are 14-bit, 0 - 16383: the MSB and the LSB the table prints, sent in that order: CUTOFF (CC 19, LSB 51); MOD WHEEL (CC 1, LSB 33).",
+      "Left out, printed without a controller (a panel switch, or `Varies`): MASTER (CC -), PRESET (CC -), CURSOR (CC -), ENTER (CC -), OCTAVE UP (CC -), OCTAVE DOWN (CC -)."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-midi-tables",
+      "realtimeEditing": "complete-for-the-manual's-midi-tables",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the panel sends these same messages when its MIDI settings allow",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "CUTOFF = 1000 (CC 19)",
+        "parameter": "filter.cutoff",
+        "value": 1000,
+        "expectedHex": "B0 13 07\nB0 33 68"
+      },
+      {
+        "name": "LFO RATE = 100 (CC 3)",
+        "parameter": "modulation.lfoRate",
+        "value": 100,
+        "expectedHex": "B0 03 64"
+      },
+      {
+        "name": "GLIDE ON/OFF = ON (CC 65)",
+        "parameter": "interfacePanel.glideOnOff",
+        "value": "on",
+        "expectedHex": "B0 41 40"
+      },
+      {
+        "name": "MOD WHEEL = 1000 (CC 1)",
+        "parameter": "modWheelFunction.modWheel",
+        "value": 1000,
+        "expectedHex": "B0 01 07\nB0 21 68"
+      }
+    ]
+  }
+}

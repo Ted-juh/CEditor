@@ -1,0 +1,4970 @@
+{
+  "schemaVersion": 1,
+  "id": "elektron.octatrack",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Elektron Octatrack",
+  "manufacturer": "Elektron",
+  "family": "Octatrack",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "track.trackLevel",
+          "name": "Track level",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 7
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackBalance",
+          "name": "Track balance",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackBalance"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 8
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "playback.playbackParamSharp1",
+          "name": "Playback param #1",
+          "group": "Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "playback.playbackParamSharp2",
+          "name": "Playback param #2",
+          "group": "Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "playback.playbackParamSharp3",
+          "name": "Playback param #3",
+          "group": "Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "playback.playbackParamSharp4",
+          "name": "Playback param #4",
+          "group": "Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp4"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "playback.playbackParamSharp5",
+          "name": "Playback param #5",
+          "group": "Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp5"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "playback.playbackParamSharp6",
+          "name": "Playback param #6",
+          "group": "Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp6"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampParamSharp1Attack",
+          "name": "Amp param #1 (Attack)",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp1Attack"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampParamSharp2Hold",
+          "name": "Amp param #2 (Hold)",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp2Hold"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampParamSharp3Release",
+          "name": "Amp param #3 (Release)",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp3Release"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampParamSharp4Volume",
+          "name": "Amp param #4 (Volume)",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp4Volume"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampParamSharp5Balance",
+          "name": "Amp param #5 (Balance)",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp5Balance"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "amp.ampParamSharp6NA",
+          "name": "Amp param #6 (N/A)",
+          "group": "Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp6NA"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoParamSharp1Speed1",
+          "name": "LFO param #1 (Speed 1)",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoParamSharp1Speed1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoParamSharp2Speed2",
+          "name": "LFO param #2 (Speed 2)",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoParamSharp2Speed2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoParamSharp3Speed3",
+          "name": "LFO param #3 (Speed 3)",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoParamSharp3Speed3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoParamSharp4Depth1",
+          "name": "LFO param #4 (Depth 1)",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoParamSharp4Depth1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoParamSharp5Depth2",
+          "name": "LFO param #5 (Depth 2)",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoParamSharp5Depth2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.lfoParamSharp6Depth3",
+          "name": "LFO param #6 (Depth 3)",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoParamSharp6Depth3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx1.fx1ParamSharp1",
+          "name": "FX1 param #1",
+          "group": "FX1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx1ParamSharp1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx1.fx1ParamSharp2",
+          "name": "FX1 param #2",
+          "group": "FX1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx1ParamSharp2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx1.fx1ParamSharp3",
+          "name": "FX1 param #3",
+          "group": "FX1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx1ParamSharp3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx1.fx1ParamSharp4",
+          "name": "FX1 param #4",
+          "group": "FX1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx1ParamSharp4"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx1.fx1ParamSharp5",
+          "name": "FX1 param #5",
+          "group": "FX1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx1ParamSharp5"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx1.fx1ParamSharp6",
+          "name": "FX1 param #6",
+          "group": "FX1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx1ParamSharp6"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx2.fx2ParamSharp1",
+          "name": "FX2 param #1",
+          "group": "FX2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx2ParamSharp1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx2.fx2ParamSharp2",
+          "name": "FX2 param #2",
+          "group": "FX2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx2ParamSharp2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx2.fx2ParamSharp3",
+          "name": "FX2 param #3",
+          "group": "FX2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx2ParamSharp3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx2.fx2ParamSharp4",
+          "name": "FX2 param #4",
+          "group": "FX2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx2ParamSharp4"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx2.fx2ParamSharp5",
+          "name": "FX2 param #5",
+          "group": "FX2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx2ParamSharp5"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fx2.fx2ParamSharp6",
+          "name": "FX2 param #6",
+          "group": "FX2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fx2ParamSharp6"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackLevel2",
+          "name": "Track level",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.cueLevel",
+          "name": "Cue level",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cueLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.crossfader",
+          "name": "Crossfader",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "crossfader"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 48
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackMute",
+          "name": "Track Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmuted",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmuted",
+              "label": "Unmuted",
+              "wire": 0
+            },
+            {
+              "id": "muted",
+              "label": "Muted",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "trackMute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 49
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.trackSolo",
+          "name": "Track Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "nosolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "nosolo",
+              "label": "No solo",
+              "wire": 0
+            },
+            {
+              "id": "soloed",
+              "label": "Soloed",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "trackSolo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 50
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.trackCue",
+          "name": "Track Cue",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "notcued",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "notcued",
+              "label": "Not Cued",
+              "wire": 0
+            },
+            {
+              "id": "cued",
+              "label": "Cued",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "trackCue"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 51
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.trackArm",
+          "name": "Track Arm",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "trkdisarm",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "trkdisarm",
+              "label": "Trk disarm",
+              "wire": 0
+            },
+            {
+              "id": "arm",
+              "label": "Arm",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "trackArm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 52
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.recrdrArm",
+          "name": "Recrdr Arm",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "recdisarm",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "recdisarm",
+              "label": "Rec disarm",
+              "wire": 0
+            },
+            {
+              "id": "arm",
+              "label": "Arm",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "recrdrArm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 53
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.allArm",
+          "name": "All Arm",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "alldisarm",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "alldisarm",
+              "label": "All disarm",
+              "wire": 0
+            },
+            {
+              "id": "arm",
+              "label": "Arm",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "allArm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 54
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.sceneASelect",
+          "name": "Scene A Select",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sceneASelect"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 55
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.sceneBSelect",
+          "name": "Scene B Select",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sceneBSelect"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 56
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.pickupSrcAbLevel",
+          "name": "Pickup SRC AB level",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pickupSrcAbLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 57
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.pickupSrcCdLevel",
+          "name": "Pickup SRC CD level",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pickupSrcCdLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 58
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.noteOn",
+          "name": "Note on",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noteOn"
+          },
+          "description": "Printed: [0]=C-1, 127=G9).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 59
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.noteOff",
+          "name": "Note off",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noteOff"
+          },
+          "description": "Printed: [0] =C-1, 127=G9).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 60
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.sendRequest",
+          "name": "Send request",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sendRequest"
+          },
+          "description": "Printed: 0 = all audio CC.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 61
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk1Mute",
+          "name": "MIDI Trk 1 Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk1Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk2Mute",
+          "name": "MIDI Trk 2 Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk2Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk3Mute",
+          "name": "MIDI Trk 3 Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk3Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 114
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk4Mute",
+          "name": "MIDI Trk 4 Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk4Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 115
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk5Mute",
+          "name": "MIDI Trk 5 Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk5Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 116
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk6Mute",
+          "name": "MIDI Trk 6 Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk6Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 117
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk7Mute",
+          "name": "MIDI Trk 7 Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk7Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 118
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk8Mute",
+          "name": "MIDI Trk 8 Mute",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk8Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 119
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk1Solo",
+          "name": "MIDI Trk 1 Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk1Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 120
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk2Solo",
+          "name": "MIDI Trk 2 Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk2Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 121
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk3Solo",
+          "name": "MIDI Trk 3 Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk3Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 122
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk4Solo",
+          "name": "MIDI Trk 4 Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk4Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 123
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk5Solo",
+          "name": "MIDI Trk 5 Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk5Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 124
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk6Solo",
+          "name": "MIDI Trk 6 Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk6Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 125
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk7Solo",
+          "name": "MIDI Trk 7 Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk7Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 126
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "track.midiTrk8Solo",
+          "name": "MIDI Trk 8 Solo",
+          "group": "Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk8Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 127
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModePlayback.playbackParamSharp1Note",
+          "name": "Playback param #1 (Note)",
+          "group": "MIDI Mode Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp1Note"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModePlayback.playbackParamSharp2Velocity",
+          "name": "Playback param #2 (Velocity)",
+          "group": "MIDI Mode Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp2Velocity"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModePlayback.playbackParamSharp3Length",
+          "name": "Playback param #3 (Length)",
+          "group": "MIDI Mode Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp3Length"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModePlayback.playbackParamSharp4Note2",
+          "name": "Playback param #4 (Note 2)",
+          "group": "MIDI Mode Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp4Note2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModePlayback.playbackParamSharp5Note3",
+          "name": "Playback param #5 (Note 3)",
+          "group": "MIDI Mode Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp5Note3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModePlayback.playbackParamSharp6Note4",
+          "name": "Playback param #6 (Note 4)",
+          "group": "MIDI Mode Playback",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playbackParamSharp6Note4"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeAmp.ampParamSharp1Transpose",
+          "name": "Amp param #1 (Transpose)",
+          "group": "MIDI Mode Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp1Transpose"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeAmp.ampParamSharp2Legato",
+          "name": "Amp param #2 (Legato)",
+          "group": "MIDI Mode Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp2Legato"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeAmp.ampParamSharp3Mode",
+          "name": "Amp param #3 (Mode)",
+          "group": "MIDI Mode Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp3Mode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeAmp.ampParamSharp4Speed",
+          "name": "Amp param #4 (Speed)",
+          "group": "MIDI Mode Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp4Speed"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeAmp.ampParamSharp5OctaveRange",
+          "name": "Amp param #5 (Octave Range)",
+          "group": "MIDI Mode Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp5OctaveRange"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeAmp.ampParamSharp6ArpNoteLength",
+          "name": "Amp param #6 (Arp Note Length)",
+          "group": "MIDI Mode Amp",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampParamSharp6ArpNoteLength"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeMidiLfo.midiLfoParamSharp1Speed1",
+          "name": "MIDI LFO param #1 (Speed 1)",
+          "group": "MIDI Mode MIDI LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "midiLfoParamSharp1Speed1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeMidiLfo.midiLfoParamSharp2Speed2",
+          "name": "MIDI LFO param #2 (Speed 2)",
+          "group": "MIDI Mode MIDI LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "midiLfoParamSharp2Speed2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeMidiLfo.midiLfoParamSharp3Speed3",
+          "name": "MIDI LFO param #3 (Speed 3)",
+          "group": "MIDI Mode MIDI LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "midiLfoParamSharp3Speed3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeMidiLfo.midiLfoParamSharp4Depth1",
+          "name": "MIDI LFO param #4 (Depth 1)",
+          "group": "MIDI Mode MIDI LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "midiLfoParamSharp4Depth1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeMidiLfo.midiLfoParamSharp5Depth2",
+          "name": "MIDI LFO param #5 (Depth 2)",
+          "group": "MIDI Mode MIDI LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "midiLfoParamSharp5Depth2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeMidiLfo.midiLfoParamSharp6Depth3",
+          "name": "MIDI LFO param #6 (Depth 3)",
+          "group": "MIDI Mode MIDI LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "midiLfoParamSharp6Depth3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp1Param",
+          "name": "CC #1 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp1Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp2Param",
+          "name": "CC #2 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp2Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp3Param",
+          "name": "CC #3 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp3Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp4Param",
+          "name": "CC #4 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp4Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp5Param",
+          "name": "CC #5 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp5Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp6Param",
+          "name": "CC #6 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp6Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp7Param",
+          "name": "CC #7 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp7Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp8Param",
+          "name": "CC #8 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp8Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp9Param",
+          "name": "CC #9 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp9Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeCc.ccSharp10Param",
+          "name": "CC #10 param",
+          "group": "MIDI Mode CC",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ccSharp10Param"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrackMute",
+          "name": "MIDI Track Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmuted",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmuted",
+              "label": "Unmuted",
+              "wire": 0
+            },
+            {
+              "id": "muted",
+              "label": "Muted",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrackMute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 49,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrackSolo",
+          "name": "MIDI Track Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "nosolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "nosolo",
+              "label": "No solo",
+              "wire": 0
+            },
+            {
+              "id": "soloed",
+              "label": "Soloed",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrackSolo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 50,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.allArm",
+          "name": "All Arm",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "alldisarm",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "alldisarm",
+              "label": "All disarm",
+              "wire": 0
+            },
+            {
+              "id": "arm",
+              "label": "Arm",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "allArm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 54,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.sceneASelect",
+          "name": "Scene A Select",
+          "group": "MIDI Mode Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sceneASelect"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 55,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.sceneBSelect",
+          "name": "Scene B Select",
+          "group": "MIDI Mode Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sceneBSelect"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 56,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk1Mute",
+          "name": "MIDI Trk 1 Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk1Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk2Mute",
+          "name": "MIDI Trk 2 Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk2Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk3Mute",
+          "name": "MIDI Trk 3 Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk3Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 114,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk4Mute",
+          "name": "MIDI Trk 4 Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk4Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 115,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk5Mute",
+          "name": "MIDI Trk 5 Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk5Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 116,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk6Mute",
+          "name": "MIDI Trk 6 Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk6Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 117,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk7Mute",
+          "name": "MIDI Trk 7 Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk7Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 118,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk8Mute",
+          "name": "MIDI Trk 8 Mute",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unmute",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unmute",
+              "label": "Unmute",
+              "wire": 0
+            },
+            {
+              "id": "mute",
+              "label": "Mute",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk8Mute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 119,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk1Solo",
+          "name": "MIDI Trk 1 Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk1Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 120,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk2Solo",
+          "name": "MIDI Trk 2 Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk2Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 121,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk3Solo",
+          "name": "MIDI Trk 3 Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk3Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 122,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk4Solo",
+          "name": "MIDI Trk 4 Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk4Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 123,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk5Solo",
+          "name": "MIDI Trk 5 Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk5Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 124,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk6Solo",
+          "name": "MIDI Trk 6 Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk6Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 125,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk7Solo",
+          "name": "MIDI Trk 7 Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk7Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 126,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "midiModeTrack.midiTrk8Solo",
+          "name": "MIDI Trk 8 Solo",
+          "group": "MIDI Mode Track",
+          "valueType": "enum",
+          "default": "unsolo",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "unsolo",
+              "label": "Unsolo",
+              "wire": 0
+            },
+            {
+              "id": "solo",
+              "label": "Solo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiTrk8Solo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 127,
+              "channel": "$autoChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile elektron-octatrack, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "elektron-octatrack",
+    "name": "Elektron Octatrack",
+    "description": "Elektron Octatrack sampler: the controllers its manual's MIDI control reference maps, the audio tracks' on a track channel and the MIDI mode's on the auto channel.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Octatrack User Manual, OS 1.40A",
+        "notes": "MIDI appendix read by tools/profiles/elektron/read-elektron-midi.mjs from Octatrack-User-Manual_ENG-OS1.40A_220204.pdf (sha256 dd0a5bb8eb80fd9d56fbdbb466a221d73a5cfd5cad396bca0e6a9f09f5255cb2), https://www.elektron.se/wp-content/uploads/2024/09/Octatrack-User-Manual_ENG-OS1.40A_220204.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/elektron/make-profiles.mjs; edit the layout in tools/profiles/elektron/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI appendix, with its printed name, sent on the CC it prints (a 14-bit pair where it prints an LSB), or its NRPN where it prints no CC. Nothing here has been sent to a real instrument yet.",
+      "The appendix prints no ranges: each parameter takes what its controller carries, 0 - 127 (0 - 16383 for a pair). What a value shows, and the values of a setting chosen from a list, are in the parameter's chapter of the manual.",
+      "The channel variable is a track's channel (track 1's by default): the parameters go to that track. Set it to the AUTO channel to edit whichever track is active.",
+      "A playback, amp, LFO or effect parameter is numbered (`Playback param #1`): what it sets depends on the machine or effect the track has, which the appendix does not say; the bracketed names are those it prints (`Amp param #1 (Attack)`).",
+      "The MIDI mode's controllers take effect on the auto channel while CC DIRECT CONNECT is off; with it on, the Octatrack passes them to its MIDI output instead.",
+      "Left out, the wheels, pedals and breath controller, which set nothing of the sound: Pitch bend, Aftertouch.",
+      "The autoChannel variable is 16 here: the manual prints no default for it; set it to the instrument's AUTO CHANNEL (PROJECT > MIDI > CHANNELS) setting."
+    ],
+    "variables": {
+      "channel": 1,
+      "autoChannel": 16
+    },
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-midi-appendix",
+      "realtimeEditing": "complete-for-the-manual's-midi-appendix",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the instrument sends these same controllers (or NRPNs, as its PARAM OUTPUT setting says) when its knobs are turned",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Track: Track level = 100 (CC 7, channel 1)",
+        "parameter": "track.trackLevel",
+        "value": 100,
+        "expectedHex": "B0 07 64"
+      },
+      {
+        "name": "Track: Track Mute = Muted (CC 49, channel 1)",
+        "parameter": "track.trackMute",
+        "value": "muted",
+        "expectedHex": "B0 31 01"
+      }
+    ]
+  }
+}

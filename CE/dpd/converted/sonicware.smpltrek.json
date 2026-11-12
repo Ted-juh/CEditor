@@ -1,0 +1,1485 @@
+{
+  "schemaVersion": 1,
+  "id": "sonicware.smpltrek",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Sonicware SmplTrek",
+  "manufacturer": "Sonicware",
+  "family": "SmplTrek",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "project.projectPlayback",
+          "name": "PROJECT PLAYBACK",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "projectPlayback"
+          },
+          "description": "CC 30, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.scenePlayback",
+          "name": "SCENE PLAYBACK",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "scenePlayback"
+          },
+          "description": "CC 31, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.trackShift",
+          "name": "TRACK SHIFT",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackShift"
+          },
+          "description": "CC 32, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 32,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.masterLevel",
+          "name": "MASTER LEVEL",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterLevel"
+          },
+          "description": "CC 33, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.projectLevel",
+          "name": "PROJECT LEVEL",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "projectLevel"
+          },
+          "description": "CC 34, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.prjExtBalance",
+          "name": "PRJ-EXT BALANCE",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "prjExtBalance"
+          },
+          "description": "CC 35, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.insertFxOnOff",
+          "name": "INSERT FX ON/OFF",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "insertFxOnOff"
+          },
+          "description": "CC 36, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.insertFxType",
+          "name": "INSERT FX TYPE",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "insertFxType"
+          },
+          "description": "CC 37, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.insertFxParmeter1",
+          "name": "INSERT FX PARMETER 1",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "insertFxParmeter1"
+          },
+          "description": "CC 38, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.insertFxParmeter2",
+          "name": "INSERT FX PARMETER 2",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "insertFxParmeter2"
+          },
+          "description": "CC 39, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.insertFxParmeter3",
+          "name": "INSERT FX PARMETER 3",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "insertFxParmeter3"
+          },
+          "description": "CC 40, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.insertFxParmeter4",
+          "name": "INSERT FX PARMETER 4",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "insertFxParmeter4"
+          },
+          "description": "CC 41, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.sendFxOnOff",
+          "name": "SEND FX ON/OFF",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sendFxOnOff"
+          },
+          "description": "CC 42, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.sendFxType",
+          "name": "SEND FX TYPE",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sendFxType"
+          },
+          "description": "CC 43, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.sendFxParmeter1",
+          "name": "SEND FX PARMETER 1",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sendFxParmeter1"
+          },
+          "description": "CC 44, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.sendFxParmeter2",
+          "name": "SEND FX PARMETER 2",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sendFxParmeter2"
+          },
+          "description": "CC 45, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.sendFxParmeter3",
+          "name": "SEND FX PARMETER 3",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sendFxParmeter3"
+          },
+          "description": "CC 46, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.sendFxParmeter4",
+          "name": "SEND FX PARMETER 4",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sendFxParmeter4"
+          },
+          "description": "CC 47, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.masterFxOnOff",
+          "name": "MASTER FX ON/OFF",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterFxOnOff"
+          },
+          "description": "CC 48, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 48,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.masterFxType",
+          "name": "MASTER FX TYPE",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterFxType"
+          },
+          "description": "CC 49, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 49,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.masterFxParmeter1",
+          "name": "MASTER FX PARMETER 1",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterFxParmeter1"
+          },
+          "description": "CC 50, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 50,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.masterFxParmeter2",
+          "name": "MASTER FX PARMETER 2",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterFxParmeter2"
+          },
+          "description": "CC 51, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 51,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.masterFxParmeter3",
+          "name": "MASTER FX PARMETER 3",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterFxParmeter3"
+          },
+          "description": "CC 52, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 52,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "project.masterFxParmeter4",
+          "name": "MASTER FX PARMETER 4",
+          "group": "Project",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterFxParmeter4"
+          },
+          "description": "CC 53, on projectChannel.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 53,
+              "channel": "$projectChannel"
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackPlayback",
+          "name": "TRACK PLAYBACK",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackPlayback"
+          },
+          "description": "CC 60.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 60
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackLevel",
+          "name": "TRACK LEVEL",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackLevel"
+          },
+          "description": "CC 61.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 61
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackPan",
+          "name": "TRACK PAN",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackPan"
+          },
+          "description": "CC 62.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackSendFx",
+          "name": "TRACK SEND FX",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackSendFx"
+          },
+          "description": "CC 63.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 63
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackMute",
+          "name": "TRACK MUTE",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackMute"
+          },
+          "description": "CC 64.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 64
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackEqType",
+          "name": "TRACK EQ TYPE",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackEqType"
+          },
+          "description": "CC 65.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 65
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackEqFreq",
+          "name": "TRACK EQ FREQ",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackEqFreq"
+          },
+          "description": "CC 66.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 66
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.trackEqAmount",
+          "name": "TRACK EQ AMOUNT",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "trackEqAmount"
+          },
+          "description": "CC 67.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 67
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "track.pitchLoopShotsTrack",
+          "name": "PITCH (LOOP/SHOTS TRACK)",
+          "group": "Track",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchLoopShotsTrack"
+          },
+          "description": "CC 68.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 68
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile sonicware-smpltrek, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "sonicware-smpltrek",
+    "name": "Sonicware SmplTrek",
+    "description": "Sonicware SmplTrek sampler: every control change its MIDI implementation chart marks recognized.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "SmplTrek MIDI implementation chart (v2)",
+        "notes": "MIDI implementation chart read by tools/profiles/sonicware/read-sonicware-chart.mjs from SmplTrek_v2_manual_MIDI_en.pdf (sha256 5fc8ca26ad019795bd43de9ecda18f45f36577337df8097dc2bb6bc01c0d7e29), https://www.sonicware.co.jp/DL/SmplTrek/DOC/SmplTrek_v2_manual_MIDI_en.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/sonicware/make-profiles.mjs; edit the layout in tools/profiles/sonicware/synths/, not this file.",
+      "Every parameter is a control change the chart marks recognized, its name the chart's remark, sent on the channel of its block. The chart prints no values: each is 0 - 127. Nothing here has been sent to a real instrument yet.",
+      "The chart puts the project's controllers on the project channel and a track's on its own: set projectChannel and the channel variable to the instrument's."
+    ],
+    "variables": {
+      "channel": 1,
+      "projectChannel": 1
+    },
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-MIDI-chart",
+      "realtimeEditing": "complete-for-the-MIDI-chart",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the instrument sends the controllers its chart marks transmitted",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Project PROJECT PLAYBACK = 100 (CC 30)",
+        "parameter": "project.projectPlayback",
+        "value": 100,
+        "expectedHex": "B0 1E 64"
+      },
+      {
+        "name": "Track PITCH (LOOP/SHOTS TRACK) = 100 (CC 68)",
+        "parameter": "track.pitchLoopShotsTrack",
+        "value": 100,
+        "expectedHex": "B0 44 64"
+      }
+    ]
+  }
+}

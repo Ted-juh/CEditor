@@ -1,0 +1,5202 @@
+{
+  "schemaVersion": 1,
+  "id": "sequential.fourm",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Sequential Fourm",
+  "manufacturer": "Sequential",
+  "family": "Fourm",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "oscillator1.octave",
+          "name": "Osc 1 Octave",
+          "group": "Oscillator 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 4
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "octave"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 01",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.noiseType22",
+          "name": "Noise Type 22",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noiseType22"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 15",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.octave",
+          "name": "Osc 2 Octave",
+          "group": "Oscillator 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 6
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "octave"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 02",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.freq",
+          "name": "Osc 1 Freq",
+          "group": "Oscillator 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1400
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "freq"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 03",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "glide.on",
+          "name": "Glide On",
+          "group": "Glide",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "on"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 17",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "glide.mode",
+          "name": "Glide Mode",
+          "group": "Glide",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "mode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 18",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.freq",
+          "name": "Osc 2 Freq",
+          "group": "Oscillator 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1400
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "freq"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 05",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "glide.rate",
+          "name": "Glide Rate",
+          "group": "Glide",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "rate"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 19",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.pitchBendRange",
+          "name": "Pitch Bend Range",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 12
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchBendRange"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.sync",
+          "name": "Osc 1 Sync",
+          "group": "Oscillator 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sync"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 07",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.cutoff",
+          "name": "Filter Cutoff",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1023
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cutoff"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1B",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.tri",
+          "name": "Osc 2 Tri",
+          "group": "Oscillator 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tri"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 08",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.saw",
+          "name": "Osc 1 Saw",
+          "group": "Oscillator 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "saw"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 09",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.resonance",
+          "name": "Filter Resonance",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "resonance"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1D",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.saw",
+          "name": "Osc 2 Saw",
+          "group": "Oscillator 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "saw"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.keyTrack",
+          "name": "Filter KeyTrack",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "keyTrack"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1E",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.pulse",
+          "name": "Osc 1 Pulse",
+          "group": "Oscillator 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pulse"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0B",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.keyAmount32",
+          "name": "Filter Key Amount 32",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "keyAmount32"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 1F",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.pulse",
+          "name": "Osc 2 Pulse",
+          "group": "Oscillator 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pulse"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0C",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.pw",
+          "name": "Osc 1 PW",
+          "group": "Oscillator 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pw"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0D",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.sync",
+          "name": "LFO Sync",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sync"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 21",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.pw",
+          "name": "Osc 2 PW",
+          "group": "Oscillator 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pw"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0E",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.freq",
+          "name": "LFO Freq",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "freq"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 22",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.level",
+          "name": "Osc 1 Level",
+          "group": "Oscillator 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "level"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 0F",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.freqSync",
+          "name": "LFO Freq Sync",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 15
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "freqSync"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 23",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.level",
+          "name": "Osc 2 Level",
+          "group": "Oscillator 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "level"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 10",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.shape",
+          "name": "LFO Shape",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 15
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "shape"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 24",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.feedbackOn",
+          "name": "Feedback On",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackOn"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 11",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo.reverseSaw",
+          "name": "LFO Reverse Saw",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverseSaw"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 25",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mixer.feedbackLevel",
+          "name": "Feedback Level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "feedbackLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 12",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.sHType39",
+          "name": "LFO S/H Type 39",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 5
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sHType39"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 26",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.noiseOn",
+          "name": "Noise On",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noiseOn"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 13",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "mixer.noiseLevel",
+          "name": "Noise Level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noiseLevel"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 14",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEnvelope.attack",
+          "name": "Filt Env Attack",
+          "group": "Filter Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 28",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ampEnvelope.attack",
+          "name": "Amp Env Attack",
+          "group": "Amp Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 29",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.pwbSrcRoute",
+          "name": "ModDst_PWBSrcRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pwbSrcRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4B",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterEnvelope.decay",
+          "name": "Filt Env Decay",
+          "group": "Filter Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.cutoffSrcRoute",
+          "name": "ModDst_CutoffSrcRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cutoffSrcRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4C",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "ampEnvelope.decay",
+          "name": "Amp Env Decay",
+          "group": "Amp Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2B",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.ampSrcRoute",
+          "name": "ModDst_AmpSrcRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ampSrcRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4D",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterEnvelope.sustain",
+          "name": "Filt Env Sustain",
+          "group": "Filter Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sustain"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2C",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoFrqSrcRoute",
+          "name": "ModDst_LFOFrqSrcRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoFrqSrcRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4E",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "ampEnvelope.sustain",
+          "name": "Amp Env Sustain",
+          "group": "Amp Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sustain"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2D",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoAmtSrcRte",
+          "name": "ModDst_LFOAmtSrcRte",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoAmtSrcRte"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4F",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterEnvelope.release",
+          "name": "Filt Env Release",
+          "group": "Filter Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "release"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2E",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.atDest1",
+          "name": "ModDst_ATDest1",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "atDest1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 50",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "ampEnvelope.release",
+          "name": "Amp Env Release",
+          "group": "Amp Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "release"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 2F",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.atDest2",
+          "name": "ModDst_ATDest2",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "atDest2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 51",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterEnvelope.velOn",
+          "name": "Filt Env Vel On",
+          "group": "Filter Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velOn"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 30",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.atDest3",
+          "name": "ModDst_ATDest3",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "atDest3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 52",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "ampEnvelope.velOn",
+          "name": "Amp Env Vel On",
+          "group": "Amp Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velOn"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 31",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "voice.keyMode",
+          "name": "Key Mode",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "keyMode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 53",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterEnvelope.velAmt",
+          "name": "Filt Env Vel Amt",
+          "group": "Filter Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velAmt"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 32",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ampEnvelope.velAmt",
+          "name": "Amp Env Vel Amt",
+          "group": "Amp Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velAmt"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 33",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.transpose",
+          "name": "Transpose",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 4
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "transpose"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 55",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "voice.envRetrig",
+          "name": "Env Retrig",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envRetrig"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 34",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.category",
+          "name": "Category",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "category"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 56",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEnvelope.amt",
+          "name": "Filt Env Amt",
+          "group": "Filter Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "amt"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 35",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.clockBpm",
+          "name": "Clock BPM",
+          "group": "Arpeggiator",
+          "valueType": "continuous",
+          "range": {
+            "min": 30,
+            "max": 250
+          },
+          "default": 30,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "clockBpm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 57",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ampEnvelope.amt",
+          "name": "Amp Env Amt",
+          "group": "Amp Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 255
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "amt"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 36",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.clockDiv",
+          "name": "Clock Div",
+          "group": "Arpeggiator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 10
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "clockDiv"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 58",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.voiceVolume",
+          "name": "Voice Volume",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "voiceVolume"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 38",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "character.vintage",
+          "name": "Vintage",
+          "group": "Character",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vintage"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 39",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.on",
+          "name": "Unison On",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "on"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 3A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "voice.voices",
+          "name": "Unison Voices",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 4
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "voices"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 3B",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "voice.detune",
+          "name": "Unison Detune",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "detune"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 3C",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.note1",
+          "name": "Unison Note 1",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 60
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "note1"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 3D",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.note2",
+          "name": "Unison Note 2",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 60
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "note2"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 3E",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.note3",
+          "name": "Unison Note 3",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 60
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "note3"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 3F",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "voice.note4",
+          "name": "Unison Note 4",
+          "group": "Voice",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 60
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "note4"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 40",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.filterEnvRoute",
+          "name": "ModSrc_FilterEnvRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEnvRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 41",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.oscBRoute",
+          "name": "ModSrc_OscBRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscBRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 42",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoRoute",
+          "name": "ModSrc_LFORoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 43",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.filterEnvAmt",
+          "name": "ModSrc_FilterEnvAmt",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 254
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterEnvAmt"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 44",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.oscBAmt",
+          "name": "ModSrc_OscBAmt",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 254
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscBAmt"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 45",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.lfoAmt",
+          "name": "ModSrc_LFOAmt",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 254
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfoAmt"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 46",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.aftertouchAmt",
+          "name": "ModSrc_AftertouchAmt",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 254
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "aftertouchAmt"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 47",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulation.freqASrcRoute",
+          "name": "ModDst_FreqASrcRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "freqASrcRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 48",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.freqBSrcRoute",
+          "name": "ModDst_FreqBSrcRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "freqBSrcRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 49",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.pwaSrcRoute",
+          "name": "ModDst_PWASrcRoute",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pwaSrcRoute"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 4A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.mode",
+          "name": "Arp Mode",
+          "group": "Arpeggiator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 7
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "mode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 6F",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.range",
+          "name": "Arp Range",
+          "group": "Arpeggiator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "range"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 70",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.repeat",
+          "name": "Arp Repeat",
+          "group": "Arpeggiator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "repeat"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 71",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.relatch",
+          "name": "Arp Relatch",
+          "group": "Arpeggiator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "relatch"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 72",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.beatSync",
+          "name": "Arp Beat Sync",
+          "group": "Arpeggiator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "beatSync"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 73",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "sequencer.reset",
+          "name": "Seq Reset",
+          "group": "Sequencer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reset"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 74",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "sequencer.playMode",
+          "name": "Seq Play Mode",
+          "group": "Sequencer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 3
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playMode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 75",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "sequencer.modDest",
+          "name": "Seq Mod Dest",
+          "group": "Sequencer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 6
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modDest"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 76",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.masterCoarseTune",
+          "name": "Master Coarse Tune",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 100
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterCoarseTune"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 00",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.midiArpNotes",
+          "name": "MIDI Arp Notes",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiArpNotes"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 0E",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.masterFineTune",
+          "name": "Master Fine Tune",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 24
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "masterFineTune"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 01",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.midiChannel",
+          "name": "MIDI Channel",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "midiChannel"
+          },
+          "description": "0 = All",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 02",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.localControl",
+          "name": "Local Control",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "alloff",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "alloff",
+              "label": "All Off",
+              "wire": 0
+            },
+            {
+              "id": "keywheelsoff",
+              "label": "Key/Wheels Off",
+              "wire": 1
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "localControl"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 0F",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiClockMode",
+          "name": "MIDI Clock Mode",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "out",
+              "label": "Out",
+              "wire": 1
+            },
+            {
+              "id": "in",
+              "label": "In",
+              "wire": 2
+            },
+            {
+              "id": "inthru",
+              "label": "In Thru",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiClockMode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 03",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.monoStereo",
+          "name": "Mono/Stereo",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "mono",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "mono",
+              "label": "Mono",
+              "wire": 0
+            },
+            {
+              "id": "stereo",
+              "label": "Stereo",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "monoStereo"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 10",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiClockCableIn",
+          "name": "MIDI Clock Cable In",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "midiport",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "midiport",
+              "label": "MIDI Port",
+              "wire": 0
+            },
+            {
+              "id": "usb",
+              "label": "USB",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiClockCableIn"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 04",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.potMode",
+          "name": "Pot Mode",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "relative",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "relative",
+              "label": "Relative",
+              "wire": 0
+            },
+            {
+              "id": "passthru",
+              "label": "Passthru",
+              "wire": 1
+            },
+            {
+              "id": "jump",
+              "label": "Jump",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "potMode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 11",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiClockCableOut",
+          "name": "MIDI Clock Cable Out",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "none",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "none",
+              "label": "None",
+              "wire": 0
+            },
+            {
+              "id": "midi",
+              "label": "MIDI",
+              "wire": 1
+            },
+            {
+              "id": "usb",
+              "label": "USB",
+              "wire": 2
+            },
+            {
+              "id": "all",
+              "label": "All",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiClockCableOut"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 05",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.footPedalAssign",
+          "name": "Foot Pedal Assign",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "breathcc2",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "breathcc2",
+              "label": "Breath CC2",
+              "wire": 0
+            },
+            {
+              "id": "footcc4",
+              "label": "Foot CC4",
+              "wire": 1
+            },
+            {
+              "id": "expcc11",
+              "label": "Exp CC11",
+              "wire": 2
+            },
+            {
+              "id": "lpffull",
+              "label": "LPF Full",
+              "wire": 3
+            },
+            {
+              "id": "lpfhalf",
+              "label": "LPF Half",
+              "wire": 4
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "footPedalAssign"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 12",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiParamSend",
+          "name": "MIDI Param Send",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "nrpn",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "nrpn",
+              "label": "NRPN",
+              "wire": 0
+            },
+            {
+              "id": "cc",
+              "label": "CC",
+              "wire": 1
+            },
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiParamSend"
+          },
+          "description": "* The manual marks it: received, but not transmitted.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 06",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.sustainPedalPolarity",
+          "name": "Sustain Pedal Polarity",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "normal",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "normal",
+              "label": "Normal",
+              "wire": 0
+            },
+            {
+              "id": "reversed",
+              "label": "Reversed",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "sustainPedalPolarity"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 13",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiParamReceive",
+          "name": "MIDI Param Receive",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "nrpn",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": false
+          },
+          "enum": [
+            {
+              "id": "nrpn",
+              "label": "NRPN",
+              "wire": 0
+            },
+            {
+              "id": "cc",
+              "label": "CC",
+              "wire": 1
+            },
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiParamReceive"
+          },
+          "description": "† The manual marks it: transmitted, but ignored when received.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 07",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.sustainMode",
+          "name": "Sustain Mode",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "sustain",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sustain",
+              "label": "Sustain",
+              "wire": 0
+            },
+            {
+              "id": "arphold",
+              "label": "Arp Hold",
+              "wire": 1
+            },
+            {
+              "id": "aprholdmoment",
+              "label": "Apr Hold Moment.",
+              "wire": 2
+            },
+            {
+              "id": "seqstartstop",
+              "label": "Seq Start/Stop",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "sustainMode"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 14",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiControlEnable",
+          "name": "MIDI Control Enable",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiControlEnable"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 08",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.globalScale",
+          "name": "Global Scale",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 64
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "globalScale"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 15",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.midiSysExEnable",
+          "name": "MIDI SysEx Enable",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiSysExEnable"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 09",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.enable",
+          "name": "Pressure Enable",
+          "group": "Modulation",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "enable"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 16",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiSysExCable",
+          "name": "MIDI SysEx Cable",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "midi",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "midi",
+              "label": "MIDI",
+              "wire": 0
+            },
+            {
+              "id": "usb",
+              "label": "USB",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiSysExCable"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 0A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.curve",
+          "name": "Pressure Curve",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 7
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "curve"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 17",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulation.curveNrpn4120",
+          "name": "Velocity Curve",
+          "group": "Modulation",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 7
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "curve"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 18",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiCableOut",
+          "name": "MIDI Cable Out",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "midi",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "midi",
+              "label": "MIDI",
+              "wire": 0
+            },
+            {
+              "id": "usb",
+              "label": "USB",
+              "wire": 1
+            },
+            {
+              "id": "all",
+              "label": "All",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiCableOut"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 0B",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.oledScreensaver",
+          "name": "OLED Screensaver",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "oledScreensaver"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 19",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiProgramSend",
+          "name": "MIDI Program Send",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiProgramSend"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 0C",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "arpeggiator.beatSyncNrpn4122",
+          "name": "Arp Beat Sync",
+          "group": "Arpeggiator",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "quantize",
+              "label": "Quantize",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "beatSync"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 1A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "global.midiProgramRecv",
+          "name": "MIDI Program Recv",
+          "group": "Global",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 1
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiProgramRecv"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 0D",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "sequencer.playStop",
+          "name": "Seq Play/Stop",
+          "group": "Sequencer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "playStop"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "20 5C",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile sequential-fourm, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "sequential-fourm",
+    "name": "Sequential Fourm",
+    "description": "Sequential Fourm, every program, global and control parameter in its MIDI Implementation's NRPN tables.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Fourm MIDI Implementation Document (version 1.1)",
+        "notes": "NRPN tables read by tools/profiles/sequential/read-nrpn-tables.mjs from Fourm-MIDI-Implementation-Document_V1.1.pdf, pages 8-10-11-12 (sha256 19871a644b92bd3dd29835595d893f56e82c8d717daf9cd5ba10584a5b067afd), https://sequential.com/wp-content/uploads/2025/12/Fourm-MIDI-Implementation-Document_V1.1.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/sequential/make-profiles.mjs; edit the layout in tools/profiles/sequential/synths/, not this file.",
+      "Every parameter is a row of the manual's NRPN tables, on its number, with its printed range and name. Nothing here has been sent to a real instrument yet.",
+      "Values go out as the manual prints the format: NRPN MSB/LSB on CC 99/98, value MSB/LSB on CC 6/38. The instrument must have its Global MIDI parameter receive set to NRPN (or All).",
+      "1 parameter(s) the manual marks as transmitted but ignored when received are read-only.",
+      "Left out, printed without a range: NRPN 4 (Osc 1 Freq MSB), 6 (Osc 2 Freq MSB), 28 (Filter Cutoff MSB), 84 (Scale), 89 (Name 1), 90 (Name 2), 91 (Name 3), 92 (Name 4), 93 (Name 5), 94 (Name 6), 95 (Name 7), 96 (Name 8), 97 (Name 9), 98 (Name 10), 99 (Name 11), 100 (Name 12), 101 (Name 13), 102 (Name 14), 103 (Name 15), 104 (Name 16), 105 (Name 17), 106 (Name 18), 107 (Name 19), 108 (Name 20), 109 (Editor Byte), 110 (Arp On), 119-126 (Seq1_RestFlags1 -8), 127-134 (Seq2_RestFlags1-8), 135-142 (Seq3_RestFlags1-8), 143-150 (Seq4_RestFlags1-8), 151-158 (Seq1_TieFlags1-8), 159-166 (Seq2_TieFlags1-8), 167-17 (Seq3_TieFlags1-8), 175-182 (Seq4_TieFlags1-8), 183-246 (Seq1_Note1-64), 247-310 (Seq2_Note1-64), 311-374 (Seq3_Note1-64), 375-438 (Seq4_Note1-64), 439-502 (Seq1_Vel1-64), 503-566 (Seq2_Vel1-64), 567-630 (Seq3_Vel1-64), 631-694 (Seq4_Vel1-64), 695-702 (Seq1_GlideFlags1-8), 703-710 (Seq2_GlideFlags1-8), 711-718 (Seq3_GlideFlags1-8), 719-726 (Seq4_GlideFlags1-8)."
+    ],
+    "identity": {
+      "manufacturerId": [
+        "01"
+      ],
+      "familyCode": [
+        "3B",
+        "01"
+      ],
+      "modelNumber": [
+        "00",
+        "00"
+      ],
+      "timeoutMs": 1000,
+      "retries": 0
+    },
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-nrpn-tables",
+      "realtimeEditing": "complete-for-the-manual's-nrpn-tables",
+      "editBufferDumpRequest": "notImplemented: the manual's program dump is not mapped yet",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the front panel sends these same NRPNs when the Global MIDI parameter send is set to NRPN",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "requests": [
+      {
+        "id": "identityRequest",
+        "name": "Identity Request",
+        "kind": "sysex",
+        "template": [
+          "F0",
+          "7E",
+          "7F",
+          "06",
+          "01",
+          "F7"
+        ],
+        "response": {
+          "kind": "identity"
+        },
+        "timeoutMs": 1000,
+        "retries": 0
+      }
+    ],
+    "startup": {
+      "policy": "pull",
+      "syncDirection": "pull",
+      "sync": [
+        {
+          "request": "identityRequest"
+        }
+      ]
+    },
+    "tests": [
+      {
+        "name": "Universal Identity Request",
+        "kind": "identityRequest",
+        "expectedHex": "F0 7E 7F 06 01 F7"
+      },
+      {
+        "name": "Osc 1 Octave = 4 (NRPN 1)",
+        "parameter": "oscillator1.octave",
+        "value": 4,
+        "expectedHex": "B0 63 00\nB0 62 01\nB0 06 00\nB0 26 04"
+      },
+      {
+        "name": "MIDI Arp Notes = On (NRPN 4110)",
+        "parameter": "global.midiArpNotes",
+        "value": "on",
+        "expectedHex": "B0 63 20\nB0 62 0E\nB0 06 00\nB0 26 01"
+      },
+      {
+        "name": "Osc 1 Freq = 200 (NRPN 3)",
+        "parameter": "oscillator1.freq",
+        "value": 200,
+        "expectedHex": "B0 63 00\nB0 62 03\nB0 06 01\nB0 26 48"
+      },
+      {
+        "name": "Seq Play/Stop = 1 (NRPN 4188)",
+        "parameter": "sequencer.playStop",
+        "value": 1,
+        "expectedHex": "B0 63 20\nB0 62 5C\nB0 06 00\nB0 26 01"
+      }
+    ]
+  }
+}

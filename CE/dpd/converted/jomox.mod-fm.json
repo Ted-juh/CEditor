@@ -1,0 +1,3810 @@
+{
+  "schemaVersion": 1,
+  "id": "jomox.mod-fm",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Jomox Mod FM",
+  "manufacturer": "Jomox",
+  "family": "Mod FM",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "fmSynthEngine.opCents",
+          "name": "OP Cents",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 100
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "opCents"
+          },
+          "description": "CC 96 (page 4): FM Synth Engine, OP Cents; value range 0-100.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 96
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1Tune",
+          "name": "OP1 Tune",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1Tune"
+          },
+          "description": "CC 100 (page 4): FM Synth Engine, OP1 Tune; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 100
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2Tune",
+          "name": "OP2 Tune",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2Tune"
+          },
+          "description": "CC 101 (page 4): FM Synth Engine, OP2 Tune; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 101
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3Tune",
+          "name": "OP3 Tune",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3Tune"
+          },
+          "description": "CC 102 (page 4): FM Synth Engine, OP3 Tune; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4Tune",
+          "name": "OP4 Tune",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4Tune"
+          },
+          "description": "CC 103 (page 4): FM Synth Engine, OP4 Tune; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount12",
+          "name": "FM Amount 1→2",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount12"
+          },
+          "description": "CC 104 (page 4): FM Synth Engine, FM Amount 1→2; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount13",
+          "name": "FM Amount 1→3",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount13"
+          },
+          "description": "CC 105 (page 4): FM Synth Engine, FM Amount 1→3; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 105
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount14",
+          "name": "FM Amount 1→4",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount14"
+          },
+          "description": "CC 106 (page 4): FM Synth Engine, FM Amount 1→4; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 106
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount21",
+          "name": "FM Amount 2→1",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount21"
+          },
+          "description": "CC 107 (page 4): FM Synth Engine, FM Amount 2→1; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount23",
+          "name": "FM Amount 2→3",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount23"
+          },
+          "description": "CC 108 (page 4): FM Synth Engine, FM Amount 2→3; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount24",
+          "name": "FM Amount 2→4",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount24"
+          },
+          "description": "CC 109 (page 4): FM Synth Engine, FM Amount 2→4; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount31",
+          "name": "FM Amount 3→1",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount31"
+          },
+          "description": "CC 110 (page 4): FM Synth Engine, FM Amount 3→1; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 110
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount32",
+          "name": "FM Amount 3→2",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount32"
+          },
+          "description": "CC 111 (page 4): FM Synth Engine, FM Amount 3→2; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 111
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount34",
+          "name": "FM Amount 3→4",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount34"
+          },
+          "description": "CC 112 (page 4): FM Synth Engine, FM Amount 3→4; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount41",
+          "name": "FM Amount 4→1",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount41"
+          },
+          "description": "CC 113 (page 4): FM Synth Engine, FM Amount 4→1; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount42",
+          "name": "FM Amount 4→2",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount42"
+          },
+          "description": "CC 114 (page 4): FM Synth Engine, FM Amount 4→2; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 114
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.fmAmount43",
+          "name": "FM Amount 4→3",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fmAmount43"
+          },
+          "description": "CC 115 (page 5): FM Synth Engine, FM Amount 4→3; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 115
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1EnvAttack",
+          "name": "OP1 Env Attack",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1EnvAttack"
+          },
+          "description": "CC 14 (page 5): FM Synth Engine, OP1 Env Attack; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 14
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2EnvAttack",
+          "name": "OP2 Env Attack",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2EnvAttack"
+          },
+          "description": "CC 15 (page 5): FM Synth Engine, OP2 Env Attack; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3EnvAttack",
+          "name": "OP3 Env Attack",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3EnvAttack"
+          },
+          "description": "CC 16 (page 5): FM Synth Engine, OP3 Env Attack; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4EnvAttack",
+          "name": "OP4 Env Attack",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4EnvAttack"
+          },
+          "description": "CC 17 (page 5): FM Synth Engine, OP4 Env Attack; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1EnvDecay",
+          "name": "OP1 Env Decay",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1EnvDecay"
+          },
+          "description": "CC 18 (page 5): FM Synth Engine, OP1 Env Decay; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2EnvDecay",
+          "name": "OP2 Env Decay",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2EnvDecay"
+          },
+          "description": "CC 19 (page 5): FM Synth Engine, OP2 Env Decay; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3EnvDecay",
+          "name": "OP3 Env Decay",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3EnvDecay"
+          },
+          "description": "CC 20 (page 5): FM Synth Engine, OP3 Env Decay; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4EnvDecay",
+          "name": "OP4 Env Decay",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4EnvDecay"
+          },
+          "description": "CC 21 (page 5): FM Synth Engine, OP4 Env Decay; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1EnvSustain",
+          "name": "OP1 Env Sustain",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1EnvSustain"
+          },
+          "description": "CC 34 (page 5): FM Synth Engine, OP1 Env Sustain; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2EnvSustain",
+          "name": "OP2 Env Sustain",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2EnvSustain"
+          },
+          "description": "CC 35 (page 5): FM Synth Engine, OP2 Env Sustain; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3EnvSustain",
+          "name": "OP3 Env Sustain",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3EnvSustain"
+          },
+          "description": "CC 36 (page 5): FM Synth Engine, OP3 Env Sustain; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4EnvSustain",
+          "name": "OP4 Env Sustain",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4EnvSustain"
+          },
+          "description": "CC 37 (page 5): FM Synth Engine, OP4 Env Sustain; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1EnvRelease",
+          "name": "OP1 Env Release",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1EnvRelease"
+          },
+          "description": "CC 38 (page 5): FM Synth Engine, OP1 Env Release; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2EnvRelease",
+          "name": "OP2 Env Release",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2EnvRelease"
+          },
+          "description": "CC 39 (page 5): FM Synth Engine, OP2 Env Release; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3EnvRelease",
+          "name": "OP3 Env Release",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3EnvRelease"
+          },
+          "description": "CC 40 (page 5): FM Synth Engine, OP3 Env Release; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4EnvRelease",
+          "name": "OP4 Env Release",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4EnvRelease"
+          },
+          "description": "CC 41 (page 5): FM Synth Engine, OP4 Env Release; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1EgVcaAmount",
+          "name": "OP1 EG→VCA Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1EgVcaAmount"
+          },
+          "description": "CC 22 (page 5): FM Synth Engine, OP1 EG→VCA Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2EgVcaAmount",
+          "name": "OP2 EG→VCA Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2EgVcaAmount"
+          },
+          "description": "CC 23 (page 5): FM Synth Engine, OP2 EG→VCA Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3EgVcaAmount",
+          "name": "OP3 EG→VCA Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3EgVcaAmount"
+          },
+          "description": "CC 24 (page 5): FM Synth Engine, OP3 EG→VCA Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4EgVcaAmount",
+          "name": "OP4 EG→VCA Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4EgVcaAmount"
+          },
+          "description": "CC 25 (page 5): FM Synth Engine, OP4 EG→VCA Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1EgFmAmount",
+          "name": "OP1 EG→FM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1EgFmAmount"
+          },
+          "description": "CC 26 (page 5): FM Synth Engine, OP1 EG→FM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2EgFmAmount",
+          "name": "OP2 EG→FM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2EgFmAmount"
+          },
+          "description": "CC 27 (page 5): FM Synth Engine, OP2 EG→FM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3EgFmAmount",
+          "name": "OP3 EG→FM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3EgFmAmount"
+          },
+          "description": "CC 28 (page 5): FM Synth Engine, OP3 EG→FM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4EgFmAmount",
+          "name": "OP4 EG→FM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4EgFmAmount"
+          },
+          "description": "CC 29 (page 5): FM Synth Engine, OP4 EG→FM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1Lfo1FmAmount",
+          "name": "OP1 LFO1→FM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1Lfo1FmAmount"
+          },
+          "description": "CC 70 (page 5): FM Synth Engine, OP1 LFO1→FM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 70
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2Lfo1FmAmount",
+          "name": "OP2 LFO1→FM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2Lfo1FmAmount"
+          },
+          "description": "CC 71 (page 5): FM Synth Engine, OP2 LFO1→FM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 71
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3Lfo1FmAmount",
+          "name": "OP3 LFO1→FM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3Lfo1FmAmount"
+          },
+          "description": "CC 72 (page 5): FM Synth Engine, OP3 LFO1→FM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 72
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4Lfo1FmAmount",
+          "name": "OP4 LFO1→FM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4Lfo1FmAmount"
+          },
+          "description": "CC 73 (page 5): FM Synth Engine, OP4 LFO1→FM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 73
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op1Lfo2AmAmount",
+          "name": "OP1 LFO2→AM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op1Lfo2AmAmount"
+          },
+          "description": "CC 74 (page 5): FM Synth Engine, OP1 LFO2→AM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 74
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op2Lfo2AmAmount",
+          "name": "OP2 LFO2→AM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op2Lfo2AmAmount"
+          },
+          "description": "CC 75 (page 5): FM Synth Engine, OP2 LFO2→AM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op3Lfo2AmAmount",
+          "name": "OP3 LFO2→AM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op3Lfo2AmAmount"
+          },
+          "description": "CC 76 (page 5): FM Synth Engine, OP3 LFO2→AM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 76
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.op4Lfo2AmAmount",
+          "name": "OP4 LFO2→AM Amount",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "op4Lfo2AmAmount"
+          },
+          "description": "CC 77 (page 5): FM Synth Engine, OP4 LFO2→AM Amount; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 77
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.lfo1MixVolume",
+          "name": "LFO1→MIX Volume",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo1MixVolume"
+          },
+          "description": "CC 78 (page 5): FM Synth Engine, LFO1→MIX Volume; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 78
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.lfo2MixVolume",
+          "name": "LFO2→MIX Volume",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo2MixVolume"
+          },
+          "description": "CC 79 (page 5): FM Synth Engine, LFO2→MIX Volume; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 79
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.lfo1Rate",
+          "name": "LFO1 Rate",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo1Rate"
+          },
+          "description": "CC 80 (page 5): FM Synth Engine, LFO1 Rate; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.lfo2Rate",
+          "name": "LFO2 Rate",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo2Rate"
+          },
+          "description": "CC 81 (page 5): FM Synth Engine, LFO2 Rate; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.lfo1Waveform",
+          "name": "LFO1 Waveform",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 63
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo1Waveform"
+          },
+          "description": "CC 82 (page 5): FM Synth Engine, LFO1 Waveform; value range 0-63.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 82
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.lfo2Waveform",
+          "name": "LFO2 Waveform",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 63
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo2Waveform"
+          },
+          "description": "CC 83 (page 5): FM Synth Engine, LFO2 Waveform; value range 0-63.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 83
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.lfo1VcoOct",
+          "name": "LFO1 VCO Oct",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 6
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo1VcoOct"
+          },
+          "description": "CC 84 (page 6): FM Synth Engine, LFO1 VCO Oct; value range 0-6.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 84
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.lfo2VcoOct",
+          "name": "LFO2 VCO Oct",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 6
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfo2VcoOct"
+          },
+          "description": "CC 85 (page 6): FM Synth Engine, LFO2 VCO Oct; value range 0-6.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 85
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.multiTarget",
+          "name": "MULTI Target",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 7
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "multiTarget"
+          },
+          "description": "CC 33 (page 6): FM Synth Engine, MULTI Target; value range 0-7.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.algorithmSelect",
+          "name": "ALGORITHM select",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 26
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "algorithmSelect"
+          },
+          "description": "CC 42 (page 6): FM Synth Engine, ALGORITHM select; value range 0-26.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.overtoneMode",
+          "name": "OVERTONE Mode",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 5
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "overtoneMode"
+          },
+          "description": "CC 67 (page 6): FM Synth Engine, OVERTONE Mode; value range 0-5.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 67
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "fmSynthEngine.volume",
+          "name": "Volume",
+          "group": "FM Synth Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volume"
+          },
+          "description": "CC 7 (page 6): FM Synth Engine, Volume; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 7
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filCutoff",
+          "name": "FIL Cutoff",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filCutoff"
+          },
+          "description": "CC 43 (page 6): Filter Engine, FIL Cutoff; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filResonance",
+          "name": "FIL Resonance",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filResonance"
+          },
+          "description": "CC 44 (page 6): Filter Engine, FIL Resonance; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filShapeLpBpHp",
+          "name": "FIL Shape LP/BP/HP",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filShapeLpBpHp"
+          },
+          "description": "CC 45 (page 6): Filter Engine, FIL Shape LP/BP/HP; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filEnvAmt",
+          "name": "FIL Env Amt",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filEnvAmt"
+          },
+          "description": "CC 46 (page 6): Filter Engine, FIL Env Amt; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filEnvAttack",
+          "name": "FIL Env Attack",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filEnvAttack"
+          },
+          "description": "CC 47 (page 6): Filter Engine, FIL Env Attack; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filEnvDecay",
+          "name": "FIL Env Decay",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filEnvDecay"
+          },
+          "description": "CC 48 (page 6): Filter Engine, FIL Env Decay; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 48
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filEnvSustain",
+          "name": "FIL Env Sustain",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filEnvSustain"
+          },
+          "description": "CC 49 (page 6): Filter Engine, FIL Env Sustain; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 49
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filEnvRelease",
+          "name": "FIL Env Release",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filEnvRelease"
+          },
+          "description": "CC 50 (page 6): Filter Engine, FIL Env Release; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 50
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filLfoRate",
+          "name": "FIL LFO Rate",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filLfoRate"
+          },
+          "description": "CC 69 (page 6): Filter Engine, FIL LFO Rate; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 69
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filLfoWaveform",
+          "name": "FIL LFO Waveform",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filLfoWaveform"
+          },
+          "description": "CC 52 (page 6): Filter Engine, FIL LFO Waveform; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 52
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filLfoIntensity",
+          "name": "FIL LFO Intensity",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filLfoIntensity"
+          },
+          "description": "CC 53 (page 6): Filter Engine, FIL LFO Intensity; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 53
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filTp24MixVol",
+          "name": "FIL TP24 Mix Vol",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filTp24MixVol"
+          },
+          "description": "CC 66 (page 6): Filter Engine, FIL TP24 Mix Vol; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 66
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filMm12MixVol",
+          "name": "FIL MM12 Mix Vol",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filMm12MixVol"
+          },
+          "description": "CC 57 (page 6): Filter Engine, FIL MM12 Mix Vol; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 57
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filKeyTrack",
+          "name": "FIL Key Track",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filKeyTrack"
+          },
+          "description": "CC 55 (page 6): Filter Engine, FIL Key Track; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 55
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filNoiseMixVol",
+          "name": "FIL Noise Mix Vol",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filNoiseMixVol"
+          },
+          "description": "CC 56 (page 6): Filter Engine, FIL Noise Mix Vol; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 56
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEngine.filNoiseMetal",
+          "name": "FIL Noise Metal",
+          "group": "Filter Engine",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filNoiseMetal"
+          },
+          "description": "CC 58 (page 6): Filter Engine, FIL Noise Metal; value range 0-127; internal 0:Off, 1:White.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 58
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxReverb.roomSize",
+          "name": "Room Size",
+          "group": "FX Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "roomSize"
+          },
+          "description": "CC 100 on channel 16 (page 7): FX Reverb, Room Size; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 100,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxReverb.lowPassReflections",
+          "name": "Low Pass Reflections",
+          "group": "FX Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lowPassReflections"
+          },
+          "description": "CC 101 on channel 16 (page 7): FX Reverb, Low Pass Reflections; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 101,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxReverb.hiPassReflections",
+          "name": "Hi Pass Reflections",
+          "group": "FX Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hiPassReflections"
+          },
+          "description": "CC 102 on channel 16 (page 7): FX Reverb, Hi Pass Reflections; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxReverb.reverbLevel",
+          "name": "Reverb Level",
+          "group": "FX Reverb",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "reverbLevel"
+          },
+          "description": "CC 103 on channel 16 (page 7): FX Reverb, Reverb Level; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxDelay.delay1Time",
+          "name": "Delay1 Time",
+          "group": "FX Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delay1Time"
+          },
+          "description": "CC 14 on channel 16 (page 7): FX Delay, Delay1 Time; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 14,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxDelay.delay1Feedback",
+          "name": "Delay1 Feedback",
+          "group": "FX Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delay1Feedback"
+          },
+          "description": "CC 15 on channel 16 (page 7): FX Delay, Delay1 Feedback; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxDelay.delay1SlowMediFast",
+          "name": "Delay1 Slow/Medi/Fast",
+          "group": "FX Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delay1SlowMediFast"
+          },
+          "description": "CC 17 on channel 16 (page 7): FX Delay, Delay1 Slow/Medi/Fast; value range 0-2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "fxDelay.delay1Level",
+          "name": "Delay1 Level",
+          "group": "FX Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delay1Level"
+          },
+          "description": "CC 18 on channel 16 (page 7): FX Delay, Delay1 Level; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxDelay.delay2Time",
+          "name": "Delay2 Time",
+          "group": "FX Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delay2Time"
+          },
+          "description": "CC 19 on channel 16 (page 7): FX Delay, Delay2 Time; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxDelay.delay2Feedback",
+          "name": "Delay2 Feedback",
+          "group": "FX Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delay2Feedback"
+          },
+          "description": "CC 20 on channel 16 (page 7): FX Delay, Delay2 Feedback; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "fxDelay.delay2SlowMediFast",
+          "name": "Delay2 Slow/Medi/Fast",
+          "group": "FX Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delay2SlowMediFast"
+          },
+          "description": "CC 21 on channel 16 (page 7): FX Delay, Delay2 Slow/Medi/Fast; value range 0-2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "fxDelay.delay2Level",
+          "name": "Delay2 Level",
+          "group": "FX Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delay2Level"
+          },
+          "description": "CC 22 on channel 16 (page 7): FX Delay, Delay2 Level; value range 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22,
+              "channel": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile jomox-mod-fm, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "jomox-mod-fm",
+    "name": "Jomox Mod FM",
+    "description": "Jomox Mod FM synthesizer: the FM engine, filter and effects controllers of its MIDI implementation.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Mod FM MIDI Implementation",
+        "notes": "The MIDI implementation's controller tables (PDF pages 3 - 8), read by tools/profiles/jomox/read-jomox-cc.mjs from ModFM_MidiImplemtation.pdf (sha256 1407541b77d38a9a329b6966accae29f89ddd155c07bf07e5a2532df6c62bb2b), https://www.jomox.de/upload/manuals/ModFM_MidiImplemtation.pdf, linked from https://www.jomox.de/support.php?lang=2&product_id=25. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/jomox/make-profiles.mjs; edit the layout in tools/profiles/jomox/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI implementation, sent as the controller it prints: a section that names its channel on that channel (16), the others on the channel variable. Nothing here has been sent to a real instrument yet.",
+      "A value range named one each by the internal range beside it (`0/64  Off/On`) is a choice; values printed without names are a choice of those values; every other range is a number, its internal range or resolution in its description.",
+      "Left out, actions: STORE Preset (CC 62, 64)."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-controller-tables: 89 parameters from 90 rows",
+      "realtimeEditing": "complete-for-the-manual's-controller-tables",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented: the manual prints a dump's header but not its bytes' meaning",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the controllers the instrument sends, as the table gives them",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "FM Synth Engine OP Cents = 100",
+        "parameter": "fmSynthEngine.opCents",
+        "value": 100,
+        "expectedHex": "B0 60 64"
+      },
+      {
+        "name": "FX Reverb Room Size = 127",
+        "parameter": "fxReverb.roomSize",
+        "value": 127,
+        "expectedHex": "BF 64 7F"
+      }
+    ]
+  }
+}

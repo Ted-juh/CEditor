@@ -26,13 +26,16 @@
 
   let newName = $state('');
 
-  function rowOk(r) { return !!(r.wires?.write?.address || r.wires?.write?.cc != null); }
+  // A write wire is addressed by a SysEx address, a controller, or an NRPN or RPN number. Counting
+  // only the first two put every NRPN parameter under "needs a write address": 92 of a Sub 37's 164.
+  function rowOk(r) { const w = r.wires?.write; return !!(w?.address || w?.cc != null || w?.nrpn || w?.rpn); }
   function rowKey(r) { return `${r.scope}::${r.paramId}`; }
 
   function msgType(r) {
     const m = r.wires?.write?.msg ?? r.wires?.rxLive?.msg;
     if (m === 'cc') return { label: 'CC', cls: 'cc' };
     if (m === 'nrpn') return { label: 'NRPN', cls: 'nrpn' };
+    if (m === 'rpn') return { label: 'RPN', cls: 'nrpn' };
     return { label: 'SysEx', cls: 'sysex' };
   }
   function vtype(r) {
@@ -46,7 +49,9 @@
   function addrText(r) {
     const w = r.wires?.write;
     if (w?.address) return w.address;
-    if (w?.cc != null) return `CC ${w.cc}`;
+    if (w?.cc != null) return w.lsbCc != null ? `CC ${w.cc} / ${w.lsbCc}` : `CC ${w.cc}`;
+    if (w?.nrpn) return `NRPN ${w.nrpn}`;
+    if (w?.rpn) return `RPN ${w.rpn}`;
     return '—';
   }
   function fmt(n) { return n < 0 ? '−' + Math.abs(n) : String(n); }

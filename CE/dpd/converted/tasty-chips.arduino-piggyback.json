@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 1,
+  "id": "tasty-chips.arduino-piggyback",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Tasty Chips Arduino Piggyback",
+  "manufacturer": "Tasty Chips",
+  "family": "Piggyback",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "controls.modulationDepth",
+          "name": "Modulation depth",
+          "group": "Controls",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modulationDepth"
+          },
+          "description": "CC 1: Modulation depth; 0: no modulation, 100: full modulation, >100: over modulation.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 1
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "controls.relativeModulationFrequency",
+          "name": "Relative modulation frequency",
+          "group": "Controls",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "relativeModulationFrequency"
+          },
+          "description": "CC 12: Relative modulation frequency; 127 = 0.99 * note pitch, 64 = 0.5*note pitch, 0 = off.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 12
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "controls.adsrAttackTime",
+          "name": "ADSR attack time",
+          "group": "Controls",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": 0,
+            "max": 4,
+            "unit": "s",
+            "mode": "number",
+            "shortLabel": "adsrAttackTime"
+          },
+          "description": "CC 73: ADSR attack time; 0=0.0s .. 127=4.0s.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 73
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "controls.adsrDecayTime",
+          "name": "ADSR decay time",
+          "group": "Controls",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": 0,
+            "max": 4,
+            "unit": "s",
+            "mode": "number",
+            "shortLabel": "adsrDecayTime"
+          },
+          "description": "CC 75: ADSR decay time; 0=0.0s .. 127=4.0s; firmware 1.2 onwards.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "controls.adsrSustainLevel",
+          "name": "ADSR sustain level",
+          "group": "Controls",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "adsrSustainLevel"
+          },
+          "description": "CC 80: ADSR sustain level; 0:Mute .. 127:Max; firmware 1.2 onwards.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "controls.adsrReleaseTime",
+          "name": "ADSR release time",
+          "group": "Controls",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": 0,
+            "max": 4,
+            "unit": "s",
+            "mode": "number",
+            "shortLabel": "adsrReleaseTime"
+          },
+          "description": "CC 72: ADSR release time; 0=0.0s .. 127=4.0s.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 72
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile tasty-chips-arduino-piggyback, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "tasty-chips-arduino-piggyback",
+    "name": "Tasty Chips Arduino Piggyback",
+    "description": "Tasty Chips Arduino Piggyback synthesizer shield: the six controllers of its manual's MIDI in table.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Arduino Piggyback synthesizer manual (web page)",
+        "notes": "The MIDI in table of https://www.tastychips.nl/sample-page/arduino-piggyback-synthesizer-manual/ (saved 2026-11-11 as tc-arduino-piggyback-manual.html, sha256 5025334d3633a950c59bb696a285836c9f756840b8f16a62e2b3abd827ac286d), linked from https://www.tastychips.nl/legacy-products-2/, read by tools/profiles/twisted/read-twisted-page.mjs. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/tastychips/make-profiles.mjs; edit the layout in tools/profiles/tastychips/synths/, not this file.",
+      "Every parameter is a row of the page's MIDI in table, sent as its controller, on the channel variable. The page is a live one, saved on 2026-11-11; one fetched another day may read otherwise. Nothing here has been sent to a real instrument yet."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-page's-table: 6 parameters",
+      "realtimeEditing": "complete-for-the-page's-table",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented: the page prints no dump",
+      "bankDump": "notImplemented",
+      "inboundControllers": "none: the page gives the Piggy MIDI in and MIDI thru only",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Modulation depth = 127",
+        "parameter": "controls.modulationDepth",
+        "value": 127,
+        "expectedHex": "B0 01 7F"
+      }
+    ]
+  }
+}

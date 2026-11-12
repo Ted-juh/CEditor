@@ -1,0 +1,662 @@
+{
+  "schemaVersion": 1,
+  "id": "expressive-e.osmose",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Expressive E Osmose",
+  "manufacturer": "Expressive E",
+  "family": "Osmose",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "macros.macro1",
+          "name": "Macro 1",
+          "group": "Macros",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "macro1"
+          },
+          "description": "CC 12. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 12
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "macros.macro2",
+          "name": "Macro 2",
+          "group": "Macros",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "macro2"
+          },
+          "description": "CC 13. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 13
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "macros.macro3",
+          "name": "Macro 3",
+          "group": "Macros",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "macro3"
+          },
+          "description": "CC 14. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 14
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "macros.macro4",
+          "name": "Macro 4",
+          "group": "Macros",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "macro4"
+          },
+          "description": "CC 15. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "macros.macro5",
+          "name": "Macro 5",
+          "group": "Macros",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "macro5"
+          },
+          "description": "CC 16. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "macros.macro6",
+          "name": "Macro 6",
+          "group": "Macros",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "macro6"
+          },
+          "description": "CC 17. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "levels.postGain",
+          "name": "Post Gain",
+          "group": "Levels",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "postGain"
+          },
+          "description": "CC 18. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "effects.globalFxParameter1",
+          "name": "Global FX Parameter 1",
+          "group": "Effects",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "globalFxParameter1"
+          },
+          "description": "CC 20. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "effects.globalFxParameter2",
+          "name": "Global FX Parameter 2",
+          "group": "Effects",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "globalFxParameter2"
+          },
+          "description": "CC 21. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "effects.globalFxParameter3",
+          "name": "Global FX Parameter 3",
+          "group": "Effects",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "globalFxParameter3"
+          },
+          "description": "CC 22. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "effects.globalFxParameter4",
+          "name": "Global FX Parameter 4",
+          "group": "Effects",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "globalFxParameter4"
+          },
+          "description": "CC 23. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "effects.globalFxMix",
+          "name": "Global FX Mix",
+          "group": "Effects",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "globalFxMix"
+          },
+          "description": "CC 24. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "levels.preGain",
+          "name": "Pre Gain",
+          "group": "Levels",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "preGain"
+          },
+          "description": "CC 26. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "effects.compressorMix",
+          "name": "Compressor Mix",
+          "group": "Effects",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compressorMix"
+          },
+          "description": "CC 93. Printed: Master Channel (channel 1) range: [0-127]. The instrument sends it too.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile expressive-e-osmose, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "expressive-e-osmose",
+    "name": "Expressive E Osmose",
+    "description": "Expressive E Osmose (and Osmose CE) sound engine: the controllers its MIDI implementation chart marks recognized, the macros, gains and global effects, on the MPE master channel.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Osmose MIDI Implementation Chart v.2.0, firmware 2.3.x rev. A (2026-07)",
+        "notes": "The MIDI implementation chart's control table (PDF pages 2, 3) read by tools/profiles/expressive/import-expressive.mjs from Osmose_MIDIImplementationChart_v2.3.x_A.pdf (sha256 8057940ceb9ea9c04134b22e68a0972d543fd3745444bd9d798a5bdfa96f3997), https://expressive-e.s3.us-east-1.amazonaws.com/CLA-Osmose/Osmose_MIDIImplementationChart_v2.3.x_A.pdf (linked from the help center's \"Osmose sound engine MIDI Implementation Chart\"). Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/expressive/make-profiles.mjs; edit the layout in tools/profiles/expressive/synths/, not this file.",
+      "Every parameter is a controller the chart marks Recognized, with the name and range it prints, sent on the channel variable. Nothing here has been sent to a real instrument yet.",
+      "The chart is for USB MIDI port 2, the sound engine port, and every controller here answers on the master channel (channel 1, the MPE master): the channel variable.",
+      "The macros' destinations are set per preset, so what each one changes depends on the preset loaded.",
+      "Left out, the wheel, the pedals, bank select and the MPE+ resolution byte, which are the player's: CC 0 Bank Select (MSB), CC 1 Modulation Wheel / Pedal 2, CC 64 Pedal 1, CC 87 MPE+ LSB Aftertouch / Presure.",
+      "Left out, rows the chart marks not recognized: CC 83 EQ tilt value, CC 84 EQ frequency."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-MIDI-implementation-chart",
+      "realtimeEditing": "complete-for-the-MIDI-implementation-chart",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the instrument sends the controllers its chart marks Transmitted",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Macros Macro 1 = 127 (CC 12)",
+        "parameter": "macros.macro1",
+        "value": 127,
+        "expectedHex": "B0 0C 7F"
+      },
+      {
+        "name": "Effects Compressor Mix = 127 (CC 93)",
+        "parameter": "effects.compressorMix",
+        "value": 127,
+        "expectedHex": "B0 5D 7F"
+      }
+    ]
+  }
+}

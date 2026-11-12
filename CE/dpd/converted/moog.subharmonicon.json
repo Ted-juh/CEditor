@@ -1,0 +1,851 @@
+{
+  "schemaVersion": 1,
+  "id": "moog.subharmonicon",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Moog Subharmonicon",
+  "manufacturer": "Moog",
+  "family": "Subharmonicon",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "oscillators.vco1Frequency",
+          "name": "VCO 1 Frequency",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco1Frequency"
+          },
+          "description": "14 bits: the MSB on CC 4, then the LSB on CC 36. Provides ± 2.5 octaves of control, added to the VCO 1 FREQ knob setting. When the VCO 1 FREQ knob is in the center position, the MIDI CC will sweep the same range as the knob.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 4,
+              "lsbCc": 36
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco1Sub1Frequency",
+          "name": "VCO 1 SUB 1 Frequency",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "integervalue16",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "integervalue16",
+              "label": "Integer Value 16",
+              "wire": 0
+            },
+            {
+              "id": "integervalue15",
+              "label": "Integer Value 15",
+              "wire": 8
+            },
+            {
+              "id": "integervalue14",
+              "label": "Integer Value 14",
+              "wire": 16
+            },
+            {
+              "id": "integervalue13",
+              "label": "Integer Value 13",
+              "wire": 24
+            },
+            {
+              "id": "integervalue12",
+              "label": "Integer Value 12",
+              "wire": 32
+            },
+            {
+              "id": "integervalue11",
+              "label": "Integer Value 11",
+              "wire": 40
+            },
+            {
+              "id": "integervalue10",
+              "label": "Integer Value 10",
+              "wire": 48
+            },
+            {
+              "id": "integervalue9",
+              "label": "Integer Value 9",
+              "wire": 56
+            },
+            {
+              "id": "integervalue8",
+              "label": "Integer Value 8",
+              "wire": 64
+            },
+            {
+              "id": "integervalue7",
+              "label": "Integer Value 7",
+              "wire": 72
+            },
+            {
+              "id": "integervalue6",
+              "label": "Integer Value 6",
+              "wire": 80
+            },
+            {
+              "id": "integervalue5",
+              "label": "Integer Value 5",
+              "wire": 88
+            },
+            {
+              "id": "integervalue4",
+              "label": "Integer Value 4",
+              "wire": 96
+            },
+            {
+              "id": "integervalue3",
+              "label": "Integer Value 3",
+              "wire": 104
+            },
+            {
+              "id": "integervalue2",
+              "label": "Integer Value 2",
+              "wire": 112
+            },
+            {
+              "id": "integervalue1",
+              "label": "Integer Value 1",
+              "wire": 120
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vco1Sub1Frequency"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. MIDI CC replaces the (VCO 1) SUB 1 FREQ knob setting; moving this knob overrides the MIDI CC value.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco1Sub2Frequency",
+          "name": "VCO 1 SUB 2 Frequency",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "integervalue16",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "integervalue16",
+              "label": "Integer Value 16",
+              "wire": 0
+            },
+            {
+              "id": "integervalue15",
+              "label": "Integer Value 15",
+              "wire": 8
+            },
+            {
+              "id": "integervalue14",
+              "label": "Integer Value 14",
+              "wire": 16
+            },
+            {
+              "id": "integervalue13",
+              "label": "Integer Value 13",
+              "wire": 24
+            },
+            {
+              "id": "integervalue12",
+              "label": "Integer Value 12",
+              "wire": 32
+            },
+            {
+              "id": "integervalue11",
+              "label": "Integer Value 11",
+              "wire": 40
+            },
+            {
+              "id": "integervalue10",
+              "label": "Integer Value 10",
+              "wire": 48
+            },
+            {
+              "id": "integervalue9",
+              "label": "Integer Value 9",
+              "wire": 56
+            },
+            {
+              "id": "integervalue8",
+              "label": "Integer Value 8",
+              "wire": 64
+            },
+            {
+              "id": "integervalue7",
+              "label": "Integer Value 7",
+              "wire": 72
+            },
+            {
+              "id": "integervalue6",
+              "label": "Integer Value 6",
+              "wire": 80
+            },
+            {
+              "id": "integervalue5",
+              "label": "Integer Value 5",
+              "wire": 88
+            },
+            {
+              "id": "integervalue4",
+              "label": "Integer Value 4",
+              "wire": 96
+            },
+            {
+              "id": "integervalue3",
+              "label": "Integer Value 3",
+              "wire": 104
+            },
+            {
+              "id": "integervalue2",
+              "label": "Integer Value 2",
+              "wire": 112
+            },
+            {
+              "id": "integervalue1",
+              "label": "Integer Value 1",
+              "wire": 120
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vco1Sub2Frequency"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. MIDI CC replaces the (VCO 1) SUB 2 FREQ knob setting; moving this knob overrides the MIDI CC value.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco2Frequency",
+          "name": "VCO 2 Frequency",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vco2Frequency"
+          },
+          "description": "14 bits: the MSB on CC 12, then the LSB on CC 44. Provides ± 2.5 octaves of control, added to the VCO 2 FREQ knob setting. When the VCO 2 FREQ knob is in the center position, the MIDI CC will sweep the same range as the knob.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 12,
+              "lsbCc": 44
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco2Sub1Frequency",
+          "name": "VCO 2 SUB 1 Frequency",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "integervalue16",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "integervalue16",
+              "label": "Integer Value 16",
+              "wire": 0
+            },
+            {
+              "id": "integervalue15",
+              "label": "Integer Value 15",
+              "wire": 8
+            },
+            {
+              "id": "integervalue14",
+              "label": "Integer Value 14",
+              "wire": 16
+            },
+            {
+              "id": "integervalue13",
+              "label": "Integer Value 13",
+              "wire": 24
+            },
+            {
+              "id": "integervalue12",
+              "label": "Integer Value 12",
+              "wire": 32
+            },
+            {
+              "id": "integervalue11",
+              "label": "Integer Value 11",
+              "wire": 40
+            },
+            {
+              "id": "integervalue10",
+              "label": "Integer Value 10",
+              "wire": 48
+            },
+            {
+              "id": "integervalue9",
+              "label": "Integer Value 9",
+              "wire": 56
+            },
+            {
+              "id": "integervalue8",
+              "label": "Integer Value 8",
+              "wire": 64
+            },
+            {
+              "id": "integervalue7",
+              "label": "Integer Value 7",
+              "wire": 72
+            },
+            {
+              "id": "integervalue6",
+              "label": "Integer Value 6",
+              "wire": 80
+            },
+            {
+              "id": "integervalue5",
+              "label": "Integer Value 5",
+              "wire": 88
+            },
+            {
+              "id": "integervalue4",
+              "label": "Integer Value 4",
+              "wire": 96
+            },
+            {
+              "id": "integervalue3",
+              "label": "Integer Value 3",
+              "wire": 104
+            },
+            {
+              "id": "integervalue2",
+              "label": "Integer Value 2",
+              "wire": 112
+            },
+            {
+              "id": "integervalue1",
+              "label": "Integer Value 1",
+              "wire": 120
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vco2Sub1Frequency"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. MIDI CC replaces the (VCO 2) SUB 1 FREQ knob setting; moving this knob overrides the MIDI CC value.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 105
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.vco2Sub2Frequency",
+          "name": "VCO 2 SUB 2 Frequency",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "integervalue16",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "integervalue16",
+              "label": "Integer Value 16",
+              "wire": 0
+            },
+            {
+              "id": "integervalue15",
+              "label": "Integer Value 15",
+              "wire": 8
+            },
+            {
+              "id": "integervalue14",
+              "label": "Integer Value 14",
+              "wire": 16
+            },
+            {
+              "id": "integervalue13",
+              "label": "Integer Value 13",
+              "wire": 24
+            },
+            {
+              "id": "integervalue12",
+              "label": "Integer Value 12",
+              "wire": 32
+            },
+            {
+              "id": "integervalue11",
+              "label": "Integer Value 11",
+              "wire": 40
+            },
+            {
+              "id": "integervalue10",
+              "label": "Integer Value 10",
+              "wire": 48
+            },
+            {
+              "id": "integervalue9",
+              "label": "Integer Value 9",
+              "wire": 56
+            },
+            {
+              "id": "integervalue8",
+              "label": "Integer Value 8",
+              "wire": 64
+            },
+            {
+              "id": "integervalue7",
+              "label": "Integer Value 7",
+              "wire": 72
+            },
+            {
+              "id": "integervalue6",
+              "label": "Integer Value 6",
+              "wire": 80
+            },
+            {
+              "id": "integervalue5",
+              "label": "Integer Value 5",
+              "wire": 88
+            },
+            {
+              "id": "integervalue4",
+              "label": "Integer Value 4",
+              "wire": 96
+            },
+            {
+              "id": "integervalue3",
+              "label": "Integer Value 3",
+              "wire": 104
+            },
+            {
+              "id": "integervalue2",
+              "label": "Integer Value 2",
+              "wire": 112
+            },
+            {
+              "id": "integervalue1",
+              "label": "Integer Value 1",
+              "wire": 120
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "vco2Sub2Frequency"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. MIDI CC replaces the (VCO 2) SUB 2 FREQ knob setting; moving this knob overrides the MIDI CC value.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 106
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterEg.vcfEgAttack",
+          "name": "VCF (EG) ATTACK",
+          "group": "Filter EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfEgAttack"
+          },
+          "description": "14 bits: the MSB on CC 23, then the LSB on CC 55. MIDI CC replaces the VCF ATTACK knob setting; moving this knob overrides the MIDI CC value.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23,
+              "lsbCc": 55
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterEg.vcfEgDecay",
+          "name": "VCF (EG) DECAY",
+          "group": "Filter EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcfEgDecay"
+          },
+          "description": "14 bits: the MSB on CC 24, then the LSB on CC 56. MIDI CC replaces the VCF DECAY knob setting; moving this knob overrides the MIDI CC value.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24,
+              "lsbCc": 56
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ampEg.vcaEgAttack",
+          "name": "VCA (EG) ATTACK",
+          "group": "Amp EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaEgAttack"
+          },
+          "description": "14 bits: the MSB on CC 28, then the LSB on CC 60. MIDI CC replaces the VCA ATTACK knob setting; moving this knob overrides the MIDI CC value.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28,
+              "lsbCc": 60
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ampEg.vcaEgDecay",
+          "name": "VCA (EG) DECAY",
+          "group": "Amp EG",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaEgDecay"
+          },
+          "description": "14 bits: the MSB on CC 29, then the LSB on CC 61. MIDI CC replaces the VCA DECAY knob setting; moving this knob overrides the MIDI CC value.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29,
+              "lsbCc": 61
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.rhythmGeneratorLogic",
+          "name": "Rhythm Generator Logic",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "or",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "or",
+              "label": "OR",
+              "wire": 0
+            },
+            {
+              "id": "xor",
+              "label": "XOR",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "rhythmGeneratorLogic"
+          },
+          "description": "Each name takes a band of values; the first value of it is sent. OR logic advances the sequencer every time a clock is received from one or both Rhythm Generators. XOR logic only advances the sequencer when just a singular clock is true - if both Rhythm Generators are true, the sequencer will not advance.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile moog-subharmonicon, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "moog-subharmonicon",
+    "name": "Moog Subharmonicon",
+    "description": "Moog Subharmonicon semi-modular polyrhythmic analog synthesizer: the MIDI CC table of its manual.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Subharmonicon Manual",
+        "notes": "MIDI CC table (pages 41, 42, 43) read by tools/profiles/moog/read-moog-pdf.mjs from Subharmonicon_Manual AMZ.pdf (sha256 c79ffe2d4fbcb48a5763ad2e937f7ea7bc712f33c2a6e7173377ab6576bf4a65), https://cdn.inmusicbrands.com/Moog/Subharmonicon/Subharmonicon_Manual%20AMZ.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/moog/make-profiles.mjs; edit the layout in tools/profiles/moog/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI tables, with its printed name. Nothing here has been sent to a real instrument yet.",
+      "No identity check: the manual prints no Device Inquiry reply.",
+      "6 knob(s) are 14-bit, 0 - 16383: the MSB and the LSB the table prints, sent in that order: VCO 1 Frequency (CC 4, LSB 36); VCO 2 Frequency (CC 12, LSB 44); VCF (EG) ATTACK (CC 23, LSB 55); VCF (EG) DECAY (CC 24, LSB 56); VCA (EG) ATTACK (CC 28, LSB 60); VCA (EG) DECAY (CC 29, LSB 61)."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-midi-tables",
+      "realtimeEditing": "complete-for-the-manual's-midi-tables",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the panel sends these same messages when its MIDI settings allow",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "VCO 1 Frequency = 1000 (CC 4)",
+        "parameter": "oscillators.vco1Frequency",
+        "value": 1000,
+        "expectedHex": "B0 04 07\nB0 24 68"
+      },
+      {
+        "name": "VCO 1 SUB 1 Frequency = Integer Value 1 (CC 103)",
+        "parameter": "oscillators.vco1Sub1Frequency",
+        "value": "integervalue1",
+        "expectedHex": "B0 67 78"
+      },
+      {
+        "name": "Rhythm Generator Logic = XOR (CC 113)",
+        "parameter": "program.rhythmGeneratorLogic",
+        "value": "xor",
+        "expectedHex": "B0 71 40"
+      }
+    ]
+  }
+}

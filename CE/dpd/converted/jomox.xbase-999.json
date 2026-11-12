@@ -1,0 +1,5188 @@
+{
+  "schemaVersion": 1,
+  "id": "jomox.xbase-999",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Jomox XBASE 999",
+  "manufacturer": "Jomox",
+  "family": "XBASE",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "bassDrum.tune",
+          "name": "Tune",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 100 (page 87): BASS DRUM, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 100
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.pitch",
+          "name": "Pitch",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitch"
+          },
+          "description": "CC 101 (page 87): BASS DRUM, Pitch; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 101
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.decay",
+          "name": "Decay",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "description": "CC 102 (page 87): BASS DRUM, Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.harmonics",
+          "name": "Harmonics",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "harmonics"
+          },
+          "description": "CC 103 (page 87): BASS DRUM, Harmonics; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.pulse",
+          "name": "Pulse",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pulse"
+          },
+          "description": "CC 104 (page 87): BASS DRUM, Pulse; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.noise",
+          "name": "Noise",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noise"
+          },
+          "description": "CC 105 (page 87): BASS DRUM, Noise; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 105
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.attack",
+          "name": "Attack",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "description": "CC 106 (page 87): BASS DRUM, Attack; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 106
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.eq",
+          "name": "EQ",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 7
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "eq"
+          },
+          "description": "CC 107 (page 87): BASS DRUM, EQ; value range 0-7; internal 0-7.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.gateTime",
+          "name": "Gate time",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "gateTime"
+          },
+          "description": "CC 99 (page 87): BASS DRUM, Gate time; value range 0-127; internal 0-15.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 99
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.compression",
+          "name": "Compression",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "compression"
+          },
+          "description": "CC 98 (page 87): BASS DRUM, Compression; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 98
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "bassDrum.bdLevel",
+          "name": "BD Level",
+          "group": "BASS DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "bdLevel"
+          },
+          "description": "CC 117 (page 87): BASS DRUM, BD Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 117
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "snareDrum.tune",
+          "name": "Tune",
+          "group": "SNARE DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 108 (page 87): SNARE DRUM, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "snareDrum.snappy",
+          "name": "Snappy",
+          "group": "SNARE DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snappy"
+          },
+          "description": "CC 109 (page 87): SNARE DRUM, Snappy; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "snareDrum.decay",
+          "name": "Decay",
+          "group": "SNARE DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "description": "CC 110 (page 87): SNARE DRUM, Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 110
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "snareDrum.detune",
+          "name": "Detune",
+          "group": "SNARE DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "detune"
+          },
+          "description": "CC 111 (page 87): SNARE DRUM, Detune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 111
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "snareDrum.noiseTune",
+          "name": "Noise Tune",
+          "group": "SNARE DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noiseTune"
+          },
+          "description": "CC 112 (page 87): SNARE DRUM, Noise Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "snareDrum.sdLevel",
+          "name": "SD Level",
+          "group": "SNARE DRUM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sdLevel"
+          },
+          "description": "CC 118 (page 87): SNARE DRUM, SD Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 118
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowTom.tune",
+          "name": "Tune",
+          "group": "LOW TOM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 12 (page 87): LOW TOM, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 12
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowTom.decay",
+          "name": "Decay",
+          "group": "LOW TOM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "description": "CC 13 (page 87): LOW TOM, Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 13
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lowTom.ltLevel",
+          "name": "LT Level",
+          "group": "LOW TOM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ltLevel"
+          },
+          "description": "CC 14 (page 87): LOW TOM, LT Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 14
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "highTom.tune",
+          "name": "Tune",
+          "group": "HIGH TOM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 15 (page 88): HIGH TOM, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "highTom.decay",
+          "name": "Decay",
+          "group": "HIGH TOM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "description": "CC 16 (page 88): HIGH TOM, Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "highTom.htLevel",
+          "name": "HT Level",
+          "group": "HIGH TOM",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "htLevel"
+          },
+          "description": "CC 17 (page 88): HIGH TOM, HT Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.tune",
+          "name": "Tune",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 18 (page 88): HI HAT, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.chAttack",
+          "name": "CH Attack",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chAttack"
+          },
+          "description": "CC 19 (page 88): HI HAT, CH Attack; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.chPeaktime",
+          "name": "CH Peaktime",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chPeaktime"
+          },
+          "description": "CC 20 (page 88): HI HAT, CH Peaktime; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.chDecay",
+          "name": "CH Decay",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "chDecay"
+          },
+          "description": "CC 21 (page 88): HI HAT, CH Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.ohAttack",
+          "name": "OH Attack",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ohAttack"
+          },
+          "description": "CC 22 (page 88): HI HAT, OH Attack; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.ohPeaktime",
+          "name": "OH Peaktime",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ohPeaktime"
+          },
+          "description": "CC 23 (page 88): HI HAT, OH Peaktime; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.ohDecay",
+          "name": "OH Decay",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ohDecay"
+          },
+          "description": "CC 24 (page 88): HI HAT, OH Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.hhLevel",
+          "name": "HH Level",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hhLevel"
+          },
+          "description": "CC 25 (page 88): HI HAT, HH Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.hhfCutoffHp",
+          "name": "HHF Cutoff HP",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hhfCutoffHp"
+          },
+          "description": "CC 59 (page 88): HI HAT, HHF Cutoff HP; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 59
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.hhfCutoffLp",
+          "name": "HHF Cutoff LP",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hhfCutoffLp"
+          },
+          "description": "CC 60 (page 88): HI HAT, HHF Cutoff LP; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 60
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.hhfResonance",
+          "name": "HHF Resonance",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hhfResonance"
+          },
+          "description": "CC 61 (page 88): HI HAT, HHF Resonance; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 61
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.hhSource",
+          "name": "HH Source",
+          "group": "HI HAT",
+          "valueType": "enum",
+          "default": "nor",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "nor",
+              "label": "Nor",
+              "wire": 32
+            },
+            {
+              "id": "fil",
+              "label": "Fil",
+              "wire": 33
+            },
+            {
+              "id": "noi",
+              "label": "Noi",
+              "wire": 34
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "hhSource"
+          },
+          "description": "CC 62 (page 88): HI HAT, HH Source; value range 32-34; internal Nor, Fil, Noi.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.reverse",
+          "name": "Reverse",
+          "group": "HI HAT",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 20
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 21
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "reverse"
+          },
+          "description": "CC 62 (page 88): HI HAT, Reverse; value range 20-21; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "hiHat.sampleSelect",
+          "name": "Sample select",
+          "group": "HI HAT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 30
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleSelect"
+          },
+          "description": "CC 63 (page 88): HI HAT, Sample select; value range 0-30; internal 909-S31.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 63
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "clap.tune",
+          "name": "Tune",
+          "group": "CLAP",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 26 (page 88): CLAP, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "clap.attack",
+          "name": "Attack",
+          "group": "CLAP",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "description": "CC 27 (page 88): CLAP, Attack; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "clap.peaktime",
+          "name": "Peaktime",
+          "group": "CLAP",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "peaktime"
+          },
+          "description": "CC 28 (page 88): CLAP, Peaktime; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "clap.decay",
+          "name": "Decay",
+          "group": "CLAP",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "description": "CC 29 (page 88): CLAP, Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "clap.clpLevel",
+          "name": "CLP Level",
+          "group": "CLAP",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "clpLevel"
+          },
+          "description": "CC 30 (page 88): CLAP, CLP Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "clap.reverse",
+          "name": "Reverse",
+          "group": "CLAP",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 22
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 23
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "reverse"
+          },
+          "description": "CC 62 (page 88): CLAP, Reverse; value range 22-23; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "clap.sampleSelect",
+          "name": "Sample select",
+          "group": "CLAP",
+          "valueType": "continuous",
+          "range": {
+            "min": 32,
+            "max": 62
+          },
+          "default": 32,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleSelect"
+          },
+          "description": "CC 63 (page 88): CLAP, Sample select; value range 32-62; internal 909-S31.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 63
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "rimShot.tune",
+          "name": "Tune",
+          "group": "RIM SHOT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 44 (page 89): RIM SHOT, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 44
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "rimShot.attack",
+          "name": "Attack",
+          "group": "RIM SHOT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "description": "CC 45 (page 89): RIM SHOT, Attack; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 45
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "rimShot.peaktime",
+          "name": "Peaktime",
+          "group": "RIM SHOT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "peaktime"
+          },
+          "description": "CC 46 (page 89): RIM SHOT, Peaktime; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 46
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "rimShot.decay",
+          "name": "Decay",
+          "group": "RIM SHOT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "description": "CC 47 (page 89): RIM SHOT, Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 47
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "rimShot.rimLevel",
+          "name": "RIM Level",
+          "group": "RIM SHOT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "rimLevel"
+          },
+          "description": "CC 48 (page 89): RIM SHOT, RIM Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 48
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "rimShot.reverse",
+          "name": "Reverse",
+          "group": "RIM SHOT",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 24
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 25
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "reverse"
+          },
+          "description": "CC 62 (page 89): RIM SHOT, Reverse; value range 24-25; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "rimShot.sampleSelect",
+          "name": "Sample select",
+          "group": "RIM SHOT",
+          "valueType": "continuous",
+          "range": {
+            "min": 64,
+            "max": 94
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleSelect"
+          },
+          "description": "CC 63 (page 89): RIM SHOT, Sample select; value range 64-94; internal 909-S31.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 63
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "crash.tune",
+          "name": "Tune",
+          "group": "CRASH",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 49 (page 89): CRASH, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 49
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "crash.attack",
+          "name": "Attack",
+          "group": "CRASH",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "description": "CC 50 (page 89): CRASH, Attack; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 50
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "crash.peaktime",
+          "name": "Peaktime",
+          "group": "CRASH",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "peaktime"
+          },
+          "description": "CC 51 (page 89): CRASH, Peaktime; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 51
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "crash.decay",
+          "name": "Decay",
+          "group": "CRASH",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "description": "CC 52 (page 89): CRASH, Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 52
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "crash.crhLevel",
+          "name": "CRH Level",
+          "group": "CRASH",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "crhLevel"
+          },
+          "description": "CC 53 (page 89): CRASH, CRH Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 53
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "crash.reverse",
+          "name": "Reverse",
+          "group": "CRASH",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 26
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 27
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "reverse"
+          },
+          "description": "CC 62 (page 89): CRASH, Reverse; value range 26-27; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "crash.sampleSelect",
+          "name": "Sample select",
+          "group": "CRASH",
+          "valueType": "continuous",
+          "range": {
+            "min": 96,
+            "max": 126
+          },
+          "default": 96,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleSelect"
+          },
+          "description": "CC 63 (page 89): CRASH, Sample select; value range 96-126; internal 909-S31.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 63
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ride.tune",
+          "name": "Tune",
+          "group": "RIDE",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tune"
+          },
+          "description": "CC 54 (page 89): RIDE, Tune; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 54
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ride.attack",
+          "name": "Attack",
+          "group": "RIDE",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "description": "CC 55 (page 89): RIDE, Attack; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 55
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ride.peaktime",
+          "name": "Peaktime",
+          "group": "RIDE",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "peaktime"
+          },
+          "description": "CC 56 (page 89): RIDE, Peaktime; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 56
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ride.decay",
+          "name": "Decay",
+          "group": "RIDE",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "description": "CC 57 (page 89): RIDE, Decay; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 57
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ride.ridLevel",
+          "name": "RID Level",
+          "group": "RIDE",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ridLevel"
+          },
+          "description": "CC 58 (page 89): RIDE, RID Level; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 58
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "ride.reverse",
+          "name": "Reverse",
+          "group": "RIDE",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 28
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 29
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "reverse"
+          },
+          "description": "CC 62 (page 89): RIDE, Reverse; value range 28-29; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 62
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "ride.sampleSelect",
+          "name": "Sample select",
+          "group": "RIDE",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 30
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sampleSelect"
+          },
+          "description": "CC 70 (page 89): RIDE, Sample select; value range 0-30; internal 909-S31.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 70
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterLeft.cutoff",
+          "name": "Cutoff",
+          "group": "FILTER LEFT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cutoff"
+          },
+          "description": "CC 85 (page 90): FILTER LEFT, Cutoff; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 85
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterLeft.q",
+          "name": "Q",
+          "group": "FILTER LEFT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "q"
+          },
+          "description": "CC 86 (page 90): FILTER LEFT, Q; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 86
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterLeft.resonance",
+          "name": "Resonance",
+          "group": "FILTER LEFT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "resonance"
+          },
+          "description": "CC 87 (page 90): FILTER LEFT, Resonance; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 87
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterLeft.filterMode",
+          "name": "Filter Mode",
+          "group": "FILTER LEFT",
+          "valueType": "enum",
+          "default": "lp",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "lp",
+              "label": "LP",
+              "wire": 0
+            },
+            {
+              "id": "hp",
+              "label": "HP",
+              "wire": 1
+            },
+            {
+              "id": "bp",
+              "label": "BP",
+              "wire": 2
+            },
+            {
+              "id": "nt",
+              "label": "NT",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "filterMode"
+          },
+          "description": "CC 93 (page 90): FILTER LEFT, Filter Mode; value range 0-3; internal LP, HP, BP, NT.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterRight.cutoff",
+          "name": "Cutoff",
+          "group": "FILTER RIGHT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cutoff"
+          },
+          "description": "CC 88 (page 90): FILTER RIGHT, Cutoff; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 88
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterRight.q",
+          "name": "Q",
+          "group": "FILTER RIGHT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "q"
+          },
+          "description": "CC 89 (page 90): FILTER RIGHT, Q; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 89
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterRight.resonance",
+          "name": "Resonance",
+          "group": "FILTER RIGHT",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "resonance"
+          },
+          "description": "CC 90 (page 90): FILTER RIGHT, Resonance; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 90
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterRight.filterMode",
+          "name": "Filter Mode",
+          "group": "FILTER RIGHT",
+          "valueType": "enum",
+          "default": "lp",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "lp",
+              "label": "LP",
+              "wire": 4
+            },
+            {
+              "id": "hp",
+              "label": "HP",
+              "wire": 5
+            },
+            {
+              "id": "bp",
+              "label": "BP",
+              "wire": 6
+            },
+            {
+              "id": "nt",
+              "label": "NT",
+              "wire": 7
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "filterMode"
+          },
+          "description": "CC 93 (page 90): FILTER RIGHT, Filter Mode; value range 4-7; internal LP, HP, BP, NT.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.gain",
+          "name": "Gain",
+          "group": "FILTER GLOBAL",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "gain"
+          },
+          "description": "CC 91 (page 90): FILTER GLOBAL, Gain; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 91
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.vcaOut",
+          "name": "VCA Out",
+          "group": "FILTER GLOBAL",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "vcaOut"
+          },
+          "description": "CC 92 (page 90): FILTER GLOBAL, VCA Out; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 92
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.routing",
+          "name": "Routing",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "ste",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "ste",
+              "label": "Ste",
+              "wire": 8
+            },
+            {
+              "id": "par",
+              "label": "Par",
+              "wire": 9
+            },
+            {
+              "id": "ser",
+              "label": "Ser",
+              "wire": 10
+            },
+            {
+              "id": "fb",
+              "label": "Fb",
+              "wire": 11
+            },
+            {
+              "id": "fbpar",
+              "label": "FbPar",
+              "wire": 12
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "routing"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, Routing; value range 8-12; internal Ste, Par, Ser, Fb, FbPar.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.bassFilter",
+          "name": "Bass->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 13
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 14
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "bassFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, Bass->Filter; value range 13,14; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.snareFilter",
+          "name": "Snare->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 15
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 16
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "snareFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, Snare->Filter; value range 15,16; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.lotomFilter",
+          "name": "LoTom->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 17
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 18
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "lotomFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, LoTom->Filter; value range 17,18; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.hitomFilter",
+          "name": "HiTom->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 19
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 20
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "hitomFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, HiTom->Filter; value range 19,20; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.hhFilter",
+          "name": "HH->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 21
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 22
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "hhFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, HH->Filter; value range 21,22; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.clapFilter",
+          "name": "Clap->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 23
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 24
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "clapFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, Clap->Filter; value range 23,24; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.rimFilter",
+          "name": "Rim->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 25
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 26
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "rimFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, Rim->Filter; value range 25,26; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.crashFilter",
+          "name": "Crash->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 27
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 28
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "crashFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, Crash->Filter; value range 27,28; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filterGlobal.rideFilter",
+          "name": "Ride->Filter",
+          "group": "FILTER GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 29
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 30
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "rideFilter"
+          },
+          "description": "CC 93 (page 90): FILTER GLOBAL, Ride->Filter; value range 29,30; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.bass",
+          "name": "Bass",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 31
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 32
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "bass"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, Bass; value range 31,32; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.snare",
+          "name": "Snare",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 33
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 34
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "snare"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, Snare; value range 33,34; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.lotom",
+          "name": "LoTom",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 35
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 36
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "lotom"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, LoTom; value range 35,36; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.hitom",
+          "name": "HiTom",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 37
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 38
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "hitom"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, HiTom; value range 37,38; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.hh",
+          "name": "HH",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 39
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 40
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "hh"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, HH; value range 39,40; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.clap",
+          "name": "Clap",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 41
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 42
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "clap"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, Clap; value range 41,42; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.rim",
+          "name": "Rim",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 43
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 44
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "rim"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, Rim; value range 43,44; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.crash",
+          "name": "Crash",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 45
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 46
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "crash"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, Crash; value range 45,46; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "muteGlobal.ride",
+          "name": "Ride",
+          "group": "MUTE GLOBAL",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 47
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 48
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "ride"
+          },
+          "description": "CC 93 (page 91): MUTE GLOBAL, Ride; value range 47,48; internal Off, On.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "stereoPan.snare",
+          "name": "Snare",
+          "group": "STEREO PAN",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "snare"
+          },
+          "description": "CC 33 (page 91): STEREO PAN, Snare; value range 0-127; internal 0-127 64=Center.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "stereoPan.lotom",
+          "name": "LoTom",
+          "group": "STEREO PAN",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lotom"
+          },
+          "description": "CC 34 (page 91): STEREO PAN, LoTom; value range 0-127; internal 0-127 64=Center.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "stereoPan.hitom",
+          "name": "HiTom",
+          "group": "STEREO PAN",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hitom"
+          },
+          "description": "CC 35 (page 91): STEREO PAN, HiTom; value range 0-127; internal 0-127 64=Center.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 35
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "stereoPan.hh",
+          "name": "HH",
+          "group": "STEREO PAN",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "hh"
+          },
+          "description": "CC 36 (page 91): STEREO PAN, HH; value range 0-127; internal 0-127 64=Center.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "stereoPan.clap",
+          "name": "Clap",
+          "group": "STEREO PAN",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "clap"
+          },
+          "description": "CC 37 (page 91): STEREO PAN, Clap; value range 0-127; internal 0-127 64=Center.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "stereoPan.rim",
+          "name": "Rim",
+          "group": "STEREO PAN",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "rim"
+          },
+          "description": "CC 38 (page 91): STEREO PAN, Rim; value range 0-127; internal 0-127 64=Center.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "stereoPan.crash",
+          "name": "Crash",
+          "group": "STEREO PAN",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "crash"
+          },
+          "description": "CC 39 (page 91): STEREO PAN, Crash; value range 0-127; internal 0-127 64=Center.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "stereoPan.ride",
+          "name": "Ride",
+          "group": "STEREO PAN",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ride"
+          },
+          "description": "CC 40 (page 91): STEREO PAN, Ride; value range 0-127; internal 0-127 64=Center.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo1.waveFree",
+          "name": "Wave Free",
+          "group": "LFO 1",
+          "valueType": "enum",
+          "default": "sup",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sup",
+              "label": "Sup",
+              "wire": 0
+            },
+            {
+              "id": "sdo",
+              "label": "Sdo",
+              "wire": 1
+            },
+            {
+              "id": "tri",
+              "label": "Tri",
+              "wire": 2
+            },
+            {
+              "id": "rct",
+              "label": "Rct",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "waveFree"
+          },
+          "description": "CC 75 (page 92): LFO 1, Wave Free; value range 0-3; internal Sup, Sdo, Tri, Rct.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo1.waveSync",
+          "name": "Wave Sync",
+          "group": "LFO 1",
+          "valueType": "enum",
+          "default": "sup",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sup",
+              "label": "Sup",
+              "wire": 4
+            },
+            {
+              "id": "sdo",
+              "label": "Sdo",
+              "wire": 5
+            },
+            {
+              "id": "tri",
+              "label": "Tri",
+              "wire": 6
+            },
+            {
+              "id": "rct",
+              "label": "Rct",
+              "wire": 7
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "waveSync"
+          },
+          "description": "CC 75 (page 92): LFO 1, Wave Sync; value range 4-7; internal Sup, Sdo, Tri, Rct.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo1.destination",
+          "name": "Destination",
+          "group": "LFO 1",
+          "valueType": "enum",
+          "default": "bdt",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "bdt",
+              "label": "BDt",
+              "wire": 0
+            },
+            {
+              "id": "sdt",
+              "label": "SDt",
+              "wire": 1
+            },
+            {
+              "id": "ltt",
+              "label": "LTt",
+              "wire": 2
+            },
+            {
+              "id": "htt",
+              "label": "HTt",
+              "wire": 3
+            },
+            {
+              "id": "hht",
+              "label": "HHt",
+              "wire": 4
+            },
+            {
+              "id": "hhf",
+              "label": "HHF",
+              "wire": 5
+            },
+            {
+              "id": "cpt",
+              "label": "CPt",
+              "wire": 6
+            },
+            {
+              "id": "rmt",
+              "label": "RMt",
+              "wire": 7
+            },
+            {
+              "id": "crt",
+              "label": "CRt",
+              "wire": 8
+            },
+            {
+              "id": "rdt",
+              "label": "RDt",
+              "wire": 9
+            },
+            {
+              "id": "fcr",
+              "label": "FCR",
+              "wire": 10
+            },
+            {
+              "id": "fcl",
+              "label": "FCL",
+              "wire": 11
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "destination"
+          },
+          "description": "CC 76 (page 92): LFO 1, Destination; value range 0-11; internal BDt, SDt, LTt, HTt, HHt, HHF, CPt, RMt, CRt, RDt, FCR, FCL.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 76
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo1.intensity",
+          "name": "Intensity",
+          "group": "LFO 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "intensity"
+          },
+          "description": "CC 77 (page 92): LFO 1, Intensity; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 77
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo1.speed",
+          "name": "Speed",
+          "group": "LFO 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "speed"
+          },
+          "description": "CC 78 (page 92): LFO 1, Speed; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 78
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo2.waveFree",
+          "name": "Wave Free",
+          "group": "LFO 2",
+          "valueType": "enum",
+          "default": "sup",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sup",
+              "label": "Sup",
+              "wire": 0
+            },
+            {
+              "id": "sdo",
+              "label": "Sdo",
+              "wire": 1
+            },
+            {
+              "id": "tri",
+              "label": "Tri",
+              "wire": 2
+            },
+            {
+              "id": "rct",
+              "label": "Rct",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "waveFree"
+          },
+          "description": "CC 79 (page 92): LFO 2, Wave Free; value range 0-3; internal Sup, Sdo, Tri, Rct.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 79
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo2.waveSync",
+          "name": "Wave Sync",
+          "group": "LFO 2",
+          "valueType": "enum",
+          "default": "sup",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sup",
+              "label": "Sup",
+              "wire": 4
+            },
+            {
+              "id": "sdo",
+              "label": "Sdo",
+              "wire": 5
+            },
+            {
+              "id": "tri",
+              "label": "Tri",
+              "wire": 6
+            },
+            {
+              "id": "rct",
+              "label": "Rct",
+              "wire": 7
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "waveSync"
+          },
+          "description": "CC 79 (page 92): LFO 2, Wave Sync; value range 4-7; internal Sup, Sdo, Tri, Rct.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 79
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo2.destination",
+          "name": "Destination",
+          "group": "LFO 2",
+          "valueType": "enum",
+          "default": "bdt",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "bdt",
+              "label": "BDt",
+              "wire": 0
+            },
+            {
+              "id": "sdt",
+              "label": "SDt",
+              "wire": 1
+            },
+            {
+              "id": "ltt",
+              "label": "LTt",
+              "wire": 2
+            },
+            {
+              "id": "htt",
+              "label": "HTt",
+              "wire": 3
+            },
+            {
+              "id": "fcr",
+              "label": "FCR",
+              "wire": 4
+            },
+            {
+              "id": "fcl",
+              "label": "FCL",
+              "wire": 5
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "destination"
+          },
+          "description": "CC 80 (page 92): LFO 2, Destination; value range 0-5; internal BDt, SDt, LTt, HTt, FCR, FCL.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80
+            }
+          ],
+          "engine": {
+            "encoding": {
+              "type": "u7"
+            },
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo2.intensity",
+          "name": "Intensity",
+          "group": "LFO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "intensity"
+          },
+          "description": "CC 81 (page 92): LFO 2, Intensity; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo2.speed",
+          "name": "Speed",
+          "group": "LFO 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "speed"
+          },
+          "description": "CC 82 (page 92): LFO 2, Speed; value range 0-127; internal 0-127.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 82
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile jomox-xbase-999, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "jomox-xbase-999",
+    "name": "Jomox XBASE 999",
+    "description": "Jomox XBASE 999 drum machine: every sound, filter, LFO, mute and pan controller of its operating manual's MIDI implementation.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "XBASE 999 Operating Manual",
+        "notes": "The MIDI implementation's controller tables (PDF pages 87 - 92), read by tools/profiles/jomox/read-jomox-cc.mjs from XBASE999_E.pdf (sha256 8c3783be6faab417d12460968ff9ae0817cc44591d46ea90d0585a84c70d70ef), https://www.jomox.de/upload/manuals/XBASE999_E.pdf, linked from https://www.jomox.de/support.php?lang=2&product_id=1. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/jomox/make-profiles.mjs; edit the layout in tools/profiles/jomox/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI implementation, sent as the controller it prints, on the channel variable. Nothing here has been sent to a real instrument yet.",
+      "A value range named one each by the internal range beside it (`0/64  Off/On`) is a choice; values printed without names are a choice of those values; every other range is a number, its internal range or resolution in its description.",
+      "Controllers several rows share, each row sending its own values: CC 62, 63, 93, 75, 79. Read back, such a controller cannot say which row it is."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-controller-tables: 112 parameters from 112 rows",
+      "realtimeEditing": "complete-for-the-manual's-controller-tables",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented: the manual prints a dump's header but not its bytes' meaning",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the controllers the instrument sends, as the table gives them",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "BASS DRUM Tune = 127",
+        "parameter": "bassDrum.tune",
+        "value": 127,
+        "expectedHex": "B0 64 7F"
+      },
+      {
+        "name": "HI HAT HH Source = noi",
+        "parameter": "hiHat.hhSource",
+        "value": "noi",
+        "expectedHex": "B0 3E 22"
+      }
+    ]
+  }
+}

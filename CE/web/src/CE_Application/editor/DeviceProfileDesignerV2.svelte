@@ -16,6 +16,7 @@
   import DpdCaptureScreen from './dpd/DpdCaptureScreen.svelte';
   import dpdLibrary from '../generated/dpd/dpdLibrary.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
+  import dpdConvertedIndex from '../generated/dpdConvertedIndex.json';
   import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
   import { validateProfile } from '../generated/dpd/validate.mjs';
   import { buildLegacyProfile } from '../generated/dpd/emit-legacy-core.mjs';
@@ -54,8 +55,25 @@
     const id = resolveDpdId(pid);
     model = id ? deepClone(dpdLibrary[id]) : null;
     openingModelJson = model ? JSON.stringify($state.snapshot(model)) : null;
+    if (!id && dpdConvertedIndex[pid]) loadConverted(pid, dpdConvertedIndex[pid]);
     if (pid) requestProfileSource(pid); // ask the engine for the saved source (no-op without the bridge)
   });
+
+  // A profile generated from its maker's document has a DPD model converted from it
+  // (CE/dpd/converted, written by CE/dpd/tools/from-legacy.mjs). There are hundreds, so they are not
+  // bundled: each is a chunk of its own, fetched when its profile is opened. It arrives after the
+  // designer has opened, so it is adopted only if this profile is still the one open and nothing has
+  // taken its place meanwhile (a saved source with its own model, or an edit).
+  async function loadConverted(pid, dpdId) {
+    try {
+      const { loadConvertedModel } = await import('./dpd/convertedModels.js');
+      const loaded = await loadConvertedModel(dpdId);
+      if (!loaded || loadedFor !== pid || model !== null) return;
+      untrack(() => designerHistory?.startsNewDocument());
+      model = deepClone(loaded);
+      openingModelJson = JSON.stringify($state.snapshot(model));
+    } catch { /* the designer stays empty, as for a profile with no model */ }
+  }
 
   // When the engine returns a saved source that embeds a dpdModel, adopt it once (round-trips edits).
   $effect(() => {

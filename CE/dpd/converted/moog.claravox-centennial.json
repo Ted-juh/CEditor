@@ -1,0 +1,2563 @@
+{
+  "schemaVersion": 1,
+  "id": "moog.claravox-centennial",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Moog Claravox Centennial",
+  "manufacturer": "Moog",
+  "family": "Claravox",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "program.volumeResponse",
+          "name": "Volume Response",
+          "group": "Program",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeResponse"
+          },
+          "description": "Also CC 12, the MSB of it, 0 - 127. Bipolar (Center Value = 0) Adjusts the linearity of the Volume Antenna response (concave to convex).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 1C",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.pitchResponse",
+          "name": "Pitch Response",
+          "group": "Program",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchResponse"
+          },
+          "description": "Also CC 13, the MSB of it, 0 - 127. Bipolar (Center Value = 0) Adjusts the linearity of the Pitch Antenna response (concave to convex).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 1D",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.quantizeAmount",
+          "name": "Quantize Amount",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "quantizeAmount"
+          },
+          "description": "Also CC 16, the MSB of it, 0 - 127. Determines the level of quantization.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 20",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.quantizeRoot",
+          "name": "Quantize (ROOT)",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "c",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "c",
+              "label": "C",
+              "wire": 0
+            },
+            {
+              "id": "cd",
+              "label": "C♯ (D♭)",
+              "wire": 11
+            },
+            {
+              "id": "d",
+              "label": "D",
+              "wire": 21
+            },
+            {
+              "id": "de",
+              "label": "D♯ (E♭)",
+              "wire": 32
+            },
+            {
+              "id": "e",
+              "label": "E",
+              "wire": 43
+            },
+            {
+              "id": "f",
+              "label": "F",
+              "wire": 53
+            },
+            {
+              "id": "fg",
+              "label": "F♯ (G♭)",
+              "wire": 64
+            },
+            {
+              "id": "g",
+              "label": "G",
+              "wire": 75
+            },
+            {
+              "id": "ga",
+              "label": "G♯ (A♭)",
+              "wire": 85
+            },
+            {
+              "id": "a",
+              "label": "A",
+              "wire": 96
+            },
+            {
+              "id": "ab",
+              "label": "A♯ (B♭)",
+              "wire": 107
+            },
+            {
+              "id": "b",
+              "label": "B",
+              "wire": 117
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "quantizeRoot"
+          },
+          "description": "Also NRPN 485. Selects the root note (key) of the scale used for quantization.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 85
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.quantizeScale",
+          "name": "Quantize Scale",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "chromatic",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "chromatic",
+              "label": "Chromatic",
+              "wire": 0
+            },
+            {
+              "id": "ionian",
+              "label": "Ionian",
+              "wire": 6
+            },
+            {
+              "id": "minorpentatonic",
+              "label": "Minor Pentatonic",
+              "wire": 12
+            },
+            {
+              "id": "fifth",
+              "label": "Fifth",
+              "wire": 17
+            },
+            {
+              "id": "dorian",
+              "label": "Dorian",
+              "wire": 23
+            },
+            {
+              "id": "phrygian",
+              "label": "Phrygian",
+              "wire": 29
+            },
+            {
+              "id": "lydian",
+              "label": "Lydian",
+              "wire": 35
+            },
+            {
+              "id": "mixolydian",
+              "label": "Mixolydian",
+              "wire": 41
+            },
+            {
+              "id": "aeolian",
+              "label": "Aeolian",
+              "wire": 47
+            },
+            {
+              "id": "locrian",
+              "label": "Locrian",
+              "wire": 52
+            },
+            {
+              "id": "majorblues",
+              "label": "Major Blues",
+              "wire": 58
+            },
+            {
+              "id": "minorblues",
+              "label": "Minor Blues",
+              "wire": 64
+            },
+            {
+              "id": "diminished",
+              "label": "Diminished",
+              "wire": 70
+            },
+            {
+              "id": "majorpentatonic",
+              "label": "Major Pentatonic",
+              "wire": 76
+            },
+            {
+              "id": "spanish",
+              "label": "Spanish",
+              "wire": 81
+            },
+            {
+              "id": "roma",
+              "label": "Roma",
+              "wire": 87
+            },
+            {
+              "id": "arabian",
+              "label": "Arabian",
+              "wire": 93
+            },
+            {
+              "id": "egyptian",
+              "label": "Egyptian",
+              "wire": 99
+            },
+            {
+              "id": "ryukyu",
+              "label": "Ryukyu",
+              "wire": 105
+            },
+            {
+              "id": "wholetone",
+              "label": "Wholetone",
+              "wire": 111
+            },
+            {
+              "id": "majorthird",
+              "label": "Major Third",
+              "wire": 116
+            },
+            {
+              "id": "minorthird",
+              "label": "Minor Third",
+              "wire": 122
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "quantizeScale"
+          },
+          "description": "Also NRPN 486. Selects the scale used for quantization.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 86
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.register",
+          "name": "Register",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "minus2",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "minus2",
+              "label": "-2",
+              "wire": 0
+            },
+            {
+              "id": "minus1",
+              "label": "-1",
+              "wire": 32
+            },
+            {
+              "id": "0",
+              "label": "0",
+              "wire": 64
+            },
+            {
+              "id": "plus1",
+              "label": "+1",
+              "wire": 96
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "register"
+          },
+          "description": "Also NRPN 475. Octave Offset for the Pitch Antenna.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.filterCutoff",
+          "name": "Filter Cutoff",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "filterCutoff"
+          },
+          "description": "Also CC 19, the MSB of it, 0 - 127. Analog VCF (Oscillator 1 only).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 23",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.brightness",
+          "name": "Brightness",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "brightness"
+          },
+          "description": "Also CC 17, the MSB of it, 0 - 127. Analog Harmonic Enhancement (Oscillator 1 only).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 21",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.wave",
+          "name": "Wave",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "wave"
+          },
+          "description": "Also CC 18, the MSB of it, 0 - 127. Analog Waveshaper (Oscillator 1 only).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 22",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayTime",
+          "name": "Delay Time",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayTime"
+          },
+          "description": "Also CC 20, the MSB of it, 0 - 127. Adjusts the Delay Time (70ms to 700ms).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 24",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayMix",
+          "name": "Delay Mix",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayMix"
+          },
+          "description": "Also CC 21, the MSB of it, 0 - 127. Adjusts the Delay Wet/Dry mix.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 25",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "delay.delayFeedback",
+          "name": "Delay Feedback",
+          "group": "Delay",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "delayFeedback"
+          },
+          "description": "Also CC 22, the MSB of it, 0 - 127. Adjusts the Delay Feedback amount.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 26",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.pitchAntennaScanFreqModAmount",
+          "name": "Pitch Antenna Scan Freq Mod Amount",
+          "group": "Program",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchAntennaScanFreqModAmount"
+          },
+          "description": "Also NRPN 472. Bipolar (Center Value = 0) This parameter controls the depth of the PITCH CV signal used to modulate the frequency at which the oscillators' wavetable is scanned.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 72
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.pitchAntennaScanPosModAmount",
+          "name": "Pitch Antenna Scan Pos Mod Amount",
+          "group": "Program",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pitchAntennaScanPosModAmount"
+          },
+          "description": "Also NRPN 473. Bipolar (Center Value = 0) This parameter controls the depth of the PITCH CV signal used to modulate the scan position of the oscillators' wavetable.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 73
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator1Mode",
+          "name": "Oscillator 1 Mode",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "sine",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sine",
+              "label": "Sine",
+              "wire": 0
+            },
+            {
+              "id": "triangle",
+              "label": "Triangle",
+              "wire": 32
+            },
+            {
+              "id": "saw",
+              "label": "Saw",
+              "wire": 64
+            },
+            {
+              "id": "wavetable",
+              "label": "Wavetable",
+              "wire": 96
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "oscillator1Mode"
+          },
+          "description": "Also NRPN 481. Selects the mode for Oscillator 1.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator1Level",
+          "name": "Oscillator 1 Level",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator1Level"
+          },
+          "description": "Also CC 25, the MSB of it, 0 - 127. Selects the level for Oscillator 1.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 29",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator1Wavetable",
+          "name": "Oscillator 1 Wavetable",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "wavetable1",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "wavetable1",
+              "label": "Wavetable 1",
+              "wire": 0
+            },
+            {
+              "id": "wavetable2",
+              "label": "Wavetable 2",
+              "wire": 16
+            },
+            {
+              "id": "wavetable3",
+              "label": "Wavetable 3",
+              "wire": 32
+            },
+            {
+              "id": "wavetable4",
+              "label": "Wavetable 4",
+              "wire": 48
+            },
+            {
+              "id": "wavetable5",
+              "label": "Wavetable 5",
+              "wire": 64
+            },
+            {
+              "id": "wavetable6",
+              "label": "Wavetable 6",
+              "wire": 80
+            },
+            {
+              "id": "wavetable7",
+              "label": "Wavetable 7",
+              "wire": 96
+            },
+            {
+              "id": "wavetable8",
+              "label": "Wavetable 8",
+              "wire": 112
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "oscillator1Wavetable"
+          },
+          "description": "Also NRPN 483. Selects the Wavetable in use for Oscillator 1, when the Oscillator 1 MODE is set to Wavetable (102).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 83
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator1ScanPositionCenter",
+          "name": "Oscillator 1 Scan Position (Center)",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator1ScanPositionCenter"
+          },
+          "description": "Also NRPN 487. Specifies the starting position for scanning back and forth through the selected Wavetable.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 87
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator1ScanFrequency",
+          "name": "Oscillator 1 Scan Frequency",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator1ScanFrequency"
+          },
+          "description": "Also CC 23, the MSB of it, 0 - 127. Adjusts the rate for scanning back and forth through the selected Wavetable (0.1 Hz to 100 Hz).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 27",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator1ScanAmountWidth",
+          "name": "Oscillator 1 Scan Amount (Width)",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator1ScanAmountWidth"
+          },
+          "description": "Also NRPN 489. Sets the width of the Wavetable scanning window (0 to full frame).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 89
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2BeatFrequency",
+          "name": "Oscillator 2 Beat Frequency",
+          "group": "Oscillators",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2BeatFrequency"
+          },
+          "description": "Also NRPN 428. Bipolar (Center Value = 0) Linear offset (-10Hz to +10Hz) for the secondary oscillator frequency relative to the primary.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2SemitoneOffset",
+          "name": "Oscillator 2 Semitone Offset",
+          "group": "Oscillators",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2SemitoneOffset"
+          },
+          "description": "Also NRPN 427. Bipolar (Center Value = 0) Musical-pitch offset (-12 semitones to +12 semitones) for the secondary oscillator relative to the primary.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2Level",
+          "name": "Oscillator 2 Level",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2Level"
+          },
+          "description": "Also CC 26, the MSB of it, 0 - 127. Specifies the level of Oscillator 2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 2A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.noiseLevel",
+          "name": "Noise Level",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noiseLevel"
+          },
+          "description": "Also CC 9, the MSB of it, 0 - 127. Specifies the level of the Noise source sent to the Filter of Oscillator 2.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 19",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2Wavetable",
+          "name": "Oscillator 2 Wavetable",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "wavetable1",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "wavetable1",
+              "label": "Wavetable 1",
+              "wire": 0
+            },
+            {
+              "id": "wavetable2",
+              "label": "Wavetable 2",
+              "wire": 16
+            },
+            {
+              "id": "wavetable3",
+              "label": "Wavetable 3",
+              "wire": 32
+            },
+            {
+              "id": "wavetable4",
+              "label": "Wavetable 4",
+              "wire": 48
+            },
+            {
+              "id": "wavetable5",
+              "label": "Wavetable 5",
+              "wire": 64
+            },
+            {
+              "id": "wavetable6",
+              "label": "Wavetable 6",
+              "wire": 80
+            },
+            {
+              "id": "wavetable7",
+              "label": "Wavetable 7",
+              "wire": 96
+            },
+            {
+              "id": "wavetable8",
+              "label": "Wavetable 8",
+              "wire": 112
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "oscillator2Wavetable"
+          },
+          "description": "Also NRPN 482. Selects the Wavetable in use for Oscillator 2, when the Oscillator 2 MODE is set to Wavetable (102).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 82
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2ScanPositionCenter",
+          "name": "Oscillator 2 Scan Position (Center)",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2ScanPositionCenter"
+          },
+          "description": "Also NRPN 488. Specifies the starting position for scan-ning back and forth through the selected Wavetable.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 88
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2ScanFrequency",
+          "name": "Oscillator 2 Scan Frequency",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2ScanFrequency"
+          },
+          "description": "Also CC 24, the MSB of it, 0 - 127. Adjusts the rate for scanning back and forth through the selected Wavetable (0.1 Hz to 100 Hz).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 28",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2ScanAmountWidth",
+          "name": "Oscillator 2 Scan Amount (Width)",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2ScanAmountWidth"
+          },
+          "description": "Also NRPN 490. Sets the width of the Wavetable scan-ning window (0 to full frame).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 90
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2FilterOffset",
+          "name": "Oscillator 2 Filter Offset",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2FilterOffset"
+          },
+          "description": "Also CC 8, the MSB of it, 0 - 127. Sets the Cutoff Frequency of the two-pole State-Variable Filter (SVF) affecting Oscillator 2 and Noise.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 18",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2FilterMode",
+          "name": "Oscillator 2 Filter Mode",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "lowpass",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "lowpass",
+              "label": "Low Pass",
+              "wire": 0
+            },
+            {
+              "id": "highpass",
+              "label": "High Pass",
+              "wire": 32
+            },
+            {
+              "id": "bandpass",
+              "label": "Band Pass",
+              "wire": 64
+            },
+            {
+              "id": "notchbandreject",
+              "label": "Notch (Band Reject)",
+              "wire": 96
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "oscillator2FilterMode"
+          },
+          "description": "Also NRPN 491. Sets the Filter mode of the two-pole State-Variable Filter (SVF) affecting Oscillator 2 and Noise.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 91
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2FilterResonanceQ",
+          "name": "Oscillator 2 Filter Resonance (Q)",
+          "group": "Oscillators",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2FilterResonanceQ"
+          },
+          "description": "Also CC 10, the MSB of it, 0 - 127. Sets the Resonance Amount of the two-pole State-Variable Filter (SVF) affecting Oscillator 2 and Noise.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 1A",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2FilterEnable",
+          "name": "Oscillator 2 Filter Enable",
+          "group": "Oscillators",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "oscillator2FilterEnable"
+          },
+          "description": "Also NRPN 503. Determines whether or not the Oscillator 2 Filter is applied to Oscillator 2 and the Noise Source.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator1PitchFilterTrackingAmount",
+          "name": "Oscillator 1 Pitch Filter Tracking Amount",
+          "group": "Oscillators",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator1PitchFilterTrackingAmount"
+          },
+          "description": "Also CC 2, the MSB of it, 0 - 127. Bipolar (Center Value/MSB 64 = 0) Determines how much the Pitch Antenna value changes the Cutoff Frequency of the Oscillator 1 Filter.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 12",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2PitchFilterTrackingAmount",
+          "name": "Oscillator 2 Pitch Filter Tracking Amount",
+          "group": "Oscillators",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2PitchFilterTrackingAmount"
+          },
+          "description": "Also CC 3, the MSB of it, 0 - 127. Bipolar (Center Value/MSB 64 = 0) Determines how much the Pitch Antenna value changes the Cutoff Frequency of the Oscillator 2 Filter.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 13",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator1VolumeFilterTrackingAmount",
+          "name": "Oscillator 1 Volume Filter Tracking Amount",
+          "group": "Oscillators",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator1VolumeFilterTrackingAmount"
+          },
+          "description": "Also CC 4, the MSB of it, 0 - 127. Bipolar (Center Value/ MSB 64 = 0) Determines how much the Volume Antenna value changes the Cut-off Frequency of the Oscillator 1 Filter.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 14",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillators.oscillator2FilterTrackingAmount",
+          "name": "Oscillator 2 Filter Tracking Amount",
+          "group": "Oscillators",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscillator2FilterTrackingAmount"
+          },
+          "description": "Also CC 5, the MSB of it, 0 - 127. Bipolar (Center Value/ MSB 64 = 0) Determines how much the Volume Antenna value changes the Cut-off Frequency of the Oscillator 2 Filter.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 15",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.noteNumberMode",
+          "name": "Note Number Mode",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "fixec",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "fixec",
+              "label": "Fixec",
+              "wire": 0
+            },
+            {
+              "id": "chromatic",
+              "label": "Chromatic",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "noteNumberMode"
+          },
+          "description": "Also NRPN 510. Determines wheth-er MIDI pitch control messages will be sent via Fixed mode or Chromatic mode.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 110
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.midiPitchOutEnable",
+          "name": "MIDI Pitch Out Enable",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "midiPitchOutEnable"
+          },
+          "description": "Also NRPN 508. Determines whether or not MIDI Pitch data corresponding with Volume and Pitch an-tenna CV will be sent.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.fixedModeMidiNoteNumber",
+          "name": "Fixed Mode MIDI Note Number",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "fixedModeMidiNoteNumber"
+          },
+          "description": "Also NRPN 509. Set the base Note Number that will be used for MIDI Note On when in Pitch Move mode.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.volumeCvOutputScale",
+          "name": "Volume CV Output Scale",
+          "group": "Program",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "volumeCvOutputScale"
+          },
+          "description": "Also CC 30, the MSB of it, 0 - 127. Bipolar (Center Value = 0) Attenuates the max CV Output level available to the selected Volume CV Out Range. Negative values invert the output range.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 2E",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.volumeCvOutputRange",
+          "name": "Volume CV Output Range",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "minus5vtoplus5v",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "minus5vtoplus5v",
+              "label": "-5V to +5V",
+              "wire": 0
+            },
+            {
+              "id": "0vtoplus5v",
+              "label": "0V to +5V",
+              "wire": 43
+            },
+            {
+              "id": "0vtoplus10v",
+              "label": "0V to +10V",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "volumeCvOutputRange"
+          },
+          "description": "Also NRPN 504. Sets the CV range found at the VOLUME OUT jack.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.pitchCvOutputRange",
+          "name": "Pitch CV Output Range",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "minus5vtoplus5v",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "minus5vtoplus5v",
+              "label": "-5V to +5V",
+              "wire": 0
+            },
+            {
+              "id": "0vtoplus5v",
+              "label": "0V to +5V",
+              "wire": 43
+            },
+            {
+              "id": "0vtoplus10v",
+              "label": "0V to +10V",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "pitchCvOutputRange"
+          },
+          "description": "Also NRPN 493. Sets the voltage range for the PITCH OUT CV jack.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.pitchCvOutQuantize",
+          "name": "Pitch CV Out Quantize",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "preminusquantization",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "preminusquantization",
+              "label": "Pre-Quantization",
+              "wire": 0
+            },
+            {
+              "id": "postminusquantization",
+              "label": "Post-Quantization",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "pitchCvOutQuantize"
+          },
+          "description": "Also NRPN 495. Selects if the value of the PITCH OUT CV jack is determined before or after any quantization.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 95
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.cvInScale",
+          "name": "CV In Scale",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cvInScale"
+          },
+          "description": "Also CC 14, the MSB of it, 0 - 127. Scales the voltage of the CV IN jack plus/minus 100%; Center value = 0 out-put.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 1E",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.cvInOffset",
+          "name": "CV In Offset",
+          "group": "Program",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -8192,
+            "max": 8191,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "cvInOffset"
+          },
+          "description": "Also CC 29, the MSB of it, 0 - 127. Bipolar (Center Value = 0) This parameter pro-vides an offset voltage that is added or sub-tracted from the CV Input Range.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 2D",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.cvInRange",
+          "name": "CV In Range",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "minus5vtoplus5v",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "minus5vtoplus5v",
+              "label": "-5V to +5V",
+              "wire": 0
+            },
+            {
+              "id": "0vtoplus10v",
+              "label": "0V to +10V",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "cvInRange"
+          },
+          "description": "Also NRPN 492. Sets the expected voltage range of the CV IN jack.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 92
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.muteMode",
+          "name": "Mute Mode",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "latching",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "latching",
+              "label": "Latching",
+              "wire": 0
+            },
+            {
+              "id": "momentary",
+              "label": "Momentary",
+              "wire": 64
+            }
+          ],
+          "ui": {
+            "preferredComponent": "ToggleButton"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "muteMode"
+          },
+          "description": "Also NRPN 507. Determines whether the panel MUTE jack toggles MUTE on/ off with successive presses (latching), or mutes on press/ unmutes on release (momentary).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "program.midiNoteOnThreshOld",
+          "name": "MIDI Note On Thresh-old",
+          "group": "Program",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "midiNoteOnThreshOld"
+          },
+          "description": "Also CC 111, the MSB of it, 0 - 127. Determines the Volume Antenna CV level at which a Note On/Off message will be sent. Note will remain On as long as Volume Antenna CV is above threshold, and will remain Off as long as Volume Antenna CV is below threshold.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "03 7F",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "program.volumeAntennaControlMode",
+          "name": "Volume Antenna Control Mode",
+          "group": "Program",
+          "valueType": "enum",
+          "default": "volumeantennaenabled",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "volumeantennaenabled",
+              "label": "Volume Antenna Enabled",
+              "wire": 0
+            },
+            {
+              "id": "enabledplusautomute",
+              "label": "Enabled + Automute",
+              "wire": 43
+            },
+            {
+              "id": "volumeantennadisabled",
+              "label": "Volume Antenna Disabled",
+              "wire": 86
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "volumeAntennaControlMode"
+          },
+          "description": "Also NRPN 513. Determines whether the Volume Antenna is active, active with automute enabled, or disabled with external MIDI CC# 7 control of Volume enabled.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile moog-claravox-centennial, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "moog-claravox-centennial",
+    "name": "Moog Claravox Centennial",
+    "description": "Moog Claravox Centennial theremin: the MIDI parameter tables of its user guide, the 14-bit settings on their NRPNs and the rest on their CCs.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Claravox Centennial User Guide",
+        "notes": "MIDI CC table (pages 56, 57, 58, 59, 60, 61, 62, 63) read by tools/profiles/moog/read-moog-pdf.mjs from Claravox_Centennial_Web_Manual.pdf (sha256 5267c36907ac8d059cca8af84aba764ba3a07bbd7593f2454c724c0e9f234ebc), https://cdn.inmusicbrands.com/Moog/BackOffice/Claravox_Centennial_Web_Manual.pdf. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/moog/make-profiles.mjs; edit the layout in tools/profiles/moog/synths/, not this file.",
+      "Every parameter is a row of the manual's MIDI tables, with its printed name. Nothing here has been sent to a real instrument yet.",
+      "No identity check: the manual prints no Device Inquiry reply.",
+      "The Quantize (ROOT) names are C♯ (D♭) and so on: the guide's ♯ and ♭ are in a font whose signs the PDF's text leaves out (`C (D )`), and are restored here.",
+      "Every row prints a CC and an NRPN. A range of 0 - 16383 is sent on the NRPN, as one 14-bit value; the rest, 0 - 127 or named values, on the CC.",
+      "Each NRPN is sent with its number split as MIDI splits one (MSB n / 128, LSB n % 128) and its value as one 14-bit number, data entry MSB on CC 6 then LSB on CC 38."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-manual's-midi-tables",
+      "realtimeEditing": "complete-for-the-manual's-midi-tables",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the panel sends these same messages when its MIDI settings allow",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Pitch Antenna Scan Freq Mod Amount = 100 (CC 72)",
+        "parameter": "program.pitchAntennaScanFreqModAmount",
+        "value": 100,
+        "expectedHex": "B0 48 64"
+      },
+      {
+        "name": "Quantize (ROOT) = B (CC 85)",
+        "parameter": "program.quantizeRoot",
+        "value": "b",
+        "expectedHex": "B0 55 75"
+      },
+      {
+        "name": "Volume Response = 1000 (NRPN 412)",
+        "parameter": "program.volumeResponse",
+        "value": 1000,
+        "expectedHex": "B0 63 03\nB0 62 1C\nB0 06 07\nB0 26 68"
+      },
+      {
+        "name": "Volume Antenna Control Mode = Volume Antenna Disabled (CC 113)",
+        "parameter": "program.volumeAntennaControlMode",
+        "value": "volumeantennadisabled",
+        "expectedHex": "B0 71 56"
+      }
+    ]
+  }
+}

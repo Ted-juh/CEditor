@@ -1,0 +1,340 @@
+{
+  "schemaVersion": 1,
+  "id": "ceditor.test-nrpn-synth",
+  "version": "1.0.0",
+  "kind": "model",
+  "label": "Test NRPN Synth",
+  "manufacturer": "CEditor",
+  "family": "Internal Test",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "filter.cutoff",
+          "name": "Filter Cutoff",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": true,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "Cutoff"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "01 20",
+              "size": 1,
+              "nullAfterSend": false,
+              "delayAfterMs": 5
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc.pitch",
+          "name": "Oscillator Pitch",
+          "group": "Oscillator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": true,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "Pitch"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "02 10",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "osc.shape",
+          "name": "Oscillator Shape",
+          "group": "Oscillator",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1023
+          },
+          "default": 512,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": true,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "Shape"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "00 14",
+              "size": 1,
+              "nullAfterSend": false,
+              "lowBits": 3,
+              "lowBitsController": 63
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "global.bendRange",
+          "name": "Pitch Bend Range",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 24
+          },
+          "default": 2,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "display": {
+            "unit": "semitones",
+            "mode": "number",
+            "shortLabel": "bendRange"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "rpn",
+              "rpn": "00 00",
+              "size": 1,
+              "nullAfterSend": true
+            }
+          ],
+          "engine": {
+            "sendPolicy": null,
+            "ui": null
+          }
+        },
+        {
+          "id": "global.fineTune",
+          "name": "Channel Fine Tuning",
+          "group": "Global",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 16383
+          },
+          "default": 8192,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "display": {
+            "mode": "number",
+            "shortLabel": "fineTune"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "rpn",
+              "rpn": "00 01",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": null,
+            "ui": null
+          }
+        },
+        {
+          "id": "osc.wave",
+          "name": "Oscillator Wave",
+          "group": "Oscillator",
+          "valueType": "enum",
+          "default": "saw",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": true,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "saw",
+              "label": "Saw",
+              "wire": 0
+            },
+            {
+              "id": "square",
+              "label": "Square",
+              "wire": 1
+            },
+            {
+              "id": "triangle",
+              "label": "Triangle",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "Wave"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "nrpn",
+              "nrpn": "02 11",
+              "size": 2,
+              "nullAfterSend": false
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile test-nrpn-synth, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "test-nrpn-synth",
+    "name": "Test NRPN Synth",
+    "coverage": {
+      "singleParameterWrite": "complete",
+      "realtimeEditing": "complete"
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Filter Cutoff 64 NRPN7",
+        "parameter": "filter.cutoff",
+        "value": 64,
+        "expectedHex": "B0 63 01\nB0 62 20\nB0 06 40"
+      },
+      {
+        "name": "Osc Pitch Center NRPN14",
+        "parameter": "osc.pitch",
+        "value": 8192,
+        "expectedHex": "B0 63 02\nB0 62 10\nB0 06 40\nB0 26 00"
+      },
+      {
+        "name": "Pitch Bend Range 2 RPN7 (101/100, then the null)",
+        "parameter": "global.bendRange",
+        "value": 2,
+        "expectedHex": "B0 65 00\nB0 64 00\nB0 06 02\nB0 65 7F\nB0 64 7F"
+      },
+      {
+        "name": "Channel Fine Tuning centre RPN14",
+        "parameter": "global.fineTune",
+        "value": 8192,
+        "expectedHex": "B0 65 00\nB0 64 01\nB0 06 40\nB0 26 00"
+      },
+      {
+        "name": "Osc Wave Triangle: a choice on a 14-bit NRPN is MSB 0, LSB its value",
+        "parameter": "osc.wave",
+        "value": "triangle",
+        "expectedHex": "B0 63 02\nB0 62 11\nB0 06 00\nB0 26 02"
+      },
+      {
+        "name": "Osc Shape 1001 on a Korg-style 10-bit NRPN: the low 3 bits on CC 63 first, the high 7 on CC 6",
+        "parameter": "osc.shape",
+        "value": 1001,
+        "expectedHex": "B0 63 00\nB0 62 14\nB0 3F 01\nB0 06 7D"
+      }
+    ],
+    "sources": [
+      {
+        "type": "internal",
+        "title": "CEditor Test NRPN Synth",
+        "notes": "Synthetic profile for Device Profile Engine NRPN tests."
+      }
+    ],
+    "testedWith": []
+  }
+}

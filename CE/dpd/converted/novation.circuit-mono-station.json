@@ -1,0 +1,3677 @@
+{
+  "schemaVersion": 1,
+  "id": "novation.circuit-mono-station",
+  "version": "0.1.0",
+  "kind": "model",
+  "label": "Novation Circuit Mono Station",
+  "manufacturer": "Novation",
+  "family": "Circuit",
+  "scopes": {
+    "global": {
+      "kind": "global",
+      "label": "Parameters",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "oscillatorCommon.oscsync",
+          "name": "Oscillator Common OscSync",
+          "group": "Oscillator Common",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "oscsync"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 110
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.keyboardOctave",
+          "name": "Oscillator 1 Keyboard Octave",
+          "group": "Oscillator 1",
+          "valueType": "signed",
+          "range": {
+            "min": 58,
+            "max": 69
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -6,
+            "max": 5,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "keyboardOctave"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 117
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.waveformType",
+          "name": "Oscillator 1 Waveform Type",
+          "group": "Oscillator 1",
+          "valueType": "enum",
+          "default": "saw",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sine",
+              "label": "Sine",
+              "wire": 0
+            },
+            {
+              "id": "triangle",
+              "label": "Triangle",
+              "wire": 1
+            },
+            {
+              "id": "saw",
+              "label": "Saw",
+              "wire": 2
+            },
+            {
+              "id": "pulse",
+              "label": "Pulse",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "waveformType"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 80
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.pulseWidth",
+          "name": "Oscillator 1 Pulse Width",
+          "group": "Oscillator 1",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pulseWidth"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 39
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.tuneCoarse",
+          "name": "Oscillator 1 Tune Coarse",
+          "group": "Oscillator 1",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tuneCoarse"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 27; the fine half, CC 59, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 27
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.tuneFine",
+          "name": "Oscillator 1 Tune Fine",
+          "group": "Oscillator 1",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 100
+          },
+          "default": 50,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -100,
+            "max": 100,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tuneFine"
+          },
+          "description": "The coarse half of 0 – 200 (-100 – 100) on CC 26; the fine half, CC 58, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 26
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.range",
+          "name": "Oscillator 1 Range",
+          "group": "Oscillator 1",
+          "valueType": "enum",
+          "default": "8",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "16",
+              "label": "16’",
+              "wire": 0
+            },
+            {
+              "id": "8",
+              "label": "8’",
+              "wire": 1
+            },
+            {
+              "id": "4",
+              "label": "4’",
+              "wire": 2
+            },
+            {
+              "id": "2",
+              "label": "2’",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "range"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 70
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator1.glide",
+          "name": "Oscillator 1 Glide",
+          "group": "Oscillator 1",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "glide"
+          },
+          "description": "(see table).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 5
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.keyboardOctave",
+          "name": "Oscillator 2 Keyboard Octave",
+          "group": "Oscillator 2",
+          "valueType": "signed",
+          "range": {
+            "min": 58,
+            "max": 69
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -6,
+            "max": 5,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "keyboardOctave"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 76
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.waveformType",
+          "name": "Oscillator 2 Waveform Type",
+          "group": "Oscillator 2",
+          "valueType": "enum",
+          "default": "saw",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "sine",
+              "label": "Sine",
+              "wire": 0
+            },
+            {
+              "id": "triangle",
+              "label": "Triangle",
+              "wire": 1
+            },
+            {
+              "id": "saw",
+              "label": "Saw",
+              "wire": 2
+            },
+            {
+              "id": "pulse",
+              "label": "Pulse",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "waveformType"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 81
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.pulseWidth",
+          "name": "Oscillator 2 Pulse Width",
+          "group": "Oscillator 2",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "pulseWidth"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 79
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.tuneCoarse",
+          "name": "Oscillator 2 Tune Coarse",
+          "group": "Oscillator 2",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tuneCoarse"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 30; the fine half, CC 62, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 30
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.tuneFine",
+          "name": "Oscillator 2 Tune Fine",
+          "group": "Oscillator 2",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 100
+          },
+          "default": 50,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -100,
+            "max": 100,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "tuneFine"
+          },
+          "description": "The coarse half of 0 – 200 (-100 – 100) on CC 29; the fine half, CC 61, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 29
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.range",
+          "name": "Oscillator 2 Range",
+          "group": "Oscillator 2",
+          "valueType": "enum",
+          "default": "8",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "16",
+              "label": "16’",
+              "wire": 0
+            },
+            {
+              "id": "8",
+              "label": "8’",
+              "wire": 1
+            },
+            {
+              "id": "4",
+              "label": "4’",
+              "wire": 2
+            },
+            {
+              "id": "2",
+              "label": "2’",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "range"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 75
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "oscillator2.glide",
+          "name": "Oscillator 2 Glide",
+          "group": "Oscillator 2",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "glide"
+          },
+          "description": "(see table).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 37
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.master",
+          "name": "Mixer Master",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 100,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "master"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 7
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.osc1Level",
+          "name": "Mixer Osc1 Level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 127,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc1Level"
+          },
+          "description": "The coarse half of 0 – 255 on CC 20; the fine half, CC 52, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 20
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.osc2Level",
+          "name": "Mixer Osc2 Level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "osc2Level"
+          },
+          "description": "The coarse half of 0 – 255 on CC 21; the fine half, CC 53, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 21
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.subOscLevel",
+          "name": "Mixer Sub Osc Level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "subOscLevel"
+          },
+          "description": "The coarse half of 0 – 255 on CC 22; the fine half, CC 54, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 22
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.noiseLevel",
+          "name": "Mixer Noise Level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "noiseLevel"
+          },
+          "description": "The coarse half of 0 – 255 on CC 23; the fine half, CC 55, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 23
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.audioInLevel",
+          "name": "Mixer Audio In Level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "audioInLevel"
+          },
+          "description": "The coarse half of 0 – 255 on CC 25; the fine half, CC 57, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 25
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "mixer.ringModLevel",
+          "name": "Mixer Ring Mod Level",
+          "group": "Mixer",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "ringModLevel"
+          },
+          "description": "The coarse half of 0 – 255 on CC 24; the fine half, CC 56, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 24
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.overdrive",
+          "name": "Filter Overdrive",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "overdrive"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 114
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.resonance",
+          "name": "Filter Resonance",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "resonance"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 71
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.frequency",
+          "name": "Filter Frequency",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 127,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "frequency"
+          },
+          "description": "The coarse half of 0 – 255 on CC 16; the fine half, CC 48, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 16
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "filter.shape",
+          "name": "Filter Shape",
+          "group": "Filter",
+          "valueType": "enum",
+          "default": "lowpass",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "lowpass",
+              "label": "Low Pass",
+              "wire": 0
+            },
+            {
+              "id": "bandpass",
+              "label": "Band Pass",
+              "wire": 1
+            },
+            {
+              "id": "highpass",
+              "label": "High Pass",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "shape"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 84
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.slope",
+          "name": "Filter Slope",
+          "group": "Filter",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "slope"
+          },
+          "description": "(see table).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 40
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.bypass",
+          "name": "Filter Bypass",
+          "group": "Filter",
+          "valueType": "enum",
+          "default": "off",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "off",
+              "label": "OFF",
+              "wire": 0
+            },
+            {
+              "id": "noise",
+              "label": "Noise",
+              "wire": 1
+            },
+            {
+              "id": "osc2",
+              "label": "Osc 2",
+              "wire": 2
+            },
+            {
+              "id": "noiseandosc2",
+              "label": "Noise and Osc 2",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "bypass"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 83
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "filter.keyTracking",
+          "name": "Filter Key Tracking",
+          "group": "Filter",
+          "valueType": "enum",
+          "default": "100",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "0",
+              "label": "0%",
+              "wire": 0
+            },
+            {
+              "id": "15",
+              "label": "15%",
+              "wire": 1
+            },
+            {
+              "id": "30",
+              "label": "30%",
+              "wire": 2
+            },
+            {
+              "id": "45",
+              "label": "45%",
+              "wire": 3
+            },
+            {
+              "id": "60",
+              "label": "60%",
+              "wire": 4
+            },
+            {
+              "id": "75",
+              "label": "75%",
+              "wire": 5
+            },
+            {
+              "id": "90",
+              "label": "90%",
+              "wire": 6
+            },
+            {
+              "id": "100",
+              "label": "100%",
+              "wire": 7
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "keyTracking"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 69
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "envelope.attack",
+          "name": "Envelope Attack",
+          "group": "Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 2,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "attack"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 90
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelope.decay",
+          "name": "Envelope Decay",
+          "group": "Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 90,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "decay"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 91
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelope.sustain",
+          "name": "Envelope Sustain",
+          "group": "Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 127,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "sustain"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 92
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "envelope.release",
+          "name": "Envelope Release",
+          "group": "Envelope",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 40,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "release"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 93
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.waveformType",
+          "name": "LFO Waveform Type",
+          "group": "LFO",
+          "valueType": "enum",
+          "default": "triangle",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "triangle",
+              "label": "Triangle",
+              "wire": 0
+            },
+            {
+              "id": "descendingsaw",
+              "label": "Descending Saw",
+              "wire": 1
+            },
+            {
+              "id": "square",
+              "label": "Square",
+              "wire": 2
+            },
+            {
+              "id": "sampleandhold",
+              "label": "Sample and hold",
+              "wire": 3
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "waveformType"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 88
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo.rate",
+          "name": "LFO Rate",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 34,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "rate"
+          },
+          "description": "The coarse half of 0 – 255 on CC 18; the fine half, CC 50, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 18
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "lfo.syncRate",
+          "name": "LFO Sync Rate",
+          "group": "LFO",
+          "valueType": "enum",
+          "default": "64beats",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "64beats",
+              "label": "64 beats",
+              "wire": 0
+            },
+            {
+              "id": "48beats",
+              "label": "48 beats",
+              "wire": 1
+            },
+            {
+              "id": "42beats",
+              "label": "42 beats",
+              "wire": 2
+            },
+            {
+              "id": "36beats",
+              "label": "36 beats",
+              "wire": 3
+            },
+            {
+              "id": "32beats",
+              "label": "32 beats",
+              "wire": 4
+            },
+            {
+              "id": "30beats",
+              "label": "30 beats",
+              "wire": 5
+            },
+            {
+              "id": "28beats",
+              "label": "28 beats",
+              "wire": 6
+            },
+            {
+              "id": "24beats",
+              "label": "24 beats",
+              "wire": 7
+            },
+            {
+              "id": "21plus23beats",
+              "label": "21 + 2/3 beats",
+              "wire": 8
+            },
+            {
+              "id": "20beats",
+              "label": "20 beats",
+              "wire": 9
+            },
+            {
+              "id": "18plus23beats",
+              "label": "18 + 2/3 beats",
+              "wire": 10
+            },
+            {
+              "id": "18beats",
+              "label": "18 beats",
+              "wire": 11
+            },
+            {
+              "id": "16beats",
+              "label": "16 beats",
+              "wire": 12
+            },
+            {
+              "id": "13plus13beats",
+              "label": "13 + 1/3 beats",
+              "wire": 13
+            },
+            {
+              "id": "12beats",
+              "label": "12 beats",
+              "wire": 14
+            },
+            {
+              "id": "10plus23beats",
+              "label": "10 + 2/3 beats",
+              "wire": 15
+            },
+            {
+              "id": "8beats",
+              "label": "8 beats",
+              "wire": 16
+            },
+            {
+              "id": "6beats",
+              "label": "6 beats",
+              "wire": 17
+            },
+            {
+              "id": "5plus13beats",
+              "label": "5 + 1/3 beats",
+              "wire": 18
+            },
+            {
+              "id": "4beats",
+              "label": "4 beats",
+              "wire": 19
+            },
+            {
+              "id": "3beats",
+              "label": "3 beats",
+              "wire": 20
+            },
+            {
+              "id": "2plus23beats",
+              "label": "2 + 2/3 beats",
+              "wire": 21
+            },
+            {
+              "id": "2nd",
+              "label": "2nd",
+              "wire": 22
+            },
+            {
+              "id": "4thdotted",
+              "label": "4th dotted",
+              "wire": 23
+            },
+            {
+              "id": "1plus13beats",
+              "label": "1 + 1/3 beats",
+              "wire": 24
+            },
+            {
+              "id": "4th",
+              "label": "4th",
+              "wire": 25
+            },
+            {
+              "id": "8thdotted",
+              "label": "8th dotted",
+              "wire": 26
+            },
+            {
+              "id": "4thtriplet",
+              "label": "4th triplet",
+              "wire": 27
+            },
+            {
+              "id": "8th",
+              "label": "8th",
+              "wire": 28
+            },
+            {
+              "id": "16thdotted",
+              "label": "16th dotted",
+              "wire": 29
+            },
+            {
+              "id": "8thtriplet",
+              "label": "8th triplet",
+              "wire": 30
+            },
+            {
+              "id": "16th",
+              "label": "16th",
+              "wire": 31
+            },
+            {
+              "id": "16thtriplet",
+              "label": "16th triplet",
+              "wire": 32
+            },
+            {
+              "id": "32nd",
+              "label": "32nd",
+              "wire": 33
+            },
+            {
+              "id": "32ndtriplet",
+              "label": "32nd triplet",
+              "wire": 34
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "syncRate"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 87
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo.clockSync",
+          "name": "LFO Clock Sync",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "clockSync"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 86
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "lfo.keySync",
+          "name": "LFO Key Sync",
+          "group": "LFO",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "keySync"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 43
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "distortion.level",
+          "name": "Distortion Level",
+          "group": "Distortion",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 0,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "level"
+          },
+          "description": "(see table).",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 94
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "distortion.type",
+          "name": "Distortion Type",
+          "group": "Distortion",
+          "valueType": "enum",
+          "default": "typei",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "typei",
+              "label": "Type I",
+              "wire": 0
+            },
+            {
+              "id": "typeii",
+              "label": "Type II",
+              "wire": 1
+            },
+            {
+              "id": "typeiii",
+              "label": "Type III",
+              "wire": 2
+            }
+          ],
+          "ui": {
+            "preferredComponent": "RadioButtonGroup"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "type"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 95
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.envtoosc1pitch",
+          "name": "Modulation Matrix EnvToOsc1Pitch",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envtoosc1pitch"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 12; the fine half, CC 44, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 12
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.envtoosc1pwm",
+          "name": "Modulation Matrix EnvToOsc1PWM",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envtoosc1pwm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 41
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.envtoosc2pitch",
+          "name": "Modulation Matrix EnvToOsc2Pitch",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envtoosc2pitch"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 13; the fine half, CC 45, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 13
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.envtoosc2pwm",
+          "name": "Modulation Matrix EnvToOsc2PWM",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envtoosc2pwm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 33
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.envtoamp",
+          "name": "Modulation Matrix EnvToAmp",
+          "group": "Modulation Matrix",
+          "valueType": "continuous",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "default": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envtoamp"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 42
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.envtofilterfreq",
+          "name": "Modulation Matrix EnvToFilterFreq",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envtofilterfreq"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 14; the fine half, CC 46, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 14
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.envtodist",
+          "name": "Modulation Matrix EnvToDist",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envtodist"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 103
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.envtoauxcv",
+          "name": "Modulation Matrix EnvToAuxCV",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "envtoauxcv"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 104
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.lfotoosc1pitch",
+          "name": "Modulation Matrix LFOToOsc1Pitch",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfotoosc1pitch"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 28; the fine half, CC 60, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 28
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.lfotoosc1pwm",
+          "name": "Modulation Matrix LFOToOsc1PWM",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfotoosc1pwm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 73
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.lfotoosc2pitch",
+          "name": "Modulation Matrix LFOToOsc2Pitch",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfotoosc2pitch"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 3; the fine half, CC 35, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 3
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.lfotoosc2pwm",
+          "name": "Modulation Matrix LFOToOsc2PWM",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfotoosc2pwm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 34
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.lfotoamp",
+          "name": "Modulation Matrix LFOToAmp",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfotoamp"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 78
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.lfotofilterfreq",
+          "name": "Modulation Matrix LFOToFilterFreq",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfotofilterfreq"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 17; the fine half, CC 49, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 17
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.lfotodist",
+          "name": "Modulation Matrix LFOToDist",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfotodist"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 108
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.lfotoauxcv",
+          "name": "Modulation Matrix LFOToAuxCV",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "lfotoauxcv"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 109
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.modseqtoosc1pitch",
+          "name": "Modulation Matrix ModSeqToOsc1Pitch",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modseqtoosc1pitch"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 15; the fine half, CC 47, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 15
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.modseqtoosc1pwm",
+          "name": "Modulation Matrix ModSeqToOsc1PWM",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modseqtoosc1pwm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 118
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.modseqtoosc2pitch",
+          "name": "Modulation Matrix ModSeqToOsc2Pitch",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modseqtoosc2pitch"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 19; the fine half, CC 51, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 19
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.modseqtoosc2pwm",
+          "name": "Modulation Matrix ModSeqToOsc2PWM",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modseqtoosc2pwm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 38
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.modseqtoamp",
+          "name": "Modulation Matrix ModSeqToAmp",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modseqtoamp"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 119
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.modseqtofilterfreq",
+          "name": "Modulation Matrix ModSeqToFilterFreq",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -128,
+            "max": 127,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modseqtofilterfreq"
+          },
+          "description": "The coarse half of 0 – 255 (-128 – 127) on CC 31; the fine half, CC 63, is left out.",
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 31
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.modseqtodist",
+          "name": "Modulation Matrix ModSeqToDist",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modseqtodist"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 111
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.modseqtoauxcv",
+          "name": "Modulation Matrix ModSeqToAuxCV",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "modseqtoauxcv"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 116
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.velocitytoosc1pitch",
+          "name": "Modulation Matrix VelocityToOsc1Pitch",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocitytoosc1pitch"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 115
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.velocitytoosc1pwm",
+          "name": "Modulation Matrix VelocityToOsc1PWM",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocitytoosc1pwm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 107
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.velocitytoosc2pitch",
+          "name": "Modulation Matrix VelocityToOsc2Pitch",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocitytoosc2pitch"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 9
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.velocitytoosc2pwm",
+          "name": "Modulation Matrix VelocityToOsc2PWM",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocitytoosc2pwm"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 36
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.velocitytoamp",
+          "name": "Modulation Matrix VelocityToAmp",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocitytoamp"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 112
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.velocitytofilterfreq",
+          "name": "Modulation Matrix VelocityToFilterFreq",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocitytofilterfreq"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 113
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.velocitytodist",
+          "name": "Modulation Matrix VelocityToDist",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocitytodist"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 105
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.velocitytoauxcv",
+          "name": "Modulation Matrix VelocityToAuxCV",
+          "group": "Modulation Matrix",
+          "valueType": "signed",
+          "range": {
+            "min": 0,
+            "max": 127
+          },
+          "default": 64,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "ui": {
+            "preferredComponent": "Knob"
+          },
+          "display": {
+            "min": -64,
+            "max": 63,
+            "unit": "",
+            "mode": "number",
+            "shortLabel": "velocitytoauxcv"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 89
+            }
+          ],
+          "engine": {
+            "type": "bipolar",
+            "sendPolicy": {
+              "mode": "continuous",
+              "coalesce": true,
+              "minIntervalMs": 0,
+              "sendFinalOnRelease": true
+            }
+          }
+        },
+        {
+          "id": "modulationMatrix.selectedRouting",
+          "name": "Modulation Matrix Selected Routing",
+          "group": "Modulation Matrix",
+          "valueType": "enum",
+          "default": "lfotofilterfreq",
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "enum": [
+            {
+              "id": "envtoosc1pitchdepth",
+              "label": "EnvToOsc1Pitch_Depth",
+              "wire": 0
+            },
+            {
+              "id": "envtoosc1shapedepth",
+              "label": "EnvToOsc1Shape_Depth",
+              "wire": 1
+            },
+            {
+              "id": "envtoosc2pitchdepth",
+              "label": "EnvToOsc2Pitch_Depth",
+              "wire": 2
+            },
+            {
+              "id": "envtoosc2shapedepth",
+              "label": "EnvToOsc2Shape_Depth",
+              "wire": 3
+            },
+            {
+              "id": "envtoampdepth",
+              "label": "EnvToAmp_Depth",
+              "wire": 4
+            },
+            {
+              "id": "envtofilterfreqdepth",
+              "label": "EnvToFilterFreq_Depth",
+              "wire": 5
+            },
+            {
+              "id": "envtodistamountdepth",
+              "label": "EnvToDistAmount_Depth",
+              "wire": 6
+            },
+            {
+              "id": "envtoauxcvdepth",
+              "label": "EnvToAuxCV_Depth",
+              "wire": 7
+            },
+            {
+              "id": "lfotoosc1pitchdepth",
+              "label": "LFOToOsc1Pitch_Depth",
+              "wire": 8
+            },
+            {
+              "id": "lfotoosc1shapedepth",
+              "label": "LFOToOsc1Shape_Depth",
+              "wire": 9
+            },
+            {
+              "id": "lfotoosc2pitchdepth",
+              "label": "LFOToOsc2Pitch_Depth",
+              "wire": 10
+            },
+            {
+              "id": "lfotoosc2shapedepth",
+              "label": "LFOToOsc2Shape_Depth",
+              "wire": 11
+            },
+            {
+              "id": "lfotoampdepth",
+              "label": "LFOToAmp_Depth",
+              "wire": 12
+            },
+            {
+              "id": "lfotofilterfreq",
+              "label": "LFOToFilterFreq",
+              "wire": 13
+            },
+            {
+              "id": "lfotodistamount",
+              "label": "LFOToDistAmount",
+              "wire": 14
+            },
+            {
+              "id": "lfotoauxcv",
+              "label": "LFOToAuxCV",
+              "wire": 15
+            },
+            {
+              "id": "modseqtoosc1pitch",
+              "label": "ModSeqToOsc1Pitch",
+              "wire": 16
+            },
+            {
+              "id": "modseqtoosc1shape",
+              "label": "ModSeqToOsc1Shape",
+              "wire": 17
+            },
+            {
+              "id": "modseqtoosc2pitch",
+              "label": "ModSeqToOsc2Pitch",
+              "wire": 18
+            },
+            {
+              "id": "modseqtoosc2shape",
+              "label": "ModSeqToOsc2Shape",
+              "wire": 19
+            },
+            {
+              "id": "modseqtoamp",
+              "label": "ModSeqToAmp",
+              "wire": 20
+            },
+            {
+              "id": "modseqtofilterfreq",
+              "label": "ModSeqToFilterFreq",
+              "wire": 21
+            },
+            {
+              "id": "modseqtodistamount",
+              "label": "ModSeqToDistAmount",
+              "wire": 22
+            },
+            {
+              "id": "modseqtoauxcv",
+              "label": "ModSeqToAuxCV",
+              "wire": 23
+            },
+            {
+              "id": "velocitytoosc1pitch",
+              "label": "VelocityToOsc1Pitch",
+              "wire": 24
+            },
+            {
+              "id": "velocitytoosc1shape",
+              "label": "VelocityToOsc1Shape",
+              "wire": 25
+            },
+            {
+              "id": "velocitytoosc2pitch",
+              "label": "VelocityToOsc2Pitch",
+              "wire": 26
+            },
+            {
+              "id": "velocitytoosc2shape",
+              "label": "VelocityToOsc2Shape",
+              "wire": 27
+            },
+            {
+              "id": "velocitytoamp",
+              "label": "VelocityToAmp",
+              "wire": 28
+            },
+            {
+              "id": "velocitytofilterfreq",
+              "label": "VelocityToFilterFreq",
+              "wire": 29
+            },
+            {
+              "id": "velocitytodistamount",
+              "label": "VelocityToDistAmount",
+              "wire": 30
+            },
+            {
+              "id": "velocitytoauxcv",
+              "label": "VelocityToAuxCV",
+              "wire": 31
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Combobox"
+          },
+          "display": {
+            "mode": "choice",
+            "shortLabel": "selectedRouting"
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "cc",
+              "cc": 102
+            }
+          ],
+          "engine": {
+            "sendPolicy": {
+              "mode": "onCommit",
+              "coalesce": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "note": "Converted by CE/dpd/tools/from-legacy.mjs from the engine profile novation-circuit-mono-station, which tools/profiles/ generates from the maker's own document (its sources say which). Emitting this model gives that profile back."
+  },
+  "completeness": "partial",
+  "engine": {
+    "id": "novation-circuit-mono-station",
+    "name": "Novation Circuit Mono Station",
+    "description": "Novation Circuit Mono Station, every control change in its MIDI parameters document.",
+    "sources": [
+      {
+        "type": "manual",
+        "title": "Circuit Mono Station MIDI Parameters v1",
+        "notes": "MIDI parameter table (pages 1-3) read by tools/profiles/novation/read-novation-pdf.mjs from circuit-mono-station-midi-parameters-v1.pdf (sha256 96fbfe75fd4167b2d560ce0e90a7673f30d7d85264f8d3d0d1cc2296fbe155cb), https://downloads.novationmusic.com/novation/circuit/circuit-monostation. Not yet checked against the instrument itself."
+      }
+    ],
+    "testedWith": [],
+    "authoringNotes": [
+      "Generated by tools/profiles/novation/make-profiles.mjs; edit the layout in tools/profiles/novation/synths/, not this file.",
+      "Every parameter is a row of the guide's MIDI parameter table, with its printed name. Nothing here has been sent to a real instrument yet.",
+      "No identity check: the guide prints no Device Inquiry reply.",
+      "21 CC pair(s) are the coarse controller alone, 0 - 127: each pair is a controller and its partner 32 above, MIDI's coarse and fine, and the Circuit Mono Station's guide says the second \"is used to create an 8-bit message for a 0-255 value range\" without saying which bit it carries. Oscillator 1 Tune Coarse (CC 27, fine CC 59); Oscillator 1 Tune Fine (CC 26, fine CC 58); Oscillator 2 Tune Coarse (CC 30, fine CC 62); Oscillator 2 Tune Fine (CC 29, fine CC 61); Mixer Osc1 Level (CC 20, fine CC 52); Mixer Osc2 Level (CC 21, fine CC 53); Mixer Sub Osc Level (CC 22, fine CC 54); Mixer Noise Level (CC 23, fine CC 55); Mixer Audio In Level (CC 25, fine CC 57); Mixer Ring Mod Level (CC 24, fine CC 56); Filter Frequency (CC 16, fine CC 48); LFO Rate (CC 18, fine CC 50); Modulation Matrix EnvToOsc1Pitch (CC 12, fine CC 44); Modulation Matrix EnvToOsc2Pitch (CC 13, fine CC 45); Modulation Matrix EnvToFilterFreq (CC 14, fine CC 46); Modulation Matrix LFOToOsc1Pitch (CC 28, fine CC 60); Modulation Matrix LFOToOsc2Pitch (CC 3, fine CC 35); Modulation Matrix LFOToFilterFreq (CC 17, fine CC 49); Modulation Matrix ModSeqToOsc1Pitch (CC 15, fine CC 47); Modulation Matrix ModSeqToOsc2Pitch (CC 19, fine CC 51); Modulation Matrix ModSeqToFilterFreq (CC 31, fine CC 63).",
+      "Left out, a CC pair that is not a controller and its fine partner 32 above: Patch Category (CC(8) 64:2), Envelope Trigger (CC(8) 73:0).",
+      "11 choice(s), their names from the value tables the rows point to (Oscillator Waveform Table, Filter Shape Table, Filter Slope Table, Oscillator Range Table, Filter Bypass Table, Oscillator Glide Table, Distortion Type Table, Filter Tracking Table, Sync Rate Table, LFO Waveform Table, Selected Routing Table) where a table numbers every value of the range, or from the rows' own notes.",
+      "A number, not a choice, where the value table it points to does not number its whole range: Oscillator Glide Table numbers 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 for a range of 0 - 127: Oscillator 1 Glide, Oscillator 2 Glide.",
+      "A number, not a choice, where the value table it points to does not number its whole range: Filter Slope Table numbers 0, 1, 2 for a range of 0 - 1: Filter Slope."
+    ],
+    "coverage": {
+      "singleParameterWrite": "complete-for-the-guide's-midi-parameter-table",
+      "realtimeEditing": "complete-for-the-guide's-midi-parameter-table",
+      "editBufferDumpRequest": "notImplemented",
+      "editBufferDumpParse": "notImplemented",
+      "bankDump": "notImplemented",
+      "inboundControllers": "the panel sends these same messages when its MIDI settings allow",
+      "verifiedOnHardware": false
+    },
+    "timing": {
+      "minDelayBetweenMessagesMs": 0
+    },
+    "tests": [
+      {
+        "name": "Oscillator Common OscSync = 1 (CC 110)",
+        "parameter": "oscillatorCommon.oscsync",
+        "value": 1,
+        "expectedHex": "B0 6E 01"
+      },
+      {
+        "name": "Oscillator 1 Waveform Type = Pulse (CC 80)",
+        "parameter": "oscillator1.waveformType",
+        "value": "pulse",
+        "expectedHex": "B0 50 03"
+      },
+      {
+        "name": "Modulation Matrix Selected Routing = VelocityToAuxCV (CC 102)",
+        "parameter": "modulationMatrix.selectedRouting",
+        "value": "velocitytoauxcv",
+        "expectedHex": "B0 66 1F"
+      }
+    ]
+  }
+}
