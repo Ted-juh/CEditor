@@ -411,6 +411,7 @@ node tools/profiles/twisted/make-profiles.mjs --check
 node tools/profiles/dexibell/make-profiles.mjs --check
 node tools/profiles/vermona/make-profiles.mjs --check
 node tools/profiles/modor/make-profiles.mjs --check
+node tools/profiles/gotharman/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
 ```
 
