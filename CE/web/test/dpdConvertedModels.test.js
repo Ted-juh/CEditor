@@ -27,7 +27,7 @@ test('every converted model is what conversion gives, and emits its profile back
     assert.ok(model, `${legacyId}: ${why}`);
     assert.equal(model.id, dpdId);
     const file = readFileSync(at(`../../dpd/converted/${dpdId}.json`), 'utf8');
-    assert.equal(file, `${JSON.stringify(model, null, 2)}\n`, `${dpdId} is stale: run node CE/dpd/tools/from-legacy.mjs --all`);
+    assert.equal(file, `${JSON.stringify(model)}\n`, `${dpdId} is stale: run node CE/dpd/tools/from-legacy.mjs --all`);
     assert.deepEqual(await compareEmission(legacy, model), [], legacyId);
   }
 });
@@ -54,4 +54,18 @@ test('the gate notices a model that sends something else', async () => {
   p.wires[0].cc = (p.wires[0].cc + 1) % 128;
   const problems = await compareEmission(legacy, model);
   assert.ok(problems.some((m) => m.startsWith(`${p.id} = `)), problems.join('\n'));
+});
+
+test('SysEx written out per parameter becomes one shape and an address each, and a wrong address is caught', async () => {
+  // The Andromeda's profile has a recipe per parameter (F0 00 00 0E 1D 0E <page> <param> <value> F7).
+  const legacy = legacyOf('alesis-a6-andromeda');
+  const { model } = legacyToDpd(legacy);
+  const edit = model.messageShapes.find((s) => s.id === 'edit');
+  assert.deepEqual(edit.template, ['F0', '00', '00', '0E', '1D', '0E', '$address', '$encodedValue', 'F7']);
+  const tempo = model.scopes.global.parameters.find((p) => p.id === 'clock.tempo');
+  assert.equal(tempo.address, '05 00');
+  assert.deepEqual(tempo.wires, [{ dir: 'write', msg: 'dt1', shape: 'edit' }]);
+  tempo.address = '05 01';
+  const problems = await compareEmission(legacy, model);
+  assert.ok(problems.some((m) => m.startsWith('clock.tempo = ')), problems.slice(0, 3).join('\n'));
 });

@@ -647,10 +647,10 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **Reading controllers back ignores the channel.** When a synth sends a controller, CEditor finds
   the parameter by its message with the channel masked out. For a profile with two parts on two
   channels (the JP-08), a knob turned on the Lower part is read as the Upper part's.
-- **The Device Profile Designer** opens the profiles it was built with and the 239 converted from
-  the control-change and NRPN profiles here (see [In the Device Profile Designer](#in-the-device-profile-designer)).
-  The SysEx and dump profiles open empty there until they are converted; they work in the Device
-  tool and in bindings.
+- **The Device Profile Designer** opens the profiles it was built with and the 244 converted from
+  the profiles here (see [In the Device Profile Designer](#in-the-device-profile-designer)). The
+  116 that read a dump back open empty there until they are converted; they work in the Device tool
+  and in bindings.
 
 ## In the Device Profile Designer
 
@@ -661,9 +661,10 @@ message each is sent with. A model is kept only if emitting it gives its profile
 equal and every parameter sending the same bytes at the ends and middle of its range and at every
 choice.
 
-So far the profiles sent as control changes and NRPNs are converted, 239 of them. The rest, those
-written as SysEx and those that read a dump back, have not been converted yet, and the Designer
-opens them empty.
+So far 244 are converted: every profile sent as control changes, NRPNs or SysEx that does not read a
+dump back. SysEx written out in full for each parameter (a KRONOS, an Andromeda) becomes one message
+shape with an address for each parameter, the bytes that differ between their messages. The 116
+that read a dump back have not been converted yet, and the Designer opens them empty.
 
 ## Adding to it
 

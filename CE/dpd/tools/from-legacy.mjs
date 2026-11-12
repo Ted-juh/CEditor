@@ -40,20 +40,78 @@ const INDEX = join(REPO, 'CE', 'web', 'src', 'CE_Application', 'generated', 'dpd
 
 const slug = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-/** The DPD id for an engine profile: `<maker>.<model>` (arturia-microfreak -> arturia.microfreak). */
+// The hand-made models' ids (CE/dpd/library), which a converted one must never take: the older
+// hand-written roland-gaia profile would otherwise convert to roland.gaia, the GAIA's own model.
+const HAND_MADE = new Set(readdirSync(join(HERE, '..', 'library')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)));
+
+/** The DPD id for an engine profile: `<maker>.<model>` (arturia-microfreak -> arturia.microfreak), `-converted` after it when a hand-made model has that id. */
 export function dpdIdOf(legacy) {
   const maker = slug(legacy.manufacturer) || 'generic';
   const rest = legacy.id.startsWith(`${maker}-`) ? legacy.id.slice(maker.length + 1) : legacy.id;
-  return `${maker}.${rest}`;
+  const id = `${maker}.${rest}`;
+  return HAND_MADE.has(id) ? `${id}-converted` : id;
 }
 
 const VALUE_TYPES = { integer: 'continuous', bipolar: 'signed', choice: 'enum', enum: 'enum', text: 'text', boolean: 'toggle', action: 'trigger', momentary: 'trigger' };
 const ENCODINGS = { 'u14-msb-lsb': 'u14', 'u14-lsb-msb': 'u14-lsb', nibbled: 'nibbles', enum: 'u7' };
 const DISPLAY_KEYS = ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC', 'mode', 'shortLabel'];
 
+const HEX = /^[0-9A-Fa-f]{2}$/;
+
+/** A recipe as a DPD messageShape: its template, checksum and delay (null: none, as it had none). */
+const shapeOf = (r, id = r.id, template = r.template) => ({
+  id, kind: 'sysex', template: [...template],
+  ...(r.checksum ? { checksum: structuredClone(r.checksum) } : {}),
+  delayAfterMs: r.delayAfterMs ?? null,
+});
+
+/**
+ * How a profile's SysEx recipes become DPD message shapes, and what each parameter sent with one
+ * carries: { shapes, plan: recipe id -> { shape, address? } }.
+ *
+ *   - A recipe with `$address` (Roland's DT1, Yamaha's and Waldorf's parameter changes) is a shape
+ *     as it stands; each parameter keeps its own address.
+ *   - Recipes written out in full for every parameter (a KRONOS, an Andromeda) are grouped by their
+ *     form (length, placeholders, checksum, delay); within a group the bytes that differ from one
+ *     recipe to the next are the parameter's address, and the rest the shape, `$address` in their
+ *     place. A recipe alone in its form, or one with a checksum, stays a shape of its own.
+ */
+function sysexPlan(recipes) {
+  const shapes = [];
+  const plan = new Map();
+  const sx = recipes.filter((r) => r.kind === 'sysex');
+  const used = new Set(sx.map((r) => r.id));
+  const groups = new Map();
+  for (const r of sx) {
+    if (r.template.includes('$address') || r.checksum) { shapes.push(shapeOf(r)); plan.set(r.id, { shape: r.id }); continue; }
+    const key = JSON.stringify([r.template.map((t) => (HEX.test(t) ? 'h' : t)), r.delayAfterMs ?? null]);
+    (groups.get(key) ?? groups.set(key, []).get(key)).push(r);
+  }
+  for (const group of groups.values()) {
+    const varying = [];
+    for (let i = 0; i < group[0].template.length; i += 1) if (new Set(group.map((r) => r.template[i])).size > 1) varying.push(i);
+    if (group.length < 2 || !varying.length) {
+      for (const r of group) { shapes.push(shapeOf(r)); plan.set(r.id, { shape: r.id }); }
+      continue;
+    }
+    const [a, b] = [varying[0], varying.at(-1)];
+    const prefix = group.map((r) => r.id).reduce((p, id) => { let i = 0; while (i < p.length && p[i] === id[i]) i += 1; return p.slice(0, i); }).replace(/[^A-Za-z]+$/, '') || 'sysex';
+    let id = prefix;
+    for (let n = 2; used.has(id) || shapes.some((x) => x.id === id); n += 1) id = `${prefix}${n}`;
+    used.add(id);
+    shapes.push(shapeOf(group[0], id, [...group[0].template.slice(0, a), '$address', ...group[0].template.slice(b + 1)]));
+    for (const r of group) plan.set(r.id, { shape: id, address: r.template.slice(a, b + 1).join(' ') });
+  }
+  return { shapes, plan };
+}
+
 /** A parameter's wire from the recipe it is sent with, or the reason it cannot be carried yet. */
-function wireOf(recipe) {
+function wireOf(recipe, sysex) {
   if (!recipe) return { why: 'no message recipe' };
+  if (recipe.kind === 'sysex') {
+    const how = sysex.plan.get(recipe.id);
+    return { wire: { dir: 'write', msg: 'dt1', shape: how.shape }, address: how.address };
+  }
   if (recipe.kind === 'cc') {
     if (recipe.value != null && recipe.value !== '$encodedValue') return { why: `cc recipe value ${recipe.value}` };
     return {
@@ -82,8 +140,8 @@ function wireOf(recipe) {
 }
 
 /** A parameter's own DPD fields (no `engine`), or the reason it cannot be carried yet. */
-function nativeParam(q, recipes) {
-  const { wire, why } = wireOf(recipes.get(q.messageRecipe));
+function nativeParam(q, recipes, sysex) {
+  const { wire, why, address } = wireOf(recipes.get(q.messageRecipe), sysex);
   if (!wire) return { why };
   const valueType = VALUE_TYPES[q.type];
   if (!valueType) return { why: `type ${q.type}` };
@@ -98,6 +156,9 @@ function nativeParam(q, recipes) {
   const display = Object.fromEntries(DISPLAY_KEYS.filter((k) => q.display?.[k] !== undefined).map((k) => [k, structuredClone(q.display[k])]));
   if (Object.keys(display).length) p.display = display;
   if (q.description != null) p.description = q.description;
+  // The parameter's address: its own (`$address` recipes), or the bytes of its written-out recipe
+  // that differ from its neighbours'.
+  if (address ?? q.address) p.address = address ?? q.address;
   p.wires = [wire];
   return { param: p };
 }
@@ -112,7 +173,9 @@ function overlay(original, derived, skip) {
   return out;
 }
 
-const PARAM_SKIP = new Set(['messageRecipe']);
+// The recipe a parameter names, and the address it fills in, are how its message is put together,
+// which the gate compares by what it sends.
+const PARAM_SKIP = new Set(['messageRecipe', 'address']);
 const PROFILE_SKIP = new Set(['parameters', 'messageRecipes', 'dpdSource']);
 
 export function emitModel(model) {
@@ -124,9 +187,10 @@ export function legacyToDpd(legacy) {
   if (legacy.dpdSource) return { why: 'already a DPD profile' };
   if (legacy.dumpDefinitions?.length) return { why: 'dumps are not converted yet' };
   const recipes = new Map((legacy.messageRecipes ?? []).map((r) => [r.id, r]));
+  const sysex = sysexPlan(legacy.messageRecipes ?? []);
   const params = [];
   for (const q of legacy.parameters ?? []) {
-    const { param, why } = nativeParam(q, recipes);
+    const { param, why } = nativeParam(q, recipes, sysex);
     if (!param) return { why };
     params.push(param);
   }
@@ -138,7 +202,9 @@ export function legacyToDpd(legacy) {
     label: legacy.name,
     manufacturer: legacy.manufacturer,
     ...(legacy.family != null ? { family: legacy.family } : {}),
-    scopes: { global: { kind: 'global', label: 'Parameters', instances: 1, parameters: params } },
+    ...(sysex.shapes.length ? { messageShapes: sysex.shapes } : {}),
+    // A one-byte base leaves every address as it is, whatever its length (add7 keeps the longer).
+    scopes: { global: { kind: 'global', label: 'Parameters', instances: 1, ...(params.some((p) => p.address) ? { base: '00', stride: '00' } : {}), parameters: params } },
     provenance: {
       source: 'official',
       verifiedRoundTrip: true,
@@ -182,9 +248,22 @@ export async function compareEmission(legacy, model) {
   const ids = (legacy.parameters ?? []).map((p) => p.id);
   if (!isDeepStrictEqual(ids, emitted.parameters.map((p) => p.id))) problems.push('the parameter ids or their order differ');
   const byId = new Map(emitted.parameters.map((p) => [p.id, p]));
+  const recipeA = new Map((legacy.messageRecipes ?? []).map((r) => [r.id, r]));
+  const recipeB = new Map((emitted.messageRecipes ?? []).map((r) => [r.id, r]));
+  // A recipe's fields but its id and template (the bytes say whether those agree); a controller
+  // recipe with no value sends $encodedValue, as the engine reads it.
+  const fieldsOf = (r) => {
+    if (!r) return null;
+    const { id, template, ...rest } = r;
+    if (rest.kind !== 'sysex' && rest.value === undefined) rest.value = '$encodedValue';
+    return rest;
+  };
   for (const q of legacy.parameters ?? []) {
     const e = byId.get(q.id);
     if (!e) continue;
+    if (q.messageRecipe && !isDeepStrictEqual(fieldsOf(recipeA.get(q.messageRecipe)), fieldsOf(recipeB.get(e.messageRecipe)))) {
+      problems.push(`${q.id}: its recipe differs (${JSON.stringify(fieldsOf(recipeB.get(e.messageRecipe)))}, the engine profile ${JSON.stringify(fieldsOf(recipeA.get(q.messageRecipe)))})`);
+    }
     for (const key of new Set([...Object.keys(q), ...Object.keys(e)])) {
       if (!PARAM_SKIP.has(key) && !isDeepStrictEqual(q[key], e[key])) problems.push(`${q.id}: ${key} differs`);
     }
@@ -225,7 +304,8 @@ async function main(argv) {
     const problems = await compareEmission(legacy, model);
     if (problems.length) { (skipped.get('emission differs') ?? skipped.set('emission differs', []).get('emission differs')).push(`${id} (${problems.slice(0, 3).join('; ')})`); continue; }
     const file = join(CONVERTED, `${model.id}.json`);
-    const text = `${JSON.stringify(model, null, 2)}\n`;
+    // One line: they are generated, and indented they were twice the size (31 MB for 244 models).
+    const text = `${JSON.stringify(model)}\n`;
     index[legacy.id] = model.id;
     if (check) {
       if (!existsSync(file) || readFileSync(file, 'utf8') !== text) { stale += 1; console.log(`stale: ${model.id}`); }

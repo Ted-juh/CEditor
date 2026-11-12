@@ -162,7 +162,7 @@
           "description": "Ordered tokens: literal hex bytes or placeholders ($deviceId, $address, $encodedValue, $size, $checksum)."
         },
         "checksum": { "$ref": "#/$defs/checksum" },
-        "delayAfterMs": { "type": "integer", "minimum": 0 }
+        "delayAfterMs": { "type": ["integer", "null"], "minimum": 0, "description": "A pause after the message; null for none at all (the emitter's default is 20 ms)." }
       }
     },
 
@@ -274,6 +274,7 @@
         "size": { "type": "integer", "minimum": 1 },
         "cc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Controller number for msg=cc." },
         "ccStride": { "type": "integer", "description": "Per-instance increment added to cc (GAIA: tone1 CC102, tone2 103, tone3 104 -> ccStride 1)." },
+        "shape": { "type": "string", "description": "For a SysEx wire: the messageShape it is sent with, when not the one its msg names (a Yamaha Parameter Change, a Waldorf Sound Parameter Change)." },
         "lsbCc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "For msg=cc: the controller carrying the value's low seven bits, the MSB going on `cc` first (a 14-bit pair)." },
         "channel": { "type": ["string", "integer"], "description": "For msg=cc, nrpn or rpn: the channel, when not the profile's $channel: a variable ($partChannel) or a fixed channel 1-16." },
         "nullAfterSend": { "type": "boolean", "description": "For msg=nrpn or rpn: whether the parameter number is set to null (7F 7F) after the value." },

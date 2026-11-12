@@ -89,7 +89,7 @@ export function resolveWires(p, absAddr, idx, resolveAddr) {
         ...Object.fromEntries(['channel', 'nullAfterSend', 'lowBits', 'lowBitsController', 'delayAfterMs']
           .filter((k) => wire[k] != null).map((k) => [k, wire[k]])),
       }
-      : { msg: wire.msg, address: addrOf(wire), size: wire.size ?? p.size ?? 1 };
+      : { msg: wire.msg, address: addrOf(wire), size: wire.size ?? p.size ?? 1, ...(wire.shape ? { shape: wire.shape } : {}) };
 
   if (Array.isArray(p.wires)) {
     const w = {};

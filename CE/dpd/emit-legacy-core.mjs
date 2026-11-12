@@ -250,7 +250,7 @@ function legacyParam(p) {
   out.messageRecipe = p.wires?.write?.msg === 'cc' ? ccRecipeId(p.wires.write)
     : p.wires?.write?.msg === 'nrpn' ? numberRecipeId('nrpn', p.wires.write)
     : p.wires?.write?.msg === 'rpn' ? numberRecipeId('rpn', p.wires.write)
-    : (p.wires?.write?.msg ?? 'dt1');
+    : (p.wires?.write?.shape ?? p.wires?.write?.msg ?? 'dt1');
   // An rxLive wire is the message the instrument SENDS when its own control moves, which need not be
   // the one the editor writes: a GAIA's filter knob is written as a DT1 to an address and transmitted
   // as CC 102/103/104. Nothing derived from the write path can recognise those, so the inbound index
@@ -273,7 +273,8 @@ function shapeToRecipe(shape, resolved) {
   const template = (shape.template ?? []).flatMap((tok) => (tok === '$modelId' ? modelBytes : [tok]));
   const recipe = { id: shape.id, kind: shape.kind, template };
   if (shape.checksum && shape.checksum.type !== 'none') recipe.checksum = shape.checksum;
-  recipe.delayAfterMs = shape.delayAfterMs ?? 20;
+  // null asks for no delay at all, as a recipe converted from one without it (tools/from-legacy.mjs).
+  if (shape.delayAfterMs !== null) recipe.delayAfterMs = shape.delayAfterMs ?? 20;
   return recipe;
 }
 
