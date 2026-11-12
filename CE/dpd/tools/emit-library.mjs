@@ -26,6 +26,7 @@ const modules = [
   [join(DPD, 'emit-legacy-core.mjs'), 'emit-legacy-core.mjs'],
   [join(DPD, 'from-legacy-core.mjs'), 'from-legacy-core.mjs'],
   [join(DPD, 'tools', 'validate.mjs'), 'validate.mjs'],
+  [join(DPD, 'tools', 'schema-enums.mjs'), 'schema-enums.mjs'],
   [join(DPD, 'tools', 'import-midici.mjs'), 'import-midici.mjs'],
 ];
 for (const [src, name] of modules) {

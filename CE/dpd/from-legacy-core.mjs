@@ -109,7 +109,7 @@ function wireOf(recipe, sysex, q) {
   if (!recipe) return { why: `message recipe ${q.messageRecipe} is missing` };
   if (recipe.kind === 'sysex') {
     const how = sysex.plan.get(recipe.id);
-    return { wire: { dir: 'write', msg: 'dt1', shape: how.shape }, address: how.address };
+    return { wire: { dir: 'write', msg: 'sysex', shape: how.shape }, address: how.address };
   }
   if (recipe.kind === 'cc') {
     if (recipe.value != null && recipe.value !== '$encodedValue') return { why: `cc recipe value ${recipe.value}` };

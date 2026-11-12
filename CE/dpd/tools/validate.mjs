@@ -1,28 +1,18 @@
 // Shared structural validator for DPD profiles. The formal contract is dpd.schema.json
-// (usable by ajv / editors); this is the dependency-free check the tools + the in-app Designer run,
-// kept in step with the schema's enums/required-fields so it's a real import gate (not a token check).
-const KINDS = ['manufacturer', 'model', 'variant', 'component'];
-const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger', 'momentary', 'text'];
-const WIRE_DIRS = ['write', 'read', 'rxLive'];
-const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'rpn', 'raw'];
-const CHECKSUM_TYPES = ['roland-7bit', 'sum-7bit', 'xor', 'none'];
-const ENCODING_TYPES = ['u7', 'u8', 's7', 'u14', 'u14-lsb', 'nibbles', 'packed8to7', 'bitslice'];
-const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'rpn', 'raw'];
-const SCOPE_KINDS = ['global', 'tone', 'part', 'effect', 'drumMap', 'patch'];
-const DUMP_KINDS = ['patch', 'performance', 'bank'];
+// (usable by ajv / editors); this is the dependency-free check the tools + the in-app Designer run.
+// The values each field allows are the schema's own, written out by make-schema-enums.mjs: the
+// validator kept copies of them, two lists for each kept in step by hand.
+import {
+  KINDS, BYTE_ORDERS, COMPLETENESS, VALUE_TYPES, WIRE_DIRS, WIRE_MSGS, CHECKSUM_TYPES, SHAPE_KINDS,
+  SCOPE_KINDS, DUMP_KINDS, PARAM_ENCODING_TYPES, DUMP_CODEC_TYPES, RECORD_FIELD_TYPES, DISPLAY_FORMATS,
+  PRESET_BANK_ROLES, PRESET_RECALL_KINDS, PROVENANCE_SOURCES,
+} from './schema-enums.mjs';
+
 // The two text codecs are parameter encodings as well as dump codecs. A patch name is ONE value —
 // ten bytes of ASCII at one address — and modelling it as ten one-byte parameters gives you ten
 // knobs where a name field belongs, and a librarian with nothing to read.
 const TEXT_CODEC_TYPES = ['text-ascii', 'text-nibbled-ascii'];
-// The engine's wider signed values (an Andromeda's s17, a KRONOS's s21) and its boolean with wire
-// values of its own, which profiles converted from the engine's format carry (tools/from-legacy.mjs).
-const ENGINE_ENCODING_TYPES = ['s14-lsb-msb', 's17-msb-lsb', 's21-lsb-msb', 's21-msb-lsb', 'boolean-u7'];
-const PARAM_ENCODING_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES, ...ENGINE_ENCODING_TYPES];
-// per-offset dump codecs: the value-encoding set plus the two text (patch-name) codecs.
-const DUMP_CODEC_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
 const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
-// $defs.parameterDisplay.format: the ce.format command that writes the value.
-const DISPLAY_FORMATS = ['number', 'hz', 'time', 'db', 'percent', 'pan', 'ratio', 'note', 'division', 'table'];
 
 /** $defs.patchSection: what a patch of this synth is, for ce.patch. */
 function checkPatchSection(patch, E) {
@@ -98,7 +88,7 @@ export function validateProfile(profile) {
   if (!KINDS.includes(profile.kind)) E('bad kind');
   if (profile.kind === 'model' && !profile.scopes) E('model needs scopes');
   if (profile.kind === 'variant' && !profile.inherits) E('variant needs inherits');
-  if (profile.byteOrder && !['msb-first', 'lsb-first'].includes(profile.byteOrder)) E(`bad byteOrder ${profile.byteOrder}`);
+  if (profile.byteOrder && !BYTE_ORDERS.includes(profile.byteOrder)) E(`bad byteOrder ${profile.byteOrder}`);
 
   if (profile.checksum) {
     if (!profile.checksum.type) E('checksum needs type');
@@ -150,6 +140,7 @@ export function validateProfile(profile) {
       for (const w of [p.rxLive, ...(p.wires ?? [])].filter(Boolean)) {
         if (!WIRE_DIRS.includes(w.dir)) E(`${sk}.${id}: bad wire dir ${w.dir}`);
         if (!WIRE_MSGS.includes(w.msg)) E(`${sk}.${id}: bad wire msg ${w.msg}`);
+        if (w.msg === 'sysex' && !w.shape) E(`${sk}.${id}: a sysex wire names the message shape it is sent with`);
       }
     }
   }
@@ -164,7 +155,12 @@ export function validateProfile(profile) {
         else if (m.checksum.type !== 'none' && (m.checksum.fromOffset == null || m.checksum.toOffset == null || m.checksum.byteOffset == null))
           E(`dump ${d.id}: message.checksum needs fromOffset/toOffset/byteOffset`);
       }
-      if (m.payload?.pack && !ENCODING_TYPES.includes(m.payload.pack.type)) E(`dump ${d.id}: bad payload.pack.type ${m.payload.pack.type}`);
+      if (m.payload?.pack && !PARAM_ENCODING_TYPES.includes(m.payload.pack.type)) E(`dump ${d.id}: bad payload.pack.type ${m.payload.pack.type}`);
+      const rec = m.payload?.records;
+      if (rec) {
+        if (!(Number.isInteger(rec.size) && rec.size > 0)) E(`dump ${d.id}: payload.records needs a size`);
+        for (const k of ['keyType', 'valueType']) if (rec[k] != null && !RECORD_FIELD_TYPES.includes(rec[k])) E(`dump ${d.id}: bad payload.records.${k} ${rec[k]}`);
+      }
     }
     (d.layout ?? []).forEach((e, i) => {
       if (!e.param || typeof e.param !== 'string') E(`dump ${d.id}: layout[${i}] needs a param ref`);
@@ -178,9 +174,9 @@ export function validateProfile(profile) {
   if (profile.presets) validatePresets(profile.presets, E);
   validateConversation(profile, E);
 
-  if (profile.provenance && !['official', 'community', 'imported', 'learn'].includes(profile.provenance.source))
+  if (profile.provenance && !PROVENANCE_SOURCES.includes(profile.provenance.source))
     E('bad provenance.source');
-  if (profile.completeness && !['full', 'partial', 'structural-only'].includes(profile.completeness))
+  if (profile.completeness && !COMPLETENESS.includes(profile.completeness))
     E('bad completeness');
 
   return { ok: errs.length === 0, errors: errs };
@@ -224,8 +220,6 @@ function validateConversation(profile, E) {
 
 // The preset model: slot map (banks), recall action, name request, init patch. Kept in step with
 // $defs.presets / presetBank / presetRecall in dpd.schema.json.
-const PRESET_BANK_ROLES = ['factory', 'user'];
-const PRESET_RECALL_KINDS = ['pc', 'bankPc', 'sysex'];
 
 export function validatePresets(presets, E) {
   const banks = presets.banks ?? [];

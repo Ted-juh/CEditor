@@ -312,12 +312,12 @@
         },
         "address": {
           "$ref": "#/$defs/hexBytes",
-          "description": "Default wire address, RELATIVE to the scope/instance base. Used for the DT1 write, RQ1 read, and (unless rxLive overrides) the DT1 the device emits on edit."
+          "description": "THE parameter's address, relative to its scope's base and instance: the one place it is written. Every SysEx wire of the parameter uses it ($address in its shape), unless a wire names an address of its own."
         },
         "size": { "type": "integer", "minimum": 1, "description": "Number of wire data bytes for this parameter (default 1)." },
         "rxLive": {
           "$ref": "#/$defs/wire",
-          "description": "Override for what the device TRANSMITS on a live edit, when it differs from the write wire. The GAIA case: cutoff is written via DT1 at 'address' but the panel knob transmits CC -> {dir:rxLive, msg:cc, cc:102, ccStride:1}."
+          "description": "The older form of a wire with dir rxLive, for a parameter with no `wires` list (the GAIA's): what the device TRANSMITS on a live edit, when it differs from the write wire. Ignored when `wires` is given; write it there."
         },
         "wires": {
           "type": "array",
@@ -367,8 +367,8 @@
       "description": "One directional wire binding for a parameter. dir=write (panel->synth), read (request value), rxLive (synth->panel on edit). msg picks the transport.",
       "properties": {
         "dir": { "enum": ["write", "read", "rxLive"] },
-        "msg": { "enum": ["dt1", "rq1", "cc", "nrpn", "rpn", "raw"] },
-        "address": { "$ref": "#/$defs/hexBytes", "description": "Relative address for sysex msgs (dt1/rq1)." },
+        "msg": { "enum": ["sysex", "dt1", "rq1", "cc", "nrpn", "rpn", "raw"], "description": "sysex: the message shape the wire names (`shape`), its $address the parameter's; dt1 and rq1: Roland's set and request, the model's shapes of those ids; cc, nrpn, rpn: a controller, an NRPN or RPN number." },
+        "address": { "$ref": "#/$defs/hexBytes", "description": "Only where this wire's message goes to another address than the parameter's (a read from another block): relative, like the parameter's. Absent: the parameter's address." },
         "size": { "type": "integer", "minimum": 1 },
         "cc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Controller number for msg=cc." },
         "ccStride": { "type": "integer", "description": "Per-instance increment added to cc (GAIA: tone1 CC102, tone2 103, tone3 104 -> ccStride 1)." },

@@ -5,7 +5,7 @@
   // it repeats); what it can be asked (requests) and what is asked when it connects; and the message
   // shapes the rest is built from. Nothing here is particular to one maker.
   import { shapeTemplate } from './dpdLabels.js';
-  import { fillShape } from '../../generated/dpd/emit-legacy-core.mjs';
+  import { fillShape, EMIT_DEFAULTS } from '../../generated/dpd/emit-legacy-core.mjs';
 
   // `shown`: mounted with every other screen; a FANTOM's 442 requests are listed when this one shows.
   let { model, merged, shown = true } = $props();
@@ -13,9 +13,10 @@
   let showAllRequests = $state(false);
   let showAllSync = $state(false);
 
-  let channel = $derived(merged?.variables?.channel ?? 1);
+  // What the model leaves out is what the emitter writes (EMIT_DEFAULTS), shown as in effect.
+  let channel = $derived(merged?.variables?.channel ?? EMIT_DEFAULTS.channel);
   let otherVariables = $derived(Object.entries(merged?.variables ?? {}).filter(([k]) => k !== 'channel'));
-  let delay = $derived(merged?.timing?.minDelayBetweenMessagesMs ?? 20);
+  let delay = $derived(merged?.timing?.minDelayBetweenMessagesMs ?? EMIT_DEFAULTS.timing.minDelayBetweenMessagesMs);
   let identity = $derived(merged?.identity ?? null);
   let shapes = $derived(merged?.messageShapes ?? []);
 
@@ -33,7 +34,7 @@
   let total = $derived(scopes.reduce((n, s) => n + s.count * s.instances, 0));
 
   let requests = $derived(merged?.requests ?? []);
-  let reqDefaults = $derived({ timeoutMs: merged?.defaults?.request?.timeoutMs ?? 1000, retries: merged?.defaults?.request?.retries ?? 0 });
+  let reqDefaults = $derived({ timeoutMs: merged?.defaults?.request?.timeoutMs ?? EMIT_DEFAULTS.request.timeoutMs, retries: merged?.defaults?.request?.retries ?? EMIT_DEFAULTS.request.retries });
   let shownRequests = $derived(!shown ? [] : showAllRequests ? requests : requests.slice(0, CAP));
   let requestName = $derived(new Map(requests.map((r) => [r.id, r.name ?? r.id])));
   let dumpName = $derived(new Map((merged?.dumps ?? []).map((d) => [d.id, d.name ?? d.id])));

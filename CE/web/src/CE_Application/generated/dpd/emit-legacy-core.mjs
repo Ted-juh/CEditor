@@ -7,6 +7,31 @@ import { resolveParams, copyJson } from './resolve.mjs';
 import { hexToBytes, checksumOf } from './codecs.mjs';
 import { assembleDump } from './dumps.mjs';
 
+/**
+ * What the emitter writes for what a model leaves out: every default it applies, in one place, so a
+ * model that does not say is not silently given something nobody can see. The Designer shows these
+ * as the values in effect (Device structure), and dpd.schema.json's descriptions name them.
+ */
+export const EMIT_DEFAULTS = Object.freeze({
+  // A parameter with no range: a 7-bit value.
+  range: { min: 0, max: 127 },
+  // A parameter with no send policy of its own and none for its type in `defaults.sendPolicy`: a
+  // choice or a name sent when it is set, anything else as it moves, 20 ms apart, and once more on
+  // release.
+  sendPolicy: (valueType) => ({ mode: valueType === 'enum' || valueType === 'text' ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true }),
+  access: { realtimeSafe: true, source: 'singleParameter' },
+  ui: (valueType) => ({ preferredComponent: valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' }),
+  // The device: channel 1, 20 ms between two messages, 20 ms after a message shape's message, and a
+  // request or an identity inquiry waited for a second and not repeated.
+  channel: 1,
+  timing: { minDelayBetweenMessagesMs: 20 },
+  shapeDelayAfterMs: 20,
+  request: { timeoutMs: 1000, retries: 0 },
+  identity: { timeoutMs: 1000, retries: 0 },
+  // The profile: untested until an instrument has answered, made on this machine.
+  profile: { minCEditorVersion: '0.9.0', status: 'experimental', trust: 'local' },
+});
+
 const flat = (rid) => rid.replace(/^[^.]+\./, '');
 // The one id a resolved parameter goes by in the legacy profile — in its `parameters` entry AND in
 // every dump mapping that names it. Instance 0 keeps its flat id (every existing panel and test binds
@@ -239,8 +264,8 @@ export function buildRequests(resolved, modelBytes) {
       ...(r.address ? { address: r.address } : {}),
       ...(r.size ? { size: r.size } : {}),
       ...(r.response ? { response: copyJson(r.response) } : {}),
-      timeoutMs: r.timeoutMs ?? defaults.timeoutMs ?? 1000,
-      retries: r.retries ?? defaults.retries ?? 0,
+      timeoutMs: r.timeoutMs ?? defaults.timeoutMs ?? EMIT_DEFAULTS.request.timeoutMs,
+      retries: r.retries ?? defaults.retries ?? EMIT_DEFAULTS.request.retries,
       ...(r.engine ?? {}),
     };
   });
@@ -291,7 +316,7 @@ function legacyParam(p, defaults = {}) {
     out.choices = p.enum.map((e) => ({ id: e.id, label: e.label, value: e.wire }));
   } else {
     out.default = p.default ?? p.range?.min ?? 0;
-    out.range = p.range ?? { min: 0, max: 127 };
+    out.range = p.range ?? copyJson(EMIT_DEFAULTS.range);
   }
   if (p.absAddress) out.address = p.absAddress;
   // shortLabel takes the INSTANCED name: two scenes of the same 110 parameters put "VCF Cutoff"
@@ -327,11 +352,11 @@ function legacyParam(p, defaults = {}) {
     : isText
       ? { type: encType, length: p.encoding?.length ?? 1, pad: p.encoding?.pad ?? 32 }
       : { type: encType };
-  out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: p.access?.realtimeSafe ?? true, source: p.access?.source ?? 'singleParameter' };
+  out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: p.access?.realtimeSafe ?? EMIT_DEFAULTS.access.realtimeSafe, source: p.access?.source ?? EMIT_DEFAULTS.access.source };
   // Its own send policy, or its model's for its value type; failing both, a name and a choice are
   // committed and the rest dragged. null: none at all.
   const sendPolicy = p.sendPolicy !== undefined ? p.sendPolicy : defaults.sendPolicy?.[p.valueType];
-  if (sendPolicy !== null) out.sendPolicy = copyJson(sendPolicy ?? { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true });
+  if (sendPolicy !== null) out.sendPolicy = copyJson(sendPolicy ?? EMIT_DEFAULTS.sendPolicy(p.valueType));
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
   // A parameter only read back (from a dump) has no write wire and is sent with nothing; a converted
   // one says so with `wires: []`. One with no wires list at all keeps the DT1 it always defaulted to.
@@ -350,7 +375,7 @@ function legacyParam(p, defaults = {}) {
   const writeCc = p.wires?.write?.msg === 'cc' ? p.wires.write.cc : null;
   if (rx?.msg === 'cc' && rx.cc != null && rx.cc !== writeCc) out.inbound = [{ kind: 'cc', controller: rx.cc }];
   if (out.messageRecipe === undefined) delete out.messageRecipe;
-  out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
+  out.ui = p.ui ?? EMIT_DEFAULTS.ui(p.valueType);
   if (p.description != null) out.description = p.description;
   if (p.source) out.source = copyJson(p.source);
   return applyEngine(out, p.engine);
@@ -365,7 +390,7 @@ function shapeToRecipe(shape, resolved) {
   const recipe = { id: shape.id, kind: shape.kind, template };
   if (shape.checksum && shape.checksum.type !== 'none') recipe.checksum = shape.checksum;
   // null asks for no delay at all, as a recipe converted from one without it (tools/from-legacy.mjs).
-  if (shape.delayAfterMs !== null) recipe.delayAfterMs = shape.delayAfterMs ?? 20;
+  if (shape.delayAfterMs !== null) recipe.delayAfterMs = shape.delayAfterMs ?? EMIT_DEFAULTS.shapeDelayAfterMs;
   return recipe;
 }
 
@@ -430,14 +455,14 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   const legacy = {
     schemaVersion: 1,
     profileVersion: resolved.version,
-    minCEditorVersion: '0.9.0',
+    minCEditorVersion: EMIT_DEFAULTS.profile.minCEditorVersion,
     id: legacyId ?? engineId ?? `${resolved.id}-dpd`,
     name: name ?? engineName ?? ((resolved.label ?? 'Device') + ' (from DPD)'),
     dpdSource: resolved.id,
     manufacturer: resolved.manufacturer ?? cap(resolved.inherits) ?? 'Generic',
     family: resolved.family ?? '',
-    status: 'experimental',
-    trust: 'local',
+    status: EMIT_DEFAULTS.profile.status,
+    trust: EMIT_DEFAULTS.profile.trust,
     // Every $name a template or matcher uses gets a home here. The engine resolves an undeclared
     // one to nothing, so a request whose address carries a $slot silently addressed byte 0.
     // The model's own `variables` (a part's channel, an FX channel) with their values, over every
@@ -448,10 +473,10 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
         .map((n) => [n, 0])),
       ...copyJson(resolved.variables ?? {}),
       ...(resolved.deviceId != null ? { deviceId: hexToBytes(resolved.deviceId)[0] } : {}),
-      channel: resolved.variables?.channel ?? 1,
+      channel: resolved.variables?.channel ?? EMIT_DEFAULTS.channel,
     },
     // How long the engine waits between two messages to this device.
-    timing: copyJson(resolved.timing ?? { minDelayBetweenMessagesMs: 20 }),
+    timing: copyJson(resolved.timing ?? EMIT_DEFAULTS.timing),
     parameters: params.map((p) => legacyParam(p, resolved.defaults)),
     messageRecipes,
   };
@@ -493,7 +518,7 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
         // makers' documents that say so), and a firmware revision to match.
         ...(resolved.identity.requestDeviceId ? { requestDeviceId: resolved.identity.requestDeviceId } : {}),
         ...(resolved.identity.revision ? { revision: toBytes(resolved.identity.revision) } : {}),
-        timeoutMs: 1000, retries: 0,
+        ...EMIT_DEFAULTS.identity,
       };
     }
   }

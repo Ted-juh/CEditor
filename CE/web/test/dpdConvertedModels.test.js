@@ -65,7 +65,7 @@ test('SysEx written out per parameter becomes one shape and an address each, and
   assert.deepEqual(edit.template, ['F0', '00', '00', '0E', '1D', '0E', '$address', '$encodedValue', 'F7']);
   const tempo = model.scopes.global.parameters.find((p) => p.id === 'clock.tempo');
   assert.equal(tempo.address, '05 00');
-  assert.deepEqual(tempo.wires, [{ dir: 'write', msg: 'dt1', shape: 'edit' }]);
+  assert.deepEqual(tempo.wires, [{ dir: 'write', msg: 'sysex', shape: 'edit' }]);
   tempo.address = '05 01';
   const problems = compareEmission(legacy, model, localCompileParameter);
   assert.ok(problems.some((m) => m.startsWith('clock.tempo = ')), problems.slice(0, 3).join('\n'));
