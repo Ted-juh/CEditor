@@ -1392,6 +1392,54 @@ int runCollectionEndsWithTests()
     return failures;
 }
 
+int runDumpNameTextTests()
+{
+    // A name as an instrument stores it: a 00 byte ends it, any other byte outside 32 - 127 reads as
+    // '?', and neither fails the dump. Waldorf's own Blofeld and Microwave banks put display
+    // characters below 32 into names and Behringer's DeepMind banks pad names with 00; each used to
+    // cost every other parameter of the sound. The JavaScript engine's twin is in
+    // deviceProfileCollection.test.js.
+    const juce::String json = R"JSON({
+      "schemaVersion": 1, "id": "probe-name-text", "name": "Probe", "manufacturer": "Probe",
+      "parameters": [
+        { "id": "name", "name": "Name", "type": "text", "encoding": { "type": "text-ascii", "length": 6, "pad": 32 },
+          "access": { "canWrite": false, "canRead": true } },
+        { "id": "level", "name": "Level", "messageRecipe": "cc7", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+      "dumpDefinitions": [
+        { "id": "sound", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "09"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 7 },
+          "completion": { "expectedBytes": 11 }, "mappings": [ { "parameter": "name", "offset": 0 }, { "parameter": "level", "offset": 6 } ] }
+      ]
+    })JSON";
+
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] Dump name text: probe profile load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const auto expectName = [&] (const char* hex, const juce::String& name, const char* why)
+    {
+        const auto parsed = engine.parseDumpMessage (hex);
+        if (! parsed.ok || parsed.values.getProperty ("name", {}).toString() != name || (int) parsed.values.getProperty ("level", -1) != 64)
+        {
+            std::cerr << "[FAIL] Dump name text: " << why << ": got " << (parsed.ok ? "\"" + parsed.values.getProperty ("name", {}).toString() + "\"" : parsed.error)
+                      << ", wanted \"" << name << "\" and level 64\n";
+            ++failures;
+        }
+    };
+    expectName ("F0 7D 09 41 42 02 44 20 20 40 F7", "AB?D", "a display character below 32 reads as ?");
+    expectName ("F0 7D 09 41 42 43 00 00 00 40 F7", "ABC", "a 00 ends the name");
+    expectName ("F0 7D 09 41 00 43 44 45 46 40 F7", "A", "what follows a 00 is not the name");
+    if (failures == 0)
+        std::cout << "[PASS] Dump name text :: 00 ends a name, other control bytes read as ?, the dump still reads\n";
+    return failures;
+}
+
 int runChecksumAlsoAcceptTests()
 {
     // Waldorf's checksum is the data's sum masked to 7 bits, and `A checksum of 7Fh is always
@@ -4824,6 +4872,7 @@ int main (int argc, char** argv)
     failures += runCcPairTests();
     failures += runCollectionEndsWithTests();
     failures += runChecksumAlsoAcceptTests();
+    failures += runDumpNameTextTests();
     failures += runDumpRecordTests();
     failures += runS21MsbFirstTests();
     failures += runS17MsbFirstTests();

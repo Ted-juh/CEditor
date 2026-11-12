@@ -269,6 +269,24 @@ juce::String normalisedTextCodec (const juce::String& codec)
     return codec;
 }
 
+// A name as an instrument stores it: a 00 byte ends it, and any other byte outside 32 - 127 is read
+// as '?'. Both used to fail the whole dump, and the makers' own sounds have both: Waldorf's Blofeld and
+// Microwave banks put display characters below 32 into names, Behringer's DeepMind banks pad names
+// with 00 (tools/profiles/check-factory-banks.mjs, docs/device-profile-factory-banks.md). One
+// character was costing every other parameter of the sound. The JavaScript engine's dumpNameText
+// reads them the same way.
+juce::String dumpNameText (const juce::Array<int>& codes)
+{
+    juce::String text;
+    for (auto code : codes)
+    {
+        if (code == 0)
+            break;
+        text += juce::String::charToString ((juce::juce_wchar) (code < 32 || code > 127 ? '?' : code));
+    }
+    return text;
+}
+
 juce::String trimRightPad (juce::String text, int padByte)
 {
     if (padByte < 0 || padByte > 127)
@@ -2430,16 +2448,11 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             if (length <= 0 || offset + length > bytes.size())
                 return juce::Result::fail ("Text dump value is outside message for " + propString (parameter, "id"));
 
-            juce::String text;
+            juce::Array<int> codes;
             for (int index = 0; index < length; ++index)
-            {
-                auto byte = bytes[offset + index];
-                if (byte < 32 || byte > 127)
-                    return juce::Result::fail ("Text dump value contains non-ASCII byte for " + propString (parameter, "id"));
-                text += juce::String::charToString ((juce::juce_wchar) byte);
-            }
+                codes.add (bytes[offset + index]);
 
-            semanticValue = trimRightPad (text, padByte);
+            semanticValue = trimRightPad (dumpNameText (codes), padByte);
             return juce::Result::ok();
         }
 
@@ -2449,18 +2462,11 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             if (length <= 0 || nibbles < length * 2 || offset + nibbles > bytes.size())
                 return juce::Result::fail ("Nibbled text dump value is outside message for " + propString (parameter, "id"));
 
-            juce::String text;
+            juce::Array<int> codes;
             for (int index = 0; index < length; ++index)
-            {
-                auto high = bytes[offset + (index * 2)] & 0x0f;
-                auto low = bytes[offset + (index * 2) + 1] & 0x0f;
-                auto byte = (high << 4) | low;
-                if (byte < 32 || byte > 127)
-                    return juce::Result::fail ("Nibbled text dump value contains non-ASCII byte for " + propString (parameter, "id"));
-                text += juce::String::charToString ((juce::juce_wchar) byte);
-            }
+                codes.add (((bytes[offset + (index * 2)] & 0x0f) << 4) | (bytes[offset + (index * 2) + 1] & 0x0f));
 
-            semanticValue = trimRightPad (text, padByte);
+            semanticValue = trimRightPad (dumpNameText (codes), padByte);
             return juce::Result::ok();
         }
 

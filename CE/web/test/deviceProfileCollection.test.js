@@ -190,3 +190,35 @@ test('when: a field is read only when the byte that selects it holds its value',
   assert.deepEqual(localParseDumpMessage(probe, 'F0 7D 05 03 40 F7').values, { engine: 3, cxDrawbar: 64 });
   assert.deepEqual(localParseDumpMessage(probe, 'F0 7D 05 00 40 F7').values, { engine: 0 });
 });
+
+// A name as an instrument stores it: a 00 byte ends it, any other byte outside 32 - 127 reads as '?',
+// and neither fails the dump. Waldorf's own Blofeld and Microwave banks put display characters below
+// 32 into names and Behringer's DeepMind banks pad names with 00; each used to cost every other
+// parameter of the sound. The C++ engine's runDumpNameTextTests checks the same probe.
+test('a name: 00 ends it, other control bytes read as ?, the dump still reads', () => {
+  const named = (type) => ({
+    schemaVersion: 1,
+    id: 'probe-name-text',
+    parameters: [
+      { id: 'name', name: 'Name', type: 'text', encoding: { type, length: 6, pad: 32 }, access: { canRead: true } },
+      { id: 'level', name: 'Level', type: 'integer', range: { min: 0, max: 127 }, encoding: { type: 'u7' }, access: { canRead: true } },
+    ],
+    dumpDefinitions: [{
+      id: 'sound',
+      kind: 'sysex',
+      matcher: { prefix: ['F0', '7D', '09'], suffix: ['F7'] },
+      payload: { offset: 3, size: type === 'text-ascii' ? 7 : 13 },
+      mappings: [{ parameter: 'name', offset: 0 }, { parameter: 'level', offset: type === 'text-ascii' ? 6 : 12 }],
+    }],
+  });
+  const read = (hex) => localParseDumpMessage(named('text-ascii'), hex);
+  for (const [hex, name] of [['F0 7D 09 41 42 02 44 20 20 40 F7', 'AB?D'], ['F0 7D 09 41 42 43 00 00 00 40 F7', 'ABC'], ['F0 7D 09 41 00 43 44 45 46 40 F7', 'A']]) {
+    const parsed = read(hex);
+    assert.equal(parsed.ok, true, parsed.error);
+    assert.deepEqual(parsed.values, { name, level: 64 }, hex);
+  }
+  // The same in nibbles: 'A' 41 as 04 01, a 1F as 01 0F.
+  const nibbled = localParseDumpMessage(named('text-nibbled-ascii'), 'F0 7D 09 04 01 01 0F 04 03 00 00 02 00 02 00 40 F7');
+  assert.equal(nibbled.ok, true, nibbled.error);
+  assert.deepEqual(nibbled.values, { name: 'A?C', level: 64 });
+});

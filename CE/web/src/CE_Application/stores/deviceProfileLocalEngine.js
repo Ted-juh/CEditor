@@ -661,6 +661,20 @@ function trimRightPad(text = '', padByte = 32) {
   return value.trimEnd();
 }
 
+// A name as an instrument stores it, as DeviceProfileEngine.cpp's dumpNameText reads it: a 00 byte
+// ends it, and any other byte outside 32 - 127 is read as '?'. Both used to fail the whole dump, and
+// the makers' own sounds have both: Waldorf's Blofeld and Microwave banks put display characters
+// below 32 into names, Behringer's DeepMind banks pad names with 00 (tools/profiles/check-factory-banks.mjs,
+// docs/device-profile-factory-banks.md). One character was costing every other parameter of the sound.
+function dumpNameText(codes = []) {
+  let text = '';
+  for (const code of codes) {
+    if (code === 0) break;
+    text += code < 32 || code > 127 ? '?' : String.fromCharCode(code);
+  }
+  return text;
+}
+
 function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecOverride = null) {
   if (offset < 0 || offset >= bytes.length) {
     return { ok: false, error: `Dump value offset is outside message for ${parameter?.id ?? ''}` };
@@ -681,14 +695,7 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
       if (length <= 0 || offset + length > bytes.length) {
         return { ok: false, error: `Text dump value is outside message for ${parameter?.id ?? ''}` };
       }
-      let text = '';
-      for (let index = 0; index < length; index += 1) {
-        const byte = bytes[offset + index];
-        if (byte < 32 || byte > 127) {
-          return { ok: false, error: `Text dump value contains non-ASCII byte for ${parameter?.id ?? ''}` };
-        }
-        text += String.fromCharCode(byte);
-      }
+      const text = dumpNameText(Array.from({ length }, (_, index) => bytes[offset + index]));
       return { ok: true, value: trimRightPad(text, pad) };
     }
 
@@ -697,16 +704,7 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
       if (length <= 0 || nibbles < length * 2 || offset + nibbles > bytes.length) {
         return { ok: false, error: `Nibbled text dump value is outside message for ${parameter?.id ?? ''}` };
       }
-      let text = '';
-      for (let index = 0; index < length; index += 1) {
-        const high = bytes[offset + (index * 2)] & 0x0f;
-        const low = bytes[offset + (index * 2) + 1] & 0x0f;
-        const byte = (high << 4) | low;
-        if (byte < 32 || byte > 127) {
-          return { ok: false, error: `Nibbled text dump value contains non-ASCII byte for ${parameter?.id ?? ''}` };
-        }
-        text += String.fromCharCode(byte);
-      }
+      const text = dumpNameText(Array.from({ length }, (_, index) => ((bytes[offset + (index * 2)] & 0x0f) << 4) | (bytes[offset + (index * 2) + 1] & 0x0f)));
       return { ok: true, value: trimRightPad(text, pad) };
     }
 
