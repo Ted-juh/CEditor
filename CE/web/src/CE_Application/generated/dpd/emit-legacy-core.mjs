@@ -18,7 +18,8 @@ const flat = (rid) => rid.replace(/^[^.]+\./, '');
 // mappings read into and wrote from Scene 1 — and the voiceCommon dump mapped Free-EG tracks 2-4 onto
 // track 1, four offsets to one id. A Scene 2 read moved Scene 1's controls, and every built dump wrote
 // Scene 1's values into Scene 2. One helper, so the two cannot drift again.
-export const legacyParamId = (p) => (p.instance > 0 ? p.resolvedId : flat(p.resolvedId));
+// A scope that names its instances (idTemplate) gives each its own id outright.
+export const legacyParamId = (p) => p.legacyId ?? (p.instance > 0 ? p.resolvedId : flat(p.resolvedId));
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined);
 
 // A cc recipe's id. A plain controller on the profile's channel keeps the id it always had
@@ -96,7 +97,12 @@ export function buildDumpDefinitions(resolved) {
   if (!dumps.length) return { dumpDefinitions: undefined, notes };
 
   const paramMap = {};
+  // A mapping naming a parameter by its own id finds that parameter first: a named scope's
+  // resolved ids (part1.x for its first instance) can be another instance's own id (part1.x of a
+  // scope numbered from 0).
+  const byOwnId = new Map();
   for (const p of resolveParams(resolved)) {
+    if (p.legacyId) byOwnId.set(p.legacyId, p);
     paramMap[p.resolvedId] = p;
     const alias = `${p.scope}.${p.paramId}`;
     if (p.instance === 0 && !(alias in paramMap)) paramMap[alias] = p;
@@ -127,7 +133,7 @@ export function buildDumpDefinitions(resolved) {
     if (m.completion?.messages !== null) def.completion.expectedMessages = m.completion?.messages ?? 1;
     if (m.completion?.bytes !== null) def.completion.expectedBytes = m.completion?.bytes ?? assembleDump(d, {}, resolved).length;
     def.mappings = (d.layout ?? []).map((e) => {
-      const p = paramMap[e.param];
+      const p = byOwnId.get(e.param) ?? paramMap[e.param];
       const codec = legacyDumpCodec(e.codec, note);
       // A record's mapping names its record, not an offset; `engine` carries what else it has.
       const mapping = {
@@ -190,17 +196,22 @@ export function templateVariables(resolved) {
   return names;
 }
 
-function legacyParam(p) {
+// The engine's type for each DPD value type, one to one. Everything but a choice and a name used to
+// be emitted as an integer, so a signed value, a switch and a button all lost what they were.
+const LEGACY_TYPES = { enum: 'choice', text: 'text', signed: 'bipolar', toggle: 'boolean', trigger: 'action', momentary: 'momentary' };
+
+function legacyParam(p, defaults = {}) {
   // The id follows legacyParamId (instance 0 flat, later instances prefixed) — the same rule the dump
   // mappings use. Later instances' names carry the instance too, because "Mixer VCO1 Level" twice in
   // a parameter list answers no question anyone is asking.
-  const instanced = p.instance > 0;
+  // A named instance's name is its own ('Part 2 Level'); otherwise later instances say which they are.
+  const instanced = p.instance > 0 && !p.named;
   const isText = p.valueType === 'text';
   const out = {
     id: legacyParamId(p),
     name: instanced ? `${p.name} (${p.scopeLabel ?? cap(p.scope)} ${p.instance + 1})` : p.name,
     group: p.group,
-    type: p.valueType === 'enum' ? 'choice' : isText ? 'text' : 'integer',
+    type: LEGACY_TYPES[p.valueType] ?? 'integer',
   };
   // The DEVICE's default when the profile records one. The fallbacks below are placeholders, not
   // data: range.min is the bottom of the dial, and for a bipolar parameter that is the extreme, not
@@ -252,9 +263,11 @@ function legacyParam(p) {
     : isText
       ? { type: encType, length: p.encoding?.length ?? 1, pad: p.encoding?.pad ?? 32 }
       : { type: encType };
-  out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: true, source: 'singleParameter' };
-  // A name is committed, not dragged.
-  out.sendPolicy = { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
+  out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: p.access?.realtimeSafe ?? true, source: p.access?.source ?? 'singleParameter' };
+  // Its own send policy, or its model's for its value type; failing both, a name and a choice are
+  // committed and the rest dragged. null: none at all.
+  const sendPolicy = p.sendPolicy !== undefined ? p.sendPolicy : defaults.sendPolicy?.[p.valueType];
+  if (sendPolicy !== null) out.sendPolicy = structuredClone(sendPolicy ?? { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true });
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
   // A parameter only read back (from a dump) has no write wire and is sent with nothing; a converted
   // one says so with `wires: []`. One with no wires list at all keeps the DT1 it always defaulted to.
@@ -370,7 +383,7 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
       channel: 1,
     },
     timing: { minDelayBetweenMessagesMs: 20 },
-    parameters: params.map(legacyParam),
+    parameters: params.map((p) => legacyParam(p, resolved.defaults)),
     messageRecipes,
   };
 

@@ -56,7 +56,9 @@
   let vtypeLabel = $derived(
     param?.valueType === 'enum' ? '◆ Enum'
       : param?.valueType === 'toggle' ? 'Toggle'
-      : param?.valueType === 'signed' ? 'Signed' : 'Continuous'
+      : param?.valueType === 'signed' ? 'Signed'
+      : param?.valueType === 'trigger' ? 'Trigger'
+      : param?.valueType === 'momentary' ? 'Momentary' : 'Continuous'
   );
   let vtypeCls = $derived(param?.valueType === 'enum' ? 'enum' : param?.valueType === 'toggle' ? 'toggle' : 'cont');
   let selLabel = $derived(entries[previewSel]?.label ?? entries[0]?.label ?? '—');

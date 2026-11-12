@@ -21,6 +21,7 @@
 // through both profiles, must give the same bytes.
 
 import { resolveModel } from './resolve.mjs';
+import { hexToBytes, bytesToHex, resolveAddress } from './codecs.mjs';
 import { buildLegacyProfile } from './emit-legacy-core.mjs';
 
 /** Structural equality of JSON values: what node's isDeepStrictEqual is for parsed JSON, in a browser too. */
@@ -48,7 +49,7 @@ export function dpdIdOf(legacy, handMade = new Set()) {
   return handMade.has(id) ? `${id}-converted` : id;
 }
 
-const VALUE_TYPES = { integer: 'continuous', bipolar: 'signed', choice: 'enum', enum: 'enum', text: 'text', boolean: 'toggle', action: 'trigger', momentary: 'trigger' };
+const VALUE_TYPES = { integer: 'continuous', bipolar: 'signed', choice: 'enum', enum: 'enum', text: 'text', boolean: 'toggle', action: 'trigger', momentary: 'momentary' };
 const ENCODINGS = { 'u14-msb-lsb': 'u14', 'u14-lsb-msb': 'u14-lsb', nibbled: 'nibbles', enum: 'u7' };
 const DISPLAY_KEYS = ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC', 'mode', 'shortLabel'];
 
@@ -147,8 +148,15 @@ function nativeParam(q, recipes, sysex) {
   if (q.range) p.range = structuredClone(q.range);
   if (q.default !== undefined) p.default = structuredClone(q.default);
   const enc = q.encoding?.type ?? 'u7';
-  p.encoding = { ...structuredClone(q.encoding ?? {}), type: ENCODINGS[enc] ?? enc };
-  p.access = { read: q.access?.canRead !== false, write: q.access?.canWrite !== false };
+  // The engine's nibble count is `nibbles`; the DPD's is `bytes`.
+  const { nibbles, ...encoding } = structuredClone(q.encoding ?? {});
+  p.encoding = { ...encoding, type: ENCODINGS[enc] ?? enc, ...(enc === 'nibbled' ? { bytes: nibbles ?? 2 } : nibbles != null ? { nibbles } : {}) };
+  p.access = {
+    read: q.access?.canRead !== false, write: q.access?.canWrite !== false,
+    ...(q.access?.realtimeSafe === false ? { realtimeSafe: false } : {}),
+    ...(q.access?.source && q.access.source !== 'singleParameter' ? { source: q.access.source } : {}),
+  };
+  p.sendPolicy = q.sendPolicy === undefined ? null : structuredClone(q.sendPolicy);
   if (Array.isArray(q.choices)) p.enum = q.choices.map((c) => ({ id: c.id, ...(c.label != null ? { label: c.label } : {}), wire: c.value }));
   if (q.ui) p.ui = structuredClone(q.ui);
   const display = Object.fromEntries(DISPLAY_KEYS.filter((k) => q.display?.[k] !== undefined).map((k) => [k, structuredClone(q.display[k])]));
@@ -216,6 +224,252 @@ function nativeDump(d) {
   };
 }
 
+// ---- Scopes -----------------------------------------------------------------------------------
+//
+// A profile lists every parameter of every part, tone or effect slot: a FANTOM's 11,852 parameters
+// are a few blocks, each several times over. Folded, each block is a scope: its parameters once,
+// how many instances, the address step between them (base + stride), and how each instance names
+// its parameters (idTemplate 'part{n}.{id}', `{n}` in its strings). A run of blocks is folded only
+// if emitting the scope gives exactly what the flat parameters did.
+
+const sub7 = (a, b) => {
+  // a - b, in 7-bit bytes of a's length (an address step), or null if it would go below zero.
+  const out = new Array(a.length).fill(0);
+  let borrow = 0;
+  for (let i = a.length - 1; i >= 0; i -= 1) {
+    let d = a[i] - (b[b.length - a.length + i] ?? 0) - borrow;
+    borrow = d < 0 ? 1 : 0;
+    if (d < 0) d += 128;
+    out[i] = d;
+  }
+  return borrow ? null : out;
+};
+
+/** A value across instances as one template ({n} where the instance's number is), or undefined. */
+function templateOf(values, ns) {
+  const first = values[0];
+  if (values.every((v) => deepEqual(v, first))) return first;
+  if (typeof first === 'string') {
+    const parts = values.map((v) => (typeof v === 'string' ? v.split(/(\d+)/) : null));
+    if (parts.some((x) => !x || x.length !== parts[0].length)) return undefined;
+    const out = [];
+    for (let i = 0; i < parts[0].length; i += 1) {
+      const col = parts.map((x) => x[i]);
+      if (col.every((c) => c === col[0])) out.push(col[0]);
+      else if (i % 2 === 1 && col.every((c, k) => c === String(ns[k]))) out.push('{n}');
+      else return undefined;
+    }
+    return out.join('');
+  }
+  if (Array.isArray(first)) {
+    if (values.some((v) => !Array.isArray(v) || v.length !== first.length)) return undefined;
+    const out = [];
+    for (let i = 0; i < first.length; i += 1) {
+      const t = templateOf(values.map((v) => v[i]), ns);
+      if (t === undefined) return undefined;
+      out.push(t);
+    }
+    return out;
+  }
+  if (first && typeof first === 'object') {
+    const keys = Object.keys(first);
+    if (values.some((v) => !v || typeof v !== 'object' || Array.isArray(v) || !deepEqual(Object.keys(v).sort(), [...keys].sort()))) return undefined;
+    const out = {};
+    for (const k of keys) {
+      const t = templateOf(values.map((v) => v[k]), ns);
+      if (t === undefined) return undefined;
+      out[k] = t;
+    }
+    return out;
+  }
+  return undefined;
+}
+
+/** A parameter's wires across instances, stepping where they step and templated, or null. */
+function foldWires(wires, ns) {
+  const out = [];
+  for (let i = 0; i < wires[0].length; i += 1) {
+    const col = wires.map((w) => ({ ...w[i] }));
+    const w0 = col[0];
+    if (w0.msg === 'cc') {
+      const step = col.length > 1 ? col[1].cc - w0.cc : 0;
+      if (col.some((w, k) => w.cc !== w0.cc + step * k || (w0.lsbCc != null && w.lsbCc !== w0.lsbCc + step * k))) return null;
+      for (const w of col) { w.cc = w0.cc; if (w0.lsbCc != null) w.lsbCc = w0.lsbCc; }
+      if (step) w0.ccStride = step;
+    }
+    for (const flavour of ['nrpn', 'rpn']) {
+      if (w0.msg !== flavour) continue;
+      const num = (h) => { const [a, b] = h.trim().split(/\s+/).map((x) => parseInt(x, 16)); return (a << 7) | b; };
+      const step = col.length > 1 ? num(col[1][flavour]) - num(w0[flavour]) : 0;
+      if (col.some((w, k) => num(w[flavour]) !== num(w0[flavour]) + step * k)) return null;
+      for (const w of col) w[flavour] = w0[flavour];
+      if (step) w0[`${flavour}Stride`] = step;
+    }
+    const stepKeys = ['ccStride', 'nrpnStride', 'rpnStride'].filter((k) => w0[k] != null);
+    const t = templateOf(col.map((w) => { const c = { ...w }; for (const k of stepKeys) delete c[k]; return c; }), ns);
+    if (t === undefined) return null;
+    for (const k of stepKeys) t[k] = w0[k];
+    out.push(t);
+  }
+  return out;
+}
+
+/** One parameter across a scope's instances, or null: its fields once, stepping and templated where they differ. */
+function foldParam(instances, rest, ns, stride) {
+  const p = { id: rest };
+  const perInstance = {};
+  // The address: the first instance's, the others the scope's stride on from it.
+  if (instances.some((q) => q.address != null)) {
+    if (!instances.every((q) => q.address != null)) return null;
+    const offset = hexToBytes(instances[0].address);
+    const steps = (s) => instances.every((q, idx) => bytesToHex(resolveAddress([0], s, idx, offset)) === q.address);
+    if (!steps(stride)) {
+      // Its own step, between its first two instances (an address of another width than the scope's).
+      const own = sub7(hexToBytes(instances[1].address), offset);
+      if (!own || !steps(own)) return null;
+      p.addressStride = bytesToHex(own);
+    }
+    p.address = instances[0].address;
+  }
+  // The wires: a controller or a number stepping by a fixed amount, the rest templated; failing
+  // that, each instance's own (one odd parameter need not keep its block from folding).
+  const wires = instances.map((q) => q.wires ?? []);
+  const folded = wires.some((w) => w.length !== wires[0].length) ? null : foldWires(wires, ns);
+  if (folded) p.wires = folded;
+  else { p.wires = structuredClone(wires[0]); perInstance.wires = structuredClone(wires); }
+  // Everything else: the same, templated, or (as a last resort) one value per instance.
+  const keys = new Set(instances.flatMap((q) => Object.keys(q)));
+  for (const key of keys) {
+    if (['id', 'address', 'wires'].includes(key)) continue;
+    const values = instances.map((q) => q[key]);
+    if (values.every((v) => v === undefined)) continue;
+    const t = values.some((v) => v === undefined) ? undefined : templateOf(values, ns);
+    if (t !== undefined) p[key] = t;
+    else if (key === 'valueType') return null;
+    else {
+      // Its first instance's value stands as the parameter's own, so the parameter is whole on its
+      // own (a choice keeps a list); the instances' values are laid over it.
+      if (values[0] !== undefined) p[key] = structuredClone(values[0]);
+      perInstance[key] = values.map((v) => (v === undefined ? null : structuredClone(v)));
+    }
+  }
+  if (Object.keys(perInstance).length) p.perInstance = perInstance;
+  return p;
+}
+
+/**
+ * Where a parameter's id carries its instance's number, as the template its instances share: the
+ * outermost segment with a number ('part2.eq.gain': part{n}.{id}, 2, 'eq.gain') or the innermost
+ * ('kit1.key36.inst.wave': kit1.key{n}.{id}; 'note1Zone7Ds.tune': note1Zone{n}Ds.{id};
+ * 'system.controlSource3': system.controlSource{n}, no rest). The number is the segment's last.
+ */
+function headOf(id, innermost) {
+  const segs = id.split('.');
+  const order = segs.map((_, i) => i);
+  if (innermost) order.reverse();
+  for (const i of order) {
+    const m = /^([A-Za-z].*?)(\d+)(\D*)$/.exec(segs[i]);
+    if (!m || (i === segs.length - 1 && m[3])) continue;
+    const rest = segs.slice(i + 1).join('.');
+    const template = [...segs.slice(0, i), `${m[1]}{n}${m[3]}`].join('.') + (rest ? '.{id}' : '');
+    return { template, name: m[1].replace(/\d+/g, ''), n: Number(m[2]), rest };
+  }
+  return null;
+}
+
+/** The parameters as scopes: { scopes } with the runs of blocks that fold, and the rest as they were. */
+function foldScopes(params, base, innermost, skip = new Set()) {
+  const head = (p) => headOf(p.id, innermost);
+  // Consecutive parameters of one <prefix><n>: a block.
+  const blocks = [];
+  for (const [i, p] of params.entries()) {
+    const h = head(p);
+    const last = blocks.at(-1);
+    if (h && last?.template === h.template && last.n === h.n && last.end === i) { last.end = i + 1; last.rests.push(h.rest); continue; }
+    blocks.push(h ? { template: h.template, name: h.name, n: h.n, start: i, end: i + 1, rests: [h.rest] } : { template: null, start: i, end: i + 1 });
+  }
+  const scopes = {};
+  const key = (k) => { let out = k; for (let n = 2; out in scopes; n += 1) out = `${k}_${n}`; return out; };
+  let flat = [];
+  const flush = () => { if (flat.length) { scopes[key('global')] = { kind: 'global', label: 'Parameters', instances: 1, ...base, parameters: flat }; flat = []; } };
+  for (let b = 0; b < blocks.length;) {
+    const first = blocks[b];
+    let e = b + 1;
+    if (first.template) {
+      while (e < blocks.length && blocks[e].template === first.template && blocks[e].n === first.n + (e - b) && deepEqual(blocks[e].rests, first.rests)) e += 1;
+    }
+    const scope = e - b >= 2 && !skip.has(first.template) ? foldRun(blocks.slice(b, e), params) : null;
+    if (scope) { flush(); scopes[key(first.name)] = scope; } else for (const bl of blocks.slice(b, e)) flat.push(...params.slice(bl.start, bl.end));
+    b = e;
+  }
+  flush();
+  return scopes;
+}
+
+/** A run of blocks (one per instance, the same parameters) as one scope, or null. */
+function foldRun(run, params) {
+  const ns = run.map((bl) => bl.n);
+  const at = (bl, j) => params[bl.start + j];
+  // The stride: between the first two instances' addresses, of the first parameter with one.
+  let stride = [0];
+  const j0 = run[0].rests.findIndex((_, j) => at(run[0], j).address != null);
+  if (j0 >= 0) {
+    const d = sub7(hexToBytes(at(run[1], j0).address ?? ''), hexToBytes(at(run[0], j0).address));
+    if (!d) return null;
+    stride = d;
+  }
+  const folded = [];
+  const prefix = run[0].name;
+  for (const [j, rest] of run[0].rests.entries()) {
+    // A parameter that is the whole numbered segment (controlSource3) is named after it.
+    const p = foldParam(run.map((bl) => at(bl, j)), rest || prefix, ns, stride);
+    if (!p) return null;
+    folded.push(p);
+  }
+  const groupTemplate = folded[0].group;
+  const label = typeof groupTemplate === 'string' && groupTemplate.includes('{n}') ? groupTemplate.replace(/\s*\{n\}\s*/, ' ').trim() : prefix;
+  return {
+    kind: /fx|effect|eq|reverb|chorus|delay|insert/i.test(prefix) ? 'effect' : /tone|partial|osc|voice|layer|timbre/i.test(prefix) ? 'tone' : 'part',
+    label, instances: run.length, first: ns[0], base: '00', stride: bytesToHex(stride),
+    idTemplate: run[0].template,
+    parameters: folded,
+  };
+}
+
+/** The model with its parameters folded into scopes, if emitting it gives exactly what the flat model did; else the flat model. */
+function withScopes(model) {
+  const flatScope = model.scopes.global;
+  const base = flatScope.base ? { base: flatScope.base, stride: flatScope.stride } : {};
+  const listed = (scopes) => Object.values(scopes).reduce((n, s) => n + s.parameters.length, 0);
+  const a = emitModel(model);
+  let best = model;
+  // By the outermost numbered segment, then the innermost: whichever lists fewer parameters, of
+  // those that emit exactly what the flat model does.
+  for (const innermost of [false, true]) {
+    // A scope whose parameters emit otherwise than they did flat is left unfolded, and the rest tried
+    // again, a few times; anything else that differs (a dump) and the fold is not used.
+    const skip = new Set();
+    for (let tries = 0; tries < 4; tries += 1) {
+      const scopes = foldScopes(flatScope.parameters, base, innermost, skip);
+      if (Object.keys(scopes).length === 1 && scopes.global) break;
+      if (listed(scopes) >= listed(best.scopes)) break;
+      const folded = { ...model, scopes };
+      const b = emitModel(folded);
+      if (deepEqual(a, b)) { best = folded; break; }
+      const { parameters: pa, ...ra } = a;
+      const { parameters: pb, ...rb } = b;
+      if (!deepEqual(ra, rb) || pa.length !== pb.length) break;
+      const bad = new Set();
+      for (const [i, q] of pa.entries()) if (!deepEqual(q, pb[i])) { bad.add(q.id); bad.add(pb[i].id); }
+      const templates = new Set();
+      for (const id of bad) { const h = headOf(id, innermost); if (h) templates.add(h.template); }
+      if (!templates.size || [...templates].every((t) => skip.has(t))) break;
+      for (const t of templates) skip.add(t);
+    }
+  }
+  return best;
+}
+
 export function emitModel(model) {
   return buildLegacyProfile(resolveModel(model, {}));
 }
@@ -252,6 +506,22 @@ export function legacyToDpd(legacy, { handMade = new Set() } = {}) {
     },
     completeness: 'partial',
   };
+  // The send policy most parameters of each value type have becomes the model's default for it, and
+  // a parameter names its own only when it has another: "knobs sent as they move, lists once set",
+  // once, rather than on every parameter.
+  const policies = new Map();
+  for (const p of params) {
+    const key = JSON.stringify(p.sendPolicy);
+    const byType = policies.get(p.valueType) ?? policies.set(p.valueType, new Map()).get(p.valueType);
+    byType.set(key, (byType.get(key) ?? 0) + 1);
+  }
+  const defaults = {};
+  for (const [type, counts] of policies) {
+    const [key] = [...counts].sort((a, b) => b[1] - a[1])[0];
+    if (key !== 'null') defaults[type] = JSON.parse(key);
+  }
+  for (const p of params) if (defaults[p.valueType] && JSON.stringify(p.sendPolicy) === JSON.stringify(defaults[p.valueType])) delete p.sendPolicy;
+  if (Object.keys(defaults).length) model.defaults = { sendPolicy: defaults };
   if (legacy.presets && !legacy.presets.nameRequest) model.presets = structuredClone(legacy.presets);
   if (legacy.dumpDefinitions?.length) model.dumps = legacy.dumpDefinitions.map(nativeDump);
 
@@ -278,7 +548,7 @@ export function legacyToDpd(legacy, { handMade = new Set() } = {}) {
   }
   const extra = overlay(legacy, emitModel(model), PROFILE_SKIP);
   if (Object.keys(extra).length) model.engine = extra;
-  return { model };
+  return { model: withScopes(model) };
 }
 
 /** The values a parameter is checked at: the ends and middle of its range, or every choice. */

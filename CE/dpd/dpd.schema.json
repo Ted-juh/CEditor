@@ -110,6 +110,13 @@
     },
 
     "provenance": { "$ref": "#/$defs/provenance" },
+    "defaults": {
+      "type": "object",
+      "description": "What a parameter has unless it says otherwise.",
+      "properties": {
+        "sendPolicy": { "type": "object", "description": "By value type (continuous, signed, enum, toggle, trigger, momentary, text): the send policy a parameter of that type has unless it names one." }
+      }
+    },
     "engine": { "type": "object", "description": "Engine-only profile fields the emitter lays over what it derives (the engine id and name, description, sources, notes, tests, coverage, timing, identity, requests, ...); a key set to null is left out. Written by tools/from-legacy.mjs." },
     "completeness": {
       "enum": ["full", "partial", "structural-only"],
@@ -189,6 +196,8 @@
         "base": { "$ref": "#/$defs/hexBytes", "description": "Base address of instance 0 (parameters address relative to this)." },
         "stride": { "$ref": "#/$defs/hexBytes", "description": "Address increment between consecutive instances (added per instance index)." },
         "instances": { "type": "integer", "minimum": 1, "description": "Instance count. May be supplied by deviceStructure instead." },
+        "first": { "type": "integer", "description": "The number of the first instance, for idTemplate and {n} (default 1)." },
+        "idTemplate": { "type": "string", "description": "How each instance names its parameters, e.g. 'part{n}.{id}': {n} the instance's number, {id} the parameter's. With it, {n} in a parameter's strings is filled the same way and perInstance values apply." },
         "instancesFrom": { "type": "string", "description": "deviceStructure field to read the instance count from, e.g. 'tones'." },
         "parameters": {
           "type": "array",
@@ -206,8 +215,8 @@
         "name": { "type": "string" },
         "group": { "type": "string", "description": "UI grouping, e.g. 'Filter'." },
         "valueType": {
-          "enum": ["continuous", "signed", "enum", "toggle", "trigger", "text"],
-          "description": "Drives the panel red/orange/green drag-fit check and the value codec. text = a fixed-length string living at ONE address (a patch name), carried by a text-ascii or text-nibbled-ascii encoding — not N one-byte parameters."
+          "enum": ["continuous", "signed", "enum", "toggle", "trigger", "momentary", "text"],
+          "description": "Drives the panel red/orange/green drag-fit check and the value codec. In the engine's profile: continuous is an integer, signed a bipolar, enum a choice, toggle a boolean, trigger an action (sent once), momentary a momentary (pressed and released). text = a fixed-length string living at ONE address (a patch name), carried by a text-ascii or text-nibbled-ascii encoding — not N one-byte parameters."
         },
         "range": {
           "type": "object",
@@ -221,7 +230,9 @@
           "additionalProperties": false,
           "properties": {
             "read": { "type": "boolean" },
-            "write": { "type": "boolean" }
+            "write": { "type": "boolean" },
+            "realtimeSafe": { "type": "boolean", "description": "Whether the value can be sent while a note plays (default true); false for one the instrument takes time to apply." },
+            "source": { "type": "string", "description": "Where the engine reads the value from: singleParameter (default), bulkDump, sysexRequest." }
           },
           "description": "Whether the device can be read from / written to for this parameter (e.g. Master Volume may be write-only)."
         },
@@ -252,6 +263,9 @@
         "display": { "$ref": "#/$defs/parameterDisplay" },
         "provenance": { "$ref": "#/$defs/provenance" },
         "description": { "type": "string", "description": "What the parameter is, as its document gives it." },
+        "addressStride": { "$ref": "#/$defs/hexBytes", "description": "In a scope of several instances: this parameter's address step between instances, when not the scope's stride." },
+        "perInstance": { "type": "object", "description": "In a scope that names its instances (idTemplate): a field whose value differs per instance in a way {n} does not express, as one value per instance." },
+        "sendPolicy": { "type": ["object", "null"], "description": "When its value is sent: mode continuous (while it moves) or onCommit (once it is set), coalesce, minIntervalMs, sendFinalOnRelease. Defaults to the model's defaults.sendPolicy for its value type; null for none." },
         "engine": { "type": "object", "description": "Engine-only details the emitter lays over the legacy parameter it derives (send policy, short label, a type the DPD value types do not name, ...); a key set to null is left out. Written by tools/from-legacy.mjs as exactly the difference between the engine profile and what the emitter derives." }
       },
       "allOf": [

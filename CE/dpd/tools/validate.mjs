@@ -2,7 +2,7 @@
 // (usable by ajv / editors); this is the dependency-free check the tools + the in-app Designer run,
 // kept in step with the schema's enums/required-fields so it's a real import gate (not a token check).
 const KINDS = ['manufacturer', 'model', 'variant', 'component'];
-const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger', 'text'];
+const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger', 'momentary', 'text'];
 const WIRE_DIRS = ['write', 'read', 'rxLive'];
 const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'rpn', 'raw'];
 const CHECKSUM_TYPES = ['roland-7bit', 'sum-7bit', 'xor', 'none'];

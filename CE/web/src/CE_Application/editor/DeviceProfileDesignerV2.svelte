@@ -322,7 +322,7 @@
           <DpdMessageShapesScreen {merged} />
         </div>
         <div class={['screen', activeScreen === 'dumps' && 'active']}>
-          <DpdBulkDumpsScreen {model} {merged} />
+          <DpdBulkDumpsScreen {model} {merged} shown={activeScreen === 'dumps'} />
         </div>
         <div class={['screen', activeScreen === 'advanced' && 'active']}>
           <DpdAdvancedScreen {model} {profileId} active={activeScreen === 'advanced'} onApplyModel={(m) => { model = m; appliedSavedFor = profileId; }} />

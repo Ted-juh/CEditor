@@ -43,6 +43,8 @@
       case 'enum': return { label: `◆ Enum · ${r.enum?.length ?? 0}`, cls: 'enum' };
       case 'toggle': return { label: 'Toggle', cls: 'toggle' };
       case 'signed': return { label: 'Signed', cls: 'cont' };
+      case 'trigger': return { label: 'Trigger', cls: 'toggle' };
+      case 'momentary': return { label: 'Momentary', cls: 'toggle' };
       default: return { label: 'Continuous', cls: 'cont' };
     }
   }

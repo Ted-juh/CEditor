@@ -9,7 +9,12 @@
   import { bytesToHex } from '../../generated/dpd/codecs.mjs';
   import NumberCell from '../../properties/NumberCell.svelte';
 
-  let { model, merged } = $props();
+  // `shown`: the designer mounts every screen and shows one. A KRONOS drum kit's dump has 20,352
+  // fields; built while hidden, its table and byte map cost every opening of the designer half a
+  // minute. They are built when the screen is shown, and the table a few hundred rows at a time.
+  let { model, merged, shown = true } = $props();
+  const ROWS = 300;
+  let showAllFields = $state(false);
 
   const CODECS = ['u7', 'u8', 's7', 'u14', 'nibbles', 'packed8to7', 'bitslice', 'text-ascii', 'text-nibbled-ascii'];
   const FIELD_COLORS = 6; // .f0..f5 cycle in CSS
@@ -19,7 +24,7 @@
   let active = $derived(dumps[Math.min(selected, Math.max(0, dumps.length - 1))] ?? null);
   let isMapped = $derived(!!(active?.message?.matcher && active?.layout?.length));
 
-  let paramOptions = $derived(merged ? resolveParams(merged).map((p) => ({ id: p.resolvedId, name: p.name ?? p.paramId, paramId: p.paramId })) : []);
+  let paramOptions = $derived(shown && merged ? resolveParams(merged).map((p) => ({ id: p.resolvedId, name: p.name ?? p.paramId, paramId: p.paramId })) : []);
   // A layout entry names its parameter by resolved id, or (a model converted from an engine profile)
   // by the parameter's own id: either finds its name.
   let nameOf = $derived(new Map(paramOptions.flatMap((o) => [[o.paramId, o.name], [o.id, o.name]])));
@@ -29,9 +34,10 @@
   const listId = `dpd-dump-params-${Math.random().toString(36).slice(2, 8)}`;
 
   // resolved byte map + probe wire (zero values → shows framing + checksum) + live round-trip
-  let map = $derived(isMapped ? safe(() => dumpByteMap(active, merged)) : null);
-  let wire = $derived(isMapped ? safe(() => assembleDump(active, {}, merged)) ?? [] : []);
-  let rt = $derived(isMapped ? safe(() => dumpRoundTrip(active, merged)) : null);
+  let map = $derived(shown && isMapped ? safe(() => dumpByteMap(active, merged)) : null);
+  let wire = $derived(shown && isMapped ? safe(() => assembleDump(active, {}, merged)) ?? [] : []);
+  let rt = $derived(shown && isMapped ? safe(() => dumpRoundTrip(active, merged)) : null);
+  let visibleLayout = $derived(!shown ? [] : showAllFields ? (active?.layout ?? []) : (active?.layout ?? []).slice(0, ROWS));
 
   function safe(fn) { try { return fn(); } catch { return null; } }
 
@@ -50,7 +56,7 @@
   let fieldFails = $derived(new Set((rt?.failures ?? []).map((f) => f.param)));
 
   // ── authoring ──
-  function selectDump(i) { selected = i; }
+  function selectDump(i) { selected = i; showAllFields = false; }
   function defineLayout(d) {
     if (!d.message) d.message = { matcher: { prefix: ['F0', 'F7'].slice(0, 1).concat([]), suffix: ['F7'] }, payload: { offset: 1 } };
     if (!d.message.matcher) d.message.matcher = { prefix: ['F0'], suffix: ['F7'] };
@@ -122,7 +128,7 @@
     <div class="layoutbox">
       <div class="lh"><span class="lt">{active.name ?? active.id} layout</span><span class="lm">offset · parameter · codec · size</span></div>
       <div class="dlhead"><span>offset</span><span>parameter</span><span>codec</span><span>size</span><span></span><span></span></div>
-      {#each active.layout as entry, i (i)}
+      {#each visibleLayout as entry, i (i)}
         {@const fail = fieldFails.has(entry.param)}
         <div class="dlrow">
           <span class="nc-wrap"><NumberCell min={0} value={entry.offset} onchange={(v) => entry.offset = v} /></span>
@@ -143,6 +149,9 @@
         </div>
       {/each}
       <datalist id={listId}>{#each paramOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}</datalist>
+      {#if shown && !showAllFields && active.layout.length > ROWS}
+        <button class="addslot asbtn" onclick={() => { showAllFields = true; }}>Show all {active.layout.length} fields</button>
+      {/if}
       <button class="addslot asbtn" onclick={() => addField(active)}>+ Add parameter</button>
     </div>
   {:else if active}

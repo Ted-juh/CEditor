@@ -647,9 +647,10 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **Reading controllers back ignores the channel.** When a synth sends a controller, CEditor finds
   the parameter by its message with the channel masked out. For a profile with two parts on two
   channels (the JP-08), a knob turned on the Lower part is read as the Upper part's.
-- **The Device Profile Designer is slow on the largest profiles.** It draws every parameter and
-  every field of a dump: a FANTOM opens in about 7 seconds, a KRONOS drum kit (20,000 parameters)
-  in about 30.
+- **The Device Profile Designer is slow on the largest profiles.** It converts and draws the whole
+  profile when it opens one: a FANTOM takes about 6 seconds, a KRONOS drum kit (20,352 parameters)
+  about 7, and the drum kit's Bulk dumps screen 4 more the first time it is shown. The parameter
+  list is not virtualised yet.
 
 ## In the Device Profile Designer
 
@@ -658,8 +659,22 @@ DPD model, converted from the profile when it opens (`CE/dpd/from-legacy-core.mj
 with their names, groups, ranges and choices and the message each is sent with, the message shapes,
 and the dumps with their framing, checksum and layout. SysEx written out in full for each parameter
 (a KRONOS, an Andromeda) becomes one message shape with an address for each parameter, the bytes
-that differ between their messages. What the DPD does not describe, a send policy or a KRONOS's
-bit-field codecs, is carried for the engine as it is.
+that differ between their messages.
+
+A block the profile repeats becomes a scope: written once, with how many instances there are, how
+far apart they sit and what each is called. The JD-Xi's drum kit is 37 keys of 145 parameters, each
+key `00 00 01 00` on from the last; the model lists the 145 once, as `drums.key{n}.{id}`. A
+parameter that steps on its own (a controller ten on per LFO, an NRPN number per part, an address a
+byte longer than its neighbours') says so itself, and a value that differs between instances in no
+pattern is listed per instance. 212 of the 360 have at least one scope, and the models list 256,896
+parameters where the profiles list 535,342; a scope is kept only where the model still emits the
+profile unchanged.
+
+Each parameter's kind is one of the DPD's own value types (continuous, signed, enum, toggle,
+trigger, momentary, text), and how it is sent as it moves (its send policy) is a DPD field: the
+model names it once per value type under `defaults.sendPolicy`, and a parameter only when it
+differs. What the DPD still does not describe, a KRONOS's bit-field codecs or the profile's notes
+and tests, is carried for the engine as it is, on fewer than 2 parameters in 100.
 
 Every one of the 360 converts, and emitting the model gives the profile back: every field equal, and
 every parameter sending the same bytes at the ends and middle of its range and at every choice

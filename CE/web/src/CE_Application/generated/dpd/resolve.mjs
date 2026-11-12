@@ -37,18 +37,51 @@ export function mergeIncludes(resolved, components) {
   return out;
 }
 
+// `{n}` in every string of a value, the instance's number in its place.
+function fillNumber(value, n) {
+  if (typeof value === 'string') return value.replaceAll('{n}', String(n));
+  if (Array.isArray(value)) return value.map((v) => fillNumber(v, n));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fillNumber(v, n)]));
+  return value;
+}
+
+/**
+ * One instance of a scope's parameter, where the scope names its instances (`idTemplate`): `{n}` in
+ * its strings filled with the instance's number (`first` + its index; a part's name, group, channel
+ * variable), and the values it has per instance (`perInstance: { field: [one per instance] }`) taken.
+ */
+export function instanceParam(p, idx, n) {
+  const { perInstance, ...rest } = p;
+  const out = fillNumber(rest, n);
+  // fillNumber copies as it goes: the designer resolves its live model, a Svelte state proxy, which
+  // structuredClone refuses (DataCloneError), and a KRONOS's per-instance values were lost to it.
+  for (const [field, values] of Object.entries(perInstance ?? {})) if (Array.isArray(values) && values[idx] !== undefined) out[field] = fillNumber(values[idx], n);
+  return out;
+}
+
 // Resolve scopes -> flat parameters with absolute addresses + directional wires.
+//
+// A scope that names its instances (`idTemplate`, e.g. 'part{n}.{id}', `first` the first instance's
+// number) gives each parameter of each instance its own id, and `{n}` in its strings that number:
+// the engine profiles' own names ('Part 2 Level', group 'Part 2'). A scope without one is as it was:
+// the first instance keeps the parameter's id, the others are '<scope><index>.<id>'.
 export function resolveParams(resolved) {
   const out = [];
   for (const [scopeKey, scope] of Object.entries(resolved.scopes ?? {})) {
     const count = scope.instances ?? (scope.instancesFrom ? resolved.deviceStructure?.[scope.instancesFrom] : 1) ?? 1;
     const base = hexToBytes(scope.base ?? '00 00 00 00');
     const stride = hexToBytes(scope.stride ?? '00 00 00 00');
+    const named = typeof scope.idTemplate === 'string';
     for (let idx = 0; idx < count; idx++) {
       const instanceLabel = count > 1 ? `${scopeKey}${idx + 1}` : scopeKey;
-      for (const p of scope.parameters ?? []) {
+      const n = (scope.first ?? 1) + idx;
+      for (const raw of scope.parameters ?? []) {
+        const p = named ? instanceParam(raw, idx, n) : raw;
         const offset = hexToBytes(p.address ?? '');
-        const absAddr = offset.length ? bytesToHex(resolveAddress(base, stride, idx, offset)) : null;
+        // A parameter whose address steps by its own amount (addressStride: a KRONOS insert effect's
+        // switch, its address a byte longer than the effect type's) uses that, not the scope's.
+        const step = p.addressStride ? hexToBytes(p.addressStride) : stride;
+        const absAddr = offset.length ? bytesToHex(resolveAddress(base, step, idx, offset)) : null;
         out.push({
           resolvedId: `${instanceLabel}.${p.id}`, scope: scopeKey, scopeLabel: scope.label, instance: idx, paramId: p.id,
           name: p.name, group: p.group, valueType: p.valueType, range: p.range, default: p.default,
@@ -58,15 +91,26 @@ export function resolveParams(resolved) {
           // its description, and `engine`, the engine-only details the emitter lays over what it
           // derives (tools/from-legacy.mjs computes it as exactly that difference).
           ...(p.description != null ? { description: p.description } : {}),
+          ...(p.sendPolicy !== undefined ? { sendPolicy: p.sendPolicy } : {}),
           // `wires: []`: a parameter sent with nothing, only read back (from a dump).
           ...(Array.isArray(p.wires) && p.wires.length === 0 ? { wiresDeclaredEmpty: true } : {}),
           ...(p.engine ? { engine: p.engine } : {}),
-          wires: resolveWires(p, absAddr, idx, (rel) => bytesToHex(resolveAddress(base, stride, idx, hexToBytes(rel)))),
+          ...(named ? { legacyId: scope.idTemplate.replaceAll('{n}', String(n)).replaceAll('{id}', raw.id), named: true } : {}),
+          wires: resolveWires(p, absAddr, idx, (rel) => bytesToHex(resolveAddress(base, step, idx, hexToBytes(rel)))),
         });
       }
     }
   }
   return out;
+}
+
+/** 'MM LL' moved on by `by` as one 14-bit number; unchanged when `by` is 0. */
+function stepNumber(number, by) {
+  if (!by || typeof number !== 'string') return number;
+  const [msb, lsb] = number.trim().split(/\s+/).map((h) => parseInt(h, 16));
+  const v = ((msb << 7) | lsb) + by;
+  const hex2 = (x) => x.toString(16).toUpperCase().padStart(2, '0');
+  return `${hex2((v >> 7) & 0x7f)} ${hex2(v & 0x7f)}`;
 }
 
 // resolveAddr (optional) resolves a wire's OWN relative address to absolute (base+stride+offset);
@@ -87,7 +131,8 @@ export function resolveWires(p, absAddr, idx, resolveAddr) {
       // Its number, and how the engine sends it: a channel of its own, a null (7F 7F) after the
       // value, Korg's low bits first on another controller, a pause after the message.
       ? {
-        msg: wire.msg, [wire.msg]: wire[wire.msg], size: wire.size ?? p.size ?? 1,
+        // A number that steps with the instance (nrpnStride, on the 14-bit number) as a cc does.
+        msg: wire.msg, [wire.msg]: stepNumber(wire[wire.msg], (wire[`${wire.msg}Stride`] ?? 0) * idx), size: wire.size ?? p.size ?? 1,
         ...Object.fromEntries(['channel', 'nullAfterSend', 'lowBits', 'lowBitsController', 'delayAfterMs']
           .filter((k) => wire[k] != null).map((k) => [k, wire[k]])),
       }

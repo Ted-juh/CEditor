@@ -80,3 +80,26 @@ test('a dump is a DPD dump: framing, checksum, layout; and a changed dump is cau
   const problems = compareEmission(legacy, model, localCompileParameter);
   assert.ok(problems.includes('profile field dumpDefinitions differs'), problems.join('\n'));
 });
+
+test('repeated blocks fold into scopes: one block, its instances, its step, its names', () => {
+  // The JD-Xi's drum kit: 37 keys of 145 parameters, each key 00 00 01 00 on from the last.
+  const jdxi = legacyToDpd(legacyOf('roland-jd-xi'), { handMade }).model;
+  const keys = Object.values(jdxi.scopes).find((s) => s.idTemplate === 'drums.key{n}.{id}');
+  assert.ok(keys, Object.values(jdxi.scopes).map((s) => s.idTemplate).join(', '));
+  assert.equal(keys.instances, 37);
+  assert.equal(keys.parameters.length, 145);
+  // The Digitakt's two LFOs: CC 102 and 112, the same eight parameters ten controllers apart.
+  const digitakt = legacyToDpd(legacyOf('elektron-digitakt'), { handMade }).model;
+  const lfo = Object.values(digitakt.scopes).find((s) => s.idTemplate === 'lfo{n}.{id}');
+  assert.equal(lfo.instances, 2);
+  assert.equal(lfo.parameters.find((p) => p.id === 'speed').wires[0].ccStride, 10);
+  // Folded or not, the model emits the profile it came from (the first test proves it for all).
+  assert.ok(Object.values(legacyToDpd(legacyOf('korg-kronos-drum-kit'), { handMade }).model.scopes).reduce((n, s) => n + s.parameters.length, 0) < 20352 / 2);
+});
+
+test('a parameter names its own send policy only when its model\'s default for its type is not it', () => {
+  const { model } = legacyToDpd(legacyOf('arturia-microfreak'), { handMade });
+  // Its knobs are sent as they move: the model says so once.
+  assert.deepEqual(model.defaults.sendPolicy, { continuous: { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true } });
+  assert.ok(Object.values(model.scopes).flatMap((s) => s.parameters).every((p) => p.sendPolicy === undefined && !p.engine?.sendPolicy));
+});
