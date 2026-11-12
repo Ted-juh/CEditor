@@ -47,6 +47,7 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | [`vermona/`](vermona/README.md) | 2 profiles from Vermona's user guides: the Mono Lancet '15's seven MIDI switches with their factory settings, and the Kick Lancet's GATE and AUDIO input modes, as choices. |
 | [`modor/`](modor/README.md) | 3 profiles from Modor's user manuals: NF-1 (and NF-1m), NF-1k and DR-2. Every received controller of the MIDI controller list, its footnotes told from its name by the raised marks' size; the DR-2's NRPNs for the drum parameters without a controller. Read from the PDFs' word positions. |
 | [`gotharman/`](gotharman/README.md) | 5 profiles from Gotharman's manuals: the Anamono's parameter list (every parameter by NRPN, its 8-bit value in the 14-bit mode, value names as choices) and the CC lists of the LD3, LD Zero, Tiny LD and SpazeBoard6, a part's parameters on the part's channel. Read from the PDFs' word positions and text. |
+| [`radikal/`](radikal/README.md) | The Radikal Technologies Delta CEP A / A2 from its manual's MIDI controller table: every row with its range and neutral value, named values as choices, the tune as a 14-bit pair. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |
 
 **Makers looked at and not built** (November 2026), each for want of its own documents reachable

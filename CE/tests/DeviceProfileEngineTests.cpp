@@ -4805,6 +4805,7 @@ int main (int argc, char** argv)
         root.getChildFile ("gotharman-ld3.ceditor-device.json"),
         root.getChildFile ("gotharman-spazeboard6.ceditor-device.json"),
         root.getChildFile ("gotharman-tiny-ld.ceditor-device.json"),
+        root.getChildFile ("radikal-delta-cep-a.ceditor-device.json"),
         root.getChildFile ("gamechanger-auto-chorus.ceditor-device.json"),
         root.getChildFile ("gamechanger-auto-delay.ceditor-device.json"),
         root.getChildFile ("gamechanger-auto-reverb.ceditor-device.json"),
