@@ -2,8 +2,11 @@
   // The 380px inspector drawer — faithful to dpd-mockup-v2.html's enum editor + "same enum,
   // any component" preview. Edits mutate the selected parameter's source enum (shared model proxy),
   // so the table badge ("Enum · N") and the previews update live.
-  // `sources`: the model's documents, which the parameter's `source.doc` indexes.
-  let { param = null, sources = [] } = $props();
+  // `sources`: the model's documents, which the parameter's `source.doc` indexes. `shapes` and
+  // `errors` are for its fields (DpdParamFields.svelte): the model's message shapes, and what the
+  // validator says about this parameter.
+  import DpdParamFields from './DpdParamFields.svelte';
+  let { param = null, sources = [], shapes = [], errors = [] } = $props();
 
   let customValues = $state(true);
   let previewSel = $state(0);
@@ -74,13 +77,11 @@
   {:else if !isEnum}
     <div class="eh"><span class={['vtype', vtypeCls]} style="cursor:default">{vtypeLabel}</span><span class="ehname">{param.name ?? param.id}</span></div>
     {#if sourceDoc}<div class="esrc">From {#if sourceDoc.url}<a href={sourceDoc.url} target="_blank" rel="noreferrer">{sourceDoc.title}</a>{:else}<b>{sourceDoc.title}</b>{/if}{#if sourceWhere}, {sourceWhere}{/if}</div>{/if}
-    <div class="esub">
-      {#if param.range}This parameter spans {param.range.min} – {param.range.max}.{:else}A {param.valueType} parameter.{/if}
-      Range &amp; encoding editing arrive with this inspector in a later step.
-    </div>
+    <DpdParamFields {param} {shapes} {errors} />
   {:else}
     <div class="eh"><span class="vtype enum" style="cursor:default">◆ Enum</span><span class="ehname">{param.name ?? param.id}</span></div>
     {#if sourceDoc}<div class="esrc">From {#if sourceDoc.url}<a href={sourceDoc.url} target="_blank" rel="noreferrer">{sourceDoc.title}</a>{:else}<b>{sourceDoc.title}</b>{/if}{#if sourceWhere}, {sourceWhere}{/if}</div>{/if}
+    <DpdParamFields {param} {shapes} {errors} />
     <div class="esub">Describe the parameter's legal values. Reorder with the arrows; the device value stays pinned to each option.</div>
 
     <div

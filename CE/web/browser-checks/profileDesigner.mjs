@@ -11,6 +11,8 @@
  *   - the Device structure screen shows how the device is talked to: its device id, identity, its
  *     parameters' blocks, the requests (a Roland RQ1 filled to its bytes, checksum and all) and what
  *     is asked when it connects
+ *   - the drawer edits the selected parameter: its name, its controller, its range, and the table
+ *     follows (arturia-microfreak's Spice)
  *   - a hand-made DPD profile (roland-gaia-dpd) still opens from the bundled library
  *   - a profile with no model opens empty and says so, without an error
  */
@@ -156,6 +158,31 @@ await check('roland-jd-xi: the Device structure screen shows its requests, its b
   assert.match(text, /When it connects · Reads the device into the panel/);
   assert.equal(await page.inputValue('.screen.active .field:has-text("Identity") input'), '41 · 0E 03 · 00 00', 'its identity');
   assert.equal(await page.inputValue('.screen.active .field:has-text("Device ID") input'), '10', 'its device id');
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+await check('arturia-microfreak: the drawer edits a parameter, and the table follows', async () => {
+  const { page, errors } = await open('arturia-microfreak');
+  await shown(page, 20000);
+  await page.fill('.screen.active .psearch', 'Spice');
+  await page.locator('.screen.active tr.prow', { hasText: 'Spice' }).first().click();
+  const commit = async (selector, value) => {
+    const field = page.locator(`.screen.active .pfields ${selector}`);
+    await field.fill(value);
+    await field.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })));
+  };
+  await commit('.pf-name', 'Spice Edited');
+  await page.fill('.screen.active .psearch', 'Spice Edited');
+  const row = page.locator('.screen.active tr.prow', { hasText: 'Spice Edited' });
+  await row.waitFor();
+  // The row's cells, each on its own: its text run together reads "CC 99" and "0 – 127" as "CC 990".
+  const cellsShow = (re) => page.waitForFunction((src) => [...(document.querySelector('.screen.active tr.prow')?.querySelectorAll('td') ?? [])]
+    .some((td) => new RegExp(src).test(td.textContent.replace(/\s+/g, ' ').trim())), re.source);
+  await commit('.pf-cc', '99');
+  await cellsShow(/^CC 99$/);
+  await commit('.pf-max', '100');
+  await cellsShow(/^0 – 100$/);
   assert.deepEqual(errors, []);
   await page.close();
 });

@@ -876,7 +876,11 @@ Device Profile**. Its screens are listed on the left:
 - **Parameters** — every parameter, its message and its range. A parameter of a repeated block (a
   part, a drum key) is listed once, marked with how many there are (×37). Type in the search box to
   find one by name, group, message or address (`cutoff`, `CC 74`, `19 01 00`). **+ Add parameter**
-  adds one; the lists of choices of a parameter can be edited in the drawer on the right.
+  adds one. Click a row to edit it in the drawer on the right: its name and group, value type,
+  range and default, the message it is sent with (controller, NRPN or RPN number, or SysEx shape and
+  address), whether it is sent as it moves or once set, and its list of choices. An edit to a row
+  marked ×37 applies to all 37. Each field takes effect when you leave it, and the validator's
+  complaints about that parameter are listed under its fields.
 - **Bulk dumps** — the dumps the synth sends, with a map of which byte holds which parameter.
 - **Device structure** — how CEditor talks to the synth: its device ID and channel, the pause between
   messages, how it answers a device inquiry, its parameters' blocks and how often each repeats, what

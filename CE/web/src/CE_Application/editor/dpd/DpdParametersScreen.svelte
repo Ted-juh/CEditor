@@ -73,6 +73,9 @@
     return model?.scopes?.[scope]?.parameters?.find((p) => p.id === pid) ?? null;
   });
 
+  // What the validator says about the selected parameter (its messages start `<scope>.<id>:`).
+  let selectedErrors = $derived(selectedParam && activeKey ? (validation?.errors ?? []).filter((e) => e.startsWith(`${activeKey.split('::')[0]}.${selectedParam.id}:`)) : []);
+
   let newName = $state('');
 
   // A write wire is addressed by a SysEx address, a controller, or an NRPN or RPN number. Counting
@@ -197,5 +200,5 @@
     {/if}
   </div>
 
-  <DpdEnumInspector param={selectedParam} sources={model?.sources ?? []} />
+  <DpdEnumInspector param={selectedParam} sources={model?.sources ?? []} shapes={model?.messageShapes ?? []} errors={selectedErrors} />
 </div>

@@ -119,6 +119,15 @@
 .dpd-app .rowlearn:hover{color:var(--accent)}
 .dpd-app .hint{margin-top:14px;font-size:12px;color:var(--txt-faint);display:flex;align-items:center;gap:8px}
 .dpd-app .hint b{color:var(--txt-dim);font-weight:600}
+.dpd-app .pfields{display:grid;grid-template-columns:104px 1fr;gap:7px 10px;align-items:center;margin:4px 0 14px;font-size:12px}
+.dpd-app .pfields > label,.dpd-app .pfields .pfl{color:var(--txt-faint)}
+.dpd-app .pfields input,.dpd-app .pfields select{min-width:0;width:100%;box-sizing:border-box;background:var(--bg-2);border:1px solid var(--line);border-radius:6px;
+  color:var(--txt);font:inherit;padding:5px 8px}
+.dpd-app .pfields input:focus,.dpd-app .pfields select:focus{outline:none;border-color:var(--accent-dim)}
+.dpd-app .pfields .pf-pair{display:flex;align-items:center;gap:6px;min-width:0}
+.dpd-app .pfields .pf-pair input{flex:1}
+.dpd-app .pfields .pfnote{flex-shrink:0;color:var(--txt-faint);font-size:11px}
+.dpd-app .perrs{font-size:11.5px;color:var(--amber);margin:-6px 0 12px;line-height:1.5}
 .dpd-app .esrc{font-size:11.5px;color:var(--txt-faint);margin:0 0 8px}
 .dpd-app .esrc b{color:var(--txt-dim);font-weight:600}
 .dpd-app .esrc a{color:var(--accent)}
