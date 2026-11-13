@@ -22,7 +22,7 @@
 
 import { readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, '../..');
@@ -179,7 +179,8 @@ export function valueProblem(parameter, value) {
 
 /** Read every message through the profile: { messages, matched, byDump, failures, problems, names }. */
 export async function checkBank(profile, messages, { adapter } = {}) {
-  const { localParseDumpMessage } = await import(join(repo, 'CE/web/src/CE_Application/stores/deviceProfileLocalEngine.js'));
+  // By URL: on Windows a path is `D:\...`, which import() reads as a URL with the scheme `d:` and refuses.
+  const { localParseDumpMessage } = await import(pathToFileURL(join(repo, 'CE/web/src/CE_Application/stores/deviceProfileLocalEngine.js')).href);
   const params = new Map(profile.parameters.map((p) => [p.id, p]));
   const result = { messages: messages.length, matched: 0, byDump: {}, checksums: {}, failures: {}, problems: {}, names: [] };
   const adapted = adapter ? messages.flatMap((raw) => adapter(raw)) : messages;
