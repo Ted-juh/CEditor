@@ -188,10 +188,10 @@ They exist because each one was broken once, and the breakage looked like a work
    effect slot's pid, which stands for its row in every effect type) names its document alone. A web
    page has no pages: its table is named by the heading a reader finds it under (Teenage
    Engineering's `14.5 midi cc map`, the OP-Z's `21.6 incoming midi table: system`). Every generator
-   here gives one. The profiles without are the ones no reader made: the hand-made DPD models
-   (`generic-cc-dpd`, `roland-gaia-dpd`, `yamaha-an1x-dpd`), the test fixtures, and the GAIA and
-   SH-201 profiles transcribed by hand (tools/scripts/qa/roland-gaia, tools/scripts/sh201-panel),
-   whose maps keep no pages.
+   here gives one. The GAIA and SH-201 profiles, transcribed by hand before any reader existed,
+   cite theirs from the reader's maps of the same documents, by address
+   (tools/profiles/roland/cite-pages.mjs). The profiles without are the hand-made DPD models
+   (`generic-cc-dpd`, `roland-gaia-dpd`, `yamaha-an1x-dpd`) and the test fixtures.
 
 ## Adding a brand
 

@@ -14,10 +14,13 @@
 // to put the tone in the parameter id where a panel can see it (`tone2.filter.cutoff`). That is
 // what makes "show tone 1, 2 and 3 at once" a layout decision rather than a profile rewrite.
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readCommitted } from '../../readCommitted.mjs';
+// Each parameter's table and page in the SH-01 MIDI Implementation, by its address: the reader's map
+// of that document (tools/profiles/roland/maps/sh-01.json), which agrees with this transcription.
+import { citePages } from '../../../profiles/roland/cite-pages.mjs';
 // The OWNER'S MANUAL's effect parameter table, which the MIDI implementation does not contain.
 // Imported rather than re-transcribed: it is one table, and two copies of it would agree until one
 // was edited. The panel reads it for the knob CAPTIONS; this file reads it for the RANGES.
@@ -552,6 +555,11 @@ function buildTests(deviceId, parameters) {
 }
 
 export function buildProfile() {
+  const map = JSON.parse(readFileSync(path.join(REPO, 'tools/profiles/roland/maps/sh-01.json'), 'utf8'));
+  return citePages(buildUncited(), map).profile;
+}
+
+function buildUncited() {
   const parameters = [patchNameParameter()];
   for (const entry of SYSTEM) {
     const parameter = buildParameter(entry, { idPrefix: 'system', group: entry.id.startsWith('writeProtect') ? 'System · Write Protection' : 'System', baseAddress: SYSTEM_BASE });

@@ -38,6 +38,20 @@ No disagreement in an address, a range, a nibble count or a label set, in either
 SH-201 document also proved the reader against an older typesetting: every dash in it is an em
 dash and its headings are marked `❍` rather than `**`.
 
+Those two documents' maps are kept (`maps/sh-01.json`, `maps/sh-201.json`, from
+`static.roland.com/assets/media/pdf/SH-01_MI.pdf` and `SH-201_MI.pdf`), and the hand-made profiles
+cite their pages from them: `cite-pages.mjs` gives each parameter the table its address falls in
+and that table's page, and nothing else. `make-gaia-profile.mjs` does it as it writes
+`roland-gaia-sh01`; the other two are kept by hand, so after editing one:
+
+```bash
+node tools/profiles/roland/cite-pages.mjs CE/profiles/test/roland-sh-201.ceditor-device.json tools/profiles/roland/maps/sh-201.json
+node tools/profiles/roland/cite-pages.mjs CE/profiles/test/roland-gaia.ceditor-device.json tools/profiles/roland/maps/sh-01.json
+```
+
+(`--check` on either says whether it is current.) The 15-parameter demo is laid out by hand; its
+layout is kept, a one-line `source` going in under each `address`.
+
 ## What the profiles are, and are not
 
 - **Every block of the edit buffer, at the manual's addresses, with the manual's names.** One RQ1
