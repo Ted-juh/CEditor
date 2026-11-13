@@ -27,6 +27,7 @@
   import { untrack } from 'svelte';
   import { get } from 'svelte/store';
 
+  import { modelToEmbed } from './dpd/saveEmbed.js';
   import { deepClone } from '../utils/deepClone.js';
   let { profileId = '' } = $props();
 
@@ -46,6 +47,8 @@
   let loadedFor = '__none__';
   let appliedSavedFor = null;
   let openingModelJson = null;
+  // Whether the model was converted from the profile on opening (dpd/saveEmbed.js).
+  let convertedOpening = false;
   $effect(() => {
     const pid = profileId;
     if (pid === loadedFor) return;
@@ -55,6 +58,7 @@
     const id = resolveDpdId(pid);
     const opening = id ? deepClone(dpdLibrary[id]) : null;
     openingModelJson = opening ? JSON.stringify(opening) : null;
+    convertedOpening = false;
     model = opening;
     if (pid) requestProfileSource(pid); // ask the engine for the saved source (no-op without the bridge)
   });
@@ -79,11 +83,13 @@
         // A different document arriving late, not an edit — see startsNewDocument().
         untrack(() => designerHistory?.startsNewDocument());
         model = deepClone(parsed.dpdModel);
+        convertedOpening = false;
       } else if (!model && parsed?.parameters && !parsed.dpdSource) {
         const { model: converted } = legacyToDpd(parsed, { handMade: new Set(Object.keys(dpdLibrary)) });
         if (converted) {
           untrack(() => designerHistory?.startsNewDocument());
           openingModelJson = JSON.stringify(converted);
+          convertedOpening = true;
           model = converted;
         }
       }
@@ -189,7 +195,7 @@
       // $state.snapshot -> a plain (non-proxy) deep copy; the resolver/clone can't handle the $state proxy.
       const plain = $state.snapshot(model);
       const merged = resolveModel(plain, dpdLibrary);
-      const legacy = buildLegacyProfile(merged, { legacyId: profileId, embedDpdModel: plain });
+      const legacy = buildLegacyProfile(merged, { legacyId: profileId, embedDpdModel: modelToEmbed({ converted: convertedOpening, openingJson: openingModelJson, model: plain }) });
       const requestId = `profile_save_${profileId}_${++saveSequence}`;
       pendingSave = { requestId, model: deepClone(plain) };
       saveProfileSource(profileId, JSON.stringify(legacy, null, 2), requestId);
@@ -230,6 +236,8 @@
   }
 
   let paramCount = $derived(resolved.length);
+  // The Parameters screen's rows: a repeated block's parameters once (685 for a JD-Xi's 6,199).
+  let rowCount = $derived(resolved.filter((p) => p.instance === 0).length);
   let dumpCount = $derived(model?.dumps?.length ?? 0);
   let familyLabel = $derived(familyLabelOf(model));
 
@@ -237,7 +245,7 @@
     { group: 'Profile', items: [
       { id: 'detect', icon: '◉', label: 'Detect devices' },
       { id: 'overview', icon: '◉', label: 'Overview' },
-      { id: 'params', icon: '▦', label: 'Parameters', count: paramCount },
+      { id: 'params', icon: '▦', label: 'Parameters', count: rowCount },
       { id: 'capture', icon: '◎', label: 'Capture' },
       { id: 'dumps', icon: '⬓', label: 'Bulk dumps', count: dumpCount || undefined },
       { id: 'device', icon: '⚙', label: 'Device structure' },

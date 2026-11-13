@@ -138,7 +138,8 @@
 <div class="toolbar">
   <button class="btn primary" onclick={() => addParam()}>+ Add parameter</button>
   <input class="psearch" type="search" placeholder="Search {allRows.length} parameters — name, group, CC 74, NRPN, 10 00…" bind:value={query} aria-label="Search parameters" />
-  {#if words.length || onlyProblems}<span class="pcount">{rows.length} of {allRows.length}</span>{/if}
+  {#if words.length || onlyProblems}<span class="pcount">{rows.length} of {allRows.length}</span>
+  {:else if (resolved?.length ?? 0) > allRows.length}<span class="pcount" title="A block the device repeats (a part, a drum key) is listed once and stands for each of its instances">{allRows.length} listed · {resolved.length} on the device</span>{/if}
   <div class="spacer"></div>
   <div class={['status-pill', !allClean && 'warn']}>
     <span class={['chk', allClean ? 'ok' : 'warn']}>{allClean ? '✓' : '!'}</span>
