@@ -14,6 +14,8 @@
  *     the schema refuses is put back, and a block's count reaches the totals
  *   - the drawer edits the selected parameter: its name, its controller, its range, and the table
  *     follows (arturia-microfreak's Spice)
+ *   - the drawer lists a repeated block's instances (the JD-Xi's 37 drum keys) and gives one a name
+ *     of its own, and takes it back
  *   - a hand-made DPD profile (roland-gaia-dpd) still opens from the bundled library
  *   - a profile with no model opens empty and says so, without an error
  */
@@ -140,6 +142,31 @@ await check('roland-jd-xi: search finds a drum key\'s parameters, a row standing
   assert.ok(tags.includes('×37'), `instance tags: ${tags.join(', ')}`);
   await page.fill('.screen.active .psearch', 'no parameter is called this');
   await page.waitForSelector('.screen.active tr.vnone');
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+await check('roland-jd-xi: the drawer lists a drum key parameter\'s 37 keys, and one key gets a name of its own', async () => {
+  const { page, errors } = await open('roland-jd-xi');
+  await shown(page, 20000);
+  await page.fill('.screen.active .psearch', 'drums partial name');
+  await page.locator('.screen.active tr.prow', { has: page.locator('.inst', { hasText: '×37' }) }).first().click();
+  await page.waitForSelector('.screen.active .ilist .irow[data-instance="72"]');
+  assert.equal(await page.locator('.screen.active .ilist .irow').count(), 37, 'keys 36 to 72');
+  const key = (n) => page.locator(`.screen.active .ilist .irow[data-instance="${n}"]`);
+  const was = await key(40).locator('.iname-in').inputValue();
+  const commit = async (field, value) => {
+    await field.fill(value);
+    await field.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })));
+  };
+  await commit(key(40).locator('.iname-in'), 'Key 40 Own Name');
+  await page.waitForSelector('.screen.active .ilist .irow.own[data-instance="40"]');
+  assert.equal(await key(40).locator('.iname-in').inputValue(), 'Key 40 Own Name');
+  assert.equal(await page.locator('.screen.active .ilist .irow.own').count(), 1, 'only key 40 has a name of its own');
+  // Emptied, it is the block's again.
+  await commit(key(40).locator('.iname-in'), '');
+  await page.waitForFunction(() => !document.querySelector('.screen.active .ilist .irow.own'));
+  assert.equal(await key(40).locator('.iname-in').inputValue(), was);
   assert.deepEqual(errors, []);
   await page.close();
 });

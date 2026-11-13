@@ -880,7 +880,10 @@ Device Profile**. Its screens are listed on the left:
   range and default, the message it is sent with (controller, NRPN or RPN number, or SysEx shape and
   address), whether it is sent as it moves or once set, and its list of choices. An edit to a row
   marked ×37 applies to all 37. Each field takes effect when you leave it, and the validator's
-  complaints about that parameter are listed under its fields.
+  complaints about that parameter are listed under its fields. Below them the drawer lists each
+  instance (each of the 37 keys) with its own name, message and default; a name or default typed
+  there belongs to that instance alone, and emptying it goes back to the block's. A block that does
+  not number its instances lists them without letting them be edited.
 - **Bulk dumps** — the dumps the synth sends, with a map of which byte holds which parameter.
 - **Device structure** — how CEditor talks to the synth: its device ID and channel, the pause between
   messages, how it answers a device inquiry, its parameters' blocks and how often each repeats, what

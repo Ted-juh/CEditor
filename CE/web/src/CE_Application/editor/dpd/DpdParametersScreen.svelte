@@ -73,6 +73,10 @@
     return model?.scopes?.[scope]?.parameters?.find((p) => p.id === pid) ?? null;
   });
 
+  // The selected parameter's block and its instances, as resolved (one row each), for the drawer.
+  let selectedScope = $derived(activeKey ? model?.scopes?.[activeKey.split('::')[0]] ?? null : null);
+  let selectedInstances = $derived(selectedParam && activeKey ? (resolved ?? []).filter((r) => `${r.scope}::${r.paramId}` === activeKey) : []);
+
   // What the validator says about the selected parameter (its messages start `<scope>.<id>:`).
   let selectedErrors = $derived(selectedParam && activeKey ? (validation?.errors ?? []).filter((e) => e.startsWith(`${activeKey.split('::')[0]}.${selectedParam.id}:`)) : []);
 
@@ -200,5 +204,6 @@
     {/if}
   </div>
 
-  <DpdEnumInspector param={selectedParam} sources={model?.sources ?? []} shapes={model?.messageShapes ?? []} errors={selectedErrors} />
+  <DpdEnumInspector param={selectedParam} sources={model?.sources ?? []} shapes={model?.messageShapes ?? []} errors={selectedErrors}
+    instances={selectedInstances} named={typeof selectedScope?.idTemplate === 'string'} first={selectedScope?.first ?? 1} describe={addrText} />
 </div>

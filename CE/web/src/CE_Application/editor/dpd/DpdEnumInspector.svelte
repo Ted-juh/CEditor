@@ -6,7 +6,9 @@
   // `errors` are for its fields (DpdParamFields.svelte): the model's message shapes, and what the
   // validator says about this parameter.
   import DpdParamFields from './DpdParamFields.svelte';
-  let { param = null, sources = [], shapes = [], errors = [] } = $props();
+  import DpdInstanceList from './DpdInstanceList.svelte';
+  // `instances`, `named`, `first`, `describe`: its block's instances, for DpdInstanceList.svelte.
+  let { param = null, sources = [], shapes = [], errors = [], instances = [], named = false, first = 1, describe = null } = $props();
 
   let customValues = $state(true);
   let previewSel = $state(0);
@@ -78,10 +80,12 @@
     <div class="eh"><span class={['vtype', vtypeCls]} style="cursor:default">{vtypeLabel}</span><span class="ehname">{param.name ?? param.id}</span></div>
     {#if sourceDoc}<div class="esrc">From {#if sourceDoc.url}<a href={sourceDoc.url} target="_blank" rel="noreferrer">{sourceDoc.title}</a>{:else}<b>{sourceDoc.title}</b>{/if}{#if sourceWhere}, {sourceWhere}{/if}</div>{/if}
     <DpdParamFields {param} {shapes} {errors} />
+    {#if instances.length > 1}<DpdInstanceList {param} {instances} {named} {first} {describe} />{/if}
   {:else}
     <div class="eh"><span class="vtype enum" style="cursor:default">◆ Enum</span><span class="ehname">{param.name ?? param.id}</span></div>
     {#if sourceDoc}<div class="esrc">From {#if sourceDoc.url}<a href={sourceDoc.url} target="_blank" rel="noreferrer">{sourceDoc.title}</a>{:else}<b>{sourceDoc.title}</b>{/if}{#if sourceWhere}, {sourceWhere}{/if}</div>{/if}
     <DpdParamFields {param} {shapes} {errors} />
+    {#if instances.length > 1}<DpdInstanceList {param} {instances} {named} {first} {describe} />{/if}
     <div class="esub">Describe the parameter's legal values. Reorder with the arrows; the device value stays pinned to each option.</div>
 
     <div
