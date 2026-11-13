@@ -50,6 +50,13 @@
   border:1px solid var(--line-2);border-radius:8px;padding:10px 13px}
 .dpd-app .field .fin input{background:none;border:none;outline:none;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:14px;width:100%}
 .dpd-app .field .fin .unit{font-size:11px;color:var(--txt-faint);white-space:nowrap;margin-left:8px}
+.dpd-app .field .fin.idfin input{flex:1;min-width:0;text-align:center}
+.dpd-app .field .fin.idfin .sep{color:var(--txt-faint);margin:0 4px}
+.dpd-app .dstable input.dsin{width:100%;min-width:0;box-sizing:border-box;background:var(--bg-2);border:1px solid var(--line);border-radius:5px;
+  color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:12px;padding:3px 6px}
+.dpd-app .dstable input.dsin:focus{outline:none;border-color:var(--accent-dim)}
+.dpd-app .dstable input.ds-inst{max-width:64px}
+.dpd-app .dstable .dspair{display:flex;gap:6px}
 .dpd-app .field .fhint{font-size:11px;color:var(--txt-faint);margin-top:8px;line-height:1.45}
 .dpd-app .dshead{display:flex;align-items:baseline;gap:14px;margin:6px 0 12px}
 .dpd-app .dshead h2{font-size:15px;font-weight:700}

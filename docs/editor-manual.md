@@ -885,6 +885,9 @@ Device Profile**. Its screens are listed on the left:
 - **Device structure** — how CEditor talks to the synth: its device ID and channel, the pause between
   messages, how it answers a device inquiry, its parameters' blocks and how often each repeats, what
   it can be asked (each request, and the dump that answers it) and what is asked when it connects.
+  The device ID, channel, pause, identity codes and each block's count, base address and stride can
+  be edited here; a value the format does not allow is put back, and an emptied field falls back to
+  what the profile inherits. The requests are shown as they are.
 - **Message shapes** — how the synth's SysEx messages are built.
 - **Advanced** — the whole profile as text, to edit anything the other screens cannot, with
   **Validate** and **Apply**.

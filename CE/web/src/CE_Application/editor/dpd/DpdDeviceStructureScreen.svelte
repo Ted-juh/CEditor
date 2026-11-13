@@ -25,6 +25,7 @@
     label: s.label ?? key,
     count: s.parameters?.length ?? 0,
     instances: s.instances ?? (s.instancesFrom ? merged?.deviceStructure?.[s.instancesFrom] : null) ?? 1,
+    fromStructure: s.instances == null ? (s.instancesFrom ?? null) : null,
     named: s.idTemplate ?? null,
     first: s.first ?? 1,
     base: s.base ?? null,
@@ -60,16 +61,55 @@
     return `${t} ms${n ? ` · ${n} retr${n === 1 ? 'y' : 'ies'}` : ''}`;
   }
   const policyText = (p) => (p === 'pull' ? 'Reads the device into the panel' : p === 'push' ? 'Sends the panel to the device' : (p ?? '—'));
+
+  // Editing. Each field commits on change into the model's own fields (what it inherits stays in its
+  // family): a value the schema would refuse puts the field back as it was; an empty one removes the
+  // model's own, and what is in effect then shows (the family's, or EMIT_DEFAULTS).
+  const HEX = /^[0-9A-F]{2}(?: [0-9A-F]{2})*$/;
+  const hexOf = (...lengths) => (s) => {
+    const h = s.toUpperCase().replace(/\s+/g, ' ');
+    return HEX.test(h) && (!lengths.length || lengths.includes(h.split(' ').length)) ? h : undefined;
+  };
+  const intIn = (lo, hi = Infinity) => (s) => (/^\d+$/.test(s) && +s >= lo && +s <= hi ? +s : undefined);
+  function edit(e, was, parse, apply) {
+    const el = e.currentTarget, raw = el.value.trim();
+    const v = raw === '' ? null : parse(raw);
+    if (v === undefined) { el.value = was ?? ''; return; }
+    apply(v);
+    if (v != null) el.value = String(v);
+  }
+  // `model[key][field]`, made or removed; the object itself removed when it is left empty.
+  function setIn(key, field, v) {
+    if (v != null) {
+      if (!model[key] || typeof model[key] !== 'object') model[key] = {};
+      model[key][field] = v;
+    } else if (model[key]) {
+      delete model[key][field];
+      if (!Object.keys(model[key]).length) delete model[key];
+    }
+  }
+  function setDeviceId(v) { if (v == null) delete model.deviceId; else model.deviceId = v; }
+  function setScope(key, field, v) {
+    const s = model.scopes?.[key];
+    if (!s) return;
+    if (v == null) delete s[field]; else s[field] = v;
+  }
+  const IDENTITY = [['manufacturerId', 'Manufacturer id', hexOf(1, 3)], ['family', 'Family code', hexOf(2)], ['member', 'Member code', hexOf(2)]];
 </script>
 
 <div class="shead"><h1>Device structure</h1></div>
 <p class="sub">How the program talks to this device: where its messages go, how its parameters are laid out, what it can be asked and what is asked when it connects.</p>
 
 <div class="fieldgrid">
-  <div class="field"><div class="fl">Device ID</div><div class="fin"><input value={merged?.deviceId ?? '—'} readonly /><span class="unit">hex</span></div><div class="fhint">Filled into every message that names <code>$deviceId</code>; 7F reaches any unit</div></div>
-  <div class="field"><div class="fl">Channel</div><div class="fin"><input value={channel} readonly /><span class="unit">1–16</span></div><div class="fhint">The channel its controllers, NRPNs and program changes go out on</div></div>
-  <div class="field"><div class="fl">Pause between messages</div><div class="fin"><input value={delay} readonly /><span class="unit">ms</span></div><div class="fhint">The least time between two messages to the device</div></div>
-  <div class="field"><div class="fl">Identity</div><div class="fin"><input value={identity ? [identity.manufacturerId, identity.family, identity.member].filter(Boolean).join(' · ') : '—'} readonly /><span class="unit">mfr · family · member</span></div><div class="fhint">{identity ? 'How it answers a device inquiry, so it can be found when it is connected' : 'No identity: the device is picked by hand'}</div></div>
+  <div class="field"><div class="fl">Device ID</div><div class="fin"><input class="ds-devid" value={merged?.deviceId ?? ''} placeholder="—" onchange={(e) => edit(e, merged?.deviceId, hexOf(1), setDeviceId)} /><span class="unit">hex</span></div><div class="fhint">Filled into every message that names <code>$deviceId</code>; 7F reaches any unit</div></div>
+  <div class="field"><div class="fl">Channel</div><div class="fin"><input class="ds-channel" value={channel} onchange={(e) => edit(e, channel, intIn(1, 16), (v) => setIn('variables', 'channel', v))} /><span class="unit">1–16</span></div><div class="fhint">The channel its controllers, NRPNs and program changes go out on</div></div>
+  <div class="field"><div class="fl">Pause between messages</div><div class="fin"><input class="ds-delay" value={delay} onchange={(e) => edit(e, delay, intIn(0), (v) => setIn('timing', 'minDelayBetweenMessagesMs', v))} /><span class="unit">ms</span></div><div class="fhint">The least time between two messages to the device</div></div>
+  <div class="field"><div class="fl">Identity</div><div class="fin idfin">
+    {#each IDENTITY as [key, label, parse], i (key)}
+      {#if i}<span class="sep">·</span>{/if}
+      <input class="ds-id-{key}" aria-label={label} placeholder={label.split(' ')[0].toLowerCase()} value={identity?.[key] ?? ''} onchange={(e) => edit(e, identity?.[key], parse, (v) => setIn('identity', key, v))} />
+    {/each}
+  </div><div class="fhint">{identity ? 'How it answers a device inquiry, so it can be found when it is connected' : 'No identity: the device is picked by hand'}</div></div>
 </div>
 
 {#if otherVariables.length}
@@ -87,12 +127,16 @@
     <thead><tr><th style="width:30%">Block</th><th style="width:14%">Parameters</th><th style="width:12%">Instances</th><th style="width:26%">Named</th><th style="width:18%">Base · stride</th></tr></thead>
     <tbody>
       {#each scopes as s (s.key)}
-        <tr>
+        <tr class="dsscope">
           <td><div class="cell pname">{s.label}</div></td>
           <td><div class="cell">{s.count}</div></td>
-          <td><div class="cell">{#if s.instances > 1}<span class="inst">×{s.instances}</span>{:else}1{/if}</div></td>
+          <!-- A count another field supplies (instancesFrom) is shown, not edited. -->
+          <td><div class="cell">{#if s.fromStructure}<span class="inst" title="From {s.fromStructure}">×{s.instances}</span>{:else}<input class="dsin ds-inst" aria-label="Instances of {s.label}" value={s.instances} onchange={(e) => edit(e, s.instances, intIn(1), (v) => setScope(s.key, 'instances', v))} />{/if}</div></td>
           <td><div class="cell"><span class="addr">{s.named ? `${s.named.replaceAll('{n}', s.first)} … ${s.named.replaceAll('{n}', s.first + s.instances - 1)}` : '—'}</span></div></td>
-          <td><div class="cell"><span class="addr">{s.base ?? '—'}{s.stride && s.stride !== '00' ? ` · +${s.stride}` : ''}</span></div></td>
+          <td><div class="cell dspair">
+            <input class="dsin ds-base" aria-label="Base address of {s.label}" placeholder="base" value={s.base ?? ''} onchange={(e) => edit(e, s.base, hexOf(), (v) => setScope(s.key, 'base', v))} />
+            <input class="dsin ds-stride" aria-label="Stride of {s.label}" placeholder="+stride" value={s.stride ?? ''} onchange={(e) => edit(e, s.stride, hexOf(), (v) => setScope(s.key, 'stride', v))} />
+          </div></td>
         </tr>
       {/each}
     </tbody>

@@ -10,7 +10,8 @@
  *     finds parameters by search; a row standing for a scope's instances says how many (JD-Xi ×37)
  *   - the Device structure screen shows how the device is talked to: its device id, identity, its
  *     parameters' blocks, the requests (a Roland RQ1 filled to its bytes, checksum and all) and what
- *     is asked when it connects
+ *     is asked when it connects; and edits them: a new device id reaches the requests' bytes, a value
+ *     the schema refuses is put back, and a block's count reaches the totals
  *   - the drawer edits the selected parameter: its name, its controller, its range, and the table
  *     follows (arturia-microfreak's Spice)
  *   - a hand-made DPD profile (roland-gaia-dpd) still opens from the bundled library
@@ -154,10 +155,31 @@ await check('roland-jd-xi: the Device structure screen shows its requests, its b
   const setup = page.locator('.screen.active tr.dsreq', { hasText: 'Request Setup' });
   assert.match((await setup.textContent()).replace(/\s+/g, ' '), /rq1 01 00 00 00 · 00 00 00 3B\s*dump · Setup/);
   assert.equal(await setup.locator('.rqmsg').getAttribute('title'), 'F0 41 10 00 00 00 0E 11 01 00 00 00 00 00 00 3B 44 F7');
-  assert.match(text, /Drums · Key\s*145\s*×37/, 'the drum keys as one block of 37');
+  const keys = page.locator('.screen.active tr.dsscope', { hasText: 'Drums · Key' });
+  assert.match(await keys.textContent(), /Drums · Key\s*145/, 'the drum keys, 145 parameters');
+  assert.equal(await keys.locator('.ds-inst').inputValue(), '37', 'as one block of 37');
   assert.match(text, /When it connects · Reads the device into the panel/);
-  assert.equal(await page.inputValue('.screen.active .field:has-text("Identity") input'), '41 · 0E 03 · 00 00', 'its identity');
-  assert.equal(await page.inputValue('.screen.active .field:has-text("Device ID") input'), '10', 'its device id');
+  const identity = await Promise.all(['manufacturerId', 'family', 'member'].map((k) => page.inputValue(`.screen.active .ds-id-${k}`)));
+  assert.deepEqual(identity, ['41', '0E 03', '00 00'], 'its identity');
+  assert.equal(await page.inputValue('.screen.active .ds-devid'), '10', 'its device id');
+
+  // Edited: the device id reaches the request's bytes; a value the schema refuses puts the field back;
+  // the drum keys' count reaches the totals.
+  const commit = async (sel, value) => {
+    const field = page.locator(sel);
+    await field.fill(value);
+    await field.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })));
+  };
+  await commit('.screen.active .ds-devid', '11');
+  await page.waitForFunction(() => [...document.querySelectorAll('.screen.active tr.dsreq')]
+    .find((r) => r.textContent.includes('Request Setup'))?.querySelector('.rqmsg')?.title.startsWith('F0 41 11 '));
+  assert.equal(await setup.locator('.rqmsg').getAttribute('title'), 'F0 41 11 00 00 00 0E 11 01 00 00 00 00 00 00 3B 44 F7');
+  await commit('.screen.active .ds-devid', 'ZZ');
+  assert.equal(await page.inputValue('.screen.active .ds-devid'), '11', 'a refused value is put back');
+  const onDevice = async () => Number((await page.textContent('.screen.active .dshead .lm')).match(/(\d+) on the device/)[1]);
+  const before = await onDevice();
+  await commit('.screen.active tr.dsscope:has-text("Drums · Key") .ds-inst', '36');
+  await page.waitForFunction((n) => document.querySelector('.screen.active .dshead .lm')?.textContent.includes(`${n} on the device`), before - 145);
   assert.deepEqual(errors, []);
   await page.close();
 });
