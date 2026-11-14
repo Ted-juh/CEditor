@@ -86,7 +86,7 @@ From PowerShell at the repository root, run:
 
 This builds the production web UI, then the Release standalone and its two plug-in
 helpers with MSVC and Ninja. The program is in
-`build/hostage-windows/CEHostStandalone_artefacts/Release/Hostage.exe`.
+`build/hostage-windows/CEHostStandalone_artefacts/Release/HoSTage.exe`.
 Keep `CEditorPluginScanner.exe` and `CEditorPluginWorker.exe` beside it.
 
 To stage the official Windows installer inputs after that build, run from the repository root:
@@ -99,6 +99,8 @@ The assembler writes the standalone program, its two helpers and an editor-role
 `hostage.json` under `build/hostage-windows-package/stage/Standalone`. Private
 crash symbols go in a sibling directory. Keep the product manifest's `appId`
 stable across releases so upgrades and per-user product data keep the same identity.
+The Windows preset reads the product name, publisher and version from this same
+manifest when compiling the executable.
 
 To compile the installer, install Inno Setup 6 and place the Microsoft x64
 VC++ redistributable from your build toolchain (`vc_redist.x64.exe`) and the

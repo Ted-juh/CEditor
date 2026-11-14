@@ -19,6 +19,7 @@
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
       "binaryDir": "${sourceDir}/build/hostage-windows",
       "cacheVariables": {
+        "CE_HOST_PRODUCT_MANIFEST": "${sourceDir}/tools/installer/hostage-windows.json",
         "CEDITOR_DEV_MODE": "OFF",
         "CEDITOR_BUILD_APP": "ON",
         "CEDITOR_SCANNER_WORKER": "ON",

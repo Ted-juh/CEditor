@@ -655,6 +655,15 @@ if(CEDITOR_BUILD_APP)
     set(CE_HOST_MFR_CODE        "Tdjh"               CACHE STRING "Generated host 4-char manufacturer code")
     set(CE_HOST_PLUGIN_CODE     "CehR"               CACHE STRING "Generated host 4-char plugin code")
 
+    set(CE_HOST_PRODUCT_MANIFEST "" CACHE FILEPATH "Optional Host Project manifest supplying the host product identity")
+    if(CE_HOST_PRODUCT_MANIFEST)
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CE_HOST_PRODUCT_MANIFEST}")
+        file(READ "${CE_HOST_PRODUCT_MANIFEST}" host_manifest)
+        string(JSON CE_HOST_PRODUCT_NAME GET "${host_manifest}" productName)
+        string(JSON CE_HOST_PRODUCT_VERSION GET "${host_manifest}" version)
+        string(JSON CE_HOST_COMPANY_NAME GET "${host_manifest}" publisher)
+    endif()
+
     set(CE_HOST_COMMON_SOURCES
         "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
@@ -699,8 +708,18 @@ if(CEDITOR_BUILD_APP)
 
     juce_add_gui_app(CEHostStandalone
         PRODUCT_NAME "${CE_HOST_PRODUCT_NAME}"
+        VERSION "${CE_HOST_PRODUCT_VERSION}"
         COMPANY_NAME "${CE_HOST_COMPANY_NAME}"
     )
+
+    if(WIN32)
+        # JUCE 8.0.7 reads the target metadata to generate this resource, but
+        # omits that input dependency, leaving Explorer metadata stale on rebuild.
+        get_target_property(host_rc_dir CEHostStandalone JUCE_GENERATED_SOURCES_DIRECTORY)
+        get_target_property(host_info CEHostStandalone JUCE_INFO_FILE)
+        add_custom_command(OUTPUT "${host_rc_dir}/CEHostStandalone_resources.rc"
+            APPEND DEPENDS "${host_info}")
+    endif()
 
     target_sources(CEHostStandalone PRIVATE
         "${CE_ROOT}/src/InstrumentHost/HostRuntimeMain.cpp"

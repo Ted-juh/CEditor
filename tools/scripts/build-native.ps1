@@ -93,7 +93,7 @@ try { $sha = (& git -C $repoRoot rev-parse --short HEAD) } catch { }
 Write-Host ""
 Write-Host "Native build succeeded ($Configuration, source $sha)."
 if ($HoSTageOnly) {
-    Write-Host "HoSTage: $repoRoot\build\hostage-windows\CEHostStandalone_artefacts\Release\Hostage.exe"
+    Write-Host "HoSTage and its helpers: $repoRoot\build\hostage-windows\CEHostStandalone_artefacts\Release"
     return
 }
 Write-Host "Editor:  $repoRoot\build\native\CEditor_artefacts\$Configuration\CEditor.exe"
