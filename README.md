@@ -89,6 +89,17 @@ helpers with MSVC and Ninja. The program is in
 `build/hostage-windows/CEHostStandalone_artefacts/Release/Hostage.exe`.
 Keep `CEditorPluginScanner.exe` and `CEditorPluginWorker.exe` beside it.
 
+To stage the official Windows installer inputs after that build, run from the repository root:
+
+```powershell
+node tools/scripts/build-host-product.mjs --stage-only --project tools/installer/hostage-windows.json --build-dir build/hostage-windows --out build/hostage-windows-package
+```
+
+The assembler writes the standalone program, its two helpers and an editor-role
+`hostage.json` under `build/hostage-windows-package/stage/Standalone`. Private
+crash symbols go in a sibling directory. Keep the product manifest's `appId`
+stable across releases so upgrades and per-user product data keep the same identity.
+
 ### Running in Development
 
 You need two things running side by side: the Vite dev server (serves the Svelte UI with hot reload) and the JUCE application (the native window with WebView).

@@ -1,7 +1,7 @@
 // build-host-product.mjs — assemble the generated Hostage product.
 //
 //   node tools/scripts/build-host-product.mjs --project <host-project.json> [--build-dir <dir>]
-//        [--config Release] [--out <dir>] [--iscc <ISCC.exe>]
+//        [--config Release] [--out <dir>] [--iscc <ISCC.exe>] [--stage-only]
 //
 // WHAT THIS DOES AND DOES NOT DO. The C++ targets (CEHostStandalone, CEHostVST3, the scan and
 // live-processing workers) are already built by CMake; this script finds them and stages them
@@ -376,6 +376,7 @@ function parseArgs(argv) {
     else if (flag === '--config') out.config = next();
     else if (flag === '--out') out.out = next();
     else if (flag === '--iscc') out.iscc = next();
+    else if (flag === '--stage-only') out.stageOnly = true;
     else if (flag === '--performance') out.performance = next();
     else if (flag === '--show') out.show = next();
     else throw new Error(`unknown argument: ${flag}`);
@@ -487,6 +488,11 @@ async function main() {
   mkdirSync(path.dirname(symbolPlan.manifestPath), { recursive: true });
   writeFileSync(symbolPlan.manifestPath, `${JSON.stringify(symbolPlan.manifest, null, 2)}\n`);
   console.log(`  private symbols: ${path.dirname(symbolPlan.manifestPath)} (not staged)`);
+
+  if (args.stageOnly) {
+    console.log(`DONE (stage only): ${stageDir}`);
+    return;
+  }
 
   const installerDir = path.join(args.out, 'installer');
   mkdirSync(installerDir, { recursive: true });
