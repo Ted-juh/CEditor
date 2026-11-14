@@ -1,7 +1,7 @@
 // build-host-product.mjs — assemble the generated Hostage product.
 //
 //   node tools/scripts/build-host-product.mjs --project <host-project.json> [--build-dir <dir>]
-//        [--config Release] [--out <dir>] [--iscc <ISCC.exe>] [--stage-only]
+//        [--config Release] [--out <dir>] [--iscc <ISCC.exe>] [--stage-only] [--prerequisites-dir <dir>]
 //
 // WHAT THIS DOES AND DOES NOT DO. The C++ targets (CEHostStandalone, CEHostVST3, the scan and
 // live-processing workers) are already built by CMake; this script finds them and stages them
@@ -352,7 +352,7 @@ export function isccArgs({ project, stageDir, outDir, artifacts, templatePath })
 export const TEMPLATE_DEFINES = [
   'MyAppName', 'MyAppVersion', 'MyAppPublisher', 'MyAppId', 'MySetupBase',
   'MySourceDir', 'MyOutputDir', 'IncludeStandalone', 'IncludeVst3',
-  'MyAppExeName', 'MyVst3BundleName',
+  'MyAppExeName', 'MyVst3BundleName', 'WindowsPrerequisitesDir',
 ];
 
 export function findIscc(explicit) {
@@ -377,13 +377,14 @@ function parseArgs(argv) {
     else if (flag === '--out') out.out = next();
     else if (flag === '--iscc') out.iscc = next();
     else if (flag === '--stage-only') out.stageOnly = true;
+    else if (flag === '--prerequisites-dir') out.prerequisitesDir = next();
     else if (flag === '--performance') out.performance = next();
     else if (flag === '--show') out.show = next();
     else throw new Error(`unknown argument: ${flag}`);
   }
   if (!out.project) throw new Error('--project <host-project.json> is required');
   out.buildDir ??= path.join(REPO, 'build', 'native');
-  out.out ??= path.join(REPO, 'build', 'host-product');
+  out.out = path.resolve(out.out ?? path.join(REPO, 'build', 'host-product'));
   return out;
 }
 
@@ -398,7 +399,10 @@ const realListDir = (dir) => {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
-  const { project, errors } = normalizeProject(JSON.parse(readFileSync(args.project, 'utf8')));
+  const rawProject = JSON.parse(readFileSync(args.project, 'utf8'));
+  const { project, errors } = normalizeProject(rawProject);
+  if (rawProject.bundleWindowsRuntimes && !args.stageOnly && !args.prerequisitesDir)
+    errors.push('--prerequisites-dir must point to the x64 VC++ and WebView2 offline installers');
   if (errors.length > 0) {
     for (const e of errors) console.error(`REFUSED: ${e}`);
     process.exit(2);
@@ -500,6 +504,10 @@ async function main() {
   const compileArgs = isccArgs({ project, stageDir, outDir: installerDir, artifacts, templatePath });
 
   const iscc = findIscc(args.iscc);
+  if (rawProject.bundleWindowsRuntimes) {
+    if (!iscc) throw new Error('Inno Setup is required to compile the official installer. Use --stage-only to stage files.');
+    compileArgs.unshift(`/DWindowsPrerequisitesDir=${path.resolve(args.prerequisitesDir)}`);
+  }
   if (iscc == null) {
     console.log('ISCC not found — staged the product folder, skipped the installer compile.');
     console.log(`  would run: ISCC ${compileArgs.join(' ')}`);

@@ -100,6 +100,17 @@ The assembler writes the standalone program, its two helpers and an editor-role
 crash symbols go in a sibling directory. Keep the product manifest's `appId`
 stable across releases so upgrades and per-user product data keep the same identity.
 
+To compile the installer, install Inno Setup 6 and place the Microsoft x64
+VC++ redistributable from your build toolchain (`vc_redist.x64.exe`) and the
+Evergreen offline installer (`MicrosoftEdgeWebView2RuntimeInstallerX64.exe`)
+in `build/hostage-windows-package/prerequisites`. Then run:
+
+```powershell
+node tools/scripts/build-host-product.mjs --project tools/installer/hostage-windows.json --build-dir build/hostage-windows --out build/hostage-windows-package --prerequisites-dir build/hostage-windows-package/prerequisites
+```
+
+The setup executable is written to `build/hostage-windows-package/installer`.
+
 ### Running in Development
 
 You need two things running side by side: the Vite dev server (serves the Svelte UI with hot reload) and the JUCE application (the native window with WebView).
