@@ -120,6 +120,29 @@ export function fingerprintParameter(profile, parameterId) {
     shots.push(shot);
   }
 
+  // A 14-bit CC pair compiles to two CCs, the MSB's then the LSB's, and arrives as two messages
+  // that are matched one at a time. So it is indexed as its MSB's controller here, and buildInbound-
+  // Index adds the LSB's beside it; decodeInbound puts the two halves together.
+  const pair = shots.every((bytes) => bytes.length === 6 && (bytes[0] & 0xf0) === 0xb0 && bytes[3] === bytes[0]
+    && bytes[1] === shots[0][1] && bytes[4] === shots[0][4]) && shots[0][4] !== shots[0][1];
+  if (pair) {
+    const other = compile(probes[0], VARIABLE_PROBES[1]);
+    if (!other) return null;
+    const statusMask = ~(shots[0][0] ^ other[0]) & 0xff;
+    return {
+      parameterId,
+      prefix: [shots[0][0] & statusMask, shots[0][1]],
+      mask: [statusMask, 0xff],
+      valueStart: 2,
+      valueLength: 1,
+      encoding: parameter.encoding ?? U7,
+      valueType: String(parameter?.type ?? ''),
+      half: 'msb',
+      lsbController: shots[0][4],
+      source: 'compiled',
+    };
+  }
+
   const shortest = Math.min(...shots.map((bytes) => bytes.length));
   const raw = [];
   for (let i = 0; i < shortest; i++) {
@@ -227,6 +250,7 @@ export function buildInboundIndex(profile) {
         source: print.source,
         valueMap: print.valueMap,
         alternate: print.alternate,
+        ...(print.half ? { half: print.half } : {}),
       });
     }
     byPrefix.get(key).parameterIds.push(print.parameterId);
@@ -238,6 +262,8 @@ export function buildInboundIndex(profile) {
     const print = fingerprintParameter(profile, id);
     if (print) add(print);
     else unresolved.push(id);
+    // The fine half of a 14-bit pair, on its own controller.
+    if (print?.half === 'msb') add({ ...print, prefix: [print.prefix[0], print.lsbController], half: 'lsb' });
     for (const declared of declaredInboundEntries(parameter)) add(declared);
   }
 
@@ -306,6 +332,7 @@ export function decodeInbound(index, hex, values = {}) {
 
   const raw = bytes.slice(entry.valueStart, entry.valueStart + entry.valueLength);
   if (raw.length !== entry.valueLength) return null;
+  if (entry.half) return decodePairHalf(entry, raw[0], values);
   const alternate = entry.alternate;
   const mapping = alternate?.whenValues?.includes(values?.[alternate.whenParameter]) ? alternate : entry;
   const parameterId = mapping === alternate ? alternate.parameterId : entry.parameterIds[0];
@@ -315,6 +342,40 @@ export function decodeInbound(index, hex, values = {}) {
   }
   const value = decodeParameterValue(
     { id: parameterId, type: entry.valueType, encoding: entry.encoding, trueValue: entry.trueValue, falseValue: entry.falseValue }, raw);
+  return value === null ? null : { parameterId, value };
+}
+
+/**
+ * One half of a 14-bit CC pair.
+ *
+ * The coarse half is a whole value on its own: MIDI has a receiver reset the fine half when the
+ * coarse one arrives, and an instrument sending only 7 bits sends only this. The fine half means
+ * nothing without the coarse one before it, so it is put together with the value the parameter
+ * already has; with none known it is ignored rather than read against an invented coarse half. A
+ * parameter whose encoder holds 7 bits takes the coarse half as its value and ignores the fine one.
+ */
+function decodePairHalf(entry, byte, values) {
+  const parameterId = entry.parameterIds[0];
+  const parameter = { id: parameterId, type: entry.valueType, encoding: entry.encoding };
+  const wide = parameterValueWidth(parameter) === 2;
+  const type = String(entry.encoding?.type ?? 'u7');
+  const lsbFirst = type === 'u14-lsb-msb' || type === 's14-lsb-msb';
+  const order = (msb, lsb) => (lsbFirst ? [lsb, msb] : [msb, lsb]);
+  let wire;
+  if (!wide) {
+    if (entry.half === 'lsb') return null;
+    wire = [byte & 0x7f];
+  } else if (entry.half === 'msb') {
+    wire = order(byte & 0x7f, 0);
+  } else {
+    const current = values?.[parameterId];
+    if (current === undefined || current === null || current === '') return null;
+    const encoded = encodeParameterValue(parameter, current);
+    if (!encoded || encoded.error || encoded.bytes?.length !== 2) return null;
+    const msb = lsbFirst ? encoded.bytes[1] : encoded.bytes[0];
+    wire = order(msb, byte & 0x7f);
+  }
+  const value = decodeParameterValue(parameter, wire);
   return value === null ? null : { parameterId, value };
 }
 

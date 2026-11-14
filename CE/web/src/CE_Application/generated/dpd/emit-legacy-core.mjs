@@ -3,9 +3,34 @@
 // produce an engine-loadable profile on save (no Node CLI); the CLI re-uses this for the generated
 // file. DEVICE-AGNOSTIC: manufacturer / family / identity / message recipes / CC controllers are all
 // derived from the resolved profile — no device is special-cased. Imports only browser-safe siblings.
-import { resolveParams } from './resolve.mjs';
-import { hexToBytes } from './codecs.mjs';
+import { resolveParams, copyJson } from './resolve.mjs';
+import { hexToBytes, checksumOf } from './codecs.mjs';
 import { assembleDump } from './dumps.mjs';
+
+/**
+ * What the emitter writes for what a model leaves out: every default it applies, in one place, so a
+ * model that does not say is not silently given something nobody can see. The Designer shows these
+ * as the values in effect (Device structure), and dpd.schema.json's descriptions name them.
+ */
+export const EMIT_DEFAULTS = Object.freeze({
+  // A parameter with no range: a 7-bit value.
+  range: { min: 0, max: 127 },
+  // A parameter with no send policy of its own and none for its type in `defaults.sendPolicy`: a
+  // choice or a name sent when it is set, anything else as it moves, 20 ms apart, and once more on
+  // release.
+  sendPolicy: (valueType) => ({ mode: valueType === 'enum' || valueType === 'text' ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true }),
+  access: { realtimeSafe: true, source: 'singleParameter' },
+  ui: (valueType) => ({ preferredComponent: valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' }),
+  // The device: channel 1, 20 ms between two messages, 20 ms after a message shape's message, and a
+  // request or an identity inquiry waited for a second and not repeated.
+  channel: 1,
+  timing: { minDelayBetweenMessagesMs: 20 },
+  shapeDelayAfterMs: 20,
+  request: { timeoutMs: 1000, retries: 0 },
+  identity: { timeoutMs: 1000, retries: 0 },
+  // The profile: untested until an instrument has answered, made on this machine.
+  profile: { minCEditorVersion: '0.9.0', status: 'experimental', trust: 'local' },
+});
 
 const flat = (rid) => rid.replace(/^[^.]+\./, '');
 // The one id a resolved parameter goes by in the legacy profile — in its `parameters` entry AND in
@@ -18,14 +43,45 @@ const flat = (rid) => rid.replace(/^[^.]+\./, '');
 // mappings read into and wrote from Scene 1 — and the voiceCommon dump mapped Free-EG tracks 2-4 onto
 // track 1, four offsets to one id. A Scene 2 read moved Scene 1's controls, and every built dump wrote
 // Scene 1's values into Scene 2. One helper, so the two cannot drift again.
-export const legacyParamId = (p) => (p.instance > 0 ? p.resolvedId : flat(p.resolvedId));
+// A scope that names its instances (idTemplate) gives each its own id outright.
+export const legacyParamId = (p) => p.legacyId ?? (p.instance > 0 ? p.resolvedId : flat(p.resolvedId));
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined);
+
+// A cc recipe's id. A plain controller on the profile's channel keeps the id it always had
+// (`cc74`); one with a low-seven-bits controller (a 14-bit pair) or a channel of its own is a
+// different message and gets its own recipe.
+/** An nrpn or rpn recipe's id: the number, and what else makes it a message of its own. */
+export function numberRecipeId(flavour, wire) {
+  const number = String(wire[flavour] ?? '').replace(/\s+/g, '');
+  const ch = wire.channel != null ? `@${String(wire.channel).replace(/^\$/, '')}` : '';
+  const how = [wire.nullAfterSend != null ? `n${wire.nullAfterSend ? 1 : 0}` : '', wire.lowBits != null ? `l${wire.lowBits}c${wire.lowBitsController}` : '', wire.delayAfterMs != null ? `d${wire.delayAfterMs}` : '', (wire.size ?? 1) >= 2 ? '' : 'v7'].filter(Boolean).join('');
+  // The id the emitter always gave a plain number on the profile's channel stays the same.
+  return wire.channel == null && wire.nullAfterSend == null && wire.lowBits == null && wire.delayAfterMs == null ? flavour + number : `${flavour}${number}${ch}${how ? `_${how}` : ''}`;
+}
+
+export function ccRecipeId(wire) {
+  const lsb = wire.lsbCc != null ? `_${wire.lsbCc}` : '';
+  const ch = wire.channel != null ? `@${String(wire.channel).replace(/^\$/, '')}` : '';
+  return `cc${wire.cc}${lsb}${ch}`;
+}
+
+// The engine-only details a profile converted from the engine's format carries (`engine`, written by
+// tools/from-legacy.mjs as the difference between that profile and what is derived here), laid over
+// what was derived: a key set to null is left out. Without one, nothing changes.
+function applyEngine(out, engine) {
+  if (!engine || typeof engine !== 'object') return out;
+  for (const [key, value] of Object.entries(engine)) {
+    if (value === null) delete out[key];
+    else out[key] = copyJson(value);
+  }
+  return out;
+}
 const toBytes = (hex) => (hex ? String(hex).trim().split(/\s+/) : []);
 
 // DPD per-offset dump codec -> the C++ engine's legacy dump codec vocabulary
-// (u7 / u8 / s7 / u14-msb-lsb / nibbled / text-ascii / text-nibbled-ascii / enum). The engine's dump
-// decoder handles u7/u8/s7 directly; the two that remain unsupported there (per-field packed8to7,
-// bitslice) degrade to u7 best-effort + a note — the DPD's own assemble/parse still handles them.
+// (u7 / u8 / s7 / u14-msb-lsb / nibbled / text-ascii / text-nibbled-ascii / bitfields). The one the
+// engine's dump decoder lacks (per-field packed8to7) degrades to u7 best-effort + a note — the DPD's
+// own assemble/parse still handles it.
 function legacyDumpCodec(codec, note) {
   switch (codec?.type) {
     case undefined: case 'u7': return undefined; // default; engine reads the parameter's own type
@@ -41,7 +97,15 @@ function legacyDumpCodec(codec, note) {
     case 'text-ascii': return { type: 'text-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'text-nibbled-ascii': return { type: 'text-nibbled-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'packed8to7': note?.(`packed8to7 per-field unsupported by the engine dump decoder`); return undefined;
-    case 'bitslice': note?.(`bitslice unsupported by the engine dump decoder`); return undefined;
+    // The engine's `bitfields`: a part a slice, and the slices' signedness, table, shift and ceiling.
+    case 'bitslice': return {
+      type: 'bitfields',
+      parts: codec.slices.map((s) => ({ at: s.byte, from: s.fromBit, bits: s.toBit - s.fromBit + 1, shift: s.valueShift })),
+      ...(codec.signed ? { signed: true } : {}),
+      ...(Array.isArray(codec.map) ? { map: copyJson(codec.map) } : {}),
+      ...(codec.shiftRight != null ? { shiftRight: codec.shiftRight } : {}),
+      ...(codec.max != null ? { max: codec.max } : {}),
+    };
     default: return undefined;
   }
 }
@@ -57,13 +121,21 @@ export function buildDumpDefinitions(resolved) {
   // Only dumps with real byte framing (a matcher + a layout) become engine dumpDefinitions. A dump
   // declared with just spans/requestShape is an unmapped placeholder (e.g. the GAIA, whose layout needs
   // its manual) — emit nothing for it so the legacy file stays clean, and flag it.
-  const dumps = all.filter((d) => d.message?.matcher && (d.layout?.length));
-  for (const d of all) if (!(d.message?.matcher && d.layout?.length))
+  // A dump marked frameOnly is emitted with an empty layout too: a Yamaha bulk header or footer frames
+  // the collection and maps nothing.
+  const framed = (d) => d.message?.matcher && (d.layout?.length || d.frameOnly === true);
+  const dumps = all.filter(framed);
+  for (const d of all) if (!framed(d))
     notes.push(`dump ${d.id}: declared without a byte layout (message.matcher + layout) — no engine dumpDefinition emitted; supply its byte map from the device manual/capture`);
   if (!dumps.length) return { dumpDefinitions: undefined, notes };
 
   const paramMap = {};
+  // A mapping naming a parameter by its own id finds that parameter first: a named scope's
+  // resolved ids (part1.x for its first instance) can be another instance's own id (part1.x of a
+  // scope numbered from 0).
+  const byOwnId = new Map();
   for (const p of resolveParams(resolved)) {
+    if (p.legacyId) byOwnId.set(p.legacyId, p);
     paramMap[p.resolvedId] = p;
     const alias = `${p.scope}.${p.paramId}`;
     if (p.instance === 0 && !(alias in paramMap)) paramMap[alias] = p;
@@ -84,22 +156,32 @@ export function buildDumpDefinitions(resolved) {
         ...(m.payload?.size != null ? { size: m.payload.size } : {}),
         // Whole-payload 8->7 block packing (Korg) — the C++ engine unpacks it before per-offset mapping.
         ...(m.payload?.pack ? { pack: m.payload.pack } : {}),
+        // A payload of records, each a key and a value: a field names its key (`record`).
+        ...(m.payload?.records ? { records: copyJson(m.payload.records) } : {}),
       },
     };
     // roland-7bit / sum-7bit / xor are all computed by the engine's dump decoder.
     if (m.checksum && m.checksum.type !== 'none')
       def.checksum = { type: m.checksum.type, fromOffset: m.checksum.fromOffset, toOffset: m.checksum.toOffset, byteOffset: m.checksum.byteOffset };
-    def.completion = {
-      expectedMessages: m.completion?.messages ?? 1,
-      expectedBytes: m.completion?.bytes ?? assembleDump(d, {}, resolved).length,
-    };
+    // A count given as null is left out (a collection the instrument sizes, ended by its footer).
+    def.completion = {};
+    if (m.completion?.messages !== null) def.completion.expectedMessages = m.completion?.messages ?? 1;
+    if (m.completion?.bytes !== null) def.completion.expectedBytes = m.completion?.bytes ?? assembleDump(d, {}, resolved).length;
     def.mappings = (d.layout ?? []).map((e) => {
-      const p = paramMap[e.param];
+      const p = byOwnId.get(e.param) ?? paramMap[e.param];
       const codec = legacyDumpCodec(e.codec, note);
-      return { parameter: p ? legacyParamId(p) : e.param, offset: e.offset, ...(codec ? { codec } : {}) };
+      // A record's mapping names its record, not an offset; `engine` carries what else it has.
+      const mapping = {
+        parameter: p ? legacyParamId(p) : e.param, ...(e.offset != null ? { offset: e.offset } : {}), ...(codec ? { codec } : {}),
+        // A record's key (and the record it follows), and a condition on another payload byte.
+        ...Object.fromEntries(['record', 'scope', 'when'].filter((k) => e[k] != null).map((k) => [k, copyJson(e[k])])),
+      };
+      return applyEngine(mapping, e.engine);
     });
-    if (d.requestShape) def.requestRecipe = d.requestShape;
-    return def;
+    // The request that asks for it: one of the model's `requests` by id (`request`), or, in a model
+    // written before requests were its own, the id under `requestShape`.
+    if (d.request ?? d.requestShape) def.requestRecipe = d.request ?? d.requestShape;
+    return applyEngine(def, d.engine);
   });
   return { dumpDefinitions, notes };
 }
@@ -137,6 +219,58 @@ export function buildDumpRequests(resolved, modelBytes, emittedDumpIds = null) {
   return out;
 }
 
+/**
+ * A message shape's template with a request's own values in place: `$address` and `$size` its bytes,
+ * `$modelId` the model's, and `$checksum` computed over the shape's checksum range once those are
+ * filled. Any other `$name` ($deviceId) stays for the engine to fill when it sends. Null when the
+ * checksum's range still holds a `$name`, which only the engine knows.
+ */
+export function fillShape(shape, { address, size } = {}, modelBytes = []) {
+  const parts = (shape.template ?? []).map((tok) => (tok === '$address' && address ? toBytes(address)
+    : tok === '$size' && size ? toBytes(size)
+    : tok === '$modelId' ? modelBytes : [tok]));
+  const out = parts.flat();
+  const at = (shape.template ?? []).indexOf('$checksum');
+  if (at < 0 || !shape.checksum || shape.checksum.type === 'none') return out;
+  const from = shape.template.indexOf(shape.checksum.from), to = shape.template.indexOf(shape.checksum.to);
+  if (from < 0 || to < from) return null;
+  const range = parts.slice(from, to + 1).flat();
+  if (range.some((b) => !/^[0-9A-Fa-f]{2}$/.test(b))) return null;
+  const sum = checksumOf(shape.checksum.type, range.map((b) => parseInt(b, 16)));
+  const before = parts.slice(0, at).flat().length;
+  out[before] = sum.toString(16).toUpperCase().padStart(2, '0');
+  return out;
+}
+
+/**
+ * The model's own `requests`: what the device can be asked and what answers. A request names a
+ * message shape and the address and size it asks for (a Roland RQ1: the bytes and checksum are the
+ * shape's), or writes its message out (`template`: an identity request, a Korg dump request).
+ * `response` says what answers it (a bulk dump by id, an identity reply); a timeout and retries
+ * left out are the model's `defaults.request`.
+ */
+export function buildRequests(resolved, modelBytes) {
+  const shapes = resolved.messageShapes ?? [];
+  const defaults = resolved.defaults?.request ?? {};
+  return (resolved.requests ?? []).map((r) => {
+    const shape = r.shape ? shapes.find((s) => s.id === r.shape) : null;
+    const template = shape ? fillShape(shape, r, modelBytes) : copyJson(r.template ?? []);
+    if (r.shape && !template) throw new Error(`request ${r.id}: shape ${r.shape} cannot be filled`);
+    return {
+      id: r.id,
+      name: r.name ?? r.id,
+      kind: r.kind ?? shape?.kind ?? 'sysex',
+      template,
+      ...(r.address ? { address: r.address } : {}),
+      ...(r.size ? { size: r.size } : {}),
+      ...(r.response ? { response: copyJson(r.response) } : {}),
+      timeoutMs: r.timeoutMs ?? defaults.timeoutMs ?? EMIT_DEFAULTS.request.timeoutMs,
+      retries: r.retries ?? defaults.retries ?? EMIT_DEFAULTS.request.retries,
+      ...(r.engine ?? {}),
+    };
+  });
+}
+
 /** Every `$name` a shape or matcher uses, so the emitted `variables` block can define them all. */
 export function templateVariables(resolved) {
   const names = new Set();
@@ -151,17 +285,22 @@ export function templateVariables(resolved) {
   return names;
 }
 
-function legacyParam(p) {
+// The engine's type for each DPD value type, one to one. Everything but a choice and a name used to
+// be emitted as an integer, so a signed value, a switch and a button all lost what they were.
+const LEGACY_TYPES = { enum: 'choice', text: 'text', signed: 'bipolar', toggle: 'boolean', trigger: 'action', momentary: 'momentary' };
+
+function legacyParam(p, defaults = {}) {
   // The id follows legacyParamId (instance 0 flat, later instances prefixed) — the same rule the dump
   // mappings use. Later instances' names carry the instance too, because "Mixer VCO1 Level" twice in
   // a parameter list answers no question anyone is asking.
-  const instanced = p.instance > 0;
+  // A named instance's name is its own ('Part 2 Level'); otherwise later instances say which they are.
+  const instanced = p.instance > 0 && !p.named;
   const isText = p.valueType === 'text';
   const out = {
     id: legacyParamId(p),
     name: instanced ? `${p.name} (${p.scopeLabel ?? cap(p.scope)} ${p.instance + 1})` : p.name,
     group: p.group,
-    type: p.valueType === 'enum' ? 'choice' : isText ? 'text' : 'integer',
+    type: LEGACY_TYPES[p.valueType] ?? 'integer',
   };
   // The DEVICE's default when the profile records one. The fallbacks below are placeholders, not
   // data: range.min is the bottom of the dial, and for a bipolar parameter that is the extreme, not
@@ -177,7 +316,7 @@ function legacyParam(p) {
     out.choices = p.enum.map((e) => ({ id: e.id, label: e.label, value: e.wire }));
   } else {
     out.default = p.default ?? p.range?.min ?? 0;
-    out.range = p.range ?? { min: 0, max: 127 };
+    out.range = p.range ?? copyJson(EMIT_DEFAULTS.range);
   }
   if (p.absAddress) out.address = p.absAddress;
   // shortLabel takes the INSTANCED name: two scenes of the same 110 parameters put "VCF Cutoff"
@@ -186,8 +325,8 @@ function legacyParam(p) {
   // How the synth's own display writes it (dpd.schema.json parameterDisplay): ce.format.parameter
   // and the readouts read these from the descriptor. The two above are the emitter's and stay.
   if (p.display && typeof p.display === 'object') {
-    for (const key of ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC']) {
-      if (p.display[key] !== undefined) out.display[key] = structuredClone(p.display[key]);
+    for (const key of ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC', 'mode', 'shortLabel']) {
+      if (p.display[key] !== undefined) out.display[key] = copyJson(p.display[key]);
     }
   }
   // A string has no normalized position — there is no 0..1 to put it on.
@@ -213,14 +352,19 @@ function legacyParam(p) {
     : isText
       ? { type: encType, length: p.encoding?.length ?? 1, pad: p.encoding?.pad ?? 32 }
       : { type: encType };
-  out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: true, source: 'singleParameter' };
-  // A name is committed, not dragged.
-  out.sendPolicy = { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
+  out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: p.access?.realtimeSafe ?? EMIT_DEFAULTS.access.realtimeSafe, source: p.access?.source ?? EMIT_DEFAULTS.access.source };
+  // Its own send policy, or its model's for its value type; failing both, a name and a choice are
+  // committed and the rest dragged. null: none at all.
+  const sendPolicy = p.sendPolicy !== undefined ? p.sendPolicy : defaults.sendPolicy?.[p.valueType];
+  if (sendPolicy !== null) out.sendPolicy = copyJson(sendPolicy ?? EMIT_DEFAULTS.sendPolicy(p.valueType));
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
-  out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc)
-    : p.wires?.write?.msg === 'nrpn' ? ('nrpn' + String(p.wires.write.nrpn ?? '').replace(/\s+/g, ''))
-    : p.wires?.write?.msg === 'rpn' ? ('rpn' + String(p.wires.write.rpn ?? '').replace(/\s+/g, ''))
-    : (p.wires?.write?.msg ?? 'dt1');
+  // A parameter only read back (from a dump) has no write wire and is sent with nothing; a converted
+  // one says so with `wires: []`. One with no wires list at all keeps the DT1 it always defaulted to.
+  out.messageRecipe = p.wiresDeclaredEmpty ? undefined
+    : p.wires?.write?.msg === 'cc' ? ccRecipeId(p.wires.write)
+    : p.wires?.write?.msg === 'nrpn' ? numberRecipeId('nrpn', p.wires.write)
+    : p.wires?.write?.msg === 'rpn' ? numberRecipeId('rpn', p.wires.write)
+    : (p.wires?.write?.shape ?? p.wires?.write?.msg ?? 'dt1');
   // An rxLive wire is the message the instrument SENDS when its own control moves, which need not be
   // the one the editor writes: a GAIA's filter knob is written as a DT1 to an address and transmitted
   // as CC 102/103/104. Nothing derived from the write path can recognise those, so the inbound index
@@ -230,8 +374,11 @@ function legacyParam(p) {
   const rx = p.wires?.rxLive;
   const writeCc = p.wires?.write?.msg === 'cc' ? p.wires.write.cc : null;
   if (rx?.msg === 'cc' && rx.cc != null && rx.cc !== writeCc) out.inbound = [{ kind: 'cc', controller: rx.cc }];
-  out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
-  return out;
+  if (out.messageRecipe === undefined) delete out.messageRecipe;
+  out.ui = p.ui ?? EMIT_DEFAULTS.ui(p.valueType);
+  if (p.description != null) out.description = p.description;
+  if (p.source) out.source = copyJson(p.source);
+  return applyEngine(out, p.engine);
 }
 
 // Translate a new-schema messageShape into a legacy messageRecipe. The legacy engine resolves
@@ -242,7 +389,8 @@ function shapeToRecipe(shape, resolved) {
   const template = (shape.template ?? []).flatMap((tok) => (tok === '$modelId' ? modelBytes : [tok]));
   const recipe = { id: shape.id, kind: shape.kind, template };
   if (shape.checksum && shape.checksum.type !== 'none') recipe.checksum = shape.checksum;
-  recipe.delayAfterMs = shape.delayAfterMs ?? 20;
+  // null asks for no delay at all, as a recipe converted from one without it (tools/from-legacy.mjs).
+  if (shape.delayAfterMs !== null) recipe.delayAfterMs = shape.delayAfterMs ?? EMIT_DEFAULTS.shapeDelayAfterMs;
   return recipe;
 }
 
@@ -257,13 +405,20 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   // scene can edit only half of any patch.
   const params = resolveParams(resolved);
 
-  // Sysex recipes from the manufacturer's message shapes, then one CC recipe per distinct controller.
+  // Sysex recipes from the manufacturer's message shapes, then one CC recipe per distinct controller
+  // (with its low-bits controller and channel, when it has them).
   const messageRecipes = (resolved.messageShapes ?? []).map((s) => shapeToRecipe(s, resolved));
-  const ccControllers = [...new Set(
-    params.filter((p) => p.wires?.write?.msg === 'cc' && p.wires.write.cc != null).map((p) => p.wires.write.cc)
-  )].sort((a, b) => a - b);
-  for (const cc of ccControllers) {
-    messageRecipes.push({ id: `cc${cc}`, kind: 'cc', channel: '$channel', controller: cc, value: '$encodedValue' });
+  const ccWires = new Map();
+  for (const p of params) {
+    const w = p.wires?.write;
+    if (w?.msg === 'cc' && w.cc != null && !ccWires.has(ccRecipeId(w))) ccWires.set(ccRecipeId(w), w);
+  }
+  for (const [id, w] of [...ccWires.entries()].sort((a, b) => a[1].cc - b[1].cc || a[0].localeCompare(b[0]))) {
+    messageRecipes.push({
+      id, kind: 'cc', channel: w.channel ?? '$channel', controller: w.cc,
+      ...(w.lsbCc != null ? { lsbController: w.lsbCc } : {}),
+      value: '$encodedValue',
+    });
   }
   // One recipe per distinct parameter number, for both flavours. NRPN and RPN differ only in the
   // controller pair that selects the number — 99/98 against 101/100 — which is the engine's business
@@ -273,43 +428,56 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
     for (const p of params) {
       const wr = p.wires?.write;
       const number = wr?.[flavour];
-      if (wr?.msg !== flavour || !number || seen.has(number)) continue;
-      seen.add(number);
+      if (wr?.msg !== flavour || !number) continue;
+      const id = numberRecipeId(flavour, wr);
+      if (seen.has(id)) continue;
+      seen.add(id);
       const [msb, lsb] = number.trim().split(/\s+/).map((h) => parseInt(h, 16));
       messageRecipes.push({
-        id: flavour + number.replace(/\s+/g, ''),
+        id,
         kind: flavour,
-        channel: '$channel',
+        channel: wr.channel ?? '$channel',
         parameterMsb: msb,
         parameterLsb: lsb,
-        valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7,
+        // Korg's low bits replace the resolution: the value is split where they say.
+        ...(wr.lowBits != null ? { lowBits: wr.lowBits, lowBitsController: wr.lowBitsController } : { valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7 }),
+        ...(wr.nullAfterSend != null ? { nullAfterSend: wr.nullAfterSend } : {}),
+        ...(wr.delayAfterMs != null ? { messageDelayAfterMs: wr.delayAfterMs } : {}),
         value: '$encodedValue',
       });
     }
   }
 
+  // A profile converted from the engine's format names its engine id and name in `engine`; asked
+  // for none, the emitter derives them (`<id>-dpd`, `<label> (from DPD)`).
+  const engineId = resolved.engine?.id;
+  const engineName = resolved.engine?.name;
   const legacy = {
     schemaVersion: 1,
     profileVersion: resolved.version,
-    minCEditorVersion: '0.9.0',
-    id: legacyId ?? `${resolved.id}-dpd`,
-    name: name ?? ((resolved.label ?? 'Device') + ' (from DPD)'),
+    minCEditorVersion: EMIT_DEFAULTS.profile.minCEditorVersion,
+    id: legacyId ?? engineId ?? `${resolved.id}-dpd`,
+    name: name ?? engineName ?? ((resolved.label ?? 'Device') + ' (from DPD)'),
     dpdSource: resolved.id,
     manufacturer: resolved.manufacturer ?? cap(resolved.inherits) ?? 'Generic',
     family: resolved.family ?? '',
-    status: 'experimental',
-    trust: 'local',
+    status: EMIT_DEFAULTS.profile.status,
+    trust: EMIT_DEFAULTS.profile.trust,
     // Every $name a template or matcher uses gets a home here. The engine resolves an undeclared
     // one to nothing, so a request whose address carries a $slot silently addressed byte 0.
+    // The model's own `variables` (a part's channel, an FX channel) with their values, over every
+    // other name at 0; its device id; and the channel, 1 unless it says otherwise.
     variables: {
       ...Object.fromEntries([...templateVariables(resolved)]
         .filter((n) => !['deviceId', 'modelId', 'manufacturerId', 'address', 'encodedValue', 'size', 'checksum', 'channel'].includes(n))
         .map((n) => [n, 0])),
+      ...copyJson(resolved.variables ?? {}),
       ...(resolved.deviceId != null ? { deviceId: hexToBytes(resolved.deviceId)[0] } : {}),
-      channel: 1,
+      channel: resolved.variables?.channel ?? EMIT_DEFAULTS.channel,
     },
-    timing: { minDelayBetweenMessagesMs: 20 },
-    parameters: params.map(legacyParam),
+    // How long the engine waits between two messages to this device.
+    timing: copyJson(resolved.timing ?? EMIT_DEFAULTS.timing),
+    parameters: params.map((p) => legacyParam(p, resolved.defaults)),
     messageRecipes,
   };
 
@@ -346,7 +514,11 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
         manufacturerId: toBytes(resolved.identity.manufacturerId ?? resolved.manufacturerId),
         ...(family ? { familyCode: toBytes(family) } : {}),
         ...(member ? { modelNumber: toBytes(member) } : {}),
-        timeoutMs: 1000, retries: 0,
+        // Only where the model asks: an inquiry addressed to one device id rather than all (the
+        // makers' documents that say so), and a firmware revision to match.
+        ...(resolved.identity.requestDeviceId ? { requestDeviceId: resolved.identity.requestDeviceId } : {}),
+        ...(resolved.identity.revision ? { revision: toBytes(resolved.identity.revision) } : {}),
+        ...EMIT_DEFAULTS.identity,
       };
     }
   }
@@ -359,14 +531,23 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   // Gated on what dumpDefinitions actually emitted — a request whose response names a dump the
   // profile does not carry makes the engine refuse the profile outright.
   const emittedDumpIds = new Set((dumpDefinitions ?? []).map((d) => d.id));
-  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId), emittedDumpIds);
+  // The model's own requests first, then one for each dump that names only a request shape.
+  const ownRequests = buildRequests(resolved, toBytes(resolved.modelId));
+  if (ownRequests.length) legacy.requests = ownRequests;
+  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId), emittedDumpIds)
+    .filter((r) => !ownRequests.some((o) => o.id === r.id));
   if (dumpRequests.length) (legacy.requests ??= []).push(...dumpRequests);
+  // What the engine asks the device when it connects, in order: request ids.
+  if (resolved.startup) {
+    const { sync, ...rest } = resolved.startup;
+    legacy.startup = { ...copyJson(rest), ...(sync ? { sync: sync.map((s) => (typeof s === 'string' ? { request: s } : copyJson(s))) } : {}) };
+  }
 
   // Preset model: carried through verbatim (the librarian/selector reads it), plus the legacy
   // engine's scan plumbing derived from it — a `requests` entry synthesized from the referenced
   // messageShape and a `presetBrowser` whose slots are the union of the bank ranges.
   if (resolved.presets) {
-    legacy.presets = structuredClone(resolved.presets);
+    legacy.presets = copyJson(resolved.presets);
     const nameRequestId = resolved.presets.nameRequest?.request;
     const shape = (resolved.messageShapes ?? []).find((s) => s.id === nameRequestId);
     if (shape) {
@@ -390,9 +571,18 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   }
 
   // The profile-wide display defaults (middleC): the engine hands them to each parameter.
-  if (resolved.display && typeof resolved.display === 'object') legacy.display = structuredClone(resolved.display);
+  if (resolved.display && typeof resolved.display === 'object') legacy.display = copyJson(resolved.display);
   // What a patch of this synth is (ce.patch): read from the document as the author wrote it.
-  if (resolved.patch && typeof resolved.patch === 'object') legacy.patch = structuredClone(resolved.patch);
+  if (resolved.patch && typeof resolved.patch === 'object') legacy.patch = copyJson(resolved.patch);
+  // The maker's documents the profile was read from; a parameter's `source.doc` is an index into them.
+  if (Array.isArray(resolved.sources)) legacy.sources = copyJson(resolved.sources);
+
+  // The engine-only fields of a converted profile, laid over the rest; an id or name the caller
+  // asked for still stands.
+  applyEngine(legacy, resolved.engine);
+  if (legacyId) legacy.id = legacyId;
+  if (name) legacy.name = name;
+  legacy.dpdSource = resolved.id;
 
   if (embedDpdModel) legacy.dpdModel = embedDpdModel;
   return legacy;

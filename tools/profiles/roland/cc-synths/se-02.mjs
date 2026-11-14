@@ -9,7 +9,7 @@ export default {
   chart: 'se-02',
   description: 'Roland SE-02 (with Studio Electronics), from the Patch parameter list of its MIDI Implementation Chart.',
   extra: [
-    { cc: 0, name: 'Bank select (0–3: A, B, C, User)', tx: false, rx: true, marks: [], why: 'Chart p1: received only; 0 - 3 select banks A, B, C and User.' },
+    { cc: 0, name: 'Bank select (0–3: A, B, C, User)', tx: false, rx: true, marks: [], page: 1, why: 'Chart p1: received only; 0 - 3 select banks A, B, C and User.' },
   ],
   ranges: {
     0: { min: 0, max: 3, why: 'the chart prints "Bank select (0–3: A, B, C, User)"' },

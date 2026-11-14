@@ -1,0 +1,56 @@
+{
+  "source": {"title":"VOX Continental MIDI Implementation","printedTitle":"VOX Continental MIDI Implementation","revision":"1.00","date":"2018.02.07","file":"VOX_Continental_MIDIimp.txt","sha256":"e00f782788450de59e24f4cc4eda76fa8416a7bb60b6cd0a791a7c6bc875fe36","url":"https://www.korg.com/us/support/download/manual/0/755/4233/"},
+  "programChange": {"line":95,"desc":"Scene Change                       pp=0~15"},
+  "received": [
+    {"line":74,"cc":7,"third":"vv    (vv)","desc":"Volume                             vv=0~127","more":[]},
+    {"line":75,"cc":10,"third":"vv    (vv)","desc":"Pan                                vv=0~127","more":[]},
+    {"line":76,"cc":11,"third":"vv    (vv)","desc":"Expression   ( CONTROL Pedal )     vv=0~127","more":[]},
+    {"line":77,"cc":64,"third":"vv    (vv)","desc":"Hold         ( DAMPER Pedal )      vv=0~127","more":[]},
+    {"line":78,"cc":66,"third":"00/7F (00/127)","desc":"Sostenuto Off/On                              *1","more":[]},
+    {"line":79,"cc":67,"third":"vv    (vv)","desc":"Soft Pedal                         vv=0~127","more":[]},
+    {"line":80,"cc":82,"third":"00/7F (00/127)","desc":"Rotary Speed ( ROTOR SPEED Pedal )            *2","more":[]},
+    {"line":81,"cc":102,"third":"vv    (vv)","desc":"Touch Controller 1                 vv=0~127","more":[]},
+    {"line":82,"cc":103,"third":"vv    (vv)","desc":"Touch Controller 2                 vv=0~127","more":[]},
+    {"line":83,"cc":104,"third":"vv    (vv)","desc":"Touch Controller 3                 vv=0~127","more":[]},
+    {"line":84,"cc":105,"third":"vv    (vv)","desc":"Touch Controller 4                 vv=0~127","more":[]},
+    {"line":85,"cc":106,"third":"vv    (vv)","desc":"Touch Controller 5                 vv=0~127","more":[]},
+    {"line":86,"cc":107,"third":"vv    (vv)","desc":"Touch Controller 6                 vv=0~127","more":[]},
+    {"line":87,"cc":108,"third":"vv    (vv)","desc":"Touch Controller 7                 vv=0~127","more":[]},
+    {"line":88,"cc":109,"third":"vv    (vv)","desc":"Touch Controller 8                 vv=0~127","more":[]},
+    {"line":89,"cc":110,"third":"vv    (vv)","desc":"Touch Controller 9                 vv=0~127","more":[]},
+    {"line":90,"cc":111,"third":"vv    (vv)","desc":"CONTROL BUTTON                     vv=0~2     *3","more":[]},
+    {"line":91,"cc":112,"third":"vv    (vv)","desc":"UPPER/LOWER BUTTON                 vv=0~1     *4","more":[]},
+    {"line":92,"cc":120,"third":"00    (00)","desc":"All Sound Off","more":[]},
+    {"line":93,"cc":121,"third":"00    (00)","desc":"Reset All Controllers","more":[]},
+    {"line":94,"cc":123,"third":"00    (00)","desc":"All Note Off","more":[]}
+  ],
+  "transmitted": [
+    {"line":13,"cc":11,"third":"vv    (vv)","desc":"Expression   ( CONTROL Pedal )     vv=0~127","more":[]},
+    {"line":14,"cc":64,"third":"vv    (vv)","desc":"Damper       ( DAMPER Pedal )      vv=0~127","more":[]},
+    {"line":15,"cc":82,"third":"00/7F (00/127)","desc":"Rotary Speed ( ROTOR SPEED Pedal )            *1","more":[]},
+    {"line":16,"cc":102,"third":"vv    (vv)","desc":"Touch Controller 1                 vv=0~127","more":[]},
+    {"line":17,"cc":103,"third":"vv    (vv)","desc":"Touch Controller 2                 vv=0~127","more":[]},
+    {"line":18,"cc":104,"third":"vv    (vv)","desc":"Touch Controller 3                 vv=0~127","more":[]},
+    {"line":19,"cc":105,"third":"vv    (vv)","desc":"Touch Controller 4                 vv=0~127","more":[]},
+    {"line":20,"cc":106,"third":"vv    (vv)","desc":"Touch Controller 5                 vv=0~127","more":[]},
+    {"line":21,"cc":107,"third":"vv    (vv)","desc":"Touch Controller 6                 vv=0~127","more":[]},
+    {"line":22,"cc":108,"third":"vv    (vv)","desc":"Touch Controller 7                 vv=0~127","more":[]},
+    {"line":23,"cc":109,"third":"vv    (vv)","desc":"Touch Controller 8                 vv=0~127","more":[]},
+    {"line":24,"cc":110,"third":"vv    (vv)","desc":"Touch Controller 9                 vv=0~127","more":[]},
+    {"line":25,"cc":111,"third":"vv    (vv)","desc":"CONTROL BUTTON                     vv=0~2     *2","more":[]},
+    {"line":26,"cc":112,"third":"vv    (vv)","desc":"UPPER/LOWER BUTTON                 vv=0~1     *3","more":[]}
+  ],
+  "nrpn": [
+  ],
+  "identity": [
+  ],
+  "programDump": null,
+  "marks": {
+    "1": "00:OFF, 7F:ON",
+    "2": "00:Slow, 7F:Fast",
+    "3": "00:Organ, 01:Key/Layer, 02:EQ",
+    "4": "00:Upper, 01:Lower"
+  },
+  "lists": {
+  }
+}

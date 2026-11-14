@@ -32,7 +32,8 @@
   import { isJuceAvailable } from '../../bridge/bridge.js';
   import NumberCell from '../../properties/NumberCell.svelte';
 
-  let { model, merged, profileId = '' } = $props();
+  // `shown`: mounted with every other screen; the engine probe is built only when this one shows.
+  let { model, merged, profileId = '', shown = true } = $props();
 
   const ROLES = ['factory', 'user'];
   const RECALL_KINDS = [
@@ -54,7 +55,7 @@
   // A legacy-shaped probe of just what the local engine needs (variables + presets + scan plumbing) —
   // recall preview and dry-run scans work on the draft model without saving to the engine first.
   let probeProfile = $derived.by(() => {
-    if (!merged || !presets) return null;
+    if (!shown || !merged || !presets) return null;
     try {
       return buildLegacyProfile($state.snapshot(merged), { legacyId: profileId || `${merged.id}-dpd` });
     } catch {

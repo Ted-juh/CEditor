@@ -1,25 +1,18 @@
 // Shared structural validator for DPD profiles. The formal contract is dpd.schema.json
-// (usable by ajv / editors); this is the dependency-free check the tools + the in-app Designer run,
-// kept in step with the schema's enums/required-fields so it's a real import gate (not a token check).
-const KINDS = ['manufacturer', 'model', 'variant', 'component'];
-const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger', 'text'];
-const WIRE_DIRS = ['write', 'read', 'rxLive'];
-const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'rpn', 'raw'];
-const CHECKSUM_TYPES = ['roland-7bit', 'sum-7bit', 'xor', 'none'];
-const ENCODING_TYPES = ['u7', 'u8', 's7', 'u14', 'u14-lsb', 'nibbles', 'packed8to7', 'bitslice'];
-const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'rpn', 'raw'];
-const SCOPE_KINDS = ['global', 'tone', 'part', 'effect', 'drumMap', 'patch'];
-const DUMP_KINDS = ['patch', 'performance', 'bank'];
+// (usable by ajv / editors); this is the dependency-free check the tools + the in-app Designer run.
+// The values each field allows are the schema's own, written out by make-schema-enums.mjs: the
+// validator kept copies of them, two lists for each kept in step by hand.
+import {
+  KINDS, BYTE_ORDERS, COMPLETENESS, VALUE_TYPES, WIRE_DIRS, WIRE_MSGS, CHECKSUM_TYPES, SHAPE_KINDS,
+  SCOPE_KINDS, DUMP_KINDS, PARAM_ENCODING_TYPES, DUMP_CODEC_TYPES, RECORD_FIELD_TYPES, DISPLAY_FORMATS,
+  PRESET_BANK_ROLES, PRESET_RECALL_KINDS, PROVENANCE_SOURCES,
+} from './schema-enums.mjs';
+
 // The two text codecs are parameter encodings as well as dump codecs. A patch name is ONE value —
 // ten bytes of ASCII at one address — and modelling it as ten one-byte parameters gives you ten
 // knobs where a name field belongs, and a librarian with nothing to read.
 const TEXT_CODEC_TYPES = ['text-ascii', 'text-nibbled-ascii'];
-const PARAM_ENCODING_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
-// per-offset dump codecs: the value-encoding set plus the two text (patch-name) codecs.
-const DUMP_CODEC_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
 const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
-// $defs.parameterDisplay.format: the ce.format command that writes the value.
-const DISPLAY_FORMATS = ['number', 'hz', 'time', 'db', 'percent', 'pan', 'ratio', 'note', 'division', 'table'];
 
 /** $defs.patchSection: what a patch of this synth is, for ce.patch. */
 function checkPatchSection(patch, E) {
@@ -72,6 +65,20 @@ function checkDisplay(display, where, E) {
   }
 }
 
+// A bit-sliced value: each slice bits fromBit..toBit of one byte (0-7), at valueShift in the value;
+// a table of [raw, value] pairs, or a shift and a ceiling, say what the bits mean.
+function checkSlices(c, where, E) {
+  if (!Array.isArray(c.slices) || !c.slices.length) { E(`${where}: bitslice needs slices`); return; }
+  for (const [i, s] of c.slices.entries()) {
+    const ok = [s.byte, s.fromBit, s.toBit, s.valueShift].every((n) => Number.isInteger(n) && n >= 0)
+      && s.toBit <= 7 && s.fromBit <= s.toBit && s.valueShift <= 24;
+    if (!ok) E(`${where}: slice ${i} needs byte >= 0, 0 <= fromBit <= toBit <= 7, valueShift 0-24`);
+  }
+  if (c.map != null && !(Array.isArray(c.map) && c.map.every((pair) => Array.isArray(pair) && pair.length === 2 && pair.every(Number.isInteger))))
+    E(`${where}: bitslice map must be [[raw, value], ...]`);
+  if (c.shiftRight != null && !(Number.isInteger(c.shiftRight) && c.shiftRight >= 0 && c.shiftRight <= 24)) E(`${where}: shiftRight must be 0-24`);
+}
+
 export function validateProfile(profile) {
   const errs = [];
   const E = (m) => errs.push(m);
@@ -81,7 +88,7 @@ export function validateProfile(profile) {
   if (!KINDS.includes(profile.kind)) E('bad kind');
   if (profile.kind === 'model' && !profile.scopes) E('model needs scopes');
   if (profile.kind === 'variant' && !profile.inherits) E('variant needs inherits');
-  if (profile.byteOrder && !['msb-first', 'lsb-first'].includes(profile.byteOrder)) E(`bad byteOrder ${profile.byteOrder}`);
+  if (profile.byteOrder && !BYTE_ORDERS.includes(profile.byteOrder)) E(`bad byteOrder ${profile.byteOrder}`);
 
   if (profile.checksum) {
     if (!profile.checksum.type) E('checksum needs type');
@@ -112,7 +119,7 @@ export function validateProfile(profile) {
       }
       if (p.encoding) {
         if (!PARAM_ENCODING_TYPES.includes(p.encoding.type)) E(`${sk}.${id}: bad encoding.type ${p.encoding.type}`);
-        if (p.encoding.type === 'bitslice' && !Array.isArray(p.encoding.slices)) E(`${sk}.${id}: bitslice encoding needs slices`);
+        if (p.encoding.type === 'bitslice') checkSlices(p.encoding, `${sk}.${id}`, E);
         if (TEXT_CODEC_TYPES.includes(p.encoding.type) && !(p.encoding.length > 0)) {
           E(`${sk}.${id}: a text encoding needs a positive length`);
         }
@@ -124,10 +131,16 @@ export function validateProfile(profile) {
         E(`${sk}.${id}: text size ${p.size} does not match its encoding length`);
       }
       if (p.address && !ADDRESS_RE.test(p.address)) E(`${sk}.${id}: bad address`);
+      if (p.source) {
+        const doc = p.source.doc ?? 0;
+        if (!Number.isInteger(doc) || doc < 0 || doc >= (profile.sources?.length ?? 0)) E(`${sk}.${id}: source names document ${doc}, and the model lists ${profile.sources?.length ?? 0}`);
+        for (const k of ['page', 'line']) if (p.source[k] != null && !(Number.isInteger(p.source[k]) && p.source[k] > 0)) E(`${sk}.${id}: source.${k} must be a positive integer`);
+      }
       checkDisplay(p.display, `${sk}.${id}`, E);
       for (const w of [p.rxLive, ...(p.wires ?? [])].filter(Boolean)) {
         if (!WIRE_DIRS.includes(w.dir)) E(`${sk}.${id}: bad wire dir ${w.dir}`);
         if (!WIRE_MSGS.includes(w.msg)) E(`${sk}.${id}: bad wire msg ${w.msg}`);
+        if (w.msg === 'sysex' && !w.shape) E(`${sk}.${id}: a sysex wire names the message shape it is sent with`);
       }
     }
   }
@@ -142,29 +155,71 @@ export function validateProfile(profile) {
         else if (m.checksum.type !== 'none' && (m.checksum.fromOffset == null || m.checksum.toOffset == null || m.checksum.byteOffset == null))
           E(`dump ${d.id}: message.checksum needs fromOffset/toOffset/byteOffset`);
       }
-      if (m.payload?.pack && !ENCODING_TYPES.includes(m.payload.pack.type)) E(`dump ${d.id}: bad payload.pack.type ${m.payload.pack.type}`);
+      if (m.payload?.pack && !PARAM_ENCODING_TYPES.includes(m.payload.pack.type)) E(`dump ${d.id}: bad payload.pack.type ${m.payload.pack.type}`);
+      const rec = m.payload?.records;
+      if (rec) {
+        if (!(Number.isInteger(rec.size) && rec.size > 0)) E(`dump ${d.id}: payload.records needs a size`);
+        for (const k of ['keyType', 'valueType']) if (rec[k] != null && !RECORD_FIELD_TYPES.includes(rec[k])) E(`dump ${d.id}: bad payload.records.${k} ${rec[k]}`);
+      }
     }
     (d.layout ?? []).forEach((e, i) => {
       if (!e.param || typeof e.param !== 'string') E(`dump ${d.id}: layout[${i}] needs a param ref`);
-      if (!Number.isInteger(e.offset) || e.offset < 0) E(`dump ${d.id}: layout[${i}] needs an integer offset >= 0`);
+      // An entry is placed by its offset, or in a dump of records by its record's key.
+      if (e.record != null ? !Number.isInteger(e.record) || e.record < 0 : !Number.isInteger(e.offset) || e.offset < 0) E(`dump ${d.id}: layout[${i}] needs an integer offset >= 0, or a record`);
       if (e.codec && !DUMP_CODEC_TYPES.includes(e.codec.type)) E(`dump ${d.id}: layout[${i}] bad codec.type ${e.codec.type}`);
+      if (e.codec?.type === 'bitslice') checkSlices(e.codec, `dump ${d.id}: layout[${i}]`, E);
     });
   }
 
   if (profile.presets) validatePresets(profile.presets, E);
+  validateConversation(profile, E);
 
-  if (profile.provenance && !['official', 'community', 'imported', 'learn'].includes(profile.provenance.source))
+  if (profile.provenance && !PROVENANCE_SOURCES.includes(profile.provenance.source))
     E('bad provenance.source');
-  if (profile.completeness && !['full', 'partial', 'structural-only'].includes(profile.completeness))
+  if (profile.completeness && !COMPLETENESS.includes(profile.completeness))
     E('bad completeness');
 
   return { ok: errs.length === 0, errors: errs };
 }
 
+// The device's conversation: its variables, the pause between messages, what it can be asked
+// (`requests`, each by a message shape with an address and size, or written out) and what is asked
+// when it connects (`startup.sync`, request ids in order). Kept in step with dpd.schema.json.
+function validateConversation(profile, E) {
+  for (const [name, value] of Object.entries(profile.variables ?? {})) {
+    if (!Number.isInteger(value)) E(`variables.${name}: must be an integer`);
+  }
+  if (profile.deviceId != null && !/^[0-9A-Fa-f]{2}$/.test(profile.deviceId)) E('deviceId must be one hex byte');
+  const delay = profile.timing?.minDelayBetweenMessagesMs;
+  if (profile.timing && !(Number.isInteger(delay) && delay >= 0)) E('timing.minDelayBetweenMessagesMs must be an integer >= 0');
+  const shapes = new Map((profile.messageShapes ?? []).map((s) => [s.id, s]));
+  const dumpIds = new Set((profile.dumps ?? []).map((d) => d.id));
+  const requestIds = new Set();
+  for (const [i, r] of (profile.requests ?? []).entries()) {
+    const id = r.id ?? `[${i}]`;
+    if (!r.id) E(`requests[${i}]: needs an id`);
+    else if (requestIds.has(r.id)) E(`requests: duplicate id ${r.id}`);
+    requestIds.add(r.id);
+    if (r.shape) {
+      const shape = shapes.get(r.shape);
+      if (!shape) E(`request ${id}: unknown message shape ${r.shape}`);
+      else for (const [token, field] of [['$address', 'address'], ['$size', 'size']]) {
+        if (shape.template.includes(token) && !r[field]) E(`request ${id}: shape ${r.shape} needs its ${field}`);
+      }
+    } else if (!(Array.isArray(r.template) && r.template.length)) E(`request ${id}: needs a message shape or a template`);
+    for (const field of ['address', 'size']) if (r[field] && !ADDRESS_RE.test(r[field])) E(`request ${id}: bad ${field}`);
+    if (r.response?.dump && !dumpIds.has(r.response.dump)) E(`request ${id}: answered by an unknown dump ${r.response.dump}`);
+    for (const field of ['timeoutMs', 'retries']) if (r[field] != null && !(Number.isInteger(r[field]) && r[field] >= 0)) E(`request ${id}: ${field} must be an integer >= 0`);
+  }
+  for (const d of profile.dumps ?? []) if (d.request && !requestIds.has(d.request)) E(`dump ${d.id}: asked for by an unknown request ${d.request}`);
+  for (const [i, s] of (profile.startup?.sync ?? []).entries()) {
+    const rid = typeof s === 'string' ? s : s?.request;
+    if (!requestIds.has(rid)) E(`startup.sync[${i}]: unknown request ${rid}`);
+  }
+}
+
 // The preset model: slot map (banks), recall action, name request, init patch. Kept in step with
 // $defs.presets / presetBank / presetRecall in dpd.schema.json.
-const PRESET_BANK_ROLES = ['factory', 'user'];
-const PRESET_RECALL_KINDS = ['pc', 'bankPc', 'sysex'];
 
 export function validatePresets(presets, E) {
   const banks = presets.banks ?? [];

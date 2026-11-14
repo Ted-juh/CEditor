@@ -63,6 +63,7 @@ export function interpretRow(row, table, layout) {
     if (cut >= 0) description = text.slice(cut).join(' ');
     name = [printed, ...wrapped].reduce((all, part) => {
       if (/\w-$/.test(all) && /^[a-z]/.test(part)) return `${all.slice(0, -1)}${part}`;   // Screen- / saver
+      if (/\s[-–]$/.test(all)) return `${all} ${part}`;                                   // Normal - / Bandpass: a dash, not a split word
       if (/[-/]$/.test(all)) return `${all}${part}`;                                      // ON/ / OFF
       return `${all} ${part}`;
     }).replace(/\s+/g, ' ').replace(/,$/, '');
@@ -208,6 +209,8 @@ export function buildNrpnProfile(data, layout) {
             id: unique(`${layerId ? `${layerId}.` : ''}${camel(group)}.${camel(leaf) || `nrpn${n}`}`, n),
             name: layerName ? `${layerName}: ${name}` : name,
             group: layerName ? `${layerName}: ${group}` : group,
+            // The page of the manual its row is printed on; a run's every NRPN is that one row's.
+            source: { page: one.page },
             ...(describe.length ? { description: describe.join(' ') } : {}),
             access: { canRead: false, canWrite: !readOnly, realtimeSafe: true, source: 'singleParameter' },
             messageRecipe: recipeFor(n),
@@ -314,7 +317,7 @@ export function buildNrpnProfile(data, layout) {
     ],
     variables,
     ...(layout.identity ? {
-      identity: { manufacturerId: ['01'], familyCode: layout.identity.familyCode, modelNumber: layout.identity.modelNumber, timeoutMs: 1000, retries: 0 },
+      identity: { manufacturerId: layout.identity.manufacturerId ?? ['01'], familyCode: layout.identity.familyCode, modelNumber: layout.identity.modelNumber, timeoutMs: 1000, retries: 0 },
     } : {}),
     coverage: {
       singleParameterWrite: 'complete-for-the-manual\'s-nrpn-tables',

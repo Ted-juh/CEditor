@@ -1,0 +1,29 @@
+{
+  "source": {
+    "title": "deton8 manual (web page)",
+    "file": "manual-deton8-index.html",
+    "sha256": "0c4e8c6cff62865a6cf7442f76ed57d2377906ad3bf67f8f93334694f7c3074e",
+    "url": "https://www.twisted-electrons.com/cdn/shop/t/11/assets/manual-deton8-index.html",
+    "saved": "2026-11-11"
+  },
+  "defaultChannel": {
+    "text": "By default, Deton8 listens on MIDI channel 10",
+    "channel": 10
+  },
+  "tables": [
+    {"title":"MIDI CC Reference","columns":["Parameter","CC"],"rows":[
+      ["Master volume","7"],
+      ["Voice volume 1-8","10-17"],
+      ["Voice decay 1-8","20-27"],
+      ["Voice pitch 1-8","30-37"],
+      ["Stutter on/off","40"],
+      ["Stutter pitch / grain rate","41"],
+      ["Stutter size / repeat rate","42"],
+      ["Filter on/off","43"],
+      ["Filter cutoff","44"],
+      ["Filter resonance","45"],
+      ["Ring mod on/off","46"],
+      ["Ring mod frequency","47"]
+    ]}
+  ]
+}

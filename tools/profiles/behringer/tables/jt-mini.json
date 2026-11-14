@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {"title":"JT MINI Quick Start Guide","file":"QSG_BE_0722-AAX_JT-MINI_A7_WW_WEB.pdf","sha256":"a62f125f26c467a17e49d7c41a122c081cf24aada7638c4e6b003c121ef95a3b","url":"https://cdn-media.empowertribe.com/59194e138cf34c498b07fe2449cf5e88/QSG_BE_0722-AAX_JT-MINI_A7_WW_WEB.pdf"}
+  ],
+  "rows": [
+    {"page":58,"cc":1,"range":"0-127","name":"Modulation"},
+    {"page":58,"cc":36,"range":"0-127","name":"VCO PWM Modulation"},
+    {"page":58,"cc":37,"range":"0-127","name":"LFO Delay Time"},
+    {"page":58,"cc":39,"range":"0-127","name":"Envelope Release"},
+    {"page":58,"cc":40,"bands":[{"range":"0-12","name":"Voice Mode Poly"},{"range":"13-37","name":"Voice Mode Unison"},{"range":"38-62","name":"Voice Mode ARP Up"},{"range":"63-87","name":"Voice Mode ARP Down"},{"range":"88-112","name":"Voice Mode ARP Up and Down"},{"range":"113-127","name":"Voice Mode ARP Random"}]},
+    {"page":59,"cc":41,"bands":[{"range":"0-21","name":"Octave 32’"},{"range":"22-43","name":"Octave 16’"},{"range":"44-65","name":"Octave 8’"},{"range":"66-87","name":"Octave 4’"},{"range":"88-109","name":"Octave 2’"},{"range":"110-127","name":"Octave 1’"}]},
+    {"page":59,"cc":42,"range":"0-127","name":"VCO Detune"},
+    {"page":59,"cc":44,"range":"0-127","name":"VCF Cutoff"},
+    {"page":59,"cc":45,"range":"0-127","name":"VCF Envelope Modulation"},
+    {"page":59,"cc":46,"range":"0-127","name":"LFO Rate"},
+    {"page":59,"cc":47,"range":"0-127","name":"VCO Pitch Modulation"},
+    {"page":59,"cc":48,"range":"0-127","name":"VCF LFO Modulation"},
+    {"page":59,"cc":49,"range":"0-127","name":"Envelope Attack Time"},
+    {"page":59,"cc":50,"range":"0-127","name":"Envelope Decay Time"},
+    {"page":59,"cc":51,"range":"0-127","name":"Envelope Sustain Level"}
+  ]
+}

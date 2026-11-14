@@ -1,0 +1,40 @@
+{
+  "sources": [
+    {"title":"SmplTrek MIDI implementation chart (v2)","file":"SmplTrek_v2_manual_MIDI_en.pdf","sha256":"5fc8ca26ad019795bd43de9ecda18f45f36577337df8097dc2bb6bc01c0d7e29","url":"https://www.sonicware.co.jp/DL/SmplTrek/DOC/SmplTrek_v2_manual_MIDI_en.pdf"}
+  ],
+  "rows": [
+    {"page":1,"cc":30,"name":"PROJECT PLAYBACK","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":31,"name":"SCENE PLAYBACK","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":32,"name":"TRACK SHIFT","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":33,"name":"MASTER LEVEL","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":34,"name":"PROJECT LEVEL","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":35,"name":"PRJ-EXT BALANCE","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":36,"name":"INSERT FX ON/OFF","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":37,"name":"INSERT FX TYPE","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":38,"name":"INSERT FX PARMETER 1","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":39,"name":"INSERT FX PARMETER 2","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":40,"name":"INSERT FX PARMETER 3","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":41,"name":"INSERT FX PARMETER 4","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":42,"name":"SEND FX ON/OFF","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":43,"name":"SEND FX TYPE","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":44,"name":"SEND FX PARMETER 1","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":45,"name":"SEND FX PARMETER 2","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":46,"name":"SEND FX PARMETER 3","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":47,"name":"SEND FX PARMETER 4","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":48,"name":"MASTER FX ON/OFF","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":49,"name":"MASTER FX TYPE","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":50,"name":"MASTER FX PARMETER 1","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":51,"name":"MASTER FX PARMETER 2","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":52,"name":"MASTER FX PARMETER 3","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":53,"name":"MASTER FX PARMETER 4","transmitted":"×","recognized":"〇","block":"Control Change （PROJECT） 1 ※"},
+    {"page":1,"cc":60,"name":"TRACK PLAYBACK","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"},
+    {"page":1,"cc":61,"name":"TRACK LEVEL","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"},
+    {"page":1,"cc":62,"name":"TRACK PAN","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"},
+    {"page":1,"cc":63,"name":"TRACK SEND FX","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"},
+    {"page":1,"cc":64,"name":"TRACK MUTE","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"},
+    {"page":1,"cc":65,"name":"TRACK EQ TYPE","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"},
+    {"page":1,"cc":66,"name":"TRACK EQ FREQ","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"},
+    {"page":1,"cc":67,"name":"TRACK EQ AMOUNT","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"},
+    {"page":1,"cc":68,"name":"PITCH (LOOP/SHOTS TRACK)","transmitted":"×","recognized":"〇","block":"Control Change （TRACK） 2 ※"}
+  ]
+}

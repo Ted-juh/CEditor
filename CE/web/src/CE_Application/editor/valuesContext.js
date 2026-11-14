@@ -108,7 +108,9 @@ export function dumpLayout(dump, parameters) {
   // A packed payload's mappings count its bytes once unpacked, which are not the message's: no field
   // has a place in the message, only the packed run as a whole.
   const pack = dump?.payload?.pack;
-  for (const mapping of pack ? [] : Array.isArray(dump?.mappings) ? dump.mappings : []) {
+  // Nor has a dump of records (the 3rd Wave's): a mapping names the record it reads, found by its key
+  // wherever it comes, so no field has a fixed place.
+  for (const mapping of pack || dump?.payload?.records ? [] : Array.isArray(dump?.mappings) ? dump.mappings : []) {
     const parameter = parameters.get(String(mapping?.parameter ?? ''));
     const offset = Number(mapping?.offset ?? 0);
     if (!parameter || !Number.isInteger(offset)) continue;

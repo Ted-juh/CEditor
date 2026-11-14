@@ -407,11 +407,118 @@ something the program does with every profile, which the larger library makes ea
   JP-08, whose Lower part sends on `lowerChannel`, a knob turned on the Lower part is read as the
   Upper part's (`matchInbound` returns `upper.vcf.cutoff` for `B0`, `B1` and `B5`). A recipe whose
   channel is a variable other than `channel` should keep that channel in its fingerprint.
+- **Korg's wide NRPN values are sent, not read back.** A recipe with `lowBitsController` sends the
+  low bits first on that controller (CC 63 on the minilogue xd), then the rest on CC 6, in both
+  engines. On the way in, `nrpn.js` assembles a value from CC 6 and 38 only, so when the instrument
+  sends one of these the CC 63 byte is an ordinary controller and the value is read from its top
+  bits. The fix is for the assembler to keep the last value of the controller a recipe names and
+  combine it with CC 6.
+- **A controller that means two things is not read back.** Six microKORG (2002) knobs mean one
+  setting in a synth program and another in a vocoder program (CC 83 is Filter Type or Formant
+  Shift), so its profile has two parameters on each. `inboundParameterIndex.js` maps a message two
+  parameters share to neither, so when the instrument sends one of those controllers nothing follows
+  it. Closing it means a profile saying which parameter applies under which setting (the program's
+  Voice Mode), and the index asking. The Digitone's and Digitone Keys' appendices print the same:
+  CC 13, 14 and 16 each for a trig parameter and an amp or FM one on the same track channel; both
+  are laid out and sent, and neither is followed when the instrument sends it.
 - **The startup read stops at the first request that is not answered.**
   `processPendingRequestTimeouts` drops a timed-out request without starting the next in the
   `startup.sync` chain. Generated profiles work around it (blocks that may not answer are read on
   request), but one unanswered block still ends the read for every block after it.
 - **The program parses every profile it finds.** `loadInternalTestProfiles` reads every file in
-  `CE/profiles/test` when a profile is first needed: about 234 MB of JSON across 94 files, the
-  largest about 9 MB. Not measured on Windows. If it is slow, load a profile's header first and its
-  parameters when it is chosen.
+  `CE/profiles/test` when a profile is first needed: about 310 MB of JSON across 169 files, the
+  largest about 9 MB (the 29 Yamaha profiles are 63 MB of it). Not measured on Windows. If it is
+  slow, load a profile's header first and its parameters when it is chosen.
+- **A setting whose meaning depends on another is left out.** Yamaha's effect parameters (`Reverb
+  Parameter 1 MSB/LSB` … `Insertion-B Parameter 32`) mean what the effect type selected says, and
+  an element's EQ frequency is printed with a range for each EQ type (`2 Band: 46-182, P.EQ:
+  83-251`). A profile parameter has one range and one meaning, so about 7,000 such rows across the
+  Yamaha profiles are not laid out, and named in each profile's notes; the microKORG's two-meaning
+  knobs above are the same gap. The data lists print the Effect Type and Effect Parameter lists that
+  would fill them. Closing it means a parameter set chosen by another parameter's value, in the
+  format and both engines, and the reader taking those lists. The Blofeld's 28 effect parameters
+  are laid out all the same, as numbers 0 - 127 with each effect type's meaning in the description,
+  since its specification gives every type the same range; what a value shows is not said.
+- **Several settings packed in one byte are left out.** A row such as `Receive Pitch Bend …
+  Receive Control Change`, a bit each, about 1,250 across the Yamaha profiles (a Master zone's
+  transmit switches, a part's receive switches): sending one bit means sending the others as they
+  are, which the format cannot say. Closing it means a bit-field encoding (a mask within a byte)
+  written read-modify-write from the byte's last read value, so it would need a Pull first. The
+  Blofeld's arpeggiator pattern is the same gap: 16 steps of two bytes each (`0sssgaaa`, step,
+  glide and accent; `0lll0ttt`, length and timing), whose fields its specification describes but
+  does not list, so they are left out. Where the fields do have lists (its Allocation and Unisono,
+  an envelope's mode and trigger), the byte is laid out as a choice of every combination, which
+  works because the whole byte is sent.
+- **A setting of several values in one message is left out.** The Motif family's drum key voice is
+  one 3-byte parameter change (`Voice Bank Number MSB`, `LSB`, `Voice Number`), about 360 rows. A
+  profile parameter is one value. Closing it means a parameter of several fields sent as one
+  message, or three parameters the engine sends together.
+- **Yamaha requests and dumps are fixed to device number 1.** The parameter changes take the
+  `deviceId` variable (10H), but the bulk dump requests are written `F0 43 20 …` and the dump
+  matchers expect `F0 43 00 …`. An instrument set to another device number answers parameter
+  changes once the variable is changed, but ignores Pull, and a dump it sends is not recognised.
+  Closing it means request templates that take the variable, and a matcher byte that does
+  (`0n`, n the variable's low nibble), in both engines.
+- **Identity takes one model code.** Several Yamaha data lists print a code for each model of a
+  range (MOXF6 `4C 06`, MOXF8 `4D 06`; MODX M6/M7/M8; MONTAGE6/7/8; MOTIF6/7/8), and a profile
+  covers the range, so those profiles check no identity. Closing it means `identity.modelNumber`
+  accepting a list. The Microwave II/XT's is the same gap differently: its member code is a bitmask
+  of the hardware fitted (`00 00` a Microwave 2, `01 00` one with the XT mainboard, `03 00` an XT,
+  more with expansions), so its profile checks none either; a list would serve it too.
+- **A structure repeated many times is laid out once.** The MODX, MODX+, MONTAGE, MODX M and
+  MONTAGE M lay out the Performance and Part 1: the other 15 parts are the same tables a part apart,
+  some 85,000 parameters a profile in full, and the MODX M's elements 9 to 128 the same again.
+  Closing it means a repeated group in the format (a block of parameters, an address stride, a
+  count) that the engines expand when asked, rather than a profile listing every copy. Waldorf's
+  multitimbral instruments are laid out for one instrument the same way: the Blofeld's Multi
+  instruments 2 to 16 (locations 01 - 0F), the Microwave II/XT's 2 to 8, and the Wave's and the
+  1989 Microwave's instruments 2 to 8 (the instrument byte of their parameter edit).
+- **A request answered by control changes is not modelled.** The Pulse's Controller Dump request
+  (`F0 3E 0B <dev> 4B F7`) is answered with the program playing, sent as the same control changes
+  its profile maps. A request's response can only be a dump or an identity reply, so a request
+  answered by controllers would wait for neither and time out; the profile leaves it out and Pulls a
+  stored program by number instead, which is not necessarily the one playing, so nothing is read
+  on connect. Closing it means a response of controllers (complete after a count of them, or a
+  quiet interval) in the format and both engines; the inbound path already maps each one.
+- **An Elektron parameter takes its controller's whole range.** The manuals' MIDI appendices print
+  each parameter's CC and NRPN numbers and nothing about its values, so every parameter of the 19
+  Elektron profiles is 0 - 127 (0 - 16383 for a 14-bit pair), and a setting chosen from a list (a
+  filter type, an LFO waveform, an algorithm) is a number rather than a choice; only the Analog
+  Heat's appendix names values (and the Octatrack's its mutes' bands). The chapters say what each value shows, in prose and under the front
+  panel's abbreviations (`11.3.1 ALGO … (1–8)`), not the appendix's names (`Algorithm`). Closing it
+  means a map from each appendix row to its chapter heading, a layout's worth for each manual, and a
+  reader for the bracketed ranges and the bulleted value lists there. Matching them automatically
+  was tried and gets about half the Digitone's and Digitakt's rows, some wrongly; the README says more.
+- **An NRPN that is several parameters is not followed inbound.** ASM's Hydrasynth gives one NRPN
+  to several parameters, the data MSB choosing which (`when VV=01H ,set OSC2 Mode`; the
+  arpeggiator's eleven settings on 39H 03H). CEditor sends each correctly, but an incoming NRPN is
+  matched by its number alone, so when the instrument sends one of them CEditor cannot tell which.
+  Closing it means the inbound index keyed by NRPN and data MSB for recipes that declare it.
+- **The Hydrasynth specification gives two pairs of parameters one message.** ENV5 is printed on
+  LFO1's NRPN (3FH 04H), and its Loop and Legato on the same data MSB as LFO1's Smooth and Steps
+  (06H, 07H). Which is right is not printed, so neither pair is in the profile; ENV5's other
+  settings do not collide and are. Closing it means sending each to an instrument and looking.
+- **An Arturia parameter takes its controller's whole range.** The manuals' CC charts print a
+  controller number for each knob and nothing about its values, so every parameter of the five
+  Arturia profiles is 0 - 127, and a setting chosen from a list (an oscillator type, a waveform, a
+  filter mode) is a number rather than a choice. The MatrixBrute's chart marks 29 controllers
+  `7-bit/14-bit` without printing the fine half's controller; they are sent as 7 bits. Closing it
+  means each manual's chapters read for values, a map written by hand as for Elektron, and the
+  MatrixBrute tried for its LSBs.
+- **The PolyEight's signed parameters are sent as raw 14 bits.** Its NRPN table prints the filter
+  envelope intensity and the eight mod matrix amounts as -32767–32767, its preset table as
+  -8192–8191, and neither says how a negative value is carried in a 14-bit data entry (offset from
+  8192, or two's complement). The profile lays them out as the 14 bits sent, 0 - 16383, and says
+  so; it also sends `0–65535` parameters as 0 - 16383. Closing it means sending 0, 8192 and 16383 to
+  one and listening.
+- **A Behringer range is sent as printed.** The guides' controller tables print a range for each
+  controller (`0 - 99` for most of the UB-1 Micro's and PRO-VS Mini's, `0 - 9`, `50 - 75`) and do not
+  say whether it is what the controller carries or what the panel shows for it. The profiles send the
+  printed range; if the instrument scales 0 - 127 to its display instead, the top of a knob stops
+  short. A range wider than a controller (the UB-1 Micro's arpeggiator `20-240` BPM) is 0 - 127 with
+  the printed range in its description. Closing it means trying one instrument of each guide's kind
+  and writing the answer into its layout.
+- **A value that shows a note name is shown as a number.** The Wave's key centres are printed `0-127,
+  represents C-2...G9`; a profile's display has a number range or a choice, so they show 0 - 127,
+  the printed text in the description. Closing it means a note display mode (the number as a note
+  name, with the octave the document numbers from).

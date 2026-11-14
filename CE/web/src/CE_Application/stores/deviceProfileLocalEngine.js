@@ -95,7 +95,7 @@ function recipeNumber(value, variables = {}, fallback = 0) {
  */
 /** 14-bit encoder names, spelled every way the profiles in this repo spell them. */
 const isU14 = (encoding) =>
-  encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb' || encoding === 'u14-lsb-msb';
+  encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb' || encoding === 'u14-lsb-msb' || encoding === 's14-lsb-msb';
 
 /**
  * How many nibbles this parameter's value occupies, or an error.
@@ -135,6 +135,7 @@ export function parameterValueWidth(parameter) {
     return length;
   }
   if (isU14(encoding)) return 2;
+  if (encoding === 's21-lsb-msb' || encoding === 's21-msb-lsb' || encoding === 's17-msb-lsb') return 3;
   if (encoding === 'nibbled') return nibbleCount(parameter).nibbles ?? 0;
   return 1;
 }
@@ -220,6 +221,23 @@ export function decodeParameterValue(parameter, bytes) {
     return ((list[0] & 0x7f) << 7) | (list[1] & 0x7f);
   }
   if (encoding === 'u14-lsb-msb') return ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
+  if (encoding === 's14-lsb-msb') {
+    const raw = ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
+    return raw >= 8192 ? raw - 16384 : raw;
+  }
+  if (encoding === 's21-lsb-msb') {
+    const raw = ((list[2] & 0x7f) << 14) | ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
+    return raw >= 1048576 ? raw - 2097152 : raw;
+  }
+  if (encoding === 's21-msb-lsb') {
+    const raw = ((list[0] & 0x7f) << 14) | ((list[1] & 0x7f) << 7) | (list[2] & 0x7f);
+    return raw >= 1048576 ? raw - 2097152 : raw;
+  }
+  if (encoding === 's17-msb-lsb') {
+    // Bits 14 - 16 are the first byte's low three; its others are not the value's (the A6's mix channel).
+    const raw = ((list[0] & 0x07) << 14) | ((list[1] & 0x7f) << 7) | (list[2] & 0x7f);
+    return raw >= 65536 ? raw - 131072 : raw;
+  }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
     if (error) return null;
@@ -249,8 +267,12 @@ export function encodeParameterValue(parameter, value) {
       : null) ?? choices.find(c => String(c.value) === requested);
     if (!choice) return { error: `Unknown choice value '${requested}' for ${parameter.id ?? ''}` };
     const number = Number(choice.value);
-    if (!Number.isInteger(number) || number < 0 || number > 127) return { error: `Choice encoded value outside MIDI data byte range for ${parameter.id ?? ''}` };
-    return { bytes: [number], number, semantic: choice.id,
+    // A choice with a 14-bit encoding carries 0 - 16383, in two bytes as a 14-bit number does (the
+    // Hydrasynth's OSC2 Mode "WaveScan" is 1 * 128 + 1), as DeviceProfileEngine.cpp encodes it.
+    const wide = encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb' || encoding === 'u14-lsb-msb';
+    if (!Number.isInteger(number) || number < 0 || number > (wide ? 16383 : 127)) return { error: `Choice encoded value outside MIDI data byte range for ${parameter.id ?? ''}` };
+    const bytes = !wide ? [number] : encoding === 'u14-lsb-msb' ? [number & 0x7f, (number >> 7) & 0x7f] : [(number >> 7) & 0x7f, number & 0x7f];
+    return { bytes, number, semantic: choice.id,
       normalized: choices.length > 1 ? choices.indexOf(choice) / (choices.length - 1) : 1,
       displayed: choice.label || choice.id };
   }
@@ -272,6 +294,39 @@ export function encodeParameterValue(parameter, value) {
     // through to the u7 line and went out as one byte, clamped to 127.
     const number = clampInt(value, 0, 16383);
     return { bytes: [number & 0x7f, (number >> 7) & 0x7f], number, normalized: number / 16383, displayed: String(number) };
+  }
+  if (encoding === 's21-lsb-msb') {
+    // Signed over 21 bits, three bytes least significant first, as DeviceProfileEngine.cpp encodes it
+    // (the KingKORG's parameter change).
+    const number = Math.round(Number(value) || 0);
+    if (number < -1048576 || number > 1048575) return { error: `Encoded s21 value outside -1048576-1048575 for ${parameter?.id ?? ''}` };
+    const wire = number & 0x1fffff;
+    return { bytes: [wire & 0x7f, (wire >> 7) & 0x7f, (wire >> 14) & 0x7f], number, normalized: (number + 1048576) / 2097151, displayed: String(number) };
+  }
+  if (encoding === 's21-msb-lsb') {
+    // The same 21 bits, most significant byte first, as DeviceProfileEngine.cpp encodes it (the
+    // KRONOS's parameter change: `valueH 0scccccc, valueM, valueL`, 21-bit two's complement).
+    const number = Math.round(Number(value) || 0);
+    if (number < -1048576 || number > 1048575) return { error: `Encoded s21 value outside -1048576-1048575 for ${parameter?.id ?? ''}` };
+    const wire = number & 0x1fffff;
+    return { bytes: [(wire >> 14) & 0x7f, (wire >> 7) & 0x7f, wire & 0x7f], number, normalized: (number + 1048576) / 2097151, displayed: String(number) };
+  }
+  if (encoding === 's17-msb-lsb') {
+    // Signed over 17 bits, three bytes most significant first, the first carrying bits 14 - 16 only, as
+    // DeviceProfileEngine.cpp encodes it (the Alesis A6's MIDI Editing: <data2> is 0xxx xyyy, xxxx the
+    // mix channel and yyy bits 14 - 16; sent with the mix channel 0).
+    const number = Math.round(Number(value) || 0);
+    if (number < -65536 || number > 65535) return { error: `Encoded s17 value outside -65536-65535 for ${parameter?.id ?? ''}` };
+    const wire = number & 0x1ffff;
+    return { bytes: [(wire >> 14) & 0x07, (wire >> 7) & 0x7f, wire & 0x7f], number, normalized: (number + 65536) / 131071, displayed: String(number) };
+  }
+  if (encoding === 's14-lsb-msb') {
+    // Signed, two's complement over 14 bits, least significant byte first, as DeviceProfileEngine.cpp
+    // encodes it (Korg's parameter change: -50 goes out 4E 7F).
+    const number = Math.round(Number(value) || 0);
+    if (number < -8192 || number > 8191) return { error: `Encoded s14 value outside -8192-8191 for ${parameter?.id ?? ''}` };
+    const wire = number & 0x3fff;
+    return { bytes: [wire & 0x7f, (wire >> 7) & 0x7f], number, normalized: (number + 8192) / 16383, displayed: String(number) };
   }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
@@ -322,7 +377,25 @@ export function localCompileParameter(profile, request = {}) {
   let bytes = [];
 
   if (kind === 'cc') {
-    bytes = [status, clampInt(recipe.controller, 0, 127), encoded.bytes[0] ?? 0];
+    const controller = clampInt(recipe.controller, 0, 127);
+    if (recipe.lsbController === undefined) {
+      bytes = [status, controller, encoded.bytes[0] ?? 0];
+    } else {
+      // A 14-bit pair, as DeviceProfileEngine.cpp sends it: the MSB on `controller`, then the LSB on
+      // `lsbController` (MIDI's coarse and fine, usually n and n + 32). The MSB goes first because a
+      // receiver resets the fine half when the coarse one arrives. One byte (a value below 128 with a
+      // 7-bit encoder) is the coarse half alone, its fine half 0.
+      const lsbController = recipe.lsbController;
+      if (!Number.isInteger(lsbController) || lsbController < 0 || lsbController > 127 || lsbController === controller) {
+        return { ok: false, error: 'CC lsbController must be 0-127 and differ from controller' };
+      }
+      const encodingType = String(parameter?.encoding?.type ?? '');
+      const lsbFirst = encodingType === 'u14-lsb-msb' || encodingType === 's14-lsb-msb';
+      const [msb, lsb] = encoded.bytes.length > 1
+        ? (lsbFirst ? [encoded.bytes[1], encoded.bytes[0]] : [encoded.bytes[0], encoded.bytes[1]])
+        : [encoded.bytes[0] ?? 0, 0];
+      bytes = [status, controller, msb & 0x7f, status, lsbController, lsb & 0x7f];
+    }
   } else if (kind === 'nrpn' || kind === 'rpn') {
     // ONE builder for both, as in DeviceProfileEngine.cpp. They differ only in the controller pair
     // that selects the parameter number: 99/98 for an NRPN, 101/100 for an RPN. Writing the RPN case
@@ -341,13 +414,33 @@ export function localCompileParameter(profile, request = {}) {
       status, selectLsb, clampInt(recipe.parameterLsb, 0, 127),
     ];
 
-    if (resolution === 14) {
+    // Korg's data entry, as DeviceProfileEngine.cpp builds it: the low `lowBits` bits FIRST, on a
+    // controller of their own (CC 63 on the minilogue family), then the rest on CC 6.
+    const lowBitsController = recipe.lowBitsController;
+    const lowBits = recipe.lowBits;
+    if (lowBitsController !== undefined || lowBits !== undefined) {
+      if (!Number.isInteger(lowBitsController) || lowBitsController < 0 || lowBitsController > 127
+        || !Number.isInteger(lowBits) || lowBits < 1 || lowBits > 7) {
+        return { ok: false, error: `${kind.toUpperCase()} lowBitsController must be 0-127 and lowBits 1-7` };
+      }
+      const value = Math.round(Number(encoded.number));
+      const high = value >> lowBits;
+      if (!Number.isInteger(value) || value < 0 || high > 127) {
+        return { ok: false, error: `${kind.toUpperCase()} value ${value} does not fit ${7 + lowBits} bits` };
+      }
+      bytes.push(status, lowBitsController, value & ((1 << lowBits) - 1));
+      bytes.push(status, 6, high);
+    } else if (resolution === 14) {
       // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps its
       // two bytes in elsewhere.
-      const lsbFirst = String(parameter?.encoding?.type ?? '') === 'u14-lsb-msb';
-      const value14 = encoded.bytes.length > 1 && !lsbFirst
-        ? encoded
-        : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
+      const encodingType = String(parameter?.encoding?.type ?? '');
+      const lsbFirst = encodingType === 'u14-lsb-msb';
+      // A signed value keeps its two's complement bytes, low first: MSB on 6, LSB on 38 all the same.
+      const value14 = encodingType === 's14-lsb-msb'
+        ? { bytes: [encoded.bytes[1], encoded.bytes[0]] }
+        : encoded.bytes.length > 1 && !lsbFirst
+          ? encoded
+          : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
       bytes.push(status, 6, value14.bytes[0] ?? 0);
       bytes.push(status, 38, value14.bytes[1] ?? 0);
     } else {
@@ -568,6 +661,20 @@ function trimRightPad(text = '', padByte = 32) {
   return value.trimEnd();
 }
 
+// A name as an instrument stores it, as DeviceProfileEngine.cpp's dumpNameText reads it: a 00 byte
+// ends it, and any other byte outside 32 - 127 is read as '?'. Both used to fail the whole dump, and
+// the makers' own sounds have both: Waldorf's Blofeld and Microwave banks put display characters
+// below 32 into names, Behringer's DeepMind banks pad names with 00 (tools/profiles/check-factory-banks.mjs,
+// docs/device-profile-factory-banks.md). One character was costing every other parameter of the sound.
+function dumpNameText(codes = []) {
+  let text = '';
+  for (const code of codes) {
+    if (code === 0) break;
+    text += code < 32 || code > 127 ? '?' : String.fromCharCode(code);
+  }
+  return text;
+}
+
 function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecOverride = null) {
   if (offset < 0 || offset >= bytes.length) {
     return { ok: false, error: `Dump value offset is outside message for ${parameter?.id ?? ''}` };
@@ -588,14 +695,7 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
       if (length <= 0 || offset + length > bytes.length) {
         return { ok: false, error: `Text dump value is outside message for ${parameter?.id ?? ''}` };
       }
-      let text = '';
-      for (let index = 0; index < length; index += 1) {
-        const byte = bytes[offset + index];
-        if (byte < 32 || byte > 127) {
-          return { ok: false, error: `Text dump value contains non-ASCII byte for ${parameter?.id ?? ''}` };
-        }
-        text += String.fromCharCode(byte);
-      }
+      const text = dumpNameText(Array.from({ length }, (_, index) => bytes[offset + index]));
       return { ok: true, value: trimRightPad(text, pad) };
     }
 
@@ -604,16 +704,7 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
       if (length <= 0 || nibbles < length * 2 || offset + nibbles > bytes.length) {
         return { ok: false, error: `Nibbled text dump value is outside message for ${parameter?.id ?? ''}` };
       }
-      let text = '';
-      for (let index = 0; index < length; index += 1) {
-        const high = bytes[offset + (index * 2)] & 0x0f;
-        const low = bytes[offset + (index * 2) + 1] & 0x0f;
-        const byte = (high << 4) | low;
-        if (byte < 32 || byte > 127) {
-          return { ok: false, error: `Nibbled text dump value contains non-ASCII byte for ${parameter?.id ?? ''}` };
-        }
-        text += String.fromCharCode(byte);
-      }
+      const text = dumpNameText(Array.from({ length }, (_, index) => ((bytes[offset + (index * 2)] & 0x0f) << 4) | (bytes[offset + (index * 2) + 1] & 0x0f)));
       return { ok: true, value: trimRightPad(text, pad) };
     }
 
@@ -633,13 +724,51 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     for (let index = 0; index < nibbles; index += 1) {
       numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
     }
-  } else if (encodingType === 'u14-lsb-msb') {
+  } else if (encodingType === 's21-lsb-msb' || encodingType === 's21-msb-lsb') {
+    if (offset + 2 >= bytes.length) return { ok: false, error: `21-bit dump value requires three bytes for ${parameter?.id ?? ''}` };
+    const [hi, lo] = encodingType === 's21-msb-lsb' ? [offset, offset + 2] : [offset + 2, offset];
+    numeric = ((bytes[hi] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[lo] & 0x7f);
+    if (numeric >= 1048576) numeric -= 2097152;
+  } else if (encodingType === 's17-msb-lsb') {
+    if (offset + 2 >= bytes.length) return { ok: false, error: `17-bit dump value requires three bytes for ${parameter?.id ?? ''}` };
+    numeric = ((bytes[offset] & 0x07) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset + 2] & 0x7f);
+    if (numeric >= 65536) numeric -= 131072;
+  } else if (encodingType === 'u14-lsb-msb' || encodingType === 's14-lsb-msb') {
     // Least significant byte first, as DeviceProfileEngine.cpp reads it. It came back as its first
-    // byte alone: 12345 (39 60) as 57.
+    // byte alone: 12345 (39 60) as 57. s14 is the same bits read as two's complement.
     if (offset + 1 >= bytes.length) return { ok: false, error: `14-bit dump value requires two bytes for ${parameter?.id ?? ''}` };
     numeric = ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+    if (encodingType === 's14-lsb-msb' && numeric >= 8192) numeric -= 16384;
   } else if (encodingType === 'u8') {
     numeric = bytes[offset] & 0xff;                // a full byte, as an unpacked payload holds one
+  } else if (encodingType === 'bitfields') {
+    // A value put together from bit fields of an unpacked payload, as DeviceProfileEngine.cpp reads
+    // it (that comment says why): parts, then a map or a shift and a ceiling.
+    const parts = Array.isArray(encoding?.parts) ? encoding.parts : [];
+    if (!parts.length) return { ok: false, error: `Bitfields dump codec requires parts for ${parameter?.id ?? ''}` };
+    numeric = 0;
+    let width = 0;
+    for (const part of parts) {
+      const at = offset + Number(part?.at ?? 0);
+      const from = Number(part?.from ?? 0);
+      const bits = Number(part?.bits ?? 8);
+      const shift = Number(part?.shift ?? 0);
+      if (!Number.isInteger(at) || at < 0 || at >= bytes.length || from < 0 || bits < 1 || from + bits > 8 || shift < 0 || shift > 24) {
+        return { ok: false, error: `Bitfields dump codec part is outside the message for ${parameter?.id ?? ''}` };
+      }
+      numeric |= ((bytes[at] >> from) & ((1 << bits) - 1)) << shift;
+      width = Math.max(width, shift + bits);
+    }
+    // Two's complement over the parts' width (the KRONOS keeps -99~+99 as a byte, 9DH~63H).
+    if (encoding?.signed === true && width < 31 && numeric >= 2 ** (width - 1)) numeric -= 2 ** width;
+    if (Array.isArray(encoding?.map)) {
+      const pair = encoding.map.find((entry) => Array.isArray(entry) && entry.length === 2 && Number(entry[0]) === numeric);
+      if (!pair) return { ok: false, error: `Bitfields dump value ${numeric} is not in the map for ${parameter?.id ?? ''}` };
+      numeric = Number(pair[1]);
+    } else {
+      numeric >>= Math.max(0, Math.min(24, Number(encoding?.shiftRight ?? 0)));
+      if (encoding?.max !== undefined) numeric = Math.min(numeric, Number(encoding.max));
+    }
   } else if (encodingType === 's7') {
     // Signed 7-bit, the byte less its bias, as decodeParameterValue and DeviceProfileEngine.cpp read
     // it. A dump's s7 field came back as the raw byte here, so a pan of -10 read as 54.
@@ -658,6 +787,20 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
   }
 
   return { ok: true, value: numeric };
+}
+
+/** Korg-style 8-in-7 unpack, as dumpUnpack8to7 in DeviceProfileEngine.cpp: each group's first byte holds the others' top bits. */
+function localUnpack8to7(wire, order, groupSize) {
+  const out = [];
+  const highFirst = order !== 'msb-low-first';
+  for (let g = 0; g < wire.length; g += groupSize + 1) {
+    const msb = wire[g];
+    const count = Math.min(groupSize, wire.length - (g + 1));
+    for (let i = 0; i < count; i += 1) {
+      out.push((wire[g + 1 + i] & 0x7f) | (((msb >> (highFirst ? groupSize - 1 - i : i)) & 1) << 7));
+    }
+  }
+  return out;
 }
 
 function localParseDumpWithDefinition(profile, dump, bytes = []) {
@@ -761,7 +904,11 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
       return failMatched('partial', 'Dump checksum range is outside message', 'error');
     }
     const got = bytes.slice(byteOffset, byteOffset + byteCount);
-    if (got.join(',') !== expected.join(',')) {
+    // A value the device takes in place of the sum (Waldorf: `A checksum of 7Fh is always accepted as
+    // valid`), one byte each, for a one-byte checksum.
+    const alsoAccept = (Array.isArray(checksum.alsoAccept) ? checksum.alsoAccept : []).map((b) => parseInt(String(b), 16));
+    const accepted = byteCount === 1 && alsoAccept.includes(got[0]);
+    if (!accepted && got.join(',') !== expected.join(',')) {
       return failMatched(
         'checksumFailed',
         `Dump checksum failed; expected ${bytesToHex(expected)} but got ${bytesToHex(got)}`,
@@ -772,7 +919,52 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
   }
 
   const mappings = Array.isArray(dump?.mappings) ? dump.mappings : [];
-  if (mappings.length === 0) return failMatched('invalidDefinition', `Dump definition has no mappings: ${dumpId}`, checksumStatus);
+  // A member of a collection may carry no value of its own (a Yamaha Bulk Header or Footer, the
+  // block of a part not laid out): it parses to nothing and counts toward the collection. Alone, a
+  // definition that reads nothing is a mistake.
+  if (mappings.length === 0 && !completion.collectionId) return failMatched('invalidDefinition', `Dump definition has no mappings: ${dumpId}`, checksumStatus);
+
+  // A packed payload (Korg's 8-in-7) is unpacked first, so mapping offsets address the unpacked
+  // bytes, as DeviceProfileEngine.cpp does. This engine read the wire bytes in place: every field
+  // after the first group came back from the wrong byte, without its top bit.
+  let decodeBytes = bytes;
+  let decodeBase = payloadOffset;
+  const pack = dump?.payload?.pack;
+  if (pack?.type === 'packed8to7') {
+    const groupSize = Math.max(1, Number(pack.groupSize ?? 7));
+    const wireLength = payloadSize > 0 ? payloadSize + Math.ceil(payloadSize / groupSize) : 0;
+    if (wireLength <= 0 || payloadOffset + wireLength > bytes.length) {
+      return failMatched('partial', `Packed dump payload is outside message: ${dumpId}`, checksumStatus);
+    }
+    decodeBytes = localUnpack8to7(bytes.slice(payloadOffset, payloadOffset + wireLength), String(pack.packOrder ?? ''), groupSize);
+    decodeBase = 0;
+  }
+
+  // A payload of records (the Groove Synthesis 3rd Wave's program dump: every setting as its NRPN
+  // number and value, four bytes each) has no fixed place for a value. Its records are read first,
+  // each a key and where it starts; a mapping then names the key it reads (`record`), and may say it
+  // reads the one met while another key last held a value (`scope`: the 3rd Wave sets NRPN 0, the
+  // part being edited, before each part's settings). A key the dump does not carry leaves its
+  // parameter unread, as a parameter with no mapping is. DeviceProfileEngine.cpp reads them the same
+  // way.
+  const records = dump?.payload?.records && typeof dump.payload.records === 'object' ? dump.payload.records : null;
+  const recordList = [];
+  const width = (type) => (String(type ?? '') === 'u14' ? 2 : 1);
+  const field = (at, type) => (width(type) === 2 ? ((bytes[at] & 0x7f) << 7) | (bytes[at + 1] & 0x7f) : bytes[at] & 0x7f);
+  const keyAt = Number(records?.keyAt ?? 0);
+  const valueAt = Number(records?.valueAt ?? 1);
+  if (records) {
+    const size = Number(records.size ?? 0);
+    if (pack || !(size > 0) || keyAt < 0 || valueAt < 0 || keyAt + width(records.keyType) > size || valueAt + width(records.valueType) > size) {
+      return failMatched('invalidDefinition', `Dump records are not a shape the engine reads: ${dumpId}`, checksumStatus);
+    }
+    let end = bytes.length - suffix.length;
+    if (checksum) end = Math.min(end, Number(checksum.byteOffset ?? end));
+    if (end < payloadOffset || (end - payloadOffset) % size !== 0) {
+      return failMatched('partial', `Dump records do not fill the payload of ${dumpId}`, checksumStatus);
+    }
+    for (let at = payloadOffset; at < end; at += size) recordList.push({ key: field(at + keyAt, records.keyType), at });
+  }
 
   const values = {};
   for (const mapping of mappings) {
@@ -780,10 +972,37 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
     const parameter = (profile?.parameters ?? []).find((item) => String(item?.id ?? '') === parameterId);
     if (!parameter) return failMatched('invalidDefinition', `Dump mapping references unknown parameter: ${parameterId}`, checksumStatus);
 
+    let valueOffset = decodeBase + Number(mapping?.offset ?? 0);
+    // `when`: a field whose meaning another byte of the payload selects (a KRONOS EXi slot's engine
+    // settings, read only when the slot's Algorithm Type byte holds that engine), as
+    // DeviceProfileEngine.cpp reads it. Unmet, the parameter is not read.
+    const when = mapping?.when && typeof mapping.when === 'object' ? mapping.when : null;
+    if (when) {
+      const source = records ? bytes : decodeBytes;
+      const at = decodeBase + Number(when.offset ?? -1);
+      if (!Number.isInteger(at) || at < decodeBase || at >= source.length) {
+        return failMatched('invalidDefinition', `Dump mapping condition is outside the payload: ${parameterId}`, checksumStatus);
+      }
+      if ((source[at] & 0xff) !== Number(when.value)) continue;
+    }
+    if (records) {
+      const key = Number(mapping?.record ?? -1);
+      if (!Number.isInteger(key) || key < 0) return failMatched('invalidDefinition', `Dump mapping names no record: ${parameterId}`, checksumStatus);
+      const scope = mapping?.scope && typeof mapping.scope === 'object' ? mapping.scope : null;
+      let held = -1;
+      let found = null;
+      for (const record of recordList) {
+        if (record.key === key && (!scope || held === Number(scope.value ?? 0))) { found = record; break; }
+        if (scope && record.key === Number(scope.record ?? -1)) held = field(record.at + valueAt, records.valueType);
+      }
+      if (!found) continue;
+      valueOffset = found.at + valueAt;
+    }
+
     const decoded = localDecodeDumpParameterValue(
       parameter,
-      bytes,
-      payloadOffset + Number(mapping?.offset ?? 0),
+      records ? bytes : decodeBytes,
+      valueOffset,
       mapping?.codec ?? mapping?.nameCodec ?? null
     );
     if (!decoded.ok) {
@@ -884,6 +1103,13 @@ export function localBuildDumpMessage(profile, dumpId = '', values = {}) {
     if (encoded?.error) return fail(`Cannot encode ${parameterId}: ${encoded.error}`);
 
     const offset = Number(mapping?.offset ?? 0);
+    // A `when` field is written only where the dump being built already holds the selecting value.
+    const when = mapping?.when && typeof mapping.when === 'object' ? mapping.when : null;
+    if (when && (body[Number(when.offset)] ?? -1) !== Number(when.value)) {
+      consumed.delete(parameterId);
+      unmapped.push(parameterId);
+      continue;
+    }
     if (offset < 0 || offset + encoded.bytes.length > body.length) {
       return fail(`Mapping for ${parameterId} writes outside the payload `
         + `(offset ${offset}, ${encoded.bytes.length} byte(s), payload ${payloadSize})`);
@@ -1009,6 +1235,10 @@ export function localCollectDumpMessages(profile, hexMessages = []) {
   let expectedBytes = 0;
   let parsedMessageCount = 0;
   let failedMessageCount = 0;
+  // A collection whose size the instrument decides (a Yamaha Performance: as many part blocks as it
+  // has parts) names the dump that ends it, its Bulk Footer, and is complete when that arrives.
+  let endsWith = '';
+  let ended = false;
 
   for (const hex of hexMessages) {
     const parsed = localParseDumpMessage(profile, hex);
@@ -1032,6 +1262,8 @@ export function localCollectDumpMessages(profile, hexMessages = []) {
 
     parsedMessageCount += 1;
     const completion = parsed.completion && typeof parsed.completion === 'object' ? parsed.completion : {};
+    if (!endsWith && completion.endsWith) endsWith = String(completion.endsWith);
+    if (parsed.dumpId && parsed.dumpId === String(completion.endsWith ?? '')) ended = true;
     const parsedCollectionId = String(completion.collectionId ?? '');
     if (!collectionId) collectionId = parsedCollectionId || String(parsed.dumpId ?? '');
     else if (parsedCollectionId && parsedCollectionId !== collectionId) {
@@ -1056,9 +1288,11 @@ export function localCollectDumpMessages(profile, hexMessages = []) {
     Object.assign(values, parsed.values ?? {});
   }
 
-  if (!expectedMessageCount) expectedMessageCount = hexMessages.length;
+  // Ended, the collection is as many messages as came: the footer is what says so.
+  if (ended || !expectedMessageCount) expectedMessageCount = hexMessages.length;
   const missingRanges = expectedBytes > 0 ? rangesForMissingCoverage(expectedBytes, covered) : [];
-  const complete = failedMessageCount === 0 && hexMessages.length >= expectedMessageCount && missingRanges.length === 0;
+  const counted = endsWith ? ended : hexMessages.length >= expectedMessageCount;
+  const complete = failedMessageCount === 0 && counted && missingRanges.length === 0;
   const ok = failedMessageCount === 0;
   const status = complete ? 'complete' : ok ? 'partial' : 'error';
   const error = complete ? '' : failedMessageCount > 0 ? `${failedMessageCount} dump message(s) failed` : 'Dump collection incomplete';
@@ -1479,6 +1713,14 @@ export function validateLocalProfileSource(profileId, source = '') {
           level: 'error',
           path: `dumpDefinitions.${index}.mappings.${mappingIndex}.parameter`,
           message: `Parameter "${parameterId}" does not exist.`,
+        });
+      }
+      // A dump of records is read by key: each mapping names the record it reads.
+      if (dump?.payload?.records && !(Number.isInteger(mapping?.record) && mapping.record >= 0)) {
+        validation.push({
+          level: 'error',
+          path: `dumpDefinitions.${index}.mappings.${mappingIndex}.record`,
+          message: 'A mapping of a dump of records names the record it reads.',
         });
       }
     }

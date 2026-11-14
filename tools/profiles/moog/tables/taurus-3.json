@@ -1,0 +1,51 @@
+{
+  "sources": [
+    {"title":"Taurus 3 User's Manual","file":"Taurus_3_Manual.pdf","sha256":"88006cf741660b63be1d2c8be3a9a8bafcbb3378166cd0cf918e1783415e52be","url":"https://cdn.inmusicbrands.com/Moog/BackOffice/Taurus_3_Manual.pdf"}
+  ],
+  "tables": [
+    {
+      "doc": 0,
+      "kind": "cc",
+      "pages": [49,50,51],
+      "rows": [
+        {"doc":0,"page":49,"section":"Footwheels","cc":"Varies","name":"CONTROL","function":"Adjusts the active parameter. The MIDI CC parameter transmitted by the CONTROL footwheel depends on the active parameter that is being modified.","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"Footwheels","cc":"7","name":"VOLUME","function":"Adjusts the output volume","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"Interface Panel","cc":"-","name":"MASTER","function":"Master mode switch","values":"-"},
+        {"doc":0,"page":49,"section":"Interface Panel","cc":"-","name":"PRESET","function":"Preset mode switch","values":"-"},
+        {"doc":0,"page":49,"section":"Interface Panel","cc":"-","name":"CURSOR","function":"Navigation control","values":"-"},
+        {"doc":0,"page":49,"section":"Interface Panel","cc":"-","name":"STORE","function":"Data entry/store control","values":"-"},
+        {"doc":0,"page":49,"section":"Oscillator","cc":"MSB 10 LSB 42","name":"B FREQ","function":"Adjusts the coarse offset frequency of Oscillator B","values":"0 - 127"},
+        {"doc":0,"page":49,"section":"Oscillator","cc":"MSB 11 LSB 43","name":"BEAT","function":"Adjusts the fine offset frequency of Oscillator B","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"Oscillator","cc":"MSB 5 LSB 37","name":"GLIDE","function":"Sets the portamento rate time","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"Oscillator","cc":"74","name":"OCTAVE","function":"Selects the octave setting of the oscillators","values":"42 (LO) 85 (MED) 127 (HI)"},
+        {"doc":0,"page":49,"section":"Oscillator","cc":"MSB 15 LSB 47","name":"MIX","function":"Adjusts the balance (mix) of Oscillators A & B","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"Oscillator","cc":"MSB 28 LSB 60","name":"ATTACK","function":"Adjusts the volume envelope attack time","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"Oscillator","cc":"MSB 30 LSB 62","name":"SUSTAIN","function":"Sets the volume envelope sustain level","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"Oscillator","cc":"MSB 29 LSB 61","name":"DECAY","function":"Adjusts the volume envelope decay time","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"LFO","cc":"MSB 3 LSB 35","name":"LFO RATE/CLOCK","function":"Adjusts the LFO frequency/clock divider","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"LFO","cc":"MSB 6 LSB 38","name":"FILTER","function":"Adjusts the Filter modulation amount","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"LFO","cc":"MSB 8 LSB 40","name":"PITCH","function":"Adjusts the Oscillator modulation amount","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"LFO","cc":"MSB 1 LSB 33","name":"MODWHEEL","function":"Adjusts combined Filter and Oscillator amounts","values":"0 – 127"},
+        {"doc":0,"page":49,"section":"LFO","cc":"102","name":"SYNC","function":"Sets the LFO sync mode","values":"42 (OFF) 85 (KY) 127 (MIDI)"},
+        {"doc":0,"page":49,"section":"LFO","cc":"68","name":"SQUARE","function":"Selects the LFO Square Wave","values":"31"},
+        {"doc":0,"page":49,"section":"LFO","cc":"68","name":"TRIANGLE","function":"Selects the LFO Triangle Wave","values":"63"},
+        {"doc":0,"page":49,"section":"LFO","cc":"68","name":"RAMP","function":"Selects the LFO Ramp Wave","values":"95"},
+        {"doc":0,"page":49,"section":"LFO","cc":"68","name":"SAW","function":"Selects the LFO Sawtooth Wave","values":"127"},
+        {"doc":0,"page":50,"section":"Filter","cc":"MSB 27 LSB 59","name":"AMOUNT","function":"Adjusts the amount of the filter envelope","values":"0 – 127"},
+        {"doc":0,"page":50,"section":"Filter","cc":"MSB 23 LSB 55","name":"ATTACK","function":"Adjusts the filter envelope attack time","values":"0 – 127"},
+        {"doc":0,"page":50,"section":"Filter","cc":"MSB 24 LSB 56","name":"DECAY","function":"Adjusts the volume envelope decay time","values":"0 – 127"},
+        {"doc":0,"page":50,"section":"Filter","cc":"MSB 19 LSB 51","name":"CUTOFF (SEE NOTE 1)","function":"Adjusts the filter cutoff frequency","values":"0 – 127"},
+        {"doc":0,"page":50,"section":"Filter","cc":"MSB 21 LSB 53","name":"RESONANCE","function":"Adjusts the filter resonance","values":"0 – 127"},
+        {"doc":0,"page":50,"section":"Arpeggiator","cc":"118","name":"ORDER","function":"Selects the Arpeggiator Order","values":"31 (UP) 63 (DN) 95 (ORDER) 127 (RAND)"},
+        {"doc":0,"page":50,"section":"Arpeggiator","cc":"117","name":"PATTERN","function":"Selects the Arpeggiator Pattern","values":"42 (LOOP) 85 (B/F) 127 (ONCE)"},
+        {"doc":0,"page":50,"section":"Arpeggiator","cc":"116","name":"OCTAVE","function":"Sets the Arpeggiator Octave range","values":"18 (-2.1) 36 (-2) 54 (-1) 73 (0) 91 (1) 109 (2) 127 (2.1)"},
+        {"doc":0,"page":50,"section":"Arpeggiator","cc":"90","name":"ON/OFF","function":"Starts and stops the Arpeggiator","values":"63 (OFF) 127 (ON)"},
+        {"doc":0,"page":50,"section":"Arpeggiator","cc":"91","name":"LATCH","function":"Enables/disables the Arpeggiator Latch","values":"63 (OFF) 127 (ON)"},
+        {"doc":0,"page":50,"section":"Arpeggiator","cc":"MSB 4 LSB 36","name":"ARP RATE","function":"Adjusts the Arpeggiator Rate","values":"0 – 127"},
+        {"doc":0,"page":50,"section":"Footswitches","cc":"65","name":"GLIDE","function":"Turns GLIDE ON/OFF","values":"63 (OFF) 127 (ON)"},
+        {"doc":0,"page":50,"section":"Footswitches","cc":"88","name":"DECAY","function":"Turns DECAY ON/OFF","values":"63 (OFF) 127 (ON)"},
+        {"doc":0,"page":50,"section":"Footswitches","cc":"89","name":"OCTAVE","function":"Turns OCTAVE ON/OFF","values":"63 (OFF) 127 (ON)"}
+      ]
+    }
+  ]
+}

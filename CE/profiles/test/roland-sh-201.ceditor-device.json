@@ -46,6 +46,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 00",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -86,6 +90,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 01",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -126,6 +134,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 02",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -166,6 +178,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 03",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 0,
         "max": 15
@@ -208,6 +224,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 04",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -247,6 +267,10 @@
       },
       "default": 1024,
       "address": "01 00 00 05",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Tune",
@@ -286,6 +310,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 09",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 40,
         "max": 88
@@ -328,6 +356,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 0A",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -368,6 +400,10 @@
       "group": "System Common",
       "type": "choice",
       "address": "01 00 00 0B",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "choices": [
         {
           "id": "patch",
@@ -430,6 +466,10 @@
       },
       "default": 120,
       "address": "01 00 00 0C",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Tempo"
@@ -465,6 +505,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 0F",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -499,6 +543,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 10",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -533,6 +581,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 11",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -567,6 +619,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 12",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -601,6 +657,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 13",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -635,6 +695,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 14",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -669,6 +733,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 15",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -703,6 +771,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 16",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -737,6 +809,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 17",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 61,
         "max": 67
@@ -779,6 +855,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 18",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 59,
         "max": 70
@@ -821,6 +901,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 19",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -855,6 +939,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 1A",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -889,6 +977,10 @@
       "group": "System Common",
       "type": "choice",
       "address": "01 00 00 1B",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "choices": [
         {
           "id": "standard",
@@ -936,6 +1028,10 @@
       "group": "System Common",
       "type": "choice",
       "address": "01 00 00 1C",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "choices": [
         {
           "id": "hold",
@@ -1013,6 +1109,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 1D",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 1,
         "max": 8
@@ -1053,6 +1153,10 @@
       "group": "System Common",
       "type": "boolean",
       "address": "01 00 00 1E",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -1087,6 +1191,10 @@
       "group": "System Common",
       "type": "choice",
       "address": "01 00 00 1F",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "choices": [
         {
           "id": "off",
@@ -1144,6 +1252,10 @@
       "group": "System Common",
       "type": "integer",
       "address": "01 00 00 20",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "range": {
         "min": 0,
         "max": 7
@@ -1185,6 +1297,10 @@
       "type": "text",
       "default": "SH-201 INIT",
       "address": "10 00 00 00",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "display": {
         "mode": "text",
         "shortLabel": "Name"
@@ -1218,6 +1334,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 00",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1258,6 +1378,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 01",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1298,6 +1422,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 02",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1338,6 +1466,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 03",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1378,6 +1510,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 04",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1418,6 +1554,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 05",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1458,6 +1598,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 06",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1498,6 +1642,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 07",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1538,6 +1686,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 08",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1578,6 +1730,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 09",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1618,6 +1774,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 0A",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1658,6 +1818,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 0B",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 32,
         "max": 127
@@ -1698,6 +1862,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 0C",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -1738,6 +1906,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 0D",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -1785,6 +1957,10 @@
       },
       "default": 120,
       "address": "10 00 00 0E",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Tempo"
@@ -1820,6 +1996,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 11",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "single",
@@ -1872,6 +2052,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 12",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "upper",
@@ -1919,6 +2103,10 @@
       "group": "Patch Common",
       "type": "integer",
       "address": "10 00 00 13",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "range": {
         "min": 21,
         "max": 108
@@ -1959,6 +2147,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 14",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "upper",
@@ -2011,6 +2203,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 15",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "upper",
@@ -2063,6 +2259,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 16",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "upper",
@@ -2115,6 +2315,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 17",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "upper",
@@ -2167,6 +2371,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 18",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "upper",
@@ -2219,6 +2427,10 @@
       "group": "Patch Common",
       "type": "boolean",
       "address": "10 00 00 19",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -2253,6 +2465,10 @@
       "group": "Patch Common",
       "type": "boolean",
       "address": "10 00 00 1A",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -2287,6 +2503,10 @@
       "group": "Patch Common",
       "type": "boolean",
       "address": "10 00 00 1B",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -2321,6 +2541,10 @@
       "group": "Patch Common",
       "type": "boolean",
       "address": "10 00 00 1C",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -2355,6 +2579,10 @@
       "group": "Patch Common",
       "type": "boolean",
       "address": "10 00 00 1D",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -2389,6 +2617,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 1E",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "osc1-osc2",
@@ -2466,6 +2698,10 @@
       "group": "Patch Common",
       "type": "choice",
       "address": "10 00 00 1F",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "choices": [
         {
           "id": "osc1-pitch",
@@ -2688,6 +2924,10 @@
       "group": "Patch Common",
       "type": "boolean",
       "address": "10 00 00 20",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -2722,6 +2962,10 @@
       "group": "Upper OSC1",
       "type": "choice",
       "address": "10 00 01 00",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "saw",
@@ -2803,6 +3047,10 @@
       "group": "Upper OSC1",
       "type": "boolean",
       "address": "10 00 01 01",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -2836,6 +3084,10 @@
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 02",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 28,
         "max": 100
@@ -2877,6 +3129,10 @@
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 03",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 14,
         "max": 114
@@ -2918,6 +3174,10 @@
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 04",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -2957,6 +3217,10 @@
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 05",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -2998,6 +3262,10 @@
       "group": "Upper OSC2",
       "type": "choice",
       "address": "10 00 01 06",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "saw",
@@ -3079,6 +3347,10 @@
       "group": "Upper OSC2",
       "type": "boolean",
       "address": "10 00 01 07",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -3112,6 +3384,10 @@
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 08",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 28,
         "max": 100
@@ -3153,6 +3429,10 @@
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 09",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 14,
         "max": 114
@@ -3194,6 +3474,10 @@
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 0A",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3233,6 +3517,10 @@
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 0B",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -3274,6 +3562,10 @@
       "group": "Upper Pitch Env",
       "type": "integer",
       "address": "10 00 01 0C",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3313,6 +3605,10 @@
       "group": "Upper Pitch Env",
       "type": "integer",
       "address": "10 00 01 0D",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3352,6 +3648,10 @@
       "group": "Upper Mix Mod",
       "type": "choice",
       "address": "10 00 01 0E",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "mix",
@@ -3403,6 +3703,10 @@
       "group": "Upper Mix Mod",
       "type": "integer",
       "address": "10 00 01 0F",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -3444,6 +3748,10 @@
       "group": "Upper Mix Mod",
       "type": "choice",
       "address": "10 00 01 10",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "flat",
@@ -3495,6 +3803,10 @@
       "group": "Upper Filter",
       "type": "choice",
       "address": "10 00 01 11",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "bypass",
@@ -3551,6 +3863,10 @@
       "group": "Upper Filter",
       "type": "choice",
       "address": "10 00 01 12",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "12db",
@@ -3597,6 +3913,10 @@
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 13",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3636,6 +3956,10 @@
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 14",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 44,
         "max": 84
@@ -3677,6 +4001,10 @@
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 15",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -3718,6 +4046,10 @@
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 16",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3757,6 +4089,10 @@
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 17",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3796,6 +4132,10 @@
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 18",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3835,6 +4175,10 @@
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 19",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3874,6 +4218,10 @@
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 1A",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -3913,6 +4261,10 @@
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 1B",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -3954,6 +4306,10 @@
       "group": "Upper AMP",
       "type": "boolean",
       "address": "10 00 01 1C",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -3987,6 +4343,10 @@
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1D",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4026,6 +4386,10 @@
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1E",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4065,6 +4429,10 @@
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1F",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -4106,6 +4474,10 @@
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 20",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4147,6 +4519,10 @@
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 21",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4186,6 +4562,10 @@
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 22",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4225,6 +4605,10 @@
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 23",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4264,6 +4648,10 @@
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 24",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4303,6 +4691,10 @@
       "group": "Upper Effects Send",
       "type": "integer",
       "address": "10 00 01 25",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4342,6 +4734,10 @@
       "group": "Upper Effects Send",
       "type": "integer",
       "address": "10 00 01 26",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4381,6 +4777,10 @@
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 27",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "tri",
@@ -4452,6 +4852,10 @@
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 28",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4491,6 +4895,10 @@
       "group": "Upper LFO1",
       "type": "boolean",
       "address": "10 00 01 29",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 1,
       "trueValue": 0,
@@ -4524,6 +4932,10 @@
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2A",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "16",
@@ -4660,6 +5072,10 @@
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 2B",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -4699,6 +5115,10 @@
       "group": "Upper LFO1",
       "type": "boolean",
       "address": "10 00 01 2C",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -4732,6 +5152,10 @@
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2D",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "pitch1",
@@ -4788,6 +5212,10 @@
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 2E",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -4829,6 +5257,10 @@
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2F",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "pitch2",
@@ -4880,6 +5312,10 @@
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 30",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -4921,6 +5357,10 @@
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 31",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "tri",
@@ -4992,6 +5432,10 @@
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 32",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -5031,6 +5475,10 @@
       "group": "Upper LFO2",
       "type": "boolean",
       "address": "10 00 01 33",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 1,
       "trueValue": 0,
@@ -5064,6 +5512,10 @@
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 34",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "16",
@@ -5200,6 +5652,10 @@
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 35",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -5239,6 +5695,10 @@
       "group": "Upper LFO2",
       "type": "boolean",
       "address": "10 00 01 36",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -5272,6 +5732,10 @@
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 37",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "pitch1",
@@ -5328,6 +5792,10 @@
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 38",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -5369,6 +5837,10 @@
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 39",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "pitch2",
@@ -5420,6 +5892,10 @@
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 3A",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -5461,6 +5937,10 @@
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3B",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 24
@@ -5500,6 +5980,10 @@
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3C",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 61,
         "max": 67
@@ -5541,6 +6025,10 @@
       "group": "Upper Performance",
       "type": "boolean",
       "address": "10 00 01 3D",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -5574,6 +6062,10 @@
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3E",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -5613,6 +6105,10 @@
       "group": "Upper Performance",
       "type": "choice",
       "address": "10 00 01 3F",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "poly",
@@ -5664,6 +6160,10 @@
       "group": "Lower OSC1",
       "type": "choice",
       "address": "10 00 02 00",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "saw",
@@ -5745,6 +6245,10 @@
       "group": "Lower OSC1",
       "type": "boolean",
       "address": "10 00 02 01",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -5778,6 +6282,10 @@
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 02",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 28,
         "max": 100
@@ -5819,6 +6327,10 @@
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 03",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 14,
         "max": 114
@@ -5860,6 +6372,10 @@
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 04",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -5899,6 +6415,10 @@
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 05",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -5940,6 +6460,10 @@
       "group": "Lower OSC2",
       "type": "choice",
       "address": "10 00 02 06",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "saw",
@@ -6021,6 +6545,10 @@
       "group": "Lower OSC2",
       "type": "boolean",
       "address": "10 00 02 07",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -6054,6 +6582,10 @@
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 08",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 28,
         "max": 100
@@ -6095,6 +6627,10 @@
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 09",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 14,
         "max": 114
@@ -6136,6 +6672,10 @@
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 0A",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6175,6 +6715,10 @@
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 0B",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -6216,6 +6760,10 @@
       "group": "Lower Pitch Env",
       "type": "integer",
       "address": "10 00 02 0C",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6255,6 +6803,10 @@
       "group": "Lower Pitch Env",
       "type": "integer",
       "address": "10 00 02 0D",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6294,6 +6846,10 @@
       "group": "Lower Mix Mod",
       "type": "choice",
       "address": "10 00 02 0E",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "mix",
@@ -6345,6 +6901,10 @@
       "group": "Lower Mix Mod",
       "type": "integer",
       "address": "10 00 02 0F",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -6386,6 +6946,10 @@
       "group": "Lower Mix Mod",
       "type": "choice",
       "address": "10 00 02 10",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "flat",
@@ -6437,6 +7001,10 @@
       "group": "Lower Filter",
       "type": "choice",
       "address": "10 00 02 11",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "bypass",
@@ -6493,6 +7061,10 @@
       "group": "Lower Filter",
       "type": "choice",
       "address": "10 00 02 12",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "12db",
@@ -6539,6 +7111,10 @@
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 13",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6578,6 +7154,10 @@
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 14",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 44,
         "max": 84
@@ -6619,6 +7199,10 @@
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 15",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -6660,6 +7244,10 @@
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 16",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6699,6 +7287,10 @@
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 17",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6738,6 +7330,10 @@
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 18",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6777,6 +7373,10 @@
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 19",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6816,6 +7416,10 @@
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 1A",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6855,6 +7459,10 @@
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 1B",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -6896,6 +7504,10 @@
       "group": "Lower AMP",
       "type": "boolean",
       "address": "10 00 02 1C",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -6929,6 +7541,10 @@
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1D",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -6968,6 +7584,10 @@
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1E",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7007,6 +7627,10 @@
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1F",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -7048,6 +7672,10 @@
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 20",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7089,6 +7717,10 @@
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 21",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7128,6 +7760,10 @@
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 22",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7167,6 +7803,10 @@
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 23",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7206,6 +7846,10 @@
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 24",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7245,6 +7889,10 @@
       "group": "Lower Effects Send",
       "type": "integer",
       "address": "10 00 02 25",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7284,6 +7932,10 @@
       "group": "Lower Effects Send",
       "type": "integer",
       "address": "10 00 02 26",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7323,6 +7975,10 @@
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 27",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "tri",
@@ -7394,6 +8050,10 @@
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 28",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7433,6 +8093,10 @@
       "group": "Lower LFO1",
       "type": "boolean",
       "address": "10 00 02 29",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 1,
       "trueValue": 0,
@@ -7466,6 +8130,10 @@
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2A",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "16",
@@ -7602,6 +8270,10 @@
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 2B",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7641,6 +8313,10 @@
       "group": "Lower LFO1",
       "type": "boolean",
       "address": "10 00 02 2C",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -7674,6 +8350,10 @@
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2D",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "pitch1",
@@ -7730,6 +8410,10 @@
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 2E",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -7771,6 +8455,10 @@
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2F",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "pitch2",
@@ -7822,6 +8510,10 @@
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 30",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -7863,6 +8555,10 @@
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 31",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "tri",
@@ -7934,6 +8630,10 @@
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 32",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -7973,6 +8673,10 @@
       "group": "Lower LFO2",
       "type": "boolean",
       "address": "10 00 02 33",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 1,
       "trueValue": 0,
@@ -8006,6 +8710,10 @@
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 34",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "16",
@@ -8142,6 +8850,10 @@
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 35",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -8181,6 +8893,10 @@
       "group": "Lower LFO2",
       "type": "boolean",
       "address": "10 00 02 36",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -8214,6 +8930,10 @@
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 37",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "pitch1",
@@ -8270,6 +8990,10 @@
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 38",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -8311,6 +9035,10 @@
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 39",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "pitch2",
@@ -8362,6 +9090,10 @@
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 3A",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 1,
         "max": 127
@@ -8403,6 +9135,10 @@
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3B",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 24
@@ -8442,6 +9178,10 @@
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3C",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 61,
         "max": 67
@@ -8483,6 +9223,10 @@
       "group": "Lower Performance",
       "type": "boolean",
       "address": "10 00 02 3D",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "default": false,
       "falseValue": 0,
       "trueValue": 1,
@@ -8516,6 +9260,10 @@
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3E",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -8555,6 +9303,10 @@
       "group": "Lower Performance",
       "type": "choice",
       "address": "10 00 02 3F",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "choices": [
         {
           "id": "poly",
@@ -8606,6 +9358,10 @@
       "group": "Delay",
       "type": "integer",
       "address": "10 00 03 00",
+      "source": {
+        "table": "Patch Delay",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -8646,6 +9402,10 @@
       "group": "Delay",
       "type": "integer",
       "address": "10 00 03 01",
+      "source": {
+        "table": "Patch Delay",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 98
@@ -8688,6 +9448,10 @@
       "group": "Delay",
       "type": "choice",
       "address": "10 00 03 02",
+      "source": {
+        "table": "Patch Delay",
+        "page": 6
+      },
       "choices": [
         {
           "id": "200",
@@ -8815,6 +9579,10 @@
       "group": "Delay",
       "type": "integer",
       "address": "10 00 03 03",
+      "source": {
+        "table": "Patch Delay",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -8855,6 +9623,10 @@
       "group": "Delay",
       "type": "integer",
       "address": "10 00 03 04",
+      "source": {
+        "table": "Patch Delay",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -8895,6 +9667,10 @@
       "group": "Reverb",
       "type": "integer",
       "address": "10 00 04 00",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -8935,6 +9711,10 @@
       "group": "Reverb",
       "type": "integer",
       "address": "10 00 04 01",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 125
@@ -8975,6 +9755,10 @@
       "group": "Reverb",
       "type": "choice",
       "address": "10 00 04 02",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "choices": [
         {
           "id": "1",
@@ -9052,6 +9836,10 @@
       "group": "Reverb",
       "type": "choice",
       "address": "10 00 04 03",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "choices": [
         {
           "id": "160",
@@ -9194,6 +9982,10 @@
       "group": "Reverb",
       "type": "integer",
       "address": "10 00 04 04",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -9234,6 +10026,10 @@
       "group": "Reverb",
       "type": "integer",
       "address": "10 00 04 05",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -9274,6 +10070,10 @@
       "group": "Reverb",
       "type": "choice",
       "address": "10 00 04 06",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "choices": [
         {
           "id": "50",
@@ -9411,6 +10211,10 @@
       "group": "Reverb",
       "type": "integer",
       "address": "10 00 04 07",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 36
@@ -9451,6 +10255,10 @@
       "group": "Reverb",
       "type": "choice",
       "address": "10 00 04 08",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "choices": [
         {
           "id": "4000",
@@ -9518,6 +10326,10 @@
       "group": "Reverb",
       "type": "integer",
       "address": "10 00 04 09",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 36
@@ -9558,6 +10370,10 @@
       "group": "Arpeggio Common",
       "type": "choice",
       "address": "10 00 05 00",
+      "source": {
+        "table": "Patch Arpeggio Common",
+        "page": 6
+      },
       "choices": [
         {
           "id": "04",
@@ -9640,6 +10456,10 @@
       "group": "Arpeggio Common",
       "type": "choice",
       "address": "10 00 05 01",
+      "source": {
+        "table": "Patch Arpeggio Common",
+        "page": 6
+      },
       "choices": [
         {
           "id": "30",
@@ -9727,6 +10547,10 @@
       "group": "Arpeggio Common",
       "type": "choice",
       "address": "10 00 05 02",
+      "source": {
+        "table": "Patch Arpeggio Common",
+        "page": 6
+      },
       "choices": [
         {
           "id": "up-l",
@@ -9824,6 +10648,10 @@
       "group": "Arpeggio Common",
       "type": "integer",
       "address": "10 00 05 03",
+      "source": {
+        "table": "Patch Arpeggio Common",
+        "page": 6
+      },
       "range": {
         "min": 61,
         "max": 67
@@ -9866,6 +10694,10 @@
       "group": "Arpeggio Common",
       "type": "integer",
       "address": "10 00 05 04",
+      "source": {
+        "table": "Patch Arpeggio Common",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 100
@@ -9906,6 +10738,10 @@
       "group": "Arpeggio Common",
       "type": "integer",
       "address": "10 00 05 05",
+      "source": {
+        "table": "Patch Arpeggio Common",
+        "page": 6
+      },
       "range": {
         "min": 0,
         "max": 127
@@ -9951,6 +10787,10 @@
       },
       "default": 16,
       "address": "10 00 05 06",
+      "source": {
+        "table": "Patch Arpeggio Common",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Step"
@@ -9991,6 +10831,10 @@
       },
       "default": 60,
       "address": "10 00 06 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -10031,6 +10875,10 @@
       },
       "default": 0,
       "address": "10 00 06 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -10071,6 +10919,10 @@
       },
       "default": 0,
       "address": "10 00 06 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -10111,6 +10963,10 @@
       },
       "default": 0,
       "address": "10 00 06 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -10151,6 +11007,10 @@
       },
       "default": 0,
       "address": "10 00 06 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -10191,6 +11051,10 @@
       },
       "default": 0,
       "address": "10 00 06 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -10231,6 +11095,10 @@
       },
       "default": 0,
       "address": "10 00 06 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -10271,6 +11139,10 @@
       },
       "default": 0,
       "address": "10 00 06 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -10311,6 +11183,10 @@
       },
       "default": 0,
       "address": "10 00 06 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -10351,6 +11227,10 @@
       },
       "default": 0,
       "address": "10 00 06 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -10391,6 +11271,10 @@
       },
       "default": 0,
       "address": "10 00 06 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -10431,6 +11315,10 @@
       },
       "default": 0,
       "address": "10 00 06 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -10471,6 +11359,10 @@
       },
       "default": 0,
       "address": "10 00 06 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -10511,6 +11403,10 @@
       },
       "default": 0,
       "address": "10 00 06 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -10551,6 +11447,10 @@
       },
       "default": 0,
       "address": "10 00 06 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -10591,6 +11491,10 @@
       },
       "default": 0,
       "address": "10 00 06 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -10631,6 +11535,10 @@
       },
       "default": 0,
       "address": "10 00 06 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -10671,6 +11579,10 @@
       },
       "default": 0,
       "address": "10 00 06 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -10711,6 +11623,10 @@
       },
       "default": 0,
       "address": "10 00 06 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -10751,6 +11667,10 @@
       },
       "default": 0,
       "address": "10 00 06 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -10791,6 +11711,10 @@
       },
       "default": 0,
       "address": "10 00 06 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -10831,6 +11755,10 @@
       },
       "default": 0,
       "address": "10 00 06 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -10871,6 +11799,10 @@
       },
       "default": 0,
       "address": "10 00 06 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -10911,6 +11843,10 @@
       },
       "default": 0,
       "address": "10 00 06 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -10951,6 +11887,10 @@
       },
       "default": 0,
       "address": "10 00 06 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -10991,6 +11931,10 @@
       },
       "default": 0,
       "address": "10 00 06 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -11031,6 +11975,10 @@
       },
       "default": 0,
       "address": "10 00 06 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -11071,6 +12019,10 @@
       },
       "default": 0,
       "address": "10 00 06 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -11111,6 +12063,10 @@
       },
       "default": 0,
       "address": "10 00 06 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -11151,6 +12107,10 @@
       },
       "default": 0,
       "address": "10 00 06 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -11191,6 +12151,10 @@
       },
       "default": 0,
       "address": "10 00 06 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -11231,6 +12195,10 @@
       },
       "default": 0,
       "address": "10 00 06 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -11271,6 +12239,10 @@
       },
       "default": 0,
       "address": "10 00 06 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -11311,6 +12283,10 @@
       },
       "default": 60,
       "address": "10 00 07 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -11351,6 +12327,10 @@
       },
       "default": 0,
       "address": "10 00 07 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -11391,6 +12371,10 @@
       },
       "default": 0,
       "address": "10 00 07 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -11431,6 +12415,10 @@
       },
       "default": 0,
       "address": "10 00 07 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -11471,6 +12459,10 @@
       },
       "default": 0,
       "address": "10 00 07 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -11511,6 +12503,10 @@
       },
       "default": 0,
       "address": "10 00 07 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -11551,6 +12547,10 @@
       },
       "default": 0,
       "address": "10 00 07 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -11591,6 +12591,10 @@
       },
       "default": 0,
       "address": "10 00 07 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -11631,6 +12635,10 @@
       },
       "default": 0,
       "address": "10 00 07 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -11671,6 +12679,10 @@
       },
       "default": 0,
       "address": "10 00 07 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -11711,6 +12723,10 @@
       },
       "default": 0,
       "address": "10 00 07 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -11751,6 +12767,10 @@
       },
       "default": 0,
       "address": "10 00 07 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -11791,6 +12811,10 @@
       },
       "default": 0,
       "address": "10 00 07 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -11831,6 +12855,10 @@
       },
       "default": 0,
       "address": "10 00 07 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -11871,6 +12899,10 @@
       },
       "default": 0,
       "address": "10 00 07 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -11911,6 +12943,10 @@
       },
       "default": 0,
       "address": "10 00 07 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -11951,6 +12987,10 @@
       },
       "default": 0,
       "address": "10 00 07 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -11991,6 +13031,10 @@
       },
       "default": 0,
       "address": "10 00 07 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -12031,6 +13075,10 @@
       },
       "default": 0,
       "address": "10 00 07 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -12071,6 +13119,10 @@
       },
       "default": 0,
       "address": "10 00 07 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -12111,6 +13163,10 @@
       },
       "default": 0,
       "address": "10 00 07 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -12151,6 +13207,10 @@
       },
       "default": 0,
       "address": "10 00 07 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -12191,6 +13251,10 @@
       },
       "default": 0,
       "address": "10 00 07 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -12231,6 +13295,10 @@
       },
       "default": 0,
       "address": "10 00 07 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -12271,6 +13339,10 @@
       },
       "default": 0,
       "address": "10 00 07 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -12311,6 +13383,10 @@
       },
       "default": 0,
       "address": "10 00 07 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -12351,6 +13427,10 @@
       },
       "default": 0,
       "address": "10 00 07 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -12391,6 +13471,10 @@
       },
       "default": 0,
       "address": "10 00 07 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -12431,6 +13515,10 @@
       },
       "default": 0,
       "address": "10 00 07 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -12471,6 +13559,10 @@
       },
       "default": 0,
       "address": "10 00 07 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -12511,6 +13603,10 @@
       },
       "default": 0,
       "address": "10 00 07 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -12551,6 +13647,10 @@
       },
       "default": 0,
       "address": "10 00 07 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -12591,6 +13691,10 @@
       },
       "default": 0,
       "address": "10 00 07 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -12631,6 +13735,10 @@
       },
       "default": 60,
       "address": "10 00 08 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -12671,6 +13779,10 @@
       },
       "default": 0,
       "address": "10 00 08 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -12711,6 +13823,10 @@
       },
       "default": 0,
       "address": "10 00 08 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -12751,6 +13867,10 @@
       },
       "default": 0,
       "address": "10 00 08 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -12791,6 +13911,10 @@
       },
       "default": 0,
       "address": "10 00 08 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -12831,6 +13955,10 @@
       },
       "default": 0,
       "address": "10 00 08 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -12871,6 +13999,10 @@
       },
       "default": 0,
       "address": "10 00 08 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -12911,6 +14043,10 @@
       },
       "default": 0,
       "address": "10 00 08 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -12951,6 +14087,10 @@
       },
       "default": 0,
       "address": "10 00 08 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -12991,6 +14131,10 @@
       },
       "default": 0,
       "address": "10 00 08 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -13031,6 +14175,10 @@
       },
       "default": 0,
       "address": "10 00 08 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -13071,6 +14219,10 @@
       },
       "default": 0,
       "address": "10 00 08 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -13111,6 +14263,10 @@
       },
       "default": 0,
       "address": "10 00 08 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -13151,6 +14307,10 @@
       },
       "default": 0,
       "address": "10 00 08 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -13191,6 +14351,10 @@
       },
       "default": 0,
       "address": "10 00 08 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -13231,6 +14395,10 @@
       },
       "default": 0,
       "address": "10 00 08 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -13271,6 +14439,10 @@
       },
       "default": 0,
       "address": "10 00 08 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -13311,6 +14483,10 @@
       },
       "default": 0,
       "address": "10 00 08 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -13351,6 +14527,10 @@
       },
       "default": 0,
       "address": "10 00 08 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -13391,6 +14571,10 @@
       },
       "default": 0,
       "address": "10 00 08 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -13431,6 +14615,10 @@
       },
       "default": 0,
       "address": "10 00 08 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -13471,6 +14659,10 @@
       },
       "default": 0,
       "address": "10 00 08 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -13511,6 +14703,10 @@
       },
       "default": 0,
       "address": "10 00 08 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -13551,6 +14747,10 @@
       },
       "default": 0,
       "address": "10 00 08 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -13591,6 +14791,10 @@
       },
       "default": 0,
       "address": "10 00 08 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -13631,6 +14835,10 @@
       },
       "default": 0,
       "address": "10 00 08 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -13671,6 +14879,10 @@
       },
       "default": 0,
       "address": "10 00 08 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -13711,6 +14923,10 @@
       },
       "default": 0,
       "address": "10 00 08 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -13751,6 +14967,10 @@
       },
       "default": 0,
       "address": "10 00 08 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -13791,6 +15011,10 @@
       },
       "default": 0,
       "address": "10 00 08 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -13831,6 +15055,10 @@
       },
       "default": 0,
       "address": "10 00 08 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -13871,6 +15099,10 @@
       },
       "default": 0,
       "address": "10 00 08 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -13911,6 +15143,10 @@
       },
       "default": 0,
       "address": "10 00 08 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -13951,6 +15187,10 @@
       },
       "default": 60,
       "address": "10 00 09 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -13991,6 +15231,10 @@
       },
       "default": 0,
       "address": "10 00 09 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -14031,6 +15275,10 @@
       },
       "default": 0,
       "address": "10 00 09 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -14071,6 +15319,10 @@
       },
       "default": 0,
       "address": "10 00 09 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -14111,6 +15363,10 @@
       },
       "default": 0,
       "address": "10 00 09 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -14151,6 +15407,10 @@
       },
       "default": 0,
       "address": "10 00 09 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -14191,6 +15451,10 @@
       },
       "default": 0,
       "address": "10 00 09 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -14231,6 +15495,10 @@
       },
       "default": 0,
       "address": "10 00 09 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -14271,6 +15539,10 @@
       },
       "default": 0,
       "address": "10 00 09 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -14311,6 +15583,10 @@
       },
       "default": 0,
       "address": "10 00 09 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -14351,6 +15627,10 @@
       },
       "default": 0,
       "address": "10 00 09 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -14391,6 +15671,10 @@
       },
       "default": 0,
       "address": "10 00 09 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -14431,6 +15715,10 @@
       },
       "default": 0,
       "address": "10 00 09 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -14471,6 +15759,10 @@
       },
       "default": 0,
       "address": "10 00 09 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -14511,6 +15803,10 @@
       },
       "default": 0,
       "address": "10 00 09 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -14551,6 +15847,10 @@
       },
       "default": 0,
       "address": "10 00 09 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -14591,6 +15891,10 @@
       },
       "default": 0,
       "address": "10 00 09 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -14631,6 +15935,10 @@
       },
       "default": 0,
       "address": "10 00 09 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -14671,6 +15979,10 @@
       },
       "default": 0,
       "address": "10 00 09 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -14711,6 +16023,10 @@
       },
       "default": 0,
       "address": "10 00 09 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -14751,6 +16067,10 @@
       },
       "default": 0,
       "address": "10 00 09 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -14791,6 +16111,10 @@
       },
       "default": 0,
       "address": "10 00 09 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -14831,6 +16155,10 @@
       },
       "default": 0,
       "address": "10 00 09 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -14871,6 +16199,10 @@
       },
       "default": 0,
       "address": "10 00 09 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -14911,6 +16243,10 @@
       },
       "default": 0,
       "address": "10 00 09 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -14951,6 +16287,10 @@
       },
       "default": 0,
       "address": "10 00 09 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -14991,6 +16331,10 @@
       },
       "default": 0,
       "address": "10 00 09 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -15031,6 +16375,10 @@
       },
       "default": 0,
       "address": "10 00 09 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -15071,6 +16419,10 @@
       },
       "default": 0,
       "address": "10 00 09 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -15111,6 +16463,10 @@
       },
       "default": 0,
       "address": "10 00 09 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -15151,6 +16507,10 @@
       },
       "default": 0,
       "address": "10 00 09 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -15191,6 +16551,10 @@
       },
       "default": 0,
       "address": "10 00 09 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -15231,6 +16595,10 @@
       },
       "default": 0,
       "address": "10 00 09 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -15271,6 +16639,10 @@
       },
       "default": 60,
       "address": "10 00 0A 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -15311,6 +16683,10 @@
       },
       "default": 0,
       "address": "10 00 0A 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -15351,6 +16727,10 @@
       },
       "default": 0,
       "address": "10 00 0A 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -15391,6 +16771,10 @@
       },
       "default": 0,
       "address": "10 00 0A 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -15431,6 +16815,10 @@
       },
       "default": 0,
       "address": "10 00 0A 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -15471,6 +16859,10 @@
       },
       "default": 0,
       "address": "10 00 0A 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -15511,6 +16903,10 @@
       },
       "default": 0,
       "address": "10 00 0A 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -15551,6 +16947,10 @@
       },
       "default": 0,
       "address": "10 00 0A 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -15591,6 +16991,10 @@
       },
       "default": 0,
       "address": "10 00 0A 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -15631,6 +17035,10 @@
       },
       "default": 0,
       "address": "10 00 0A 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -15671,6 +17079,10 @@
       },
       "default": 0,
       "address": "10 00 0A 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -15711,6 +17123,10 @@
       },
       "default": 0,
       "address": "10 00 0A 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -15751,6 +17167,10 @@
       },
       "default": 0,
       "address": "10 00 0A 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -15791,6 +17211,10 @@
       },
       "default": 0,
       "address": "10 00 0A 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -15831,6 +17255,10 @@
       },
       "default": 0,
       "address": "10 00 0A 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -15871,6 +17299,10 @@
       },
       "default": 0,
       "address": "10 00 0A 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -15911,6 +17343,10 @@
       },
       "default": 0,
       "address": "10 00 0A 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -15951,6 +17387,10 @@
       },
       "default": 0,
       "address": "10 00 0A 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -15991,6 +17431,10 @@
       },
       "default": 0,
       "address": "10 00 0A 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -16031,6 +17475,10 @@
       },
       "default": 0,
       "address": "10 00 0A 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -16071,6 +17519,10 @@
       },
       "default": 0,
       "address": "10 00 0A 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -16111,6 +17563,10 @@
       },
       "default": 0,
       "address": "10 00 0A 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -16151,6 +17607,10 @@
       },
       "default": 0,
       "address": "10 00 0A 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -16191,6 +17651,10 @@
       },
       "default": 0,
       "address": "10 00 0A 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -16231,6 +17695,10 @@
       },
       "default": 0,
       "address": "10 00 0A 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -16271,6 +17739,10 @@
       },
       "default": 0,
       "address": "10 00 0A 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -16311,6 +17783,10 @@
       },
       "default": 0,
       "address": "10 00 0A 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -16351,6 +17827,10 @@
       },
       "default": 0,
       "address": "10 00 0A 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -16391,6 +17871,10 @@
       },
       "default": 0,
       "address": "10 00 0A 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -16431,6 +17915,10 @@
       },
       "default": 0,
       "address": "10 00 0A 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -16471,6 +17959,10 @@
       },
       "default": 0,
       "address": "10 00 0A 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -16511,6 +18003,10 @@
       },
       "default": 0,
       "address": "10 00 0A 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -16551,6 +18047,10 @@
       },
       "default": 0,
       "address": "10 00 0A 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -16591,6 +18091,10 @@
       },
       "default": 60,
       "address": "10 00 0B 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -16631,6 +18135,10 @@
       },
       "default": 0,
       "address": "10 00 0B 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -16671,6 +18179,10 @@
       },
       "default": 0,
       "address": "10 00 0B 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -16711,6 +18223,10 @@
       },
       "default": 0,
       "address": "10 00 0B 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -16751,6 +18267,10 @@
       },
       "default": 0,
       "address": "10 00 0B 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -16791,6 +18311,10 @@
       },
       "default": 0,
       "address": "10 00 0B 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -16831,6 +18355,10 @@
       },
       "default": 0,
       "address": "10 00 0B 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -16871,6 +18399,10 @@
       },
       "default": 0,
       "address": "10 00 0B 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -16911,6 +18443,10 @@
       },
       "default": 0,
       "address": "10 00 0B 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -16951,6 +18487,10 @@
       },
       "default": 0,
       "address": "10 00 0B 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -16991,6 +18531,10 @@
       },
       "default": 0,
       "address": "10 00 0B 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -17031,6 +18575,10 @@
       },
       "default": 0,
       "address": "10 00 0B 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -17071,6 +18619,10 @@
       },
       "default": 0,
       "address": "10 00 0B 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -17111,6 +18663,10 @@
       },
       "default": 0,
       "address": "10 00 0B 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -17151,6 +18707,10 @@
       },
       "default": 0,
       "address": "10 00 0B 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -17191,6 +18751,10 @@
       },
       "default": 0,
       "address": "10 00 0B 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -17231,6 +18795,10 @@
       },
       "default": 0,
       "address": "10 00 0B 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -17271,6 +18839,10 @@
       },
       "default": 0,
       "address": "10 00 0B 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -17311,6 +18883,10 @@
       },
       "default": 0,
       "address": "10 00 0B 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -17351,6 +18927,10 @@
       },
       "default": 0,
       "address": "10 00 0B 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -17391,6 +18971,10 @@
       },
       "default": 0,
       "address": "10 00 0B 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -17431,6 +19015,10 @@
       },
       "default": 0,
       "address": "10 00 0B 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -17471,6 +19059,10 @@
       },
       "default": 0,
       "address": "10 00 0B 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -17511,6 +19103,10 @@
       },
       "default": 0,
       "address": "10 00 0B 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -17551,6 +19147,10 @@
       },
       "default": 0,
       "address": "10 00 0B 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -17591,6 +19191,10 @@
       },
       "default": 0,
       "address": "10 00 0B 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -17631,6 +19235,10 @@
       },
       "default": 0,
       "address": "10 00 0B 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -17671,6 +19279,10 @@
       },
       "default": 0,
       "address": "10 00 0B 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -17711,6 +19323,10 @@
       },
       "default": 0,
       "address": "10 00 0B 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -17751,6 +19367,10 @@
       },
       "default": 0,
       "address": "10 00 0B 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -17791,6 +19411,10 @@
       },
       "default": 0,
       "address": "10 00 0B 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -17831,6 +19455,10 @@
       },
       "default": 0,
       "address": "10 00 0B 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -17871,6 +19499,10 @@
       },
       "default": 0,
       "address": "10 00 0B 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -17911,6 +19543,10 @@
       },
       "default": 60,
       "address": "10 00 0C 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -17951,6 +19587,10 @@
       },
       "default": 0,
       "address": "10 00 0C 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -17991,6 +19631,10 @@
       },
       "default": 0,
       "address": "10 00 0C 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -18031,6 +19675,10 @@
       },
       "default": 0,
       "address": "10 00 0C 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -18071,6 +19719,10 @@
       },
       "default": 0,
       "address": "10 00 0C 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -18111,6 +19763,10 @@
       },
       "default": 0,
       "address": "10 00 0C 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -18151,6 +19807,10 @@
       },
       "default": 0,
       "address": "10 00 0C 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -18191,6 +19851,10 @@
       },
       "default": 0,
       "address": "10 00 0C 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -18231,6 +19895,10 @@
       },
       "default": 0,
       "address": "10 00 0C 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -18271,6 +19939,10 @@
       },
       "default": 0,
       "address": "10 00 0C 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -18311,6 +19983,10 @@
       },
       "default": 0,
       "address": "10 00 0C 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -18351,6 +20027,10 @@
       },
       "default": 0,
       "address": "10 00 0C 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -18391,6 +20071,10 @@
       },
       "default": 0,
       "address": "10 00 0C 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -18431,6 +20115,10 @@
       },
       "default": 0,
       "address": "10 00 0C 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -18471,6 +20159,10 @@
       },
       "default": 0,
       "address": "10 00 0C 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -18511,6 +20203,10 @@
       },
       "default": 0,
       "address": "10 00 0C 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -18551,6 +20247,10 @@
       },
       "default": 0,
       "address": "10 00 0C 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -18591,6 +20291,10 @@
       },
       "default": 0,
       "address": "10 00 0C 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -18631,6 +20335,10 @@
       },
       "default": 0,
       "address": "10 00 0C 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -18671,6 +20379,10 @@
       },
       "default": 0,
       "address": "10 00 0C 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -18711,6 +20423,10 @@
       },
       "default": 0,
       "address": "10 00 0C 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -18751,6 +20467,10 @@
       },
       "default": 0,
       "address": "10 00 0C 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -18791,6 +20511,10 @@
       },
       "default": 0,
       "address": "10 00 0C 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -18831,6 +20555,10 @@
       },
       "default": 0,
       "address": "10 00 0C 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -18871,6 +20599,10 @@
       },
       "default": 0,
       "address": "10 00 0C 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -18911,6 +20643,10 @@
       },
       "default": 0,
       "address": "10 00 0C 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -18951,6 +20687,10 @@
       },
       "default": 0,
       "address": "10 00 0C 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -18991,6 +20731,10 @@
       },
       "default": 0,
       "address": "10 00 0C 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -19031,6 +20775,10 @@
       },
       "default": 0,
       "address": "10 00 0C 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -19071,6 +20819,10 @@
       },
       "default": 0,
       "address": "10 00 0C 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -19111,6 +20863,10 @@
       },
       "default": 0,
       "address": "10 00 0C 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -19151,6 +20907,10 @@
       },
       "default": 0,
       "address": "10 00 0C 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -19191,6 +20951,10 @@
       },
       "default": 0,
       "address": "10 00 0C 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -19231,6 +20995,10 @@
       },
       "default": 60,
       "address": "10 00 0D 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -19271,6 +21039,10 @@
       },
       "default": 0,
       "address": "10 00 0D 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -19311,6 +21083,10 @@
       },
       "default": 0,
       "address": "10 00 0D 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -19351,6 +21127,10 @@
       },
       "default": 0,
       "address": "10 00 0D 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -19391,6 +21171,10 @@
       },
       "default": 0,
       "address": "10 00 0D 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -19431,6 +21215,10 @@
       },
       "default": 0,
       "address": "10 00 0D 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -19471,6 +21259,10 @@
       },
       "default": 0,
       "address": "10 00 0D 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -19511,6 +21303,10 @@
       },
       "default": 0,
       "address": "10 00 0D 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -19551,6 +21347,10 @@
       },
       "default": 0,
       "address": "10 00 0D 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -19591,6 +21391,10 @@
       },
       "default": 0,
       "address": "10 00 0D 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -19631,6 +21435,10 @@
       },
       "default": 0,
       "address": "10 00 0D 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -19671,6 +21479,10 @@
       },
       "default": 0,
       "address": "10 00 0D 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -19711,6 +21523,10 @@
       },
       "default": 0,
       "address": "10 00 0D 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -19751,6 +21567,10 @@
       },
       "default": 0,
       "address": "10 00 0D 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -19791,6 +21611,10 @@
       },
       "default": 0,
       "address": "10 00 0D 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -19831,6 +21655,10 @@
       },
       "default": 0,
       "address": "10 00 0D 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -19871,6 +21699,10 @@
       },
       "default": 0,
       "address": "10 00 0D 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -19911,6 +21743,10 @@
       },
       "default": 0,
       "address": "10 00 0D 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -19951,6 +21787,10 @@
       },
       "default": 0,
       "address": "10 00 0D 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -19991,6 +21831,10 @@
       },
       "default": 0,
       "address": "10 00 0D 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -20031,6 +21875,10 @@
       },
       "default": 0,
       "address": "10 00 0D 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -20071,6 +21919,10 @@
       },
       "default": 0,
       "address": "10 00 0D 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -20111,6 +21963,10 @@
       },
       "default": 0,
       "address": "10 00 0D 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -20151,6 +22007,10 @@
       },
       "default": 0,
       "address": "10 00 0D 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -20191,6 +22051,10 @@
       },
       "default": 0,
       "address": "10 00 0D 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -20231,6 +22095,10 @@
       },
       "default": 0,
       "address": "10 00 0D 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -20271,6 +22139,10 @@
       },
       "default": 0,
       "address": "10 00 0D 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -20311,6 +22183,10 @@
       },
       "default": 0,
       "address": "10 00 0D 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -20351,6 +22227,10 @@
       },
       "default": 0,
       "address": "10 00 0D 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -20391,6 +22271,10 @@
       },
       "default": 0,
       "address": "10 00 0D 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -20431,6 +22315,10 @@
       },
       "default": 0,
       "address": "10 00 0D 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -20471,6 +22359,10 @@
       },
       "default": 0,
       "address": "10 00 0D 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -20511,6 +22403,10 @@
       },
       "default": 0,
       "address": "10 00 0D 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -20551,6 +22447,10 @@
       },
       "default": 60,
       "address": "10 00 0E 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -20591,6 +22491,10 @@
       },
       "default": 0,
       "address": "10 00 0E 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -20631,6 +22535,10 @@
       },
       "default": 0,
       "address": "10 00 0E 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -20671,6 +22579,10 @@
       },
       "default": 0,
       "address": "10 00 0E 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -20711,6 +22623,10 @@
       },
       "default": 0,
       "address": "10 00 0E 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -20751,6 +22667,10 @@
       },
       "default": 0,
       "address": "10 00 0E 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -20791,6 +22711,10 @@
       },
       "default": 0,
       "address": "10 00 0E 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -20831,6 +22755,10 @@
       },
       "default": 0,
       "address": "10 00 0E 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -20871,6 +22799,10 @@
       },
       "default": 0,
       "address": "10 00 0E 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -20911,6 +22843,10 @@
       },
       "default": 0,
       "address": "10 00 0E 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -20951,6 +22887,10 @@
       },
       "default": 0,
       "address": "10 00 0E 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -20991,6 +22931,10 @@
       },
       "default": 0,
       "address": "10 00 0E 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -21031,6 +22975,10 @@
       },
       "default": 0,
       "address": "10 00 0E 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -21071,6 +23019,10 @@
       },
       "default": 0,
       "address": "10 00 0E 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -21111,6 +23063,10 @@
       },
       "default": 0,
       "address": "10 00 0E 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -21151,6 +23107,10 @@
       },
       "default": 0,
       "address": "10 00 0E 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -21191,6 +23151,10 @@
       },
       "default": 0,
       "address": "10 00 0E 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -21231,6 +23195,10 @@
       },
       "default": 0,
       "address": "10 00 0E 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -21271,6 +23239,10 @@
       },
       "default": 0,
       "address": "10 00 0E 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -21311,6 +23283,10 @@
       },
       "default": 0,
       "address": "10 00 0E 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -21351,6 +23327,10 @@
       },
       "default": 0,
       "address": "10 00 0E 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -21391,6 +23371,10 @@
       },
       "default": 0,
       "address": "10 00 0E 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -21431,6 +23415,10 @@
       },
       "default": 0,
       "address": "10 00 0E 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -21471,6 +23459,10 @@
       },
       "default": 0,
       "address": "10 00 0E 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -21511,6 +23503,10 @@
       },
       "default": 0,
       "address": "10 00 0E 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -21551,6 +23547,10 @@
       },
       "default": 0,
       "address": "10 00 0E 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -21591,6 +23591,10 @@
       },
       "default": 0,
       "address": "10 00 0E 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -21631,6 +23635,10 @@
       },
       "default": 0,
       "address": "10 00 0E 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -21671,6 +23679,10 @@
       },
       "default": 0,
       "address": "10 00 0E 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -21711,6 +23723,10 @@
       },
       "default": 0,
       "address": "10 00 0E 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -21751,6 +23767,10 @@
       },
       "default": 0,
       "address": "10 00 0E 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -21791,6 +23811,10 @@
       },
       "default": 0,
       "address": "10 00 0E 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -21831,6 +23855,10 @@
       },
       "default": 0,
       "address": "10 00 0E 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -21871,6 +23899,10 @@
       },
       "default": 60,
       "address": "10 00 0F 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -21911,6 +23943,10 @@
       },
       "default": 0,
       "address": "10 00 0F 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -21951,6 +23987,10 @@
       },
       "default": 0,
       "address": "10 00 0F 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -21991,6 +24031,10 @@
       },
       "default": 0,
       "address": "10 00 0F 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -22031,6 +24075,10 @@
       },
       "default": 0,
       "address": "10 00 0F 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -22071,6 +24119,10 @@
       },
       "default": 0,
       "address": "10 00 0F 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -22111,6 +24163,10 @@
       },
       "default": 0,
       "address": "10 00 0F 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -22151,6 +24207,10 @@
       },
       "default": 0,
       "address": "10 00 0F 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -22191,6 +24251,10 @@
       },
       "default": 0,
       "address": "10 00 0F 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -22231,6 +24295,10 @@
       },
       "default": 0,
       "address": "10 00 0F 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -22271,6 +24339,10 @@
       },
       "default": 0,
       "address": "10 00 0F 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -22311,6 +24383,10 @@
       },
       "default": 0,
       "address": "10 00 0F 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -22351,6 +24427,10 @@
       },
       "default": 0,
       "address": "10 00 0F 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -22391,6 +24471,10 @@
       },
       "default": 0,
       "address": "10 00 0F 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -22431,6 +24515,10 @@
       },
       "default": 0,
       "address": "10 00 0F 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -22471,6 +24559,10 @@
       },
       "default": 0,
       "address": "10 00 0F 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -22511,6 +24603,10 @@
       },
       "default": 0,
       "address": "10 00 0F 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -22551,6 +24647,10 @@
       },
       "default": 0,
       "address": "10 00 0F 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -22591,6 +24691,10 @@
       },
       "default": 0,
       "address": "10 00 0F 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -22631,6 +24735,10 @@
       },
       "default": 0,
       "address": "10 00 0F 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -22671,6 +24779,10 @@
       },
       "default": 0,
       "address": "10 00 0F 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -22711,6 +24823,10 @@
       },
       "default": 0,
       "address": "10 00 0F 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -22751,6 +24867,10 @@
       },
       "default": 0,
       "address": "10 00 0F 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -22791,6 +24911,10 @@
       },
       "default": 0,
       "address": "10 00 0F 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -22831,6 +24955,10 @@
       },
       "default": 0,
       "address": "10 00 0F 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -22871,6 +24999,10 @@
       },
       "default": 0,
       "address": "10 00 0F 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -22911,6 +25043,10 @@
       },
       "default": 0,
       "address": "10 00 0F 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -22951,6 +25087,10 @@
       },
       "default": 0,
       "address": "10 00 0F 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -22991,6 +25131,10 @@
       },
       "default": 0,
       "address": "10 00 0F 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -23031,6 +25175,10 @@
       },
       "default": 0,
       "address": "10 00 0F 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -23071,6 +25219,10 @@
       },
       "default": 0,
       "address": "10 00 0F 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -23111,6 +25263,10 @@
       },
       "default": 0,
       "address": "10 00 0F 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -23151,6 +25307,10 @@
       },
       "default": 0,
       "address": "10 00 0F 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -23191,6 +25351,10 @@
       },
       "default": 60,
       "address": "10 00 10 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -23231,6 +25395,10 @@
       },
       "default": 0,
       "address": "10 00 10 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -23271,6 +25439,10 @@
       },
       "default": 0,
       "address": "10 00 10 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -23311,6 +25483,10 @@
       },
       "default": 0,
       "address": "10 00 10 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -23351,6 +25527,10 @@
       },
       "default": 0,
       "address": "10 00 10 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -23391,6 +25571,10 @@
       },
       "default": 0,
       "address": "10 00 10 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -23431,6 +25615,10 @@
       },
       "default": 0,
       "address": "10 00 10 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -23471,6 +25659,10 @@
       },
       "default": 0,
       "address": "10 00 10 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -23511,6 +25703,10 @@
       },
       "default": 0,
       "address": "10 00 10 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -23551,6 +25747,10 @@
       },
       "default": 0,
       "address": "10 00 10 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -23591,6 +25791,10 @@
       },
       "default": 0,
       "address": "10 00 10 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -23631,6 +25835,10 @@
       },
       "default": 0,
       "address": "10 00 10 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -23671,6 +25879,10 @@
       },
       "default": 0,
       "address": "10 00 10 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -23711,6 +25923,10 @@
       },
       "default": 0,
       "address": "10 00 10 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -23751,6 +25967,10 @@
       },
       "default": 0,
       "address": "10 00 10 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -23791,6 +26011,10 @@
       },
       "default": 0,
       "address": "10 00 10 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -23831,6 +26055,10 @@
       },
       "default": 0,
       "address": "10 00 10 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -23871,6 +26099,10 @@
       },
       "default": 0,
       "address": "10 00 10 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -23911,6 +26143,10 @@
       },
       "default": 0,
       "address": "10 00 10 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -23951,6 +26187,10 @@
       },
       "default": 0,
       "address": "10 00 10 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -23991,6 +26231,10 @@
       },
       "default": 0,
       "address": "10 00 10 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -24031,6 +26275,10 @@
       },
       "default": 0,
       "address": "10 00 10 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -24071,6 +26319,10 @@
       },
       "default": 0,
       "address": "10 00 10 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -24111,6 +26363,10 @@
       },
       "default": 0,
       "address": "10 00 10 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -24151,6 +26407,10 @@
       },
       "default": 0,
       "address": "10 00 10 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -24191,6 +26451,10 @@
       },
       "default": 0,
       "address": "10 00 10 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -24231,6 +26495,10 @@
       },
       "default": 0,
       "address": "10 00 10 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -24271,6 +26539,10 @@
       },
       "default": 0,
       "address": "10 00 10 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -24311,6 +26583,10 @@
       },
       "default": 0,
       "address": "10 00 10 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -24351,6 +26627,10 @@
       },
       "default": 0,
       "address": "10 00 10 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -24391,6 +26671,10 @@
       },
       "default": 0,
       "address": "10 00 10 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -24431,6 +26715,10 @@
       },
       "default": 0,
       "address": "10 00 10 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -24471,6 +26759,10 @@
       },
       "default": 0,
       "address": "10 00 10 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -24511,6 +26803,10 @@
       },
       "default": 60,
       "address": "10 00 11 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -24551,6 +26847,10 @@
       },
       "default": 0,
       "address": "10 00 11 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -24591,6 +26891,10 @@
       },
       "default": 0,
       "address": "10 00 11 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -24631,6 +26935,10 @@
       },
       "default": 0,
       "address": "10 00 11 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -24671,6 +26979,10 @@
       },
       "default": 0,
       "address": "10 00 11 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -24711,6 +27023,10 @@
       },
       "default": 0,
       "address": "10 00 11 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -24751,6 +27067,10 @@
       },
       "default": 0,
       "address": "10 00 11 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -24791,6 +27111,10 @@
       },
       "default": 0,
       "address": "10 00 11 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -24831,6 +27155,10 @@
       },
       "default": 0,
       "address": "10 00 11 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -24871,6 +27199,10 @@
       },
       "default": 0,
       "address": "10 00 11 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -24911,6 +27243,10 @@
       },
       "default": 0,
       "address": "10 00 11 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -24951,6 +27287,10 @@
       },
       "default": 0,
       "address": "10 00 11 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -24991,6 +27331,10 @@
       },
       "default": 0,
       "address": "10 00 11 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -25031,6 +27375,10 @@
       },
       "default": 0,
       "address": "10 00 11 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -25071,6 +27419,10 @@
       },
       "default": 0,
       "address": "10 00 11 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -25111,6 +27463,10 @@
       },
       "default": 0,
       "address": "10 00 11 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -25151,6 +27507,10 @@
       },
       "default": 0,
       "address": "10 00 11 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -25191,6 +27551,10 @@
       },
       "default": 0,
       "address": "10 00 11 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -25231,6 +27595,10 @@
       },
       "default": 0,
       "address": "10 00 11 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -25271,6 +27639,10 @@
       },
       "default": 0,
       "address": "10 00 11 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -25311,6 +27683,10 @@
       },
       "default": 0,
       "address": "10 00 11 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -25351,6 +27727,10 @@
       },
       "default": 0,
       "address": "10 00 11 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -25391,6 +27771,10 @@
       },
       "default": 0,
       "address": "10 00 11 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -25431,6 +27815,10 @@
       },
       "default": 0,
       "address": "10 00 11 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -25471,6 +27859,10 @@
       },
       "default": 0,
       "address": "10 00 11 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -25511,6 +27903,10 @@
       },
       "default": 0,
       "address": "10 00 11 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -25551,6 +27947,10 @@
       },
       "default": 0,
       "address": "10 00 11 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -25591,6 +27991,10 @@
       },
       "default": 0,
       "address": "10 00 11 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -25631,6 +28035,10 @@
       },
       "default": 0,
       "address": "10 00 11 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -25671,6 +28079,10 @@
       },
       "default": 0,
       "address": "10 00 11 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -25711,6 +28123,10 @@
       },
       "default": 0,
       "address": "10 00 11 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -25751,6 +28167,10 @@
       },
       "default": 0,
       "address": "10 00 11 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -25791,6 +28211,10 @@
       },
       "default": 0,
       "address": "10 00 11 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -25831,6 +28255,10 @@
       },
       "default": 60,
       "address": "10 00 12 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -25871,6 +28299,10 @@
       },
       "default": 0,
       "address": "10 00 12 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -25911,6 +28343,10 @@
       },
       "default": 0,
       "address": "10 00 12 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -25951,6 +28387,10 @@
       },
       "default": 0,
       "address": "10 00 12 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -25991,6 +28431,10 @@
       },
       "default": 0,
       "address": "10 00 12 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -26031,6 +28475,10 @@
       },
       "default": 0,
       "address": "10 00 12 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -26071,6 +28519,10 @@
       },
       "default": 0,
       "address": "10 00 12 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -26111,6 +28563,10 @@
       },
       "default": 0,
       "address": "10 00 12 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -26151,6 +28607,10 @@
       },
       "default": 0,
       "address": "10 00 12 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -26191,6 +28651,10 @@
       },
       "default": 0,
       "address": "10 00 12 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -26231,6 +28695,10 @@
       },
       "default": 0,
       "address": "10 00 12 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -26271,6 +28739,10 @@
       },
       "default": 0,
       "address": "10 00 12 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -26311,6 +28783,10 @@
       },
       "default": 0,
       "address": "10 00 12 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -26351,6 +28827,10 @@
       },
       "default": 0,
       "address": "10 00 12 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -26391,6 +28871,10 @@
       },
       "default": 0,
       "address": "10 00 12 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -26431,6 +28915,10 @@
       },
       "default": 0,
       "address": "10 00 12 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -26471,6 +28959,10 @@
       },
       "default": 0,
       "address": "10 00 12 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -26511,6 +29003,10 @@
       },
       "default": 0,
       "address": "10 00 12 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -26551,6 +29047,10 @@
       },
       "default": 0,
       "address": "10 00 12 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -26591,6 +29091,10 @@
       },
       "default": 0,
       "address": "10 00 12 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -26631,6 +29135,10 @@
       },
       "default": 0,
       "address": "10 00 12 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -26671,6 +29179,10 @@
       },
       "default": 0,
       "address": "10 00 12 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -26711,6 +29223,10 @@
       },
       "default": 0,
       "address": "10 00 12 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -26751,6 +29267,10 @@
       },
       "default": 0,
       "address": "10 00 12 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -26791,6 +29311,10 @@
       },
       "default": 0,
       "address": "10 00 12 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -26831,6 +29355,10 @@
       },
       "default": 0,
       "address": "10 00 12 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -26871,6 +29399,10 @@
       },
       "default": 0,
       "address": "10 00 12 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -26911,6 +29443,10 @@
       },
       "default": 0,
       "address": "10 00 12 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -26951,6 +29487,10 @@
       },
       "default": 0,
       "address": "10 00 12 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -26991,6 +29531,10 @@
       },
       "default": 0,
       "address": "10 00 12 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -27031,6 +29575,10 @@
       },
       "default": 0,
       "address": "10 00 12 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -27071,6 +29619,10 @@
       },
       "default": 0,
       "address": "10 00 12 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -27111,6 +29663,10 @@
       },
       "default": 0,
       "address": "10 00 12 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -27151,6 +29707,10 @@
       },
       "default": 60,
       "address": "10 00 13 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -27191,6 +29751,10 @@
       },
       "default": 0,
       "address": "10 00 13 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -27231,6 +29795,10 @@
       },
       "default": 0,
       "address": "10 00 13 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -27271,6 +29839,10 @@
       },
       "default": 0,
       "address": "10 00 13 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -27311,6 +29883,10 @@
       },
       "default": 0,
       "address": "10 00 13 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -27351,6 +29927,10 @@
       },
       "default": 0,
       "address": "10 00 13 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -27391,6 +29971,10 @@
       },
       "default": 0,
       "address": "10 00 13 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -27431,6 +30015,10 @@
       },
       "default": 0,
       "address": "10 00 13 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -27471,6 +30059,10 @@
       },
       "default": 0,
       "address": "10 00 13 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -27511,6 +30103,10 @@
       },
       "default": 0,
       "address": "10 00 13 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -27551,6 +30147,10 @@
       },
       "default": 0,
       "address": "10 00 13 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -27591,6 +30191,10 @@
       },
       "default": 0,
       "address": "10 00 13 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -27631,6 +30235,10 @@
       },
       "default": 0,
       "address": "10 00 13 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -27671,6 +30279,10 @@
       },
       "default": 0,
       "address": "10 00 13 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -27711,6 +30323,10 @@
       },
       "default": 0,
       "address": "10 00 13 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -27751,6 +30367,10 @@
       },
       "default": 0,
       "address": "10 00 13 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -27791,6 +30411,10 @@
       },
       "default": 0,
       "address": "10 00 13 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -27831,6 +30455,10 @@
       },
       "default": 0,
       "address": "10 00 13 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -27871,6 +30499,10 @@
       },
       "default": 0,
       "address": "10 00 13 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -27911,6 +30543,10 @@
       },
       "default": 0,
       "address": "10 00 13 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -27951,6 +30587,10 @@
       },
       "default": 0,
       "address": "10 00 13 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -27991,6 +30631,10 @@
       },
       "default": 0,
       "address": "10 00 13 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -28031,6 +30675,10 @@
       },
       "default": 0,
       "address": "10 00 13 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -28071,6 +30719,10 @@
       },
       "default": 0,
       "address": "10 00 13 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -28111,6 +30763,10 @@
       },
       "default": 0,
       "address": "10 00 13 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -28151,6 +30807,10 @@
       },
       "default": 0,
       "address": "10 00 13 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -28191,6 +30851,10 @@
       },
       "default": 0,
       "address": "10 00 13 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -28231,6 +30895,10 @@
       },
       "default": 0,
       "address": "10 00 13 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -28271,6 +30939,10 @@
       },
       "default": 0,
       "address": "10 00 13 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -28311,6 +30983,10 @@
       },
       "default": 0,
       "address": "10 00 13 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -28351,6 +31027,10 @@
       },
       "default": 0,
       "address": "10 00 13 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -28391,6 +31071,10 @@
       },
       "default": 0,
       "address": "10 00 13 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -28431,6 +31115,10 @@
       },
       "default": 0,
       "address": "10 00 13 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -28471,6 +31159,10 @@
       },
       "default": 60,
       "address": "10 00 14 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -28511,6 +31203,10 @@
       },
       "default": 0,
       "address": "10 00 14 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -28551,6 +31247,10 @@
       },
       "default": 0,
       "address": "10 00 14 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -28591,6 +31291,10 @@
       },
       "default": 0,
       "address": "10 00 14 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -28631,6 +31335,10 @@
       },
       "default": 0,
       "address": "10 00 14 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -28671,6 +31379,10 @@
       },
       "default": 0,
       "address": "10 00 14 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -28711,6 +31423,10 @@
       },
       "default": 0,
       "address": "10 00 14 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -28751,6 +31467,10 @@
       },
       "default": 0,
       "address": "10 00 14 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -28791,6 +31511,10 @@
       },
       "default": 0,
       "address": "10 00 14 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -28831,6 +31555,10 @@
       },
       "default": 0,
       "address": "10 00 14 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -28871,6 +31599,10 @@
       },
       "default": 0,
       "address": "10 00 14 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -28911,6 +31643,10 @@
       },
       "default": 0,
       "address": "10 00 14 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -28951,6 +31687,10 @@
       },
       "default": 0,
       "address": "10 00 14 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -28991,6 +31731,10 @@
       },
       "default": 0,
       "address": "10 00 14 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -29031,6 +31775,10 @@
       },
       "default": 0,
       "address": "10 00 14 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -29071,6 +31819,10 @@
       },
       "default": 0,
       "address": "10 00 14 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -29111,6 +31863,10 @@
       },
       "default": 0,
       "address": "10 00 14 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -29151,6 +31907,10 @@
       },
       "default": 0,
       "address": "10 00 14 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -29191,6 +31951,10 @@
       },
       "default": 0,
       "address": "10 00 14 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -29231,6 +31995,10 @@
       },
       "default": 0,
       "address": "10 00 14 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -29271,6 +32039,10 @@
       },
       "default": 0,
       "address": "10 00 14 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -29311,6 +32083,10 @@
       },
       "default": 0,
       "address": "10 00 14 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -29351,6 +32127,10 @@
       },
       "default": 0,
       "address": "10 00 14 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -29391,6 +32171,10 @@
       },
       "default": 0,
       "address": "10 00 14 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -29431,6 +32215,10 @@
       },
       "default": 0,
       "address": "10 00 14 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -29471,6 +32259,10 @@
       },
       "default": 0,
       "address": "10 00 14 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -29511,6 +32303,10 @@
       },
       "default": 0,
       "address": "10 00 14 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -29551,6 +32347,10 @@
       },
       "default": 0,
       "address": "10 00 14 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -29591,6 +32391,10 @@
       },
       "default": 0,
       "address": "10 00 14 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -29631,6 +32435,10 @@
       },
       "default": 0,
       "address": "10 00 14 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -29671,6 +32479,10 @@
       },
       "default": 0,
       "address": "10 00 14 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -29711,6 +32523,10 @@
       },
       "default": 0,
       "address": "10 00 14 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -29751,6 +32567,10 @@
       },
       "default": 0,
       "address": "10 00 14 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -29791,6 +32611,10 @@
       },
       "default": 60,
       "address": "10 00 15 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "Note"
@@ -29831,6 +32655,10 @@
       },
       "default": 0,
       "address": "10 00 15 02",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "01"
@@ -29871,6 +32699,10 @@
       },
       "default": 0,
       "address": "10 00 15 04",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "02"
@@ -29911,6 +32743,10 @@
       },
       "default": 0,
       "address": "10 00 15 06",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "03"
@@ -29951,6 +32787,10 @@
       },
       "default": 0,
       "address": "10 00 15 08",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "04"
@@ -29991,6 +32831,10 @@
       },
       "default": 0,
       "address": "10 00 15 0A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "05"
@@ -30031,6 +32875,10 @@
       },
       "default": 0,
       "address": "10 00 15 0C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "06"
@@ -30071,6 +32919,10 @@
       },
       "default": 0,
       "address": "10 00 15 0E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "07"
@@ -30111,6 +32963,10 @@
       },
       "default": 0,
       "address": "10 00 15 10",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "08"
@@ -30151,6 +33007,10 @@
       },
       "default": 0,
       "address": "10 00 15 12",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "09"
@@ -30191,6 +33051,10 @@
       },
       "default": 0,
       "address": "10 00 15 14",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "10"
@@ -30231,6 +33095,10 @@
       },
       "default": 0,
       "address": "10 00 15 16",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "11"
@@ -30271,6 +33139,10 @@
       },
       "default": 0,
       "address": "10 00 15 18",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "12"
@@ -30311,6 +33183,10 @@
       },
       "default": 0,
       "address": "10 00 15 1A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "13"
@@ -30351,6 +33227,10 @@
       },
       "default": 0,
       "address": "10 00 15 1C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "14"
@@ -30391,6 +33271,10 @@
       },
       "default": 0,
       "address": "10 00 15 1E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "15"
@@ -30431,6 +33315,10 @@
       },
       "default": 0,
       "address": "10 00 15 20",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "16"
@@ -30471,6 +33359,10 @@
       },
       "default": 0,
       "address": "10 00 15 22",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "17"
@@ -30511,6 +33403,10 @@
       },
       "default": 0,
       "address": "10 00 15 24",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "18"
@@ -30551,6 +33447,10 @@
       },
       "default": 0,
       "address": "10 00 15 26",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "19"
@@ -30591,6 +33491,10 @@
       },
       "default": 0,
       "address": "10 00 15 28",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "20"
@@ -30631,6 +33535,10 @@
       },
       "default": 0,
       "address": "10 00 15 2A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "21"
@@ -30671,6 +33579,10 @@
       },
       "default": 0,
       "address": "10 00 15 2C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "22"
@@ -30711,6 +33623,10 @@
       },
       "default": 0,
       "address": "10 00 15 2E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "23"
@@ -30751,6 +33667,10 @@
       },
       "default": 0,
       "address": "10 00 15 30",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "24"
@@ -30791,6 +33711,10 @@
       },
       "default": 0,
       "address": "10 00 15 32",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "25"
@@ -30831,6 +33755,10 @@
       },
       "default": 0,
       "address": "10 00 15 34",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "26"
@@ -30871,6 +33799,10 @@
       },
       "default": 0,
       "address": "10 00 15 36",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "27"
@@ -30911,6 +33843,10 @@
       },
       "default": 0,
       "address": "10 00 15 38",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "28"
@@ -30951,6 +33887,10 @@
       },
       "default": 0,
       "address": "10 00 15 3A",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "29"
@@ -30991,6 +33931,10 @@
       },
       "default": 0,
       "address": "10 00 15 3C",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "30"
@@ -31031,6 +33975,10 @@
       },
       "default": 0,
       "address": "10 00 15 3E",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "31"
@@ -31071,6 +34019,10 @@
       },
       "default": 0,
       "address": "10 00 15 40",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "display": {
         "mode": "number",
         "shortLabel": "32"
@@ -31231,6 +34183,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "01 00 00 00",
+      "source": {
+        "table": "System Common",
+        "page": 4
+      },
       "size": "00 00 00 21",
       "display": {
         "mode": "action",
@@ -31264,6 +34220,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 00 00",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "size": "00 00 00 21",
       "display": {
         "mode": "action",
@@ -31297,6 +34257,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 00 00",
+      "source": {
+        "table": "Patch Common",
+        "page": 5
+      },
       "size": "00 00 15 42",
       "display": {
         "mode": "action",
@@ -31330,6 +34294,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 01 00",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "size": "00 00 00 40",
       "display": {
         "mode": "action",
@@ -31363,6 +34331,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 02 00",
+      "source": {
+        "table": "Patch Tone",
+        "page": 5
+      },
       "size": "00 00 00 40",
       "display": {
         "mode": "action",
@@ -31396,6 +34368,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 03 00",
+      "source": {
+        "table": "Patch Delay",
+        "page": 6
+      },
       "size": "00 00 00 05",
       "display": {
         "mode": "action",
@@ -31429,6 +34405,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 04 00",
+      "source": {
+        "table": "Patch Reverb",
+        "page": 6
+      },
       "size": "00 00 00 0A",
       "display": {
         "mode": "action",
@@ -31462,6 +34442,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 05 00",
+      "source": {
+        "table": "Patch Arpeggio Common",
+        "page": 6
+      },
       "size": "00 00 00 08",
       "display": {
         "mode": "action",
@@ -31495,6 +34479,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 06 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31528,6 +34516,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 07 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31561,6 +34553,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 08 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31594,6 +34590,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 09 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31627,6 +34627,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 0A 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31660,6 +34664,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 0B 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31693,6 +34701,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 0C 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31726,6 +34738,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 0D 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31759,6 +34775,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 0E 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31792,6 +34812,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 0F 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31825,6 +34849,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 10 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31858,6 +34886,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 11 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31891,6 +34923,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 12 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31924,6 +34960,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 13 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31957,6 +34997,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 14 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",
@@ -31990,6 +35034,10 @@
       "type": "action",
       "triggerValue": 0,
       "address": "10 00 15 00",
+      "source": {
+        "table": "Patch Arpeggio Pattern",
+        "page": 6
+      },
       "size": "00 00 00 42",
       "display": {
         "mode": "action",

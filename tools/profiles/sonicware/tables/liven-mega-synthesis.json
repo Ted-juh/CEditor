@@ -1,0 +1,33 @@
+{
+  "sources": [
+    {"title":"LIVEN Mega Synthesis MIDI implementation chart","file":"MEGA-SYNTHESIS_manual_MIDI_en.pdf","sha256":"4fc6c37e9e180911a4b6bc81a518fa09dae6db88dd0569c262648bdff2254d63","url":"https://www.sonicware.co.jp/DL/LIVEN_MegaSynthesis/DOC/MEGA-SYNTHESIS_manual_MIDI_en.pdf"}
+  ],
+  "rows": [
+    {"page":1,"cc":5,"name":"VELOCITY","transmitted":"〇","recognized":"〇","block":"Control Change"},
+    {"page":1,"cc":20,"name":"FX ACTIVE","transmitted":"〇","recognized":"〇","block":"Control Change"},
+    {"page":1,"cc":21,"name":"FX TYPE","transmitted":"〇","recognized":"〇","block":"Control Change"},
+    {"page":1,"cc":22,"name":"FX SPEED","transmitted":"〇","recognized":"〇","block":"Control Change"},
+    {"page":1,"cc":23,"name":"FX AMOUNT","transmitted":"〇","recognized":"〇","block":"Control Change"},
+    {"page":1,"cc":24,"name":"PTN LEVEL","transmitted":"〇","recognized":"〇","block":"Control Change"},
+    {"page":1,"cc":25,"name":"SEQ MODE","transmitted":"〇","recognized":"〇","block":"Control Change"},
+    {"page":1,"cc":27,"name":"BANK","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":28,"name":"SOUND","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":29,"name":"ATTACK","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":30,"name":"RELEASE & GATE","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":31,"name":"OCTAVE","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":32,"name":"SWEEP CURVE","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":33,"name":"SWEEP SPEED","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":34,"name":"SWEEP RANGE","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":35,"name":"TRACK PAN","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":36,"name":"TRACK LEVEL","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":37,"name":"→ FX","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":38,"name":"LEGACY","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":39,"name":"VOICE MODE","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":40,"name":"VOICE ADJ","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":41,"name":"SWING","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":42,"name":"TRANSPOSE","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":43,"name":"RANDOM STEP","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":44,"name":"PRM LOCK","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"},
+    {"page":1,"cc":45,"name":"TRACK MUTE","transmitted":"〇","recognized":"〇","block":"Control Change （TRACK）"}
+  ]
+}

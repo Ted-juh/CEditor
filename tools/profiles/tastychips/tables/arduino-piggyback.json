@@ -1,0 +1,16 @@
+{
+  "source": {"title":"Arduino Piggyback synthesizer manual (web page)","file":"tc-arduino-piggyback-manual.html","sha256":"5025334d3633a950c59bb696a285836c9f756840b8f16a62e2b3abd827ac286d","url":"https://www.tastychips.nl/sample-page/arduino-piggyback-synthesizer-manual/","linkedFrom":"https://www.tastychips.nl/legacy-products-2/","saved":"2026-11-11"},
+  "columns": [
+    "Piggy command",
+    "MIDI control number (hex, dec)",
+    "Value information"
+  ],
+  "rows": [
+    ["Modulation depth","0x01, 1","0: no modulation, 100: full modulation, >100: over modulation"],
+    ["Relative modulation frequency","0x0C, 12","127 = 0.99 * note pitch, 64 = 0.5*note pitch, 0 = off"],
+    ["ADSR attack time","0x49, 73","0=0.0s .. 127=4.0s"],
+    ["ADSR decay time*","0x4B, 75","0=0.0s .. 127=4.0s"],
+    ["ADSR sustain level*","0x50, 80","0:Mute .. 127:Max"],
+    ["ADSR release time","0x48, 72","0=0.0s .. 127=4.0s"]
+  ]
+}

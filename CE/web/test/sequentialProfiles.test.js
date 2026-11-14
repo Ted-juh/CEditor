@@ -1,5 +1,5 @@
 // sequentialProfiles.test.js — device profiles read out of Sequential's (and Dave Smith
-// Instruments') own manuals.
+// Instruments' and Oberheim's) own manuals.
 //
 // tools/profiles/sequential/ reads a manual's NRPN tables (read-nrpn-tables.mjs), commits them as
 // tables/<name>.json, and builds a profile from them and a layout. Checked here against things that
@@ -164,6 +164,9 @@ test('what a row means: choices only when the labels name every value, explanati
   assert.deepEqual(choice.labels.map((l) => l.label), ['Off', 'Master', 'Slave', 'Slave Thru']);
   const wrapped = interpretRow({ nrpn: '4121', range: '0-1', desc: 'OLED Screen-', more: ['saver', '0 = Off', '1 = On'] }, {}, layout);
   assert.equal(wrapped.name, 'OLED Screensaver');
+  // A dash with a space before it is punctuation, not a word split across the line (the OB-6).
+  const dash = interpretRow({ nrpn: '50', range: '0-1', desc: 'Filter Normal -', more: ['Bandpass'] }, {}, layout);
+  assert.equal(dash.name, 'Filter Normal - Bandpass');
   const explained = interpretRow({ nrpn: '356', range: '1-33', desc: 'Track 1 Reset', more: ['“Default” resets for 16- and 32-step sequences', 'are 17 and 33, respectively.'] }, {}, layout);
   assert.equal(explained.name, 'Track 1 Reset');
   assert.match(explained.description, /^“Default” resets/);
@@ -253,7 +256,6 @@ for (const { name, profile, text, out, data } of BUILT) {
       const lines = Array.from({ length: bytes.length / 3 }, (unused, i) => hex(bytes.slice(i * 3, i * 3 + 3)));
       assert.equal(lines.join('\n'), vector.expectedHex, vector.name);
     }
-    assert.ok(profile.tests.some((t) => t.kind === 'identityRequest' && t.expectedHex === 'F0 7E 7F 06 01 F7'));
   });
 
   test(`${profile.id}: only what the manual says is ignored when received is read-only`, () => {
@@ -277,6 +279,58 @@ for (const { name, profile, text, out, data } of BUILT) {
   test(`${profile.id}: the source is the manual, and nobody has tried it on an instrument`, () => {
     assert.equal(profile.coverage.verifiedOnHardware, false);
     assert.match(profile.sources[0].notes, new RegExp(`sha256 ${data.source.sha256}`));
-    assert.ok(profile.identity.familyCode.length === 2);
+  });
+
+  test(`${profile.id}: it recognises the instrument, or says why it cannot`, () => {
+    if (profile.identity) {
+      assert.equal(profile.identity.familyCode.length, 2);
+      assert.ok(profile.tests.some((t) => t.kind === 'identityRequest' && t.expectedHex === 'F0 7E 7F 06 01 F7'));
+    } else {
+      assert.ok(profile.authoringNotes.some((n) => /^No identity check: /.test(n)), 'a profile without an identity says why');
+    }
   });
 }
+
+/* ------------------------------------------------------------------ Oberheim */
+
+const builtProfile = (id) => BUILT.find((b) => b.profile.id === id)?.profile;
+const nrpnOf = (profile, parameter) => {
+  const recipe = profile.messageRecipes.find((r) => r.id === parameter.messageRecipe);
+  return recipe.parameterMsb * 128 + recipe.parameterLsb;
+};
+const atNrpn = (profile, n) => profile.parameters.filter((p) => nrpnOf(profile, p) === n);
+
+test('the OB-6: a Prophet-6 layout, its globals in Global, no identity because its manual prints the Prophet-6\'s', { skip: !builtProfile('oberheim-ob-6') }, () => {
+  const profile = builtProfile('oberheim-ob-6');
+  assert.equal(profile.manufacturer, 'Oberheim');
+  assert.equal(profile.identity, undefined);
+  assert.ok(profile.authoringNotes.some((n) => /2DH \(the Prophet-6's\).*2EH/.test(n)));
+  assert.equal(atNrpn(profile, 1039)[0].group, 'Global', 'Seq Jack is a global');
+  assert.equal(atNrpn(profile, 1024)[0].name, 'Master Fine Tune', 'the Global table names the globals');
+  assert.equal(atNrpn(profile, 50)[0].name, 'Filter Normal - Bandpass');
+  assert.equal(atNrpn(profile, 143)[0].group, 'Cross Mod');
+  assert.equal(profile.parameters.filter((p) => /^Seq Step \d+ (Note|Vel) \d$/.test(p.name)).length, 768);
+  assert.equal(profile.presets.banks.length, 10);
+});
+
+test('the OB-X8: names as printed, with the manual\'s slips said where they are', { skip: !builtProfile('oberheim-ob-x8') }, () => {
+  const profile = builtProfile('oberheim-ob-x8');
+  assert.equal(profile.identity, undefined);
+  assert.equal(profile.presets, undefined);
+  assert.equal(profile.parameters.length, 113);
+  assert.equal(atNrpn(profile, 86)[0].name, 'ARP NUMBER OF TRANSPOSE INTERVALS');
+  for (const n of [56, 57]) assert.match(atNrpn(profile, n)[0].description, /same name for NRPN 56 and 57/);
+  assert.equal(atNrpn(profile, 94)[0].range.max, 1207, 'kept as printed');
+  assert.match(atNrpn(profile, 1122)[0].description, /1090/);
+  assert.deepEqual(atNrpn(profile, 1090), [], 'the second split number is not offered');
+  assert.ok(profile.authoringNotes.some((n) => /NRPN 102, .*121\.$/.test(n)), 'the program name is left out');
+});
+
+test('the TEO-5: Oberheim\'s own manufacturer ID, globals from 4096, the cutoff\'s MSB half left out', { skip: !builtProfile('oberheim-teo-5') }, () => {
+  const profile = builtProfile('oberheim-teo-5');
+  assert.deepEqual([profile.identity.manufacturerId, profile.identity.familyCode], [['02'], ['5A', '01']]);
+  for (const n of [4096, 4118, 4122]) assert.equal(atNrpn(profile, n)[0].group, 'Global', `NRPN ${n}`);
+  assert.deepEqual([...atNrpn(profile, 35), ...atNrpn(profile, 39)], []);
+  assert.equal(atNrpn(profile, 34)[0].range.max, 1024);
+  assert.equal(profile.presets, undefined);
+});

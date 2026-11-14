@@ -8,7 +8,7 @@ import {
   assembleDump, parseDump, dumpRoundTrip, dumpByteMap,
 } from './dpd.mjs';
 import { validateProfile } from './validate.mjs';
-import { buildLegacyProfile, buildDumpDefinitions } from '../emit-legacy-core.mjs';
+import { buildLegacyProfile, buildDumpDefinitions, EMIT_DEFAULTS } from '../emit-legacy-core.mjs';
 import { midiCiToProfile } from './import-midici.mjs';
 
 let pass = 0, fail = 0;
@@ -457,5 +457,28 @@ section('MIDI-CI import -> legacy emit (discovery Save path)');
 }
 
 // ---------------------------------------------------------------- report
+// ── What a model leaves out is EMIT_DEFAULTS, and nothing else ──
+console.log('\n— the emitter\'s defaults (EMIT_DEFAULTS)');
+{
+  const bare = { schemaVersion: 1, id: 'test.bare', version: '0.1.0', kind: 'model', label: 'Bare',
+    messageShapes: [{ id: 'edit', kind: 'sysex', template: ['F0', '7D', '$address', '$encodedValue', 'F7'] }],
+    scopes: { global: { kind: 'global', parameters: [
+      { id: 'knob', valueType: 'continuous', wires: [{ dir: 'write', msg: 'cc', cc: 1 }] },
+      { id: 'list', valueType: 'enum', enum: [{ id: 'a', label: 'A', wire: 0 }], address: '00', wires: [{ dir: 'write', msg: 'sysex', shape: 'edit' }] },
+    ] } } };
+  const out = buildLegacyProfile(resolveModel(bare, {}));
+  const [knob, list] = out.parameters;
+  const same = (a, b, m) => eq(JSON.stringify(a), JSON.stringify(b), m);
+  same(knob.range, EMIT_DEFAULTS.range, 'no range: EMIT_DEFAULTS.range');
+  same(knob.sendPolicy, EMIT_DEFAULTS.sendPolicy('continuous'), 'no send policy: a knob as it moves');
+  same(list.sendPolicy, EMIT_DEFAULTS.sendPolicy('enum'), 'no send policy: a choice once set');
+  same([knob.access.realtimeSafe, knob.access.source], [EMIT_DEFAULTS.access.realtimeSafe, EMIT_DEFAULTS.access.source], 'access');
+  same(knob.ui, EMIT_DEFAULTS.ui('continuous'), 'ui');
+  same(out.timing, EMIT_DEFAULTS.timing, 'timing');
+  same(out.variables.channel, EMIT_DEFAULTS.channel, 'channel');
+  same(out.messageRecipes.find((r) => r.id === 'edit').delayAfterMs, EMIT_DEFAULTS.shapeDelayAfterMs, 'a shape\'s pause');
+  same([out.minCEditorVersion, out.status, out.trust], [EMIT_DEFAULTS.profile.minCEditorVersion, EMIT_DEFAULTS.profile.status, EMIT_DEFAULTS.profile.trust], 'profile');
+}
+
 console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'} — ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

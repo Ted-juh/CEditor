@@ -1,0 +1,33 @@
+{
+  "sources": [
+    {"title":"JT-4000 MICRO Quick Start Guide","file":"QSG_BE_0722-ABR_JT-4000-MICRO_WW.pdf","sha256":"0c49849602a502e08428395d529b568e736aa42de7bb60b4e2ae936cba98e976","url":"https://cdn-media.empowertribe.com/7bad56e3d4f94b5ca2d36494034e1ea9/QSG_BE_0722-ABR_JT-4000-MICRO_WW.pdf"}
+  ],
+  "rows": [
+    {"page":27,"cc":1,"name":"Modulation"},
+    {"page":27,"cc":5,"name":"Portamento Time"},
+    {"page":27,"cc":24,"name":"OSC1 Wave"},
+    {"page":27,"cc":25,"name":"OSC2 Wave"},
+    {"page":27,"cc":28,"name":"LFO2 Amount"},
+    {"page":27,"cc":70,"name":"LFO1 Amount"},
+    {"page":27,"cc":71,"name":"VCF Resonance"},
+    {"page":27,"cc":72,"name":"LFO1 Rate"},
+    {"page":27,"cc":73,"name":"LFO2 Rate"},
+    {"page":27,"cc":74,"name":"VCF Cutoff"},
+    {"page":27,"cc":81,"name":"VCA EG Attack"},
+    {"page":27,"cc":82,"name":"VCA EG Decay"},
+    {"page":27,"cc":83,"name":"VCA EG Sustain"},
+    {"page":27,"cc":84,"name":"VCA EG Release"},
+    {"page":27,"cc":85,"name":"VCF EG Attack"},
+    {"page":27,"cc":86,"name":"VCF EG Decay"},
+    {"page":27,"cc":87,"name":"VCF EG Sustain"},
+    {"page":27,"cc":88,"name":"VCF EG Release"},
+    {"page":27,"cc":95,"name":"Ring Modulation Amount"},
+    {"page":27,"cc":96,"name":"Ring Modulation on/off (0-64 = off / 65 – 127 = on)"},
+    {"page":27,"cc":111,"name":"OSC1 Fine Tune"},
+    {"page":27,"cc":112,"name":"OSC2 Fine Tune"},
+    {"page":27,"cc":113,"name":"OSC1 PWM/supersaw Detune/FM Feedback"},
+    {"page":27,"cc":114,"name":"OSC2 PWM"},
+    {"page":27,"cc":115,"name":"OSC1 Coarse Tune"},
+    {"page":27,"cc":116,"name":"OSC2 Coarse Tune"}
+  ]
+}

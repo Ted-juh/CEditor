@@ -1,0 +1,251 @@
+// read-kronos-table.mjs — one of the KRONOS's object tables (Prog_HD-1.txt, CombiAndSongTimbreSet.txt,
+// Global.txt, …) as rows.
+//
+// Korg ships the KRONOS's MIDI Implementation as a ZIP of plain text: KRONOS_MIDI_SysEx.txt gives the
+// messages, and a table per object gives every setting of that object a row,
+//
+//   | OFS  | bit | parameter | parameter | data(hex) | value | TYP|SOC|SUB|PID|IDX|note
+//   |   92 |     | Insert Effect1 | Panpot | 00~7F | L000~R127 |  7|  0|  0|  6|  0|
+//   |      | 6   | Insert Effect1 | Switch | 00~01 | Off~On    |  6|  0|  0|  0|  0|* -> bypass, Invert Value
+//
+// its byte in the object (OFS, blank for a bit field sharing the byte above), its bits, its group and
+// name, its range in hex and as shown, the five bytes its parameter change takes, and a note after the
+// box. Reserved bytes are printed `*`. This reads the rows as printed and decides nothing about them.
+
+/**
+ * The header: `HD-1 Program Size: 3706 byte … Version 1.01 (Jan  7, 2015)` and `Object Version: 5`.
+ * The NAUTILUS's prints no version of the table, only its size.
+ */
+export function readObjectHeader(text) {
+  const lines = text.split(/\r?\n/);
+  const size = lines.map((l) => /^(.*?)\s+Size:\s*(\d+)\s*byte(?:\s+Version\s+(\S+)\s+\(([^)]*)\))?/.exec(l)).find(Boolean);
+  const object = lines.map((l) => /^Object Version:\s*(\d+)/.exec(l)).find(Boolean);
+  if (!size) throw new Error('No "<object> Size: n byte" line');
+  return {
+    title: size[1].trim(),
+    size: Number(size[2]),
+    ...(size[3] ? { version: size[3], date: size[4].replace(/\s+/g, ' ').trim() } : {}),
+    objectVersion: object ? Number(object[1]) : null,
+  };
+}
+
+const ID_CELLS = 5;
+
+/**
+ * Every row with a parameter id or a name, in order: `{ line, ofs, bit, group, name, data, value,
+ * id, note }`. A row printing no OFS shares the byte of the row above it, and gets that OFS. Reserved
+ * rows (`*`) and the boxes' rules are skipped; a row with an id and no name (the further bytes of a
+ * value spread over several, each with its own id) is kept as printed.
+ *
+ * Forms of Global.txt's, read as printed:
+ *   - a name column of two sub-columns, a control and what of it (`Program Up        Channel`),
+ *     where a blank control (`                  Assignment`) is the control above, as is a bare
+ *     name straight after (the NAUTILUS prints `Assignment` flush left);
+ *   - a blank group cell under a named row of the same box: the group above (`QuickAccess User
+ *     1-A`, then its Sound Browse Type, Function Type, … with the cell blank);
+ *   - a group cell on a row that continues the name above it: the heading wrapped, its two lines
+ *     one group (`Special Function` over `Assignments`), for both rows.
+ */
+export function readObjectRows(text) {
+  const rows = [];
+  let ofs = null;
+  let control = null;
+  let afterSplit = false;     // the row above was a control and its first attribute
+  let above = null;           // the last named row of the box, for a blank group cell under it
+  text.split(/\r?\n/).forEach((raw, index) => {
+    if (raw.startsWith('+')) { above = null; return; }
+    if (!raw.startsWith('|')) return;
+    const cells = raw.split('|');
+    if (cells.length < 7 + ID_CELLS) return;
+    const [ofsCell, bit, printedGroup, printedName, data, value] = cells.slice(1, 7).map((c) => c.trim());
+    let name = printedName;
+    let group = printedGroup;
+    const split = /^ (\S.*?\S)\s{3,}(\S.*?)\s*$/.exec(cells[4]);
+    const continued = /^ {4,}(\S.*?)\s*$/.exec(cells[4]);
+    let continues = false;
+    // The NAUTILUS prints the second attribute flush left (`Assignment`), the KRONOS under the first.
+    const bare = !split && !continued && printedName && !/\s{3,}/.test(printedName) && afterSplit;
+    afterSplit = false;
+    if (split && !/^[(*]/.test(split[1])) { control = split[1]; name = `${control} ${split[2]}`; afterSplit = true; }
+    else if ((continued || bare) && control) { name = `${control} ${continued ? continued[1] : printedName}`; continues = true; }
+    else control = null;
+    if (name && above) {
+      if (!group) group = above.group;
+      else if (continues && above.group && group !== above.group) { group = `${above.group} ${group}`; above.group = group; }
+    }
+    const idCells = cells.slice(7, 7 + ID_CELLS).map((c) => c.trim());
+    const note = cells.slice(7 + ID_CELLS).join('|').trim();
+    if (/^data\(hex\)$/i.test(data)) return;                       // the heading row
+    const hasId = idCells.every((c) => /^\d+$/.test(c));
+    if (/^\d+$/.test(ofsCell)) ofs = Number(ofsCell);
+    if (!hasId && [ofsCell, bit, group, name, data, value].some((c) => c === '*' || c === '|')) return;
+    // A row with a byte and bits and nothing else carries the rest of the value above: Swing is the
+    // whole of byte 2578 and bits 1~0 of 2579, whose bits 6 and 7 are Quantize Trigger and Key Sync.
+    // Read as two whole bytes, Swing took those two switches as its sign.
+    if (!hasId && !name && !group && /^\d+$/.test(ofsCell) && bit && !data && !value && rows.at(-1)?.name) {
+      const last = rows.at(-1);
+      (last.more ??= []).push({ ofs, bit });
+      return;
+    }
+    if (!hasId && !name) return;
+    const row = {
+      line: index + 1,
+      ofs,
+      ...(bit ? { bit } : {}),
+      group,
+      name,
+      data,
+      value,
+      ...(hasId ? { id: idCells.map(Number) } : {}),
+      ...(note ? { note } : {}),
+    };
+    rows.push(row);
+    if (row.name) above = row;
+  });
+  return rows;
+}
+
+/**
+ * The lines of one message's block in KRONOS_MIDI_SysEx.txt (`[43] Parameter Change (integer)` up to
+ * the next block), or one of its footnotes (`*3` up to the next).
+ */
+export function messageBlock(text, code) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => l.startsWith(`[${code}]`));
+  if (start < 0) return null;
+  const end = lines.findIndex((l, i) => i > start && /^\[[0-9A-F]{2}\]/.test(l));
+  return lines.slice(start, end < 0 ? undefined : end).map((l) => l.trimEnd()).filter((l, i, all) => l || (i && all[i - 1]));
+}
+
+export function footnote(text, mark) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => l.trim() === `*${mark}`);
+  if (start < 0) return null;
+  const end = lines.findIndex((l, i) => i > start && /^\*\d+\s*$/.test(l.trim()));
+  return lines.slice(start, end < 0 ? undefined : end).map((l) => l.trimEnd()).filter(Boolean);
+}
+
+/**
+ * Prog_EXi.txt: a table per EXi engine, after a heading with its number and name (`2:AL-1, Number Of
+ * Param. = 609`), each row a setting of the engine's own block, its offset inside the block, and its
+ * id with TYP printed `11/12`, the slot (EXi1 or EXi2) the message names:
+ *
+ *   | OFS  | bit | parameter          | data(hex) | value      | TYP |SOC|SUB|PID|IDX|
+ *   |    1 | 4~0 | [LFO1] Waveform    | 00~11     | Triangle~… |11/12|  6|  0|  0|  0|
+ *
+ * A row printing only an OFS and bits holds the rest of the value above it. Engines with no table
+ * (`0:Off`, `1:HD-1`) are kept with no rows.
+ */
+export function readEngineTables(text) {
+  const engines = [];
+  let ofs = null;
+  text.split(/\r?\n/).forEach((raw, index) => {
+    const heading = /^(\d+):([^,|]+?)(?:,\s*Number Of Param\.\s*=\s*(\d+))?\s*$/.exec(raw);
+    if (heading) {
+      engines.push({ number: Number(heading[1]), name: heading[2].trim(), ...(heading[3] ? { printedCount: Number(heading[3]) } : {}), rows: [] });
+      ofs = null;
+      return;
+    }
+    if (!raw.startsWith('|') || !engines.length) return;
+    const cells = raw.split('|');
+    if (cells.length < 11) return;
+    const [ofsCell, bit, name, data, value, typ, ...idCells] = cells.slice(1, 11).map((c) => c.trim());
+    const note = cells.slice(11).join('|').trim();
+    if (/^data\(hex\)$/i.test(data)) return;
+    if (/^\d+$/.test(ofsCell)) ofs = Number(ofsCell);
+    if (name === '*') return;
+    // A row printing only an OFS (and bits, or none for the whole byte) holds the rest of the value above it.
+    if (!name) { if (/^\d+$/.test(ofsCell) || bit) { if (engines.at(-1).rows.length) engines.at(-1).rows.push({ line: index + 1, ofs, ...(bit ? { bit } : {}), continues: true }); } return; }
+    const hasId = /^\d+\/\d+$/.test(typ) && idCells.every((c) => /^\d+$/.test(c));
+    engines.at(-1).rows.push({
+      line: index + 1,
+      ofs,
+      ...(bit ? { bit } : {}),
+      name,
+      data,
+      value,
+      ...(hasId ? { typ, id: idCells.map(Number) } : { printedId: [typ, ...idCells].join(' ') }),
+      ...(note ? { note } : {}),
+    });
+  });
+  return engines;
+}
+
+/** The runs of reserved bytes an object table prints (`| 2908 | *`, `|    | | *`, `| 3908 | *`): `{ from, to }`. */
+export function readReservedRuns(text) {
+  const runs = [];
+  let open = null;
+  for (const raw of text.split(/\r?\n/)) {
+    if (!raw.startsWith('|')) { if (open) { runs.push(open); open = null; } continue; }
+    const cells = raw.split('|').map((c) => c.trim());
+    const reserved = cells.slice(2, 7).some((c) => c === '*');
+    const ofs = /^\d+$/.test(cells[1]) ? Number(cells[1]) : null;
+    if (reserved) { if (ofs !== null) { if (open) open.to = ofs; else open = { from: ofs, to: ofs }; } }
+    else if (open) { runs.push(open); open = null; }
+  }
+  if (open) runs.push(open);
+  return runs;
+}
+
+/**
+ * Effect.txt: a table per effect type after a heading with its number and name (`01:Stereo Dyna
+ * Compressor`), each row a parameter of the type with its `pid`:
+ *
+ *   | OFS | bit | parameter      | DATA(hex) | Value     | pid |
+ *   |  0  | 0   | Bypass         | 00(fixed) | Off       |  0  |
+ *   |     | 7~1 | Wet/Dry        | 00~64     | Dry~Wet   |  1  |
+ *
+ * Kept: each type's number and name, and each row with a pid (its name, range and value as printed).
+ */
+export function readEffectTables(text) {
+  const types = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const heading = /^(\d+):(.+?)\s*$/.exec(raw);
+    if (heading) { types.push({ number: Number(heading[1]), name: heading[2].trim(), rows: [] }); continue; }
+    if (!raw.startsWith('|') || !types.length) continue;
+    const cells = raw.split('|').map((c) => c.trim());
+    if (cells.length < 7 || /^DATA\(hex\)$/i.test(cells[4]) || !cells[3] || !/^\d+$/.test(cells[6])) continue;
+    types.at(-1).rows.push({ name: cells[3], data: cells[4], value: cells[5], pid: Number(cells[6]) });
+  }
+  return types;
+}
+
+/**
+ * A table keyed by columns of its own (WaveSequence.txt's `IDX|PID`, DrumKit.txt's `note|VSP|PID`):
+ * `{ keys, rows }`, each row's `key` holding those columns by name. A value cell that wraps onto the
+ * next line (`Multisample,Rest,` then `Tie`) is joined; a group cell indented under the one above
+ * continues it (`Note1 Zone1 - 2` over `    Velocity Control`), and a blank one repeats it. The
+ * table's own elisions (`...`) are skipped: they are what the builder fills, from the rows printed.
+ */
+export function readKeyedRows(text) {
+  const lines = text.split(/\r?\n/);
+  const head = lines.find((l) => /^\|\s*OFS\s*\|/.test(l));
+  if (!head) throw new Error('No `| OFS |` heading');
+  const keys = head.split('|').slice(7).map((c) => c.trim()).filter(Boolean);
+  const rows = [];
+  let ofs = null;
+  let above = null;
+  lines.forEach((raw, index) => {
+    if (raw.startsWith('+')) { above = null; return; }
+    if (!raw.startsWith('|')) return;
+    const cells = raw.split('|');
+    if (cells.length < 7 + keys.length) return;
+    const [ofsCell, bit, printedGroup, name, data, value] = cells.slice(1, 7).map((c) => c.trim());
+    const keyCells = cells.slice(7, 7 + keys.length).map((c) => c.trim());
+    const note = cells.slice(7 + keys.length).join('|').trim();
+    if (/^data\(hex\)$/i.test(data) || /^\.\.\./.test(ofsCell)) return;
+    const hasKey = keyCells.every((c) => /^\d+$/.test(c));
+    if (/^\d+$/.test(ofsCell)) ofs = Number(ofsCell);
+    if (!hasKey && [ofsCell, bit, printedGroup, name, data, value].some((c) => c === '*' || c === '|')) return;
+    // A value wrapped onto the next line, nothing else printed on it.
+    if (!hasKey && !ofsCell && !name && !printedGroup && value && rows.length && rows.at(-1).line === index) { rows.at(-1).value += value; rows.at(-1).line = index + 1; return; }
+    if (!hasKey && !name) return;
+    let group = printedGroup;
+    if (above && /^ {3,}\S/.test(cells[3])) { group = `${above.group} ${printedGroup}`; above.group = group; }
+    else if (above && !group) group = above.group;
+    const row = { line: index + 1, ofs, ...(bit ? { bit } : {}), group, name, data, value, ...(hasKey ? { key: Object.fromEntries(keys.map((k, i) => [k, Number(keyCells[i])])) } : {}), ...(note ? { note } : {}) };
+    rows.push(row);
+    above = row;
+  });
+  return { keys, rows };
+}

@@ -22,7 +22,8 @@
     impactOfChange, collectBindings, profileConsumers, shareManifest, shareReadiness,
   } from '../../utils/profileImpact.js';
 
-  let { model, merged, profileId = '' } = $props();
+  // `shown`: mounted with every other screen; what an edit would break is worked out when this one shows.
+  let { model, merged, profileId = '', shown = true } = $props();
 
   // The published profile is what is stored in the engine; `model` is the working copy. The
   // difference between them IS the impact, which is why nothing else has to be diffed by hand.
@@ -38,7 +39,7 @@
 
   let consumers = $derived(profileConsumers(profileId, $panels, roleProfiles));
   let bindings = $derived(collectBindings($panels, roleProfiles).filter((b) => b.profileId === profileId));
-  let impact = $derived(saved ? impactOfChange(saved, merged ?? model, bindings) : null);
+  let impact = $derived(shown && saved ? impactOfChange(saved, merged ?? model, bindings) : null);
   let manifest = $derived(shareManifest(merged ?? model));
   let readiness = $derived(shareReadiness(merged ?? model));
 
@@ -71,6 +72,8 @@
       <p class="note">This profile has not been saved to the engine yet, so there is no published
         version to compare against. Save it once and this becomes a running diff of what your edits
         would do to panels already using it.</p>
+    {:else if !impact}
+      <!-- not shown: nothing worked out -->
     {:else if impact.findings.length === 0}
       <p class="note">Every parameter a panel binds to is still here, with the same id, type and
         range. {#if impact.added > 0}{impact.added} new parameter{impact.added === 1 ? '' : 's'} added — new ones break nothing.{/if}</p>
