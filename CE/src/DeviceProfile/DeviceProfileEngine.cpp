@@ -66,6 +66,9 @@ juce::Array<int> parseHexBytes (const juce::String& text)
     juce::Array<int> bytes;
     juce::StringArray tokens;
     tokens.addTokens (text, " ,\t\r\n", "");
+    // Two separators in a row (`F0  7E`, a trailing space) leave an empty token between them, which
+    // read as a 00 byte here: the JavaScript engine (normalizeHex) drops it, and so does this.
+    tokens.removeEmptyStrings();
 
     for (const auto& token : tokens)
         bytes.add (parseHexByte (token));
@@ -264,6 +267,24 @@ juce::String normalisedTextCodec (const juce::String& codec)
     if (codec == "nibbled-ascii" || codec == "packed-nibbled-ascii")
         return "text-nibbled-ascii";
     return codec;
+}
+
+// A name as an instrument stores it: a 00 byte ends it, and any other byte outside 32 - 127 is read
+// as '?'. Both used to fail the whole dump, and the makers' own sounds have both: Waldorf's Blofeld and
+// Microwave banks put display characters below 32 into names, Behringer's DeepMind banks pad names
+// with 00 (tools/profiles/check-factory-banks.mjs, docs/device-profile-factory-banks.md). One
+// character was costing every other parameter of the sound. The JavaScript engine's dumpNameText
+// reads them the same way.
+juce::String dumpNameText (const juce::Array<int>& codes)
+{
+    juce::String text;
+    for (auto code : codes)
+    {
+        if (code == 0)
+            break;
+        text += juce::String::charToString ((juce::juce_wchar) (code < 32 || code > 127 ? '?' : code));
+    }
+    return text;
 }
 
 juce::String trimRightPad (juce::String text, int padByte)
@@ -1462,6 +1483,17 @@ DumpBuildResult DeviceProfileEngine::buildDumpMessage (const juce::String& dumpI
             return fail ("Cannot encode " + parameterId + ": " + encoded.getErrorMessage());
 
         const auto offset = propInt (*mapping, "offset");
+        // A `when` field is written only where the dump being built already holds the selecting value.
+        if (auto* when = asObject (mapping->getProperty ("when")))
+        {
+            const auto at = propInt (*when, "offset", -1);
+            if (at < 0 || at >= body.size() || body[at] != propInt (*when, "value", -1))
+            {
+                consumed.erase (parameterId);
+                result.unmappedParameters.add (parameterId);
+                continue;
+            }
+        }
         if (offset < 0 || offset + encodedBytes.size() > body.size())
             return fail ("Mapping for " + parameterId + " writes outside the payload (offset "
                          + juce::String (offset) + ", " + juce::String (encodedBytes.size()) + " byte(s), payload "
@@ -1552,6 +1584,11 @@ DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::Strin
     juce::Array<juce::var> diagnostics;
     std::set<int> coveredBytes;
 
+    // A collection whose size the instrument decides (a Yamaha Performance: as many part blocks as
+    // it has parts) names the dump that ends it, its Bulk Footer, and is complete when that arrives.
+    juce::String endsWith;
+    auto ended = false;
+
     auto appendDiagnostic = [&] (const juce::String& code, const juce::String& message, const juce::String& sourceId = {})
     {
         appendDiagnostics (diagnostics, dumpDiagnosticList (code, message, sourceId));
@@ -1586,6 +1623,13 @@ DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::Strin
         const auto collectionId = completion != nullptr
             ? completion->getProperty ("collectionId").toString()
             : juce::String {};
+        const auto messageEndsWith = completion != nullptr
+            ? completion->getProperty ("endsWith").toString()
+            : juce::String {};
+        if (endsWith.isEmpty())
+            endsWith = messageEndsWith;
+        if (parsed.dumpId.isNotEmpty() && parsed.dumpId == messageEndsWith)
+            ended = true;
         if (result.collectionId.isEmpty())
             result.collectionId = collectionId.isNotEmpty() ? collectionId : parsed.dumpId;
         else if (collectionId.isNotEmpty() && collectionId != result.collectionId)
@@ -1647,7 +1691,8 @@ DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::Strin
     auto missingRanges = result.expectedBytes > 0 ? missingRangesForCoverage (result.expectedBytes, coveredBytes)
                                                   : juce::Array<juce::var> {};
 
-    if (result.expectedMessageCount <= 0)
+    // Ended, the collection is as many messages as came: the footer is what says so.
+    if (ended || result.expectedMessageCount <= 0)
         result.expectedMessageCount = result.receivedMessageCount;
 
     result.values = juce::var (values);
@@ -1657,8 +1702,10 @@ DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::Strin
     result.duplicateRanges = juce::var (duplicateRanges);
     result.diagnostics = juce::var (diagnostics);
 
+    const auto counted = endsWith.isNotEmpty() ? ended
+                                          : result.receivedMessageCount >= result.expectedMessageCount;
     result.complete = result.failedMessageCount == 0
-        && result.receivedMessageCount >= result.expectedMessageCount
+        && counted
         && missingRanges.isEmpty();
     result.ok = result.failedMessageCount == 0;
     result.status = result.complete ? "complete" : (result.ok ? "partial" : "error");
@@ -2215,7 +2262,16 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         if (byteOffset + byteCount > bytes.size())
             return failForMatchedDump ("partial", "Dump checksum range is outside message", "error");
 
-        for (int i = 0; i < byteCount; ++i)
+        // A value the device takes in place of the sum (Waldorf: `A checksum of 7Fh is always
+        // accepted as valid`), one byte each, for a one-byte checksum.
+        bool accepted = false;
+        if (byteCount == 1)
+            if (const auto* also = checksum->getProperty ("alsoAccept").getArray())
+                for (const auto& value : *also)
+                    if (value.toString().getHexValue32() == bytes[byteOffset])
+                        accepted = true;
+
+        for (int i = 0; i < byteCount && ! accepted; ++i)
             if (bytes[byteOffset + i] != expected[i])
                 return failForMatchedDump ("checksumFailed",
                                            "Dump checksum failed; expected " + byteToHex (expected[i])
@@ -2225,9 +2281,16 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         checksumStatus = "ok";
     }
 
+    // A member of a collection may carry no value of its own (a Yamaha Bulk Header or Footer, the
+    // block of a part not laid out): it parses to nothing and counts toward the collection. Alone,
+    // a definition that reads nothing is a mistake.
     auto* mappings = asArray (dump.getProperty ("mappings"));
-    if (mappings == nullptr || mappings->isEmpty())
+    const auto inCollection = completion != nullptr && completion->getProperty ("collectionId").toString().isNotEmpty();
+    if ((mappings == nullptr || mappings->isEmpty()) && ! inCollection)
         return failForMatchedDump ("invalidDefinition", "Dump definition has no mappings: " + dumpId, checksumStatus);
+    const juce::Array<juce::var> noMappings;
+    if (mappings == nullptr)
+        mappings = &noMappings;
 
     // Resolve the buffer that mappings decode against. A block-packed payload (Korg 8->7) is unpacked
     // here so mapping offsets address the UNPACKED bytes; otherwise mappings decode in place from the
@@ -2245,6 +2308,42 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         unpackedPayload = dumpUnpack8to7 (wirePayload, packOrder, packGroupSize);
         decodeBytes = &unpackedPayload;
         decodeBase = 0;
+    }
+
+    // A payload of records (the Groove Synthesis 3rd Wave's program dump: every setting as its NRPN
+    // number and value, four bytes each) has no fixed place for a value. Its records are read first,
+    // each a key and where it starts; a mapping then names the key it reads (`record`), and may say
+    // it reads the one met while another key last held a value (`scope`: the 3rd Wave sets NRPN 0,
+    // the part being edited, before each part's settings). A key the dump does not carry leaves its
+    // parameter unread, as a parameter with no mapping is. deviceProfileLocalEngine.js reads them
+    // the same way.
+    auto* records = payload != nullptr ? asObject (payload->getProperty ("records")) : nullptr;
+    juce::Array<int> recordKeys, recordStarts;
+    const auto recordWidth = [] (const juce::String& type) { return type == "u14" ? 2 : 1; };
+    const auto recordField = [&bytes, &recordWidth] (int at, const juce::String& type)
+    {
+        return recordWidth (type) == 2 ? ((bytes[at] & 0x7f) << 7) | (bytes[at + 1] & 0x7f) : (bytes[at] & 0x7f);
+    };
+    const auto recordKeyAt = records != nullptr ? propInt (*records, "keyAt", 0) : 0;
+    const auto recordKeyType = records != nullptr ? propString (*records, "keyType") : juce::String();
+    const auto recordValueAt = records != nullptr ? propInt (*records, "valueAt", 1) : 1;
+    const auto recordValueType = records != nullptr ? propString (*records, "valueType") : juce::String();
+    if (records != nullptr)
+    {
+        const auto size = propInt (*records, "size", 0);
+        if (payloadPacked || size <= 0 || recordKeyAt < 0 || recordValueAt < 0
+            || recordKeyAt + recordWidth (recordKeyType) > size || recordValueAt + recordWidth (recordValueType) > size)
+            return failForMatchedDump ("invalidDefinition", "Dump records are not a shape the engine reads: " + dumpId, checksumStatus);
+        auto end = bytes.size() - suffix.size();
+        if (checksum != nullptr)
+            end = juce::jmin (end, propInt (*checksum, "byteOffset", end));
+        if (end < payloadOffset || (end - payloadOffset) % size != 0)
+            return failForMatchedDump ("partial", "Dump records do not fill the payload of " + dumpId, checksumStatus);
+        for (int at = payloadOffset; at < end; at += size)
+        {
+            recordKeys.add (recordField (at + recordKeyAt, recordKeyType));
+            recordStarts.add (at);
+        }
     }
 
     // Owned from the start: two failure paths below return before `values` reaches the result.
@@ -2265,9 +2364,44 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         if (codecOverride.isVoid())
             codecOverride = mapping->getProperty ("nameCodec");
 
+        auto valueOffset = decodeBase + propInt (*mapping, "offset");
+        // `when`: a field whose meaning another byte of the payload selects (a KRONOS EXi slot's engine
+        // settings, read only when the slot's Algorithm Type byte holds that engine). Unmet, the
+        // parameter is not read. deviceProfileLocalEngine.js reads it the same way.
+        if (auto* when = asObject (mapping->getProperty ("when")))
+        {
+            const auto& source = records != nullptr ? bytes : *decodeBytes;
+            const auto at = decodeBase + propInt (*when, "offset", -1);
+            if (at < decodeBase || at >= source.size())
+                return failForMatchedDump ("invalidDefinition", "Dump mapping condition is outside the payload: " + parameterId, checksumStatus);
+            if ((source[at] & 0xff) != propInt (*when, "value", -1))
+                continue;
+        }
+        if (records != nullptr)
+        {
+            const auto key = propInt (*mapping, "record", -1);
+            if (key < 0)
+                return failForMatchedDump ("invalidDefinition", "Dump mapping names no record: " + parameterId, checksumStatus);
+            auto* scope = asObject (mapping->getProperty ("scope"));
+            const auto scopeKey = scope != nullptr ? propInt (*scope, "record", -1) : -1;
+            const auto scopeValue = scope != nullptr ? propInt (*scope, "value", 0) : 0;
+            auto scopeHeld = -1;
+            auto found = -1;
+            for (int i = 0; i < recordKeys.size() && found < 0; ++i)
+            {
+                if (recordKeys[i] == key && (scope == nullptr || scopeHeld == scopeValue))
+                    found = i;
+                else if (scope != nullptr && recordKeys[i] == scopeKey)
+                    scopeHeld = recordField (recordStarts[i] + recordValueAt, recordValueType);
+            }
+            if (found < 0)
+                continue;
+            valueOffset = recordStarts[found] + recordValueAt;
+        }
+
         auto decoded = decodeDumpParameterValue (*parameter,
-                                                 *decodeBytes,
-                                                 decodeBase + propInt (*mapping, "offset"),
+                                                 records != nullptr ? bytes : *decodeBytes,
+                                                 valueOffset,
                                                  semanticValue,
                                                  codecOverride);
         if (decoded.failed())
@@ -2314,16 +2448,11 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             if (length <= 0 || offset + length > bytes.size())
                 return juce::Result::fail ("Text dump value is outside message for " + propString (parameter, "id"));
 
-            juce::String text;
+            juce::Array<int> codes;
             for (int index = 0; index < length; ++index)
-            {
-                auto byte = bytes[offset + index];
-                if (byte < 32 || byte > 127)
-                    return juce::Result::fail ("Text dump value contains non-ASCII byte for " + propString (parameter, "id"));
-                text += juce::String::charToString ((juce::juce_wchar) byte);
-            }
+                codes.add (bytes[offset + index]);
 
-            semanticValue = trimRightPad (text, padByte);
+            semanticValue = trimRightPad (dumpNameText (codes), padByte);
             return juce::Result::ok();
         }
 
@@ -2333,18 +2462,11 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             if (length <= 0 || nibbles < length * 2 || offset + nibbles > bytes.size())
                 return juce::Result::fail ("Nibbled text dump value is outside message for " + propString (parameter, "id"));
 
-            juce::String text;
+            juce::Array<int> codes;
             for (int index = 0; index < length; ++index)
-            {
-                auto high = bytes[offset + (index * 2)] & 0x0f;
-                auto low = bytes[offset + (index * 2) + 1] & 0x0f;
-                auto byte = (high << 4) | low;
-                if (byte < 32 || byte > 127)
-                    return juce::Result::fail ("Nibbled text dump value contains non-ASCII byte for " + propString (parameter, "id"));
-                text += juce::String::charToString ((juce::juce_wchar) byte);
-            }
+                codes.add (((bytes[offset + (index * 2)] & 0x0f) << 4) | (bytes[offset + (index * 2) + 1] & 0x0f));
 
-            semanticValue = trimRightPad (text, padByte);
+            semanticValue = trimRightPad (dumpNameText (codes), padByte);
             return juce::Result::ok();
         }
 
@@ -2358,12 +2480,36 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
         numeric = ((bytes[offset] & 0x7f) << 7) | (bytes[offset + 1] & 0x7f);
     }
-    else if (encodingType == "u14-lsb-msb")
+    else if (encodingType == "s21-lsb-msb" || encodingType == "s21-msb-lsb")
     {
-        // 14-bit, least-significant byte first (byteOrder lsb-first).
+        if (offset + 2 >= bytes.size())
+            return juce::Result::fail ("21-bit dump value requires three bytes for " + propString (parameter, "id"));
+        // Least significant byte first (the KingKORG's), or most (the KRONOS's).
+        const auto hi = encodingType == "s21-msb-lsb" ? offset : offset + 2;
+        const auto lo = encodingType == "s21-msb-lsb" ? offset + 2 : offset;
+        numeric = ((bytes[hi] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[lo] & 0x7f);
+        if (numeric >= 1048576)
+            numeric -= 2097152;
+    }
+    else if (encodingType == "s17-msb-lsb")
+    {
+        // 17 bits, most significant byte first, the first byte's low three bits being bits 14 - 16
+        // (the Alesis A6's: the rest of that byte is its mix channel, not the value's).
+        if (offset + 2 >= bytes.size())
+            return juce::Result::fail ("17-bit dump value requires three bytes for " + propString (parameter, "id"));
+        numeric = ((bytes[offset] & 0x07) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset + 2] & 0x7f);
+        if (numeric >= 65536)
+            numeric -= 131072;
+    }
+    else if (encodingType == "u14-lsb-msb" || encodingType == "s14-lsb-msb")
+    {
+        // 14-bit, least-significant byte first (byteOrder lsb-first); s14 is the same bits read as
+        // two's complement.
         if (offset + 1 >= bytes.size())
             return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
         numeric = ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+        if (encodingType == "s14-lsb-msb" && numeric >= 8192)
+            numeric -= 16384;
     }
     else if (encodingType == "nibbled")
     {
@@ -2385,6 +2531,63 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
     else if (encodingType == "u8")
     {
         numeric = bytes[offset] & 0xff; // full 8-bit byte (e.g. recovered from an unpacked payload)
+    }
+    else if (encodingType == "bitfields")
+    {
+        // A value put together from bit fields of an unpacked payload, as Korg's program dumps keep
+        // one: the minilogue's VCO 1 PITCH is byte 20 (its bits 2-9) and bits 0-1 of byte 52, which
+        // it shares with three other settings; the minilogue xd's is two bytes, low byte first.
+        // Each part is { at: bytes after the mapping's offset, from: first bit, bits: how many,
+        // shift: where they go }. `signed` reads what the parts make as two's complement over their
+        // width (the KRONOS keeps -99~+99 as a byte, 9DH~63H). Then either `map` ([[dump value,
+        // wire value], ...]: a setting kept as 0-3 in the dump and sent as 0, 42, 84, 127), or
+        // `shiftRight` and `max` (a 10-bit value read as the 7-bit controller that sends it, its top
+        // seven bits).
+        auto* parts = encoding != nullptr ? asArray (encoding->getProperty ("parts")) : nullptr;
+        if (parts == nullptr || parts->isEmpty())
+            return juce::Result::fail ("Bitfields dump codec requires parts for " + propString (parameter, "id"));
+
+        numeric = 0;
+        auto width = 0;
+        for (const auto& partValue : *parts)
+        {
+            auto* part = asObject (partValue);
+            if (part == nullptr)
+                return juce::Result::fail ("Bitfields dump codec part is not an object for " + propString (parameter, "id"));
+            const auto at = offset + propInt (*part, "at", 0);
+            const auto from = propInt (*part, "from", 0);
+            const auto bits = propInt (*part, "bits", 8);
+            const auto shift = propInt (*part, "shift", 0);
+            if (at < 0 || at >= bytes.size() || from < 0 || bits < 1 || from + bits > 8 || shift < 0 || shift > 24)
+                return juce::Result::fail ("Bitfields dump codec part is outside the message for " + propString (parameter, "id"));
+            numeric |= ((bytes[at] >> from) & ((1 << bits) - 1)) << shift;
+            width = juce::jmax (width, shift + bits);
+        }
+        if ((bool) encoding->getProperty ("signed") && width < 31 && numeric >= (1 << (width - 1)))
+            numeric -= 1 << width;
+
+        if (auto* map = asArray (encoding->getProperty ("map")))
+        {
+            auto found = false;
+            for (const auto& pairValue : *map)
+            {
+                auto* pair = asArray (pairValue);
+                if (pair != nullptr && pair->size() == 2 && (int) pair->getReference (0) == numeric)
+                {
+                    numeric = (int) pair->getReference (1);
+                    found = true;
+                    break;
+                }
+            }
+            if (! found)
+                return juce::Result::fail ("Bitfields dump value " + juce::String (numeric) + " is not in the map for " + propString (parameter, "id"));
+        }
+        else
+        {
+            numeric >>= juce::jlimit (0, 24, propInt (*encoding, "shiftRight", 0));
+            if (encoding->hasProperty ("max"))
+                numeric = juce::jmin (numeric, propInt (*encoding, "max", numeric));
+        }
     }
 
     if (type == "choice" || type == "enum")
@@ -2522,6 +2725,62 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             return juce::Result::ok();
         }
 
+        if (encodingType == "s21-lsb-msb")
+        {
+            // A signed value in 21 bits, two's complement, three 7-bit bytes least significant first:
+            // the KingKORG's parameter change ("vvh,vvm,vvl = signed value", sent vvl vvm vvh).
+            auto value = (int) std::round (numeric);
+            if (value < -1048576 || value > 1048575)
+                return juce::Result::fail ("Encoded s21 value outside -1048576-1048575 for " + propString (parameter, "id"));
+            const auto wire = value & 0x1fffff;
+            encodedBytes.add (wire & 0x7f);
+            encodedBytes.add ((wire >> 7) & 0x7f);
+            encodedBytes.add ((wire >> 14) & 0x7f);
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "s21-msb-lsb")
+        {
+            // The same 21 bits, most significant byte first: the KRONOS's parameter change
+            // ("valueH 0scccccc, valueM 0bbbbbbb, valueL 0aaaaaaa", 21-bit two's complement).
+            auto value = (int) std::round (numeric);
+            if (value < -1048576 || value > 1048575)
+                return juce::Result::fail ("Encoded s21 value outside -1048576-1048575 for " + propString (parameter, "id"));
+            const auto wire = value & 0x1fffff;
+            encodedBytes.add ((wire >> 14) & 0x7f);
+            encodedBytes.add ((wire >> 7) & 0x7f);
+            encodedBytes.add (wire & 0x7f);
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "s17-msb-lsb")
+        {
+            // A signed value in 17 bits, two's complement, most significant byte first, that byte
+            // carrying bits 14 - 16 only: the Alesis A6's MIDI Editing (<data2> is 0xxx xyyy, xxxx the
+            // mix channel, sent here as 0, and yyy bits 14 - 16; <data1> bits 7 - 13; <data0> 0 - 6).
+            auto value = (int) std::round (numeric);
+            if (value < -65536 || value > 65535)
+                return juce::Result::fail ("Encoded s17 value outside -65536-65535 for " + propString (parameter, "id"));
+            const auto wire = value & 0x1ffff;
+            encodedBytes.add ((wire >> 14) & 0x07);
+            encodedBytes.add ((wire >> 7) & 0x7f);
+            encodedBytes.add (wire & 0x7f);
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "s14-lsb-msb")
+        {
+            // A signed value in 14 bits, two's complement, least significant byte first: Korg's
+            // parameter change ("VVvv = signed value": -50 is 3FCEH, sent 4E 7F).
+            auto value = (int) std::round (numeric);
+            if (value < -8192 || value > 8191)
+                return juce::Result::fail ("Encoded s14 value outside -8192-8191 for " + propString (parameter, "id"));
+            const auto wire = value & 0x3fff;
+            encodedBytes.add (wire & 0x7f);
+            encodedBytes.add ((wire >> 7) & 0x7f);
+            return juce::Result::ok();
+        }
+
         if (encodingType == "nibbled")
         {
             auto value = (int) std::round (numeric);
@@ -2588,13 +2847,24 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
                                               : requested == juce::String (value);
             if (matched)
             {
-                if (! isMidiDataByte (value))
+                // A choice with a 14-bit encoding carries 0 - 16383, in two bytes as a 14-bit number
+                // does: the Hydrasynth's NRPNs give several parameters one number, the data MSB
+                // choosing which, so OSC2 Mode's "WaveScan" is 1 * 128 + 1. Every other choice is a
+                // single data byte.
+                const auto wide = encodingType == "u14" || encodingType == "14bit"
+                               || encodingType == "u14-msb-lsb" || encodingType == "u14-lsb-msb";
+                if (wide ? (value < 0 || value > 16383) : ! isMidiDataByte (value))
                     return juce::Result::fail ("Choice encoded value outside MIDI data byte range for " + propString (parameter, "id"));
 
                 semanticValue = id;
                 normalizedValue = choices->size() > 1 ? (double) index / (double) (choices->size() - 1) : 1.0;
                 displayedValue = label.isNotEmpty() ? label : id;
-                encodedBytes.add (value);
+                if (! wide)
+                    encodedBytes.add (value);
+                else if (encodingType == "u14-lsb-msb")
+                    encodedBytes.addArray ({ value & 0x7f, (value >> 7) & 0x7f });
+                else
+                    encodedBytes.addArray ({ (value >> 7) & 0x7f, value & 0x7f });
                 return juce::Result::ok();
             }
         }
@@ -2709,7 +2979,34 @@ CompileResult DeviceProfileEngine::compileCc (const juce::String& deviceRole,
     message.kind = "cc";
     message.bytes.add (0xb0 + (channel - 1));
     message.bytes.add (controller);
-    message.bytes.add (encodedBytes[0]);
+
+    // A 14-bit pair: the MSB on `controller`, then the LSB on `lsbController` (MIDI's coarse and fine,
+    // usually n and n + 32), as two messages. The MSB goes first because a receiver resets the fine
+    // half when the coarse one arrives. One byte (a value below 128 with a 7-bit encoder) is the
+    // coarse half alone, its fine half 0. deviceProfileLocalEngine.js builds the same bytes.
+    const auto lsbController = propInt (recipe, "lsbController", -1);
+    const auto hasLsb = recipe.hasProperty ("lsbController");
+    MidiMessageSpec fine;
+    if (hasLsb)
+    {
+        if (! isMidiDataByte (lsbController) || lsbController == controller)
+            return { false, "CC lsbController must be 0-127 and differ from controller", {} };
+
+        auto* encoding = asObject (parameter.getProperty ("encoding"));
+        const auto encodingType = encoding != nullptr ? propString (*encoding, "type") : juce::String();
+        const auto lsbFirst = encodingType == "u14-lsb-msb" || encodingType == "s14-lsb-msb";
+        const auto msb = encodedBytes.size() > 1 ? encodedBytes[lsbFirst ? 1 : 0] : encodedBytes[0];
+        const auto lsb = encodedBytes.size() > 1 ? encodedBytes[lsbFirst ? 0 : 1] : 0;
+        message.bytes.add (msb & 0x7f);
+        fine.kind = "cc";
+        fine.bytes.add (0xb0 + (channel - 1));
+        fine.bytes.add (lsbController);
+        fine.bytes.add (lsb & 0x7f);
+    }
+    else
+    {
+        message.bytes.add (encodedBytes[0]);
+    }
 
     MidiTransaction transaction;
     transaction.transactionId = "dry_tx";
@@ -2717,6 +3014,8 @@ CompileResult DeviceProfileEngine::compileCc (const juce::String& deviceRole,
     transaction.parameterId = propString (parameter, "id");
     transaction.semanticValue = semanticValue;
     transaction.messages.add (message);
+    if (hasLsb)
+        transaction.messages.add (fine);
     transaction.displayedValue = displayedValue;
     transaction.normalizedValue = normalizedValue;
     transaction.encodedValueHex = bytesToHex (encodedBytes);
@@ -2777,8 +3076,33 @@ CompileResult DeviceProfileEngine::compileParameterNumber (const juce::String& d
     addCc (transaction.messages, selectMsbController, parameterMsb);
     addCc (transaction.messages, selectLsbController, parameterLsb);
 
+    // Korg's data entry: the low bits of a value wider than 7 bits go FIRST, on a controller of their
+    // own (CC 63 on the minilogue family), then the rest on CC 6. `lowBits` says how many: 3 for the
+    // 10-bit values (0~1023: 3 then 7), 3 for the 8-bit ones (0~200: 3 then 5), 7 for 14 bits.
+    // Unlike CC 38 the split is not at 7 bits, so it is a recipe of its own, not valueResolution.
+    const auto lowBitsController = propInt (recipe, "lowBitsController", -1);
+    const auto lowBits = propInt (recipe, "lowBits", 0);
     auto resolution = propInt (recipe, "valueResolution", 7);
-    if (resolution == 14)
+    if (lowBitsController >= 0 || lowBits != 0)
+    {
+        if (! isMidiDataByte (lowBitsController) || lowBits < 1 || lowBits > 7)
+            return { false, label + " lowBitsController must be 0-127 and lowBits 1-7", {} };
+        if (encodedBytes.isEmpty())
+            return { false, label + " recipe requires an encoded value", {} };
+
+        auto* encoding = asObject (parameter.getProperty ("encoding"));
+        const auto lsbFirst = encoding != nullptr && propString (*encoding, "type") == "u14-lsb-msb";
+        const auto value = encodedBytes.size() == 1
+                               ? encodedBytes[0]
+                               : (encodedBytes[lsbFirst ? 1 : 0] << 7) | encodedBytes[lsbFirst ? 0 : 1];
+        const auto high = value >> lowBits;
+        if (! isMidiDataByte (high))
+            return { false, label + " value " + juce::String (value) + " does not fit " + juce::String (7 + lowBits) + " bits", {} };
+
+        addCc (transaction.messages, lowBitsController, value & ((1 << lowBits) - 1));
+        addCc (transaction.messages, 6, high);
+    }
+    else if (resolution == 14)
     {
         if (encodedBytes.isEmpty())
             return { false, label + " 14-bit recipe requires an encoded value", {} };
@@ -2798,7 +3122,8 @@ CompileResult DeviceProfileEngine::compileParameterNumber (const juce::String& d
             // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps
             // its two bytes in elsewhere.
             auto* encoding = asObject (parameter.getProperty ("encoding"));
-            const auto lsbFirst = encoding != nullptr && propString (*encoding, "type") == "u14-lsb-msb";
+            const auto encodingType = encoding != nullptr ? propString (*encoding, "type") : juce::String();
+            const auto lsbFirst = encodingType == "u14-lsb-msb" || encodingType == "s14-lsb-msb";
             addCc (transaction.messages, 6, encodedBytes[lsbFirst ? 1 : 0]);
             addCc (transaction.messages, 38, encodedBytes[lsbFirst ? 0 : 1]);
         }

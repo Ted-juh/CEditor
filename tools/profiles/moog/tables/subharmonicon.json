@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {"title":"Subharmonicon Manual","file":"Subharmonicon_Manual AMZ.pdf","sha256":"c79ffe2d4fbcb48a5763ad2e937f7ea7bc712f33c2a6e7173377ab6576bf4a65","url":"https://cdn.inmusicbrands.com/Moog/Subharmonicon/Subharmonicon_Manual%20AMZ.pdf"}
+  ],
+  "tables": [
+    {
+      "doc": 0,
+      "kind": "cc",
+      "pages": [41,42,43],
+      "rows": [
+        {"doc":0,"page":41,"section":"","cc":"4 [MSB]/ 36 [LSB]","name":"VCO 1 Frequency","default":"0","values":"0 - 127 [MSB] / 0 - 127 [LSB] (14-Bit)","notes":"Provides ± 2.5 octaves of control, added to the VCO 1 FREQ knob setting. When the VCO 1 FREQ knob is in the center position, the MIDI CC will sweep the same range as the knob."},
+        {"doc":0,"page":41,"section":"","cc":"103","name":"VCO 1 SUB 1 Frequency","default":"0","values":"0 - 7 = Integer Value 16 8 - 15 = Integer Value 15 16 - 23 = Integer Value 14 24 - 31 = Integer Value 13 32 - 39 = Integer Value 12 40 - 47 = Integer Value 11 48 - 55 = Integer Value 10 56 - 63 = Integer Value 9 64 - 71 = Integer Value 8 72 - 79 = Integer Value 7 80 - 87 = Integer Value 6 88 - 95 = Integer Value 5 96 - 103 = Integer Value 4 104 - 111 = Integer Value 3 112 - 119 = Integer Value 2 120 - 127 = Integer Value 1","notes":"MIDI CC replaces the (VCO 1) SUB 1 FREQ knob setting; moving this knob overrides the MIDI CC value."},
+        {"doc":0,"page":41,"section":"","cc":"104","name":"VCO 1 SUB 2 Frequency","default":"0","values":"0 - 7 = Integer Value 16 8 - 15 = Integer Value 15 16 - 23 = Integer Value 14 24 - 31 = Integer Value 13 32 - 39 = Integer Value 12 40 - 47 = Integer Value 11 48 - 55 = Integer Value 10 56 - 63 = Integer Value 9 64 - 71 = Integer Value 8 72 - 79 = Integer Value 7 80 - 87 = Integer Value 6 88 - 95 = Integer Value 5 96 - 103 = Integer Value 4 104 - 111 = Integer Value 3 112 - 119 = Integer Value 2 120 - 127 = Integer Value 1","notes":"MIDI CC replaces the (VCO 1) SUB 2 FREQ knob setting; moving this knob overrides the MIDI CC value."},
+        {"doc":0,"page":41,"section":"","cc":"12 [MSB]/ 44 [LSB]","name":"VCO 2 Frequency","default":"0","values":"0 - 127 [MSB] / 0 - 127 [LSB] (14-Bit)","notes":"Provides ± 2.5 octaves of control, added to the VCO 2 FREQ knob setting. When the VCO 2 FREQ knob is in the center position, the MIDI CC will sweep the same range as the knob."},
+        {"doc":0,"page":42,"section":"","cc":"105","name":"VCO 2 SUB 1 Frequency","default":"0","values":"0 - 7 = Integer Value 16 8 - 15 = Integer Value 15 16 - 23 = Integer Value 14 24 - 31 = Integer Value 13 32 - 39 = Integer Value 12 40 - 47 = Integer Value 11 48 - 55 = Integer Value 10 56 - 63 = Integer Value 9 64 - 71 = Integer Value 8 72 - 79 = Integer Value 7 80 - 87 = Integer Value 6 88 - 95 = Integer Value 5 96 - 103 = Integer Value 4 104 - 111 = Integer Value 3 112 - 119 = Integer Value 2 120 - 127 = Integer Value 1","notes":"MIDI CC replaces the (VCO 2) SUB 1 FREQ knob setting; moving this knob overrides the MIDI CC value."},
+        {"doc":0,"page":42,"section":"","cc":"106","name":"VCO 2 SUB 2 Frequency","default":"0","values":"0 - 7 = Integer Value 16 8 - 15 = Integer Value 15 16 - 23 = Integer Value 14 24 - 31 = Integer Value 13 32 - 39 = Integer Value 12 40 - 47 = Integer Value 11 48 - 55 = Integer Value 10 56 - 63 = Integer Value 9 64 - 71 = Integer Value 8 72 - 79 = Integer Value 7 80 - 87 = Integer Value 6 88 - 95 = Integer Value 5 96 - 103 = Integer Value 4 104 - 111 = Integer Value 3 112 - 119 = Integer Value 2 120 - 127 = Integer Value 1","notes":"MIDI CC replaces the (VCO 2) SUB 2 FREQ knob setting; moving this knob overrides the MIDI CC value."},
+        {"doc":0,"page":42,"section":"","cc":"23 [MSB]/ 55 [LSB]","name":"VCF (EG) ATTACK","default":"0","values":"0 - 127 [MSB] / 0 - 127 [LSB]","notes":"MIDI CC replaces the VCF ATTACK knob setting; moving this knob overrides the MIDI CC value."},
+        {"doc":0,"page":42,"section":"","cc":"24 [MSB]/ 56 [LSB]","name":"VCF (EG) DECAY","default":"0","values":"0 - 127 [MSB] / 0 - 127 [LSB]","notes":"MIDI CC replaces the VCF DECAY knob setting; moving this knob overrides the MIDI CC value."},
+        {"doc":0,"page":42,"section":"","cc":"28 [MSB]/ 60 [LSB]","name":"VCA (EG) ATTACK","default":"0","values":"0 - 127 [MSB] / 0 - 127 [LSB]","notes":"MIDI CC replaces the VCA ATTACK knob setting; moving this knob overrides the MIDI CC value."},
+        {"doc":0,"page":42,"section":"","cc":"29 [MSB]/ 61 [LSB]","name":"VCA (EG) DECAY","default":"0","values":"0 - 127 [MSB] / 0 - 127 [LSB]","notes":"MIDI CC replaces the VCA DECAY knob setting; moving this knob overrides the MIDI CC value."},
+        {"doc":0,"page":43,"section":"","cc":"113","name":"Rhythm Generator Logic","default":"0","values":"0 - 63 OR / 64 - 127 XOR","notes":"OR logic advances the sequencer every time a clock is received from one or both Rhythm Generators. XOR logic only advances the sequencer when just a singular clock is true — if both Rhythm Generators are true, the sequencer will not advance."}
+      ]
+    }
+  ]
+}

@@ -9,7 +9,14 @@
   import { bytesToHex } from '../../generated/dpd/codecs.mjs';
   import NumberCell from '../../properties/NumberCell.svelte';
 
-  let { model, merged } = $props();
+  // `shown`: the designer mounts every screen and shows one. A KRONOS drum kit's dump has 20,352
+  // fields; built while hidden, its table and byte map cost every opening of the designer half a
+  // minute. They are built when the screen is shown, and the table a few hundred rows at a time.
+  let { model, merged, shown = true } = $props();
+  // The ruler draws a box a byte and the legend a name a field: a drum kit's dump is 43,921 bytes.
+  const ROWS = 300, BYTES = 512, LEGEND = 48;
+  let showAllFields = $state(false);
+  let showAllBytes = $state(false);
 
   const CODECS = ['u7', 'u8', 's7', 'u14', 'nibbles', 'packed8to7', 'bitslice', 'text-ascii', 'text-nibbled-ascii'];
   const FIELD_COLORS = 6; // .f0..f5 cycle in CSS
@@ -19,12 +26,21 @@
   let active = $derived(dumps[Math.min(selected, Math.max(0, dumps.length - 1))] ?? null);
   let isMapped = $derived(!!(active?.message?.matcher && active?.layout?.length));
 
-  let paramOptions = $derived(merged ? resolveParams(merged).map((p) => ({ id: p.resolvedId, name: p.name ?? p.paramId })) : []);
+  let paramOptions = $derived(shown && merged ? resolveParams(merged).map((p) => ({ id: p.resolvedId, name: p.name ?? p.paramId, paramId: p.paramId })) : []);
+  // A layout entry names its parameter by resolved id, or (a model converted from an engine profile)
+  // by the parameter's own id: either finds its name.
+  let nameOf = $derived(new Map(paramOptions.flatMap((o) => [[o.paramId, o.name], [o.id, o.name]])));
+  // One list of parameters for every row to choose from. A <select> of every parameter in every row
+  // was rows x parameters elements: a KRONOS program dump (1,662 rows, 2,862 parameters) built 4.7
+  // million <option>s and hung the designer, which mounts this screen when it opens.
+  const listId = `dpd-dump-params-${Math.random().toString(36).slice(2, 8)}`;
 
   // resolved byte map + probe wire (zero values → shows framing + checksum) + live round-trip
-  let map = $derived(isMapped ? safe(() => dumpByteMap(active, merged)) : null);
-  let wire = $derived(isMapped ? safe(() => assembleDump(active, {}, merged)) ?? [] : []);
-  let rt = $derived(isMapped ? safe(() => dumpRoundTrip(active, merged)) : null);
+  let map = $derived(shown && isMapped ? safe(() => dumpByteMap(active, merged)) : null);
+  let wire = $derived(shown && isMapped ? safe(() => assembleDump(active, {}, merged)) ?? [] : []);
+  let rt = $derived(shown && isMapped ? safe(() => dumpRoundTrip(active, merged)) : null);
+  let visibleWire = $derived(showAllBytes ? wire : wire.slice(0, BYTES));
+  let visibleLayout = $derived(!shown ? [] : showAllFields ? (active?.layout ?? []) : (active?.layout ?? []).slice(0, ROWS));
 
   function safe(fn) { try { return fn(); } catch { return null; } }
 
@@ -37,13 +53,13 @@
     for (let i = 0; i < map.payloadOffset; i++) out[i] = 'header';
     for (let i = n - map.suffixLen; i < n; i++) out[i] = 'suffix';
     if (map.checksum) out[map.checksum.byteOffset ?? pEnd] = 'checksum';
-    if (!map.packed) map.fields.forEach((f, fi) => { for (let k = 0; k < f.size; k++) { const idx = map.payloadOffset + f.offset + k; if (idx < pEnd) out[idx] = 'f' + (fi % FIELD_COLORS); } });
+    if (!map.packed && !map.records) map.fields.forEach((f, fi) => { for (let k = 0; k < f.size; k++) { const idx = map.payloadOffset + f.offset + k; if (idx < pEnd) out[idx] = 'f' + (fi % FIELD_COLORS); } });
     return out;
   });
   let fieldFails = $derived(new Set((rt?.failures ?? []).map((f) => f.param)));
 
   // ── authoring ──
-  function selectDump(i) { selected = i; }
+  function selectDump(i) { selected = i; showAllFields = false; showAllBytes = false; }
   function defineLayout(d) {
     if (!d.message) d.message = { matcher: { prefix: ['F0', 'F7'].slice(0, 1).concat([]), suffix: ['F7'] }, payload: { offset: 1 } };
     if (!d.message.matcher) d.message.matcher = { prefix: ['F0'], suffix: ['F7'] };
@@ -92,21 +108,27 @@
       {#if rt?.ok}<span class="status-pill"><span class="chk ok">✓</span> Round-trip verified — {map.fields.length} fields, {wire.length} bytes</span>
       {:else}<span class="status-pill warn"><span class="chk warn">!</span> Round-trip failing{#if rt?.failures?.length}: {rt.failures[0].param ?? rt.failures[0].error}{/if}</span>{/if}
       {#if map.packed}<span class="tag">payload 8→7 packed</span>{/if}
+      {#if map.records}<span class="tag">payload of records</span>{/if}
+      {#if rt?.shadowed?.length}<span class="tag" title={rt.shadowed.join(', ')}>{rt.shadowed.length} field{rt.shadowed.length === 1 ? '' : 's'} sharing bytes with another, not checked alone</span>{/if}
       {#if map.completion?.messages > 1}<span class="tag">{map.completion.messages}-message bank</span>{/if}
       <span style="margin-left:auto" class="lm">request via {active.requestShape ?? '—'}</span>
     </div>
 
     <!-- byte ruler: the framed message -->
     <div class="druler">
-      {#each wire as b, i (i)}
+      {#each visibleWire as b, i (i)}
         <div class={['dbyte', regions[i]]} title={regions[i]}>
           <span class="bi">{i}</span><span class="bv">{b.toString(16).padStart(2, '0').toUpperCase()}</span>
         </div>
       {/each}
     </div>
+    {#if wire.length > visibleWire.length}
+      <button class="addslot asbtn" onclick={() => { showAllBytes = true; }}>Show all {wire.length} bytes</button>
+    {/if}
     <div class="dlegend">
       <span class="lk header">header</span>
-      {#each map.fields as f, fi (f.param)}<span class={['lk', 'f' + (fi % FIELD_COLORS)]}>{f.name}</span>{/each}
+      {#each map.fields.slice(0, LEGEND) as f, fi (f.param)}<span class={['lk', 'f' + (fi % FIELD_COLORS)]}>{f.name}</span>{/each}
+      {#if map.fields.length > LEGEND}<span class="lk">… {map.fields.length - LEGEND} more fields</span>{/if}
       {#if map.checksum}<span class="lk checksum">checksum · {map.checksum.type}</span>{/if}
       <span class="lk suffix">end</span>
     </div>
@@ -115,14 +137,12 @@
     <div class="layoutbox">
       <div class="lh"><span class="lt">{active.name ?? active.id} layout</span><span class="lm">offset · parameter · codec · size</span></div>
       <div class="dlhead"><span>offset</span><span>parameter</span><span>codec</span><span>size</span><span></span><span></span></div>
-      {#each active.layout as entry, i (i)}
+      {#each visibleLayout as entry, i (i)}
         {@const fail = fieldFails.has(entry.param)}
         <div class="dlrow">
           <span class="nc-wrap"><NumberCell min={0} value={entry.offset} onchange={(v) => entry.offset = v} /></span>
-          <select class="psel" bind:value={entry.param}>
-            {#each paramOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
-            {#if !paramOptions.some((o) => o.id === entry.param)}<option value={entry.param}>{entry.param} (name)</option>{/if}
-          </select>
+          <input class="psel" list={listId} value={entry.param} title={nameOf.get(entry.param) ?? entry.param}
+            onchange={(e) => { entry.param = e.currentTarget.value; }} />
           <select class="csel" value={entry.codec?.type ?? 'u7'} onchange={(e) => setCodec(entry, e.target.value)}>
             {#each CODECS as c (c)}<option value={c}>{c}</option>{/each}
           </select>
@@ -137,6 +157,10 @@
           <button class="xbtn" title="remove" onclick={() => removeField(active, i)}>✕</button>
         </div>
       {/each}
+      <datalist id={listId}>{#each paramOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}</datalist>
+      {#if shown && !showAllFields && active.layout.length > ROWS}
+        <button class="addslot asbtn" onclick={() => { showAllFields = true; }}>Show all {active.layout.length} fields</button>
+      {/if}
       <button class="addslot asbtn" onclick={() => addField(active)}>+ Add parameter</button>
     </div>
   {:else if active}

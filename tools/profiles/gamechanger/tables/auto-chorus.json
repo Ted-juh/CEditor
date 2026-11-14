@@ -1,0 +1,26 @@
+{
+  "source": {"title":"AUTO Chorus Quick Guide","file":"WEB_Auto_Chorus_AMCH_QuickGuide2.pdf","sha256":"c72fa533fbdc88aa83a007b5331e9da36bd6f6d16e22272b7256d3864bf986d1","url":"https://gamechangeraudio.com/wp-content/uploads/2024/09/WEB_Auto_Chorus_AMCH_QuickGuide2.pdf","linkedFrom":"https://gamechangeraudio.com/auto/","pages":[9,9]},
+  "bands": [
+    {"page":9,"cc":8,"name":"LEVEL","msb":"[0...127] = [0...1]","pair":"[0...16383] = [0...1]"},
+    {"page":9,"cc":9,"name":"RATE","msb":"[0...127] = [0...1]","pair":"[0...16383] = [0...1]"},
+    {"page":9,"cc":10,"name":"DEPTH","msb":"[0...127] = [0...1]","pair":"[0...16383] = [0...1]"},
+    {"page":9,"cc":11,"name":"FEEDBACK","msb":"[0...127] = [0...1]","pair":"[0...16383] = [0...1]"},
+    {"page":9,"cc":12,"name":"DYN TIME","msb":"[0...127] = [0...1]","pair":"[0...16383] = [0...1]"},
+    {"page":9,"cc":13,"name":"DYN THRES","msb":"[0...127] = [0...1]","pair":"[0...16383] = [0...1]"},
+    {"page":9,"cc":14,"name":"PITCH SENS","msb":"[0...127] = [0...1]","pair":"[0...16383] = [0...1]"},
+    {"page":9,"cc":15,"name":"PITCH SLEW","msb":"[0...127] = [0...1]","pair":"[0...16383] = [0...1]"},
+    {"page":9,"cc":16,"name":"Attenuverter for CV in 1","msb":"[0...63] = [-1...0], [64...127] = [0...1]","pair":"[0...8191] = [-1...0], [8192...16383] = [0...1]"},
+    {"page":9,"cc":17,"name":"Attenuverter for CV in 2","msb":"[0...63] = [-1...0], [64...127] = [0...1]","pair":"[0...8191] = [-1...0], [8192...16383] = [0...1]"},
+    {"page":9,"cc":18,"name":"Attenuverter for CV in 3","msb":"[0...63] = [-1...0], [64...127] = [0...1]","pair":"[0...8191] = [-1...0], [8192...16383] = [0...1]"},
+    {"page":9,"cc":19,"name":"Attenuverter for CV in 4","msb":"[0...63] = [-1...0], [64...127] = [0...1]","pair":"[0...8191] = [-1...0], [8192...16383] = [0...1]"},
+    {"page":9,"cc":20,"name":"Dynamics mode","msb":"[0...42] = FAST, [43...84] = SLOW, [85...127] = GATE","pair":"[0...5461] = FAST, [5462...10922] = SLOW, [10923...16383] = GATE"},
+    {"page":9,"cc":21,"name":"Pitchtrack mode","msb":"[0...42] = NOTE, [43...84] = TONE, [85...127] = V/OCT","pair":"[0...5461] = NOTE, [5462...10922] = TONE, [10923...16383] = V/OCT"},
+    {"page":9,"cc":22,"name":"Effect type","msb":"[0...42] = CHORUS, [43...84] = ENSEMBLE, [85...127] = FLANGER","pair":"[0...5461] = CHORUS, [5462...10922] = ENSEMBLE, [10923...16383] = FLANGER"},
+    {"page":9,"cc":23,"name":"SHAPE","msb":"[0...42] = SAW, [43...84] = SINE, [85...127] = RAMP","pair":"[0...5461] = SAW, [5462...10922] = SINE, [10923...16383] = RAMP"},
+    {"page":9,"cc":24,"name":"CV mode","msb":"[0...42] = SUM, [43...84] = EXT, [85... 127] = ALT","pair":"[0...5461] = SUM, [5462...10922] = EXT, [10923...16383] = ALT"},
+    {"page":9,"cc":25,"name":"Mix mode","msb":"[0...42] = IN, [43...84] = WET, [85...127] = MIX","pair":"[0...5461] = IN, [5462...10922] = WET, [10923...16383] = MIX"},
+    {"page":9,"cc":26,"name":"Signal level","msb":"[0...42] = INST, [43...84] = LINE, [85...127] = EU","pair":"[0...5461] = INST, [5462...10922] = LINE, [10923...16383] = EU"},
+    {"page":9,"cc":27,"name":"EFFECT ON","msb":"[0...63] = OFF, [64...127] = ON","pair":"[0...8191] = OFF, [8192...16383] = ON"},
+    {"page":9,"cc":28,"name":"AUTO ON","msb":"[0...63] = OFF, [64...127] = ON","pair":"[0...8191] = OFF, [8192...16383] = ON"}
+  ]
+}

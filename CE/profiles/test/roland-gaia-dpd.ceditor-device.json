@@ -509,7 +509,7 @@
       "id": "filter.envDepth",
       "name": "Env Depth",
       "group": "Filter",
-      "type": "integer",
+      "type": "bipolar",
       "default": -63,
       "range": {
         "min": -63,
@@ -1101,7 +1101,7 @@
       "id": "tone2.filter.envDepth",
       "name": "Env Depth (Tone 2)",
       "group": "Filter",
-      "type": "integer",
+      "type": "bipolar",
       "default": -63,
       "range": {
         "min": -63,
@@ -1693,7 +1693,7 @@
       "id": "tone3.filter.envDepth",
       "name": "Env Depth (Tone 3)",
       "group": "Filter",
-      "type": "integer",
+      "type": "bipolar",
       "default": -63,
       "range": {
         "min": -63,

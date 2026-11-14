@@ -2,7 +2,13 @@
   // The 380px inspector drawer — faithful to dpd-mockup-v2.html's enum editor + "same enum,
   // any component" preview. Edits mutate the selected parameter's source enum (shared model proxy),
   // so the table badge ("Enum · N") and the previews update live.
-  let { param = null } = $props();
+  // `sources`: the model's documents, which the parameter's `source.doc` indexes. `shapes` and
+  // `errors` are for its fields (DpdParamFields.svelte): the model's message shapes, and what the
+  // validator says about this parameter.
+  import DpdParamFields from './DpdParamFields.svelte';
+  import DpdInstanceList from './DpdInstanceList.svelte';
+  // `instances`, `named`, `first`, `describe`: its block's instances, for DpdInstanceList.svelte.
+  let { param = null, sources = [], shapes = [], errors = [], instances = [], named = false, first = 1, describe = null } = $props();
 
   let customValues = $state(true);
   let previewSel = $state(0);
@@ -56,10 +62,15 @@
   let vtypeLabel = $derived(
     param?.valueType === 'enum' ? '◆ Enum'
       : param?.valueType === 'toggle' ? 'Toggle'
-      : param?.valueType === 'signed' ? 'Signed' : 'Continuous'
+      : param?.valueType === 'signed' ? 'Signed'
+      : param?.valueType === 'trigger' ? 'Trigger'
+      : param?.valueType === 'momentary' ? 'Momentary' : 'Continuous'
   );
   let vtypeCls = $derived(param?.valueType === 'enum' ? 'enum' : param?.valueType === 'toggle' ? 'toggle' : 'cont');
   let selLabel = $derived(entries[previewSel]?.label ?? entries[0]?.label ?? '—');
+  // Where the maker's document prints it: its title, and the page or line.
+  let sourceDoc = $derived(param?.source ? sources?.[param.source.doc ?? 0] ?? null : null);
+  let sourceWhere = $derived(!param?.source ? '' : [param.source.table, param.source.page ? `p. ${param.source.page}` : param.source.line ? `line ${param.source.line}` : null].filter(Boolean).join(', '));
 </script>
 
 <div class="enumdrawer">
@@ -67,12 +78,14 @@
     <div class="drawer-empty">Select a parameter to edit its details.</div>
   {:else if !isEnum}
     <div class="eh"><span class={['vtype', vtypeCls]} style="cursor:default">{vtypeLabel}</span><span class="ehname">{param.name ?? param.id}</span></div>
-    <div class="esub">
-      {#if param.range}This parameter spans {param.range.min} – {param.range.max}.{:else}A {param.valueType} parameter.{/if}
-      Range &amp; encoding editing arrive with this inspector in a later step.
-    </div>
+    {#if sourceDoc}<div class="esrc">From {#if sourceDoc.url}<a href={sourceDoc.url} target="_blank" rel="noreferrer">{sourceDoc.title}</a>{:else}<b>{sourceDoc.title}</b>{/if}{#if sourceWhere}, {sourceWhere}{/if}</div>{/if}
+    <DpdParamFields {param} {shapes} {errors} />
+    {#if instances.length > 1}<DpdInstanceList {param} {instances} {named} {first} {describe} />{/if}
   {:else}
     <div class="eh"><span class="vtype enum" style="cursor:default">◆ Enum</span><span class="ehname">{param.name ?? param.id}</span></div>
+    {#if sourceDoc}<div class="esrc">From {#if sourceDoc.url}<a href={sourceDoc.url} target="_blank" rel="noreferrer">{sourceDoc.title}</a>{:else}<b>{sourceDoc.title}</b>{/if}{#if sourceWhere}, {sourceWhere}{/if}</div>{/if}
+    <DpdParamFields {param} {shapes} {errors} />
+    {#if instances.length > 1}<DpdInstanceList {param} {instances} {named} {first} {describe} />{/if}
     <div class="esub">Describe the parameter's legal values. Reorder with the arrows; the device value stays pinned to each option.</div>
 
     <div

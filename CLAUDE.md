@@ -383,7 +383,39 @@ commands are in `tools/profiles/README.md`. Before pushing a change to a profile
 ```bash
 node tools/profiles/roland/make-profiles.mjs --check && node tools/profiles/roland/make-cc-profiles.mjs --check
 node tools/profiles/sequential/make-profiles.mjs --check
+node tools/profiles/korg/make-profiles.mjs --check
+node tools/profiles/novation/make-profiles.mjs --check
+node tools/profiles/moog/make-profiles.mjs --check
+node tools/profiles/yamaha/make-profiles.mjs --check
+node tools/profiles/waldorf/make-profiles.mjs --check
+node tools/profiles/elektron/make-profiles.mjs --check
+node tools/profiles/behringer/make-profiles.mjs --check
+node tools/profiles/arturia/make-profiles.mjs --check
+node tools/profiles/asm/make-profiles.mjs --check
+node tools/profiles/nord/make-profiles.mjs --check
+node tools/profiles/modal/make-profiles.mjs --check
+node tools/profiles/dreadbox/make-profiles.mjs --check
+node tools/profiles/udo/make-profiles.mjs --check
+node tools/profiles/groove/make-profiles.mjs --check
+node tools/profiles/teenage/make-profiles.mjs --check
+node tools/profiles/sonicware/make-profiles.mjs --check
+node tools/profiles/blackcorp/make-profiles.mjs --check
+node tools/profiles/erica/make-profiles.mjs --check
+node tools/profiles/expressive/make-profiles.mjs --check
+node tools/profiles/alesis/make-profiles.mjs --check
+node tools/profiles/gamechanger/make-profiles.mjs --check
+node tools/profiles/hammond/make-profiles.mjs --check
+node tools/profiles/tastychips/make-profiles.mjs --check
+node tools/profiles/jomox/make-profiles.mjs --check
+node tools/profiles/twisted/make-profiles.mjs --check
+node tools/profiles/dexibell/make-profiles.mjs --check
+node tools/profiles/vermona/make-profiles.mjs --check
+node tools/profiles/modor/make-profiles.mjs --check
+node tools/profiles/gotharman/make-profiles.mjs --check
+node tools/profiles/radikal/make-profiles.mjs --check
+node tools/profiles/kodamo/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
+node CE/dpd/tools/from-legacy.mjs --check     # every profile converts to the DPD model the Designer opens, and emits back
 ```
 
 and build `CEditorDeviceProfileTests` **in Release** (`cmake --build build/native --config Release

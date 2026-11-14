@@ -1,0 +1,144 @@
+{
+  "sources": [
+    {"title":"Grandmother Manual, Version 2","file":"Grandmother_Manual_Version_2.pdf","sha256":"07e5e0b0582759b3e0f8976e595a917ab813f773ffd258b38ece5a428f5e368a","url":"https://cdn.inmusicbrands.com/Moog/Grandmother/Grandmother_Manual_Version_2.pdf"}
+  ],
+  "tables": [
+    {
+      "doc": 0,
+      "kind": "cc",
+      "pages": [43],
+      "rows": [
+        {"doc":0,"page":43,"section":"","cc":"CC 1","name":"MOD WHEEL","values":"0-127 (or 0-16383 using CC1 & CC 33)"},
+        {"doc":0,"page":43,"section":"","cc":"CC 3","name":"MODULATION RATE","values":"0-127 (or 0-16383 using CC3 & CC 35)"},
+        {"doc":0,"page":43,"section":"","cc":"CC 5","name":"GLIDE TIME","values":"0-127 (or 0-16383 using CC5 & CC 37)"},
+        {"doc":0,"page":43,"section":"","cc":"CC 8","name":"ARP/SEQ RATE","values":"0-127 (or 0-16383 using CC8 & CC 40)"},
+        {"doc":0,"page":43,"section":"","cc":"CC 12","name":"OSCILLATOR 2 FREQUENCY","values":"0-127 (or 0-16383 using CC12 & CC 44)"},
+        {"doc":0,"page":43,"section":"","cc":"CC 65","name":"GLIDE ON/OFF","values":"0 = Off, 64 = On"},
+        {"doc":0,"page":43,"section":"","cc":"CC 69","name":"ARP/SEQ HOLD","values":"0 = Off, 64 = On"},
+        {"doc":0,"page":43,"section":"","cc":"CC 73","name":"ARP/SEQ PLAY","values":"0 = Off, 64 = On"},
+        {"doc":0,"page":43,"section":"","cc":"CC 74","name":"OSCILLATOR 1 OCTAVE","values":"0 = 32’, 32 = 16’, 64 = 8’, 96 = 4’"},
+        {"doc":0,"page":43,"section":"","cc":"CC 75","name":"OSCILLATOR 2 OCTAVE","values":"0 = 32’, 32 = 16’, 64 = 8’, 96 = 4’"},
+        {"doc":0,"page":43,"section":"","cc":"CC 77","name":"OSCILLATOR 2 SYNC","values":"0 = Off, 64 = On"},
+        {"doc":0,"page":43,"section":"","cc":"CC 85","name":"GLIDE TYPE","values":"0 = LCR, 43 = LCT, 85 = Exponential"},
+        {"doc":0,"page":43,"section":"","cc":"CC 89","name":"KEYBOARD OCTAVE","values":"0 = -2, 26 = -1, 51 = 0, 77 = +1, 102 = +2"},
+        {"doc":0,"page":43,"section":"","cc":"CC 90","name":"ARP/SEQ CLOCK DIVISION","values":"(See Grandmother Clock Divisions table)"},
+        {"doc":0,"page":43,"section":"","cc":"CC 91","name":"ARP/SEQ MODE","values":"0 = ARP, 43 = SEQ, 85 = REC"},
+        {"doc":0,"page":43,"section":"","cc":"CC 92","name":"ARP/SEQ PATTERN","values":"0 = ORDR, 43 = FWD/BKWD, 85 = RNDM"},
+        {"doc":0,"page":43,"section":"","cc":"CC 93","name":"ARP RANGE/SEQ NUMBER","values":"0 = 1, 43 = 2, 85 = 3"},
+        {"doc":0,"page":43,"section":"","cc":"CC 94","name":"LEGATO GLIDE","values":"0 = Off, 64 = On"},
+        {"doc":0,"page":43,"section":"","cc":"CC 103","name":"GATED GLIDE","values":"0 = Off, 64 = On"},
+        {"doc":0,"page":43,"section":"","cc":"CC 107","name":"PITCH BEND UP AMT","values":"(see table 2)"},
+        {"doc":0,"page":43,"section":"","cc":"CC 108","name":"PITCH BEND DOWN AMT","values":"(see table 2)"},
+        {"doc":0,"page":43,"section":"","cc":"CC 119","name":"KB TRANSPOSE (SEMITONES)","values":"(see table 3)"}
+      ]
+    }
+  ],
+  "valueTables": [
+    {
+      "doc": 0,
+      "title": "the Grandmother Clock Divisions table",
+      "for": [90],
+      "pages": [43],
+      "rows": [
+        {"doc":0,"page":43,"section":"","value":"0","label":"4 WHOLE NOTES"},
+        {"doc":0,"page":43,"section":"","value":"5","label":"3 WHOLE NOTES"},
+        {"doc":0,"page":43,"section":"","value":"11","label":"2 WHOLE NOTES"},
+        {"doc":0,"page":43,"section":"","value":"16","label":"DOTTED WHOLE NOTE"},
+        {"doc":0,"page":43,"section":"","value":"21","label":"WHOLE NOTE"},
+        {"doc":0,"page":43,"section":"","value":"27","label":"DOTTED HALF NOTE"},
+        {"doc":0,"page":43,"section":"","value":"32","label":"WHOLE NOTE TRIPLET"},
+        {"doc":0,"page":43,"section":"","value":"37","label":"HALF NOTE"}
+      ]
+    },
+    {
+      "doc": 0,
+      "title": "the Grandmother Clock Divisions table",
+      "for": [90],
+      "pages": [43],
+      "rows": [
+        {"doc":0,"page":43,"section":"","value":"43","label":"DOTTED QUARTER NOTE"},
+        {"doc":0,"page":43,"section":"","value":"48","label":"HALF NOTE TRIPLET"},
+        {"doc":0,"page":43,"section":"","value":"53","label":"QUARTER NOTE"},
+        {"doc":0,"page":43,"section":"","value":"59","label":"DOTTED EIGHTH NOTE"},
+        {"doc":0,"page":43,"section":"","value":"64","label":"QUARTER NOTE TRIP-LET"},
+        {"doc":0,"page":43,"section":"","value":"69","label":"EIGHTH NOTE"},
+        {"doc":0,"page":43,"section":"","value":"75","label":"DOTTED SIXTEENTH NOTE"},
+        {"doc":0,"page":43,"section":"","value":"80","label":"EIGHTH NOTE TRIPLET"},
+        {"doc":0,"page":43,"section":"","value":"85","label":"SIXTEENTH NOTE"},
+        {"doc":0,"page":43,"section":"","value":"91","label":"DOTTED 32ND NOTE"},
+        {"doc":0,"page":43,"section":"","value":"96","label":"SIXTEENTH NOTE TRIP-LET"},
+        {"doc":0,"page":43,"section":"","value":"101","label":"32ND NOTE"},
+        {"doc":0,"page":43,"section":"","value":"107","label":"DOTTED 64TH NOTE"},
+        {"doc":0,"page":43,"section":"","value":"112","label":"32ND NOTE TRIPLET"},
+        {"doc":0,"page":43,"section":"","value":"117","label":"64TH NOTE"},
+        {"doc":0,"page":43,"section":"","value":"123","label":"64TH NOTE TRIPLET"}
+      ]
+    },
+    {
+      "doc": 0,
+      "title": "Table 2",
+      "for": [107,108],
+      "pages": [44],
+      "rows": [
+        {"doc":0,"page":44,"section":"","value":"0","label":"0 (OFF)"},
+        {"doc":0,"page":44,"section":"","value":"5","label":"1"},
+        {"doc":0,"page":44,"section":"","value":"10","label":"2"},
+        {"doc":0,"page":44,"section":"","value":"15","label":"3"},
+        {"doc":0,"page":44,"section":"","value":"20","label":"4"},
+        {"doc":0,"page":44,"section":"","value":"26","label":"5"},
+        {"doc":0,"page":44,"section":"","value":"31","label":"6"},
+        {"doc":0,"page":44,"section":"","value":"36","label":"7"},
+        {"doc":0,"page":44,"section":"","value":"41","label":"8"},
+        {"doc":0,"page":44,"section":"","value":"46","label":"9"},
+        {"doc":0,"page":44,"section":"","value":"51","label":"10"},
+        {"doc":0,"page":44,"section":"","value":"56","label":"11"},
+        {"doc":0,"page":44,"section":"","value":"61","label":"12 (ONE OCTAVE)"},
+        {"doc":0,"page":44,"section":"","value":"67","label":"13"},
+        {"doc":0,"page":44,"section":"","value":"72","label":"14"},
+        {"doc":0,"page":44,"section":"","value":"77","label":"15"},
+        {"doc":0,"page":44,"section":"","value":"82","label":"16"},
+        {"doc":0,"page":44,"section":"","value":"87","label":"17"},
+        {"doc":0,"page":44,"section":"","value":"92","label":"18"},
+        {"doc":0,"page":44,"section":"","value":"97","label":"19"},
+        {"doc":0,"page":44,"section":"","value":"102","label":"20"},
+        {"doc":0,"page":44,"section":"","value":"108","label":"21"},
+        {"doc":0,"page":44,"section":"","value":"113","label":"22"},
+        {"doc":0,"page":44,"section":"","value":"118","label":"23"},
+        {"doc":0,"page":44,"section":"","value":"123","label":"24 (TWO OCTAVES)"}
+      ]
+    },
+    {
+      "doc": 0,
+      "title": "Table 3",
+      "for": [119],
+      "pages": [44],
+      "rows": [
+        {"doc":0,"page":44,"section":"","value":"0","label":"-12"},
+        {"doc":0,"page":44,"section":"","value":"5","label":"-11"},
+        {"doc":0,"page":44,"section":"","value":"10","label":"-10"},
+        {"doc":0,"page":44,"section":"","value":"15","label":"-9"},
+        {"doc":0,"page":44,"section":"","value":"20","label":"-8"},
+        {"doc":0,"page":44,"section":"","value":"26","label":"-7"},
+        {"doc":0,"page":44,"section":"","value":"31","label":"-6"},
+        {"doc":0,"page":44,"section":"","value":"36","label":"-5"},
+        {"doc":0,"page":44,"section":"","value":"41","label":"-4"},
+        {"doc":0,"page":44,"section":"","value":"46","label":"-3"},
+        {"doc":0,"page":44,"section":"","value":"51","label":"-2"},
+        {"doc":0,"page":44,"section":"","value":"56","label":"-1"},
+        {"doc":0,"page":44,"section":"","value":"61","label":"0 (OFF)"},
+        {"doc":0,"page":44,"section":"","value":"67","label":"+1"},
+        {"doc":0,"page":44,"section":"","value":"72","label":"+2"},
+        {"doc":0,"page":44,"section":"","value":"77","label":"+3"},
+        {"doc":0,"page":44,"section":"","value":"82","label":"+4"},
+        {"doc":0,"page":44,"section":"","value":"87","label":"+5"},
+        {"doc":0,"page":44,"section":"","value":"92","label":"+6"},
+        {"doc":0,"page":44,"section":"","value":"97","label":"+7"},
+        {"doc":0,"page":44,"section":"","value":"102","label":"+8"},
+        {"doc":0,"page":44,"section":"","value":"108","label":"+9"},
+        {"doc":0,"page":44,"section":"","value":"113","label":"+10"},
+        {"doc":0,"page":44,"section":"","value":"118","label":"+11"},
+        {"doc":0,"page":44,"section":"","value":"123","label":"+12"}
+      ]
+    }
+  ]
+}

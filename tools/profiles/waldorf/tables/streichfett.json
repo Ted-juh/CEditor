@@ -1,0 +1,30 @@
+{
+  "sources": [
+    {"title":"Streichfett Reference Manual","file":"Streichfett_Manual_EN.pdf","sha256":"0d7291d42c7203ad1e35e4b04266394506f2c328e7d206d7d2b8e0ca909b2bec","url":"https://downloads.waldorfmusic.com/cloud/index.php/s/BppCqf8X5knMwyC/download"}
+  ],
+  "controllers": [
+    {"page":21,"controller":1,"name":"Modulation Wheel","value":"0…127"},
+    {"page":21,"controller":64,"name":"Sustain Pedal","value":"0 = Off, 64 = On"},
+    {"page":21,"controller":70,"name":"String Registration","value":"0 = Base, 1 = Both, va 2 = 8"},
+    {"page":21,"controller":71,"name":"String Octaves","value":"0…127"},
+    {"page":21,"controller":72,"name":"String Release","value":"0...127"},
+    {"page":21,"controller":73,"name":"Crescendo","value":"0…127"},
+    {"page":21,"controller":74,"name":"String Ensemble Type","value":"0 = String, 1 = String + Chorus, 2 = Chorus"},
+    {"page":21,"controller":75,"name":"String Ensemble","value":"0…127"},
+    {"page":21,"controller":76,"name":"Solo Tone","value":"0...127"},
+    {"page":21,"controller":77,"name":"Solo Tremolo","value":"0…127"},
+    {"page":21,"controller":78,"name":"Solo Split","value":"0 = Low, 1 = Layer, 2 = High"},
+    {"page":21,"controller":79,"name":"Solo Sustain","value":"0 = No sustain, 1 = Full sustain"},
+    {"page":21,"controller":80,"name":"Solo Attack","value":"0...127"},
+    {"page":21,"controller":81,"name":"Solo Decay","value":"0...127"},
+    {"page":21,"controller":82,"name":"Balance","value":"0…127"},
+    {"page":21,"controller":91,"name":"FX Type","value":"0 = Reverb, 1 = Phaser, 2 = Animate"},
+    {"page":21,"controller":92,"name":"FX Animate amount","value":"0...127"},
+    {"page":21,"controller":93,"name":"FX Phaser amount","value":"0…127"},
+    {"page":21,"controller":94,"name":"FX Reverb amount","value":"0…127"},
+    {"page":21,"controller":120,"name":"All Sound Off","value":"Immediate silence"},
+    {"page":21,"controller":121,"name":"Reset All Controllers","value":"Resets Mod. Wheel, Sust. Pedal, Pitch Bend"},
+    {"page":21,"controller":122,"name":"Local Control","value":"0 = Off, 127 = On"},
+    {"page":21,"controller":123,"name":"All Notes Off","value":"Releases all voices"}
+  ]
+}

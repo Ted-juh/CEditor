@@ -58,7 +58,54 @@
         "family": { "type": "string", "description": "Device family code (2 bytes LSB MSB), space-hex." },
         "member": { "type": "string", "description": "Device family member code (2 bytes LSB MSB), space-hex." },
         "firmware": { "type": "string", "description": "Firmware/version match for variant resolution." },
-        "capturedReply": { "type": "string", "description": "An Identity Reply captured from the real instrument, as space-hex — the evidence behind family/member. Never matched against; kept so a measured code can be told from an authored guess." }
+        "capturedReply": { "type": "string", "description": "An Identity Reply captured from the real instrument, as space-hex — the evidence behind family/member. Never matched against; kept so a measured code can be told from an authored guess." },
+        "requestDeviceId": { "type": "string", "description": "The device id the inquiry is sent to, when the maker's document says to address it ('$deviceId', or a byte such as '7F'). Absent: 7F, all call, which every instrument answers." },
+        "revision": { "type": "string", "description": "Software revision bytes to match, space-hex. Only where the maker's document pins one; a revision pinned without cause makes a firmware update look like another instrument." }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "The maker's documents the profile is read from, in order: a parameter's source.doc is an index into this list.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "description": "'manual', 'midi-implementation', 'data-list', 'webpage', ..." },
+          "title": { "type": "string" },
+          "url": { "type": "string" },
+          "file": { "type": "string" },
+          "sha256": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "variables": {
+      "type": "object",
+      "description": "The values the device's messages are filled with unless the person sets their own: a part's channel, an FX channel, a bank. 'channel' is 1 when absent; the device id is `deviceId`.",
+      "additionalProperties": { "type": "integer" }
+    },
+    "timing": {
+      "type": "object",
+      "description": "How messages to the device are paced.",
+      "properties": {
+        "minDelayBetweenMessagesMs": { "type": "integer", "minimum": 0, "description": "The least time between two messages sent to the device. 20 when absent." }
+      }
+    },
+    "requests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/request" },
+      "description": "What the device can be asked, and what answers each: a bulk dump, an identity reply. Dumps name the request that asks for them; `startup` names those asked when the device connects."
+    },
+    "startup": {
+      "type": "object",
+      "description": "What happens when the device connects.",
+      "properties": {
+        "policy": { "type": "string", "description": "'pull': read the device's state into the panel. 'push': send the panel's to the device." },
+        "syncDirection": { "type": "string", "description": "Which side wins when they differ: 'pull' or 'push'." },
+        "sync": {
+          "type": "array",
+          "description": "The requests asked, in order, by id (or { request: id } with options of its own).",
+          "items": { "oneOf": [{ "type": "string" }, { "type": "object", "required": ["request"], "properties": { "request": { "type": "string" } } }] }
+        }
       }
     },
     "checksum": { "$ref": "#/$defs/checksum" },
@@ -110,6 +157,19 @@
     },
 
     "provenance": { "$ref": "#/$defs/provenance" },
+    "defaults": {
+      "type": "object",
+      "description": "What a parameter has unless it says otherwise.",
+      "properties": {
+        "sendPolicy": { "type": "object", "description": "By value type (continuous, signed, enum, toggle, trigger, momentary, text): the send policy a parameter of that type has unless it names one." },
+        "request": {
+          "type": "object",
+          "description": "The timeout and retries a request has unless it names its own. 1000 ms and no retry when absent.",
+          "properties": { "timeoutMs": { "type": "integer", "minimum": 0 }, "retries": { "type": "integer", "minimum": 0 } }
+        }
+      }
+    },
+    "engine": { "type": "object", "description": "Engine-only profile fields the emitter lays over what it derives (the engine id and name, description, sources, notes, tests, coverage, ...); a key set to null is left out. Written by tools/from-legacy.mjs." },
     "completeness": {
       "enum": ["full", "partial", "structural-only"],
       "description": "How finished the profile is. Imported profiles that lack bit-level detail land as partial/structural-only."
@@ -128,6 +188,28 @@
   ],
 
   "$defs": {
+    "request": {
+      "type": "object",
+      "required": ["id"],
+      "description": "One thing the device can be asked. Either a message shape and the address and size it asks for (a Roland RQ1: the emitter fills the bytes and computes the checksum), or the message written out (`template`).",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "As a person reads it; the id when absent." },
+        "shape": { "type": "string", "description": "The id of a message shape whose $address and $size this request fills." },
+        "address": { "$ref": "#/$defs/hexBytes" },
+        "size": { "$ref": "#/$defs/hexBytes" },
+        "template": { "type": "array", "items": { "type": "string" }, "description": "The message written out: hex bytes, or $names the engine fills ($deviceId)." },
+        "kind": { "enum": ["sysex"], "description": "sysex when absent." },
+        "response": {
+          "type": "object",
+          "description": "What answers: { kind: 'bulkDump', dump: <dump id> }, { kind: 'identity' }, ...",
+          "properties": { "kind": { "type": "string" }, "dump": { "type": "string" }, "collectionId": { "type": "string" } }
+        },
+        "timeoutMs": { "type": "integer", "minimum": 0, "description": "defaults.request.timeoutMs when absent." },
+        "retries": { "type": "integer", "minimum": 0, "description": "defaults.request.retries when absent." },
+        "engine": { "type": "object", "description": "Engine-only request fields the emitter lays over what it derives." }
+      }
+    },
     "hexBytes": {
       "type": "string",
       "pattern": "^([0-9A-Fa-f]{2})(\\s[0-9A-Fa-f]{2})*$",
@@ -161,7 +243,7 @@
           "description": "Ordered tokens: literal hex bytes or placeholders ($deviceId, $address, $encodedValue, $size, $checksum)."
         },
         "checksum": { "$ref": "#/$defs/checksum" },
-        "delayAfterMs": { "type": "integer", "minimum": 0 }
+        "delayAfterMs": { "type": ["integer", "null"], "minimum": 0, "description": "A pause after the message; null for none at all (the emitter's default is 20 ms)." }
       }
     },
 
@@ -188,6 +270,8 @@
         "base": { "$ref": "#/$defs/hexBytes", "description": "Base address of instance 0 (parameters address relative to this)." },
         "stride": { "$ref": "#/$defs/hexBytes", "description": "Address increment between consecutive instances (added per instance index)." },
         "instances": { "type": "integer", "minimum": 1, "description": "Instance count. May be supplied by deviceStructure instead." },
+        "first": { "type": "integer", "description": "The number of the first instance, for idTemplate and {n} (default 1)." },
+        "idTemplate": { "type": "string", "description": "How each instance names its parameters, e.g. 'part{n}.{id}': {n} the instance's number, {id} the parameter's. With it, {n} in a parameter's strings is filled the same way and perInstance values apply." },
         "instancesFrom": { "type": "string", "description": "deviceStructure field to read the instance count from, e.g. 'tones'." },
         "parameters": {
           "type": "array",
@@ -205,8 +289,8 @@
         "name": { "type": "string" },
         "group": { "type": "string", "description": "UI grouping, e.g. 'Filter'." },
         "valueType": {
-          "enum": ["continuous", "signed", "enum", "toggle", "trigger", "text"],
-          "description": "Drives the panel red/orange/green drag-fit check and the value codec. text = a fixed-length string living at ONE address (a patch name), carried by a text-ascii or text-nibbled-ascii encoding — not N one-byte parameters."
+          "enum": ["continuous", "signed", "enum", "toggle", "trigger", "momentary", "text"],
+          "description": "Drives the panel red/orange/green drag-fit check and the value codec. In the engine's profile: continuous is an integer, signed a bipolar, enum a choice, toggle a boolean, trigger an action (sent once), momentary a momentary (pressed and released). text = a fixed-length string living at ONE address (a patch name), carried by a text-ascii or text-nibbled-ascii encoding — not N one-byte parameters."
         },
         "range": {
           "type": "object",
@@ -220,18 +304,20 @@
           "additionalProperties": false,
           "properties": {
             "read": { "type": "boolean" },
-            "write": { "type": "boolean" }
+            "write": { "type": "boolean" },
+            "realtimeSafe": { "type": "boolean", "description": "Whether the value can be sent while a note plays (default true); false for one the instrument takes time to apply." },
+            "source": { "type": "string", "description": "Where the engine reads the value from: singleParameter (default), bulkDump, sysexRequest." }
           },
           "description": "Whether the device can be read from / written to for this parameter (e.g. Master Volume may be write-only)."
         },
         "address": {
           "$ref": "#/$defs/hexBytes",
-          "description": "Default wire address, RELATIVE to the scope/instance base. Used for the DT1 write, RQ1 read, and (unless rxLive overrides) the DT1 the device emits on edit."
+          "description": "THE parameter's address, relative to its scope's base and instance: the one place it is written. Every SysEx wire of the parameter uses it ($address in its shape), unless a wire names an address of its own."
         },
         "size": { "type": "integer", "minimum": 1, "description": "Number of wire data bytes for this parameter (default 1)." },
         "rxLive": {
           "$ref": "#/$defs/wire",
-          "description": "Override for what the device TRANSMITS on a live edit, when it differs from the write wire. The GAIA case: cutoff is written via DT1 at 'address' but the panel knob transmits CC -> {dir:rxLive, msg:cc, cc:102, ccStride:1}."
+          "description": "The older form of a wire with dir rxLive, for a parameter with no `wires` list (the GAIA's): what the device TRANSMITS on a live edit, when it differs from the write wire. Ignored when `wires` is given; write it there."
         },
         "wires": {
           "type": "array",
@@ -249,7 +335,22 @@
           "properties": { "preferredComponent": { "type": "string" } }
         },
         "display": { "$ref": "#/$defs/parameterDisplay" },
-        "provenance": { "$ref": "#/$defs/provenance" }
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "description": { "type": "string", "description": "What the parameter is, as its document gives it." },
+        "source": {
+          "type": "object",
+          "description": "Where the maker's document prints it: which of the model's sources (doc, 0 when absent) and where in it.",
+          "properties": {
+            "doc": { "type": "integer", "minimum": 0 },
+            "page": { "type": "integer", "minimum": 1 },
+            "line": { "type": "integer", "minimum": 1 },
+            "table": { "type": "string", "description": "The table or chart that holds it, as the document names it." }
+          }
+        },
+        "addressStride": { "$ref": "#/$defs/hexBytes", "description": "In a scope of several instances: this parameter's address step between instances, when not the scope's stride." },
+        "perInstance": { "type": "object", "description": "In a scope that names its instances (idTemplate): a field whose value differs per instance in a way {n} does not express, as one value per instance." },
+        "sendPolicy": { "type": ["object", "null"], "description": "When its value is sent: mode continuous (while it moves) or onCommit (once it is set), coalesce, minIntervalMs, sendFinalOnRelease. Defaults to the model's defaults.sendPolicy for its value type; null for none." },
+        "engine": { "type": "object", "description": "Engine-only details the emitter lays over the legacy parameter it derives (send policy, short label, a type the DPD value types do not name, ...); a key set to null is left out. Written by tools/from-legacy.mjs as exactly the difference between the engine profile and what the emitter derives." }
       },
       "allOf": [
         {
@@ -266,11 +367,18 @@
       "description": "One directional wire binding for a parameter. dir=write (panel->synth), read (request value), rxLive (synth->panel on edit). msg picks the transport.",
       "properties": {
         "dir": { "enum": ["write", "read", "rxLive"] },
-        "msg": { "enum": ["dt1", "rq1", "cc", "nrpn", "rpn", "raw"] },
-        "address": { "$ref": "#/$defs/hexBytes", "description": "Relative address for sysex msgs (dt1/rq1)." },
+        "msg": { "enum": ["sysex", "dt1", "rq1", "cc", "nrpn", "rpn", "raw"], "description": "sysex: the message shape the wire names (`shape`), its $address the parameter's; dt1 and rq1: Roland's set and request, the model's shapes of those ids; cc, nrpn, rpn: a controller, an NRPN or RPN number." },
+        "address": { "$ref": "#/$defs/hexBytes", "description": "Only where this wire's message goes to another address than the parameter's (a read from another block): relative, like the parameter's. Absent: the parameter's address." },
         "size": { "type": "integer", "minimum": 1 },
         "cc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Controller number for msg=cc." },
         "ccStride": { "type": "integer", "description": "Per-instance increment added to cc (GAIA: tone1 CC102, tone2 103, tone3 104 -> ccStride 1)." },
+        "shape": { "type": "string", "description": "For a SysEx wire: the messageShape it is sent with, when not the one its msg names (a Yamaha Parameter Change, a Waldorf Sound Parameter Change)." },
+        "lsbCc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "For msg=cc: the controller carrying the value's low seven bits, the MSB going on `cc` first (a 14-bit pair)." },
+        "channel": { "type": ["string", "integer"], "description": "For msg=cc, nrpn or rpn: the channel, when not the profile's $channel: a variable ($partChannel) or a fixed channel 1-16." },
+        "nullAfterSend": { "type": "boolean", "description": "For msg=nrpn or rpn: whether the parameter number is set to null (7F 7F) after the value." },
+        "lowBits": { "type": "integer", "minimum": 1, "maximum": 7, "description": "For msg=nrpn or rpn: the value's low bits go first, this many, on lowBitsController (Korg's data entry), the rest on CC 6." },
+        "lowBitsController": { "type": "integer", "minimum": 0, "maximum": 127, "description": "For msg=nrpn or rpn with lowBits: the controller carrying the low bits." },
+        "delayAfterMs": { "type": "integer", "minimum": 0, "description": "For msg=nrpn or rpn: a pause after the message." },
         "nrpn": { "type": "string", "description": "NRPN MSB/LSB, space-hex, for msg=nrpn." },
         "rpn": { "type": "string", "description": "RPN MSB/LSB, space-hex, for msg=rpn. Selected with CC 101/100 rather than 99/98; the registered numbers the MIDI spec names (00 00 pitch bend range, 00 01 fine tune, 00 02 coarse tune) live here." },
         "channelRelative": { "type": "boolean", "description": "If true, the CC/NRPN/RPN channel follows the part/instance channel rather than a fixed one." }
@@ -295,7 +403,7 @@
       "description": "How a logical value maps to/from wire bytes. The same primitive expresses simple u7 through Korg 8->7 block packing; round-trip (encode then decode) must be identity across the full range.",
       "properties": {
         "type": {
-          "enum": ["u7", "u8", "s7", "u14", "u14-lsb", "nibbles", "packed8to7", "bitslice", "text-ascii", "text-nibbled-ascii"],
+          "enum": ["u7", "u8", "s7", "u14", "u14-lsb", "nibbles", "packed8to7", "bitslice", "text-ascii", "text-nibbled-ascii", "s14-lsb-msb", "s17-msb-lsb", "s21-lsb-msb", "s21-msb-lsb", "boolean-u7"],
           "description": "u7=1 byte 0-127. u8=1 byte 0-255. s7=signed centered. u14=14-bit value over two 7-bit bytes, MSB first (Yamaha/Roland 2-byte fields); u14-lsb=LSB first. nibbles=value split across N nibble bytes (high nibble first). packed8to7=Korg block packing. bitslice=value assembled from declared bit-slices. text-ascii=`length` ASCII bytes, padded with `pad`; text-nibbled-ascii=the same, each character split across two nibble bytes."
         },
         "bytes": { "type": "integer", "minimum": 1, "description": "Wire byte count for nibbles/u8." },
@@ -321,7 +429,11 @@
               "valueShift": { "type": "integer", "minimum": 0, "description": "Bit position in the assembled value where this slice lands." }
             }
           }
-        }
+        },
+        "signed": { "type": "boolean", "description": "For bitslice: the assembled bits are two's complement over the slices' width (a KRONOS keeps -99..+99 as one byte, 9D..63)." },
+        "map": { "type": "array", "items": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }, "description": "For bitslice: [[raw, value], ...], the value given by table (a switch stored inverted)." },
+        "shiftRight": { "type": "integer", "minimum": 0, "maximum": 24, "description": "For bitslice: the raw bits moved right (a 16-bit field the device reads the top bits of)." },
+        "max": { "type": "integer", "description": "For bitslice: the value no larger than this." }
       }
     },
 
@@ -515,19 +627,24 @@
     "dumpLayoutEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["param", "offset"],
-      "description": "One parameter's place in a dump's byte payload. Explicit - a device's dump byte order is NOT derivable from scope addresses.",
+      "required": ["param"],
+      "anyOf": [{ "required": ["offset"] }, { "required": ["record"] }],
+      "description": "One parameter's place in a dump's byte payload, by offset, or by record in a dump of key/value records. Explicit - a device's dump byte order is NOT derivable from scope addresses.",
       "properties": {
         "param": { "type": "string", "description": "Parameter reference: a resolved id (e.g. 'tone1.filter.cutoff') or scope-relative 'scopeId.paramId'." },
         "offset": { "type": "integer", "minimum": 0, "description": "Byte offset within the (unpacked) payload." },
         "size": { "type": "integer", "minimum": 1, "description": "Byte count; defaults to the codec's natural size." },
+        "record": { "type": "integer", "minimum": 0, "description": "In a dump of key/value records (payload.records): the key of the record holding the value, instead of an offset." },
+        "scope": { "type": "object", "description": "With record: the record of another key it must follow, and that record's value (the part being edited)." },
+        "when": { "type": "object", "description": "Read only when the payload byte at `offset` holds `value` (a field whose meaning another byte selects)." },
+        "engine": { "type": "object", "description": "Engine-only mapping details the emitter lays over what it derives (a codec the DPD does not name, such as bitfields); written by tools/from-legacy.mjs." },
         "codec": {
           "type": "object",
           "additionalProperties": true,
           "required": ["type"],
           "description": "Per-dump codec; defaults to the parameter's own encoding. Superset of $defs.encoding: also u14 (two-byte MSB-first) and text (patch names).",
           "properties": {
-            "type": { "enum": ["u7", "u8", "s7", "nibbles", "packed8to7", "bitslice", "u14", "text-ascii", "text-nibbled-ascii"] },
+            "type": { "enum": ["u7", "u8", "s7", "nibbles", "packed8to7", "bitslice", "u14", "u14-lsb", "text-ascii", "text-nibbled-ascii"] },
             "length": { "type": "integer", "minimum": 1, "description": "For text codecs: character count." },
             "pad": { "type": "integer", "description": "For text codecs: pad byte (default 32 = space)." }
           }
@@ -544,7 +661,9 @@
         "name": { "type": "string" },
         "kind": { "enum": ["patch", "performance", "bank"] },
         "spans": { "type": "array", "items": { "type": "string" }, "description": "Scope ids this dump covers (a performance spans global + all parts)." },
-        "requestShape": { "type": "string", "description": "messageShape id used to request this dump." },
+        "frameOnly": { "type": "boolean", "description": "A message that frames a collection and maps nothing (a Yamaha bulk header or footer): emitted all the same, with no mappings." },
+        "request": { "type": "string", "description": "The id of the request (in `requests`) that asks the device for this dump." },
+        "requestShape": { "type": "string", "description": "A message shape that asks for this dump, the emitter making a request of it. A model with `requests` names one with `request` instead." },
         "message": {
           "type": "object",
           "additionalProperties": false,
@@ -564,6 +683,18 @@
               "properties": {
                 "offset": { "type": "integer", "minimum": 0, "description": "Byte index where parameter data begins (after the header)." },
                 "size": { "type": "integer", "minimum": 0, "description": "Unpacked payload byte count." },
+            "records": {
+              "type": "object",
+              "description": "A payload of records, each `size` bytes: a key at `keyAt` and a value at `valueAt`, each u7 or u14 (`keyType`, `valueType`). A layout entry then names its key (`record`), and may name the record and value that must have come before it (`scope`): the Groove Synthesis 3rd Wave's dump is every setting as its NRPN number and value, NRPN 0 (the part) before each part's.",
+              "required": ["size"],
+              "properties": {
+                "size": { "type": "integer", "minimum": 1 },
+                "keyAt": { "type": "integer", "minimum": 0 },
+                "keyType": { "enum": ["u7", "u14"] },
+                "valueAt": { "type": "integer", "minimum": 0 },
+                "valueType": { "enum": ["u7", "u14"] }
+              }
+            },
                 "pack": { "$ref": "#/$defs/encoding", "description": "Optional block packing of the WHOLE payload before per-offset mapping (e.g. Korg packed8to7)." }
               }
             },

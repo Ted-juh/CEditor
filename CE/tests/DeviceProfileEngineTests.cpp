@@ -1339,6 +1339,466 @@ int runLsbFirstEncodingTests (const juce::File& nrpnFile)
     return 0;
 }
 
+// A 14-bit CC pair: the MSB on `controller`, then the LSB on `lsbController`, as two messages; a 7-bit
+// encoder sends the coarse half with its fine half 0; an LSB on the MSB's own controller is refused.
+// deviceProfileLocalEngine.js builds the same bytes (inboundParameterIndex.test.js checks them).
+int runCollectionEndsWithTests()
+{
+    // A collection whose size the instrument decides: complete when the dump it names arrives,
+    // however many came before it, and not before, however many have.
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-endswith", "name": "Probe", "manufacturer": "Probe",
+      "parameters": [
+        { "id": "level", "name": "Level", "messageRecipe": "cc7", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+      "dumpDefinitions": [
+        { "id": "header", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "01"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 0 },
+          "completion": { "expectedMessages": 2, "expectedBytes": 4, "collectionId": "performance", "endsWith": "footer" }, "mappings": [] },
+        { "id": "part", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "02"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 1 },
+          "completion": { "expectedMessages": 2, "expectedBytes": 5, "collectionId": "performance", "endsWith": "footer" },
+          "mappings": [ { "parameter": "level", "offset": 0 } ] },
+        { "id": "footer", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "03"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 0 },
+          "completion": { "expectedMessages": 2, "expectedBytes": 4, "collectionId": "performance", "endsWith": "footer" }, "mappings": [] }
+      ]
+    })JSON";
+
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] Collection endsWith: probe profile load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    juce::StringArray begun { "F0 7D 01 F7", "F0 7D 02 40 F7" };
+    const auto partial = engine.collectDumpMessages (begun);
+    if (partial.complete)
+    {
+        std::cerr << "[FAIL] Collection endsWith: complete before its footer, at its expected count\n";
+        ++failures;
+    }
+    juce::StringArray whole { "F0 7D 01 F7", "F0 7D 02 40 F7", "F0 7D 02 41 F7", "F0 7D 03 F7" };
+    const auto complete = engine.collectDumpMessages (whole);
+    if (! complete.complete || complete.expectedMessageCount != 4 || (int) complete.values.getProperty ("level", -1) != 65)
+    {
+        std::cerr << "[FAIL] Collection endsWith: the footer should complete it with 4 messages and level 65, got "
+                  << (complete.complete ? "complete" : "incomplete") << ", " << complete.expectedMessageCount << " expected\n";
+        ++failures;
+    }
+    if (failures == 0)
+        std::cout << "[PASS] Collection endsWith :: complete when its footer arrives, not at a count\n";
+    return failures;
+}
+
+int runDumpNameTextTests()
+{
+    // A name as an instrument stores it: a 00 byte ends it, any other byte outside 32 - 127 reads as
+    // '?', and neither fails the dump. Waldorf's own Blofeld and Microwave banks put display
+    // characters below 32 into names and Behringer's DeepMind banks pad names with 00; each used to
+    // cost every other parameter of the sound. The JavaScript engine's twin is in
+    // deviceProfileCollection.test.js.
+    const juce::String json = R"JSON({
+      "schemaVersion": 1, "id": "probe-name-text", "name": "Probe", "manufacturer": "Probe",
+      "parameters": [
+        { "id": "name", "name": "Name", "type": "text", "encoding": { "type": "text-ascii", "length": 6, "pad": 32 },
+          "access": { "canWrite": false, "canRead": true } },
+        { "id": "level", "name": "Level", "messageRecipe": "cc7", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+      "dumpDefinitions": [
+        { "id": "sound", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "09"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 7 },
+          "completion": { "expectedBytes": 11 }, "mappings": [ { "parameter": "name", "offset": 0 }, { "parameter": "level", "offset": 6 } ] }
+      ]
+    })JSON";
+
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] Dump name text: probe profile load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const auto expectName = [&] (const char* hex, const juce::String& name, const char* why)
+    {
+        const auto parsed = engine.parseDumpMessage (hex);
+        if (! parsed.ok || parsed.values.getProperty ("name", {}).toString() != name || (int) parsed.values.getProperty ("level", -1) != 64)
+        {
+            std::cerr << "[FAIL] Dump name text: " << why << ": got " << (parsed.ok ? "\"" + parsed.values.getProperty ("name", {}).toString() + "\"" : parsed.error)
+                      << ", wanted \"" << name << "\" and level 64\n";
+            ++failures;
+        }
+    };
+    expectName ("F0 7D 09 41 42 02 44 20 20 40 F7", "AB?D", "a display character below 32 reads as ?");
+    expectName ("F0 7D 09 41 42 43 00 00 00 40 F7", "ABC", "a 00 ends the name");
+    expectName ("F0 7D 09 41 00 43 44 45 46 40 F7", "A", "what follows a 00 is not the name");
+    if (failures == 0)
+        std::cout << "[PASS] Dump name text :: 00 ends a name, other control bytes read as ?, the dump still reads\n";
+    return failures;
+}
+
+int runChecksumAlsoAcceptTests()
+{
+    // Waldorf's checksum is the data's sum masked to 7 bits, and `A checksum of 7Fh is always
+    // accepted as valid`: a dump may carry 7F instead, where the profile says so (alsoAccept). The
+    // JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const auto profile = [] (bool alsoAccept)
+    {
+        return juce::String (R"JSON({
+          "schemaVersion": 1, "id": "probe-also-accept", "name": "Probe", "manufacturer": "Probe",
+          "parameters": [
+            { "id": "level", "name": "Level", "messageRecipe": "cc7", "type": "integer",
+              "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } }
+          ],
+          "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+          "dumpDefinitions": [
+            { "id": "sound", "kind": "sysex", "matcher": { "prefix": ["F0", "3E", "13"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 2 },
+              "checksum": { "type": "sum-7bit", "fromOffset": 3, "toOffset": 4, "byteOffset": 5)JSON")
+             + (alsoAccept ? ", \"alsoAccept\": [\"7F\"]" : "")
+             + R"JSON( },
+              "completion": { "expectedBytes": 7 }, "mappings": [ { "parameter": "level", "offset": 1 } ] }
+          ]
+        })JSON";
+    };
+    auto failures = 0;
+    const auto read = [] (const juce::String& json, const juce::String& hex)
+    {
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromJson (json, error))
+            return juce::String ("load: " + error);
+        const auto parsed = engine.parseDumpMessage (hex);
+        return parsed.ok ? juce::String ((int) parsed.values.getProperty ("level", -1)) : juce::String ("refused");
+    };
+    const struct { bool alsoAccept; const char* hex; const char* expected; const char* why; } cases[] = {
+        { false, "F0 3E 13 01 40 41 F7", "64", "01 + 40 = 41: the sum" },
+        { false, "F0 3E 13 01 40 7F F7", "refused", "without alsoAccept, 7F is a wrong checksum" },
+        { true, "F0 3E 13 01 40 7F F7", "64", "with it, 7F is taken" },
+        { true, "F0 3E 13 01 40 42 F7", "refused", "and any other wrong value is still refused" },
+    };
+    for (const auto& c : cases)
+    {
+        const auto got = read (profile (c.alsoAccept), c.hex);
+        if (got != c.expected)
+        {
+            std::cerr << "[FAIL] Checksum alsoAccept: " << c.why << ": expected " << c.expected << ", got " << got << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] Checksum alsoAccept :: a value the device always accepts, and nothing else\n";
+    return failures;
+}
+
+int runDumpRecordTests()
+{
+    // A dump of records (the Groove Synthesis 3rd Wave's edit buffer): each setting a record of its
+    // key and value, two bytes each, in whatever order the device sends; a mapping names the key it
+    // reads, and a scope the record of another key it must follow (the part being edited). The
+    // JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const auto profile = [] (bool named)
+    {
+        return juce::String (R"JSON({
+          "schemaVersion": 1, "id": "probe-records", "name": "Probe", "manufacturer": "Probe",
+          "parameters": [
+            { "id": "tempo", "name": "Tempo", "messageRecipe": "cc7", "type": "integer",
+              "range": { "min": 200, "max": 2400 }, "encoding": { "type": "u14" }, "access": { "canWrite": true, "canRead": true } },
+            { "id": "cutoff", "name": "Cutoff", "messageRecipe": "cc7", "type": "integer",
+              "range": { "min": 0, "max": 255 }, "encoding": { "type": "u14" }, "access": { "canWrite": true, "canRead": true } },
+            { "id": "absent", "name": "Absent", "messageRecipe": "cc7", "type": "integer",
+              "range": { "min": 0, "max": 127 }, "encoding": { "type": "u14" }, "access": { "canWrite": true, "canRead": true } }
+          ],
+          "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+          "dumpDefinitions": [
+            { "id": "editBuffer", "kind": "sysex", "matcher": { "prefix": ["F0", "00", "02", "4A", "01", "03"], "suffix": ["F7"] },
+              "payload": { "offset": 6, "records": { "size": 4, "keyAt": 0, "keyType": "u14", "valueAt": 2, "valueType": "u14" } },
+              "completion": { "expectedMessages": 1 },
+              "mappings": [ { "parameter": "tempo")JSON")
+             + (named ? ", \"record\": 33" : "")
+             + R"JSON( },
+                { "parameter": "cutoff", "record": 300, "scope": { "record": 0, "value": 2 } },
+                { "parameter": "absent", "record": 400 } ] }
+          ]
+        })JSON";
+    };
+    const auto read = [] (const juce::String& json, const juce::String& hex)
+    {
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromJson (json, error))
+            return juce::String ("load: " + error);
+        const auto parsed = engine.parseDumpMessage (hex);
+        if (! parsed.ok)
+            return "refused " + parsed.matchStatus;
+        juce::StringArray got;
+        for (const auto* id : { "tempo", "cutoff", "absent" })
+            if (parsed.values.hasProperty (id))
+                got.add (juce::String (id) + "=" + parsed.values.getProperty (id, {}).toString());
+        return got.joinIntoString (" ");
+    };
+    // Part 1's cutoff (300 = 02 2C) is 10, part 2's 200; tempo (33 = 00 21) is 1200 (09 30).
+    const juce::String body = "00 00 00 01  02 2C 00 0A  00 21 09 30  00 00 00 02  02 2C 01 48";
+    const struct { bool named; juce::String hex; const char* expected; const char* why; } cases[] = {
+        { true, "F0 00 02 4A 01 03 " + body + " F7", "tempo=1200 cutoff=200", "part 2's cutoff, the tempo wherever it comes, nothing for a key the dump lacks" },
+        { true, "F0 00 02 4A 01 03 " + body + " 00 F7", "refused partial", "a record cut short is refused" },
+        { false, "F0 00 02 4A 01 03 " + body + " F7", "refused invalidDefinition", "a mapping of a dump of records names its record" },
+    };
+    auto failures = 0;
+    for (const auto& c : cases)
+    {
+        const auto got = read (profile (c.named), c.hex);
+        if (got != c.expected)
+        {
+            std::cerr << "[FAIL] Dump records: " << c.why << ": expected " << c.expected << ", got " << got << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] Dump records :: read by key, a scoped one after its scope, a short record refused\n";
+    return failures;
+}
+
+int runDumpWhenTests()
+{
+    // `when`: a field another byte selects (a KRONOS EXi slot's engine settings, read only when the
+    // slot's Algorithm Type holds that engine). Byte 0 selects which of two parameters byte 1 is.
+    // The JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-when", "name": "Probe", "manufacturer": "Probe",
+      "parameters": [
+        { "id": "engine", "name": "Engine", "messageRecipe": "cc7", "type": "integer", "range": { "min": 0, "max": 9 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } },
+        { "id": "alCutoff", "name": "AL Cutoff", "messageRecipe": "cc7", "type": "integer", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } },
+        { "id": "cxDrawbar", "name": "CX Drawbar", "messageRecipe": "cc7", "type": "integer", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+      "dumpDefinitions": [
+        { "id": "probe", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "05"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 2 },
+          "completion": { "expectedBytes": 6 },
+          "mappings": [ { "parameter": "engine", "offset": 0 },
+                        { "parameter": "alCutoff", "offset": 1, "when": { "offset": 0, "value": 2 } },
+                        { "parameter": "cxDrawbar", "offset": 1, "when": { "offset": 0, "value": 3 } } ] }
+      ]
+    })JSON";
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] when: probe did not load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const struct { const char* hex; const char* expected; } cases[] = {
+        { "F0 7D 05 02 40 F7", "engine=2 alCutoff=64" },
+        { "F0 7D 05 03 40 F7", "engine=3 cxDrawbar=64" },
+        { "F0 7D 05 00 40 F7", "engine=0" },
+    };
+    for (const auto& c : cases)
+    {
+        const auto parsed = engine.parseDumpMessage (c.hex);
+        juce::StringArray got;
+        for (const auto* id : { "engine", "alCutoff", "cxDrawbar" })
+            if (parsed.ok && parsed.values.hasProperty (id))
+                got.add (juce::String (id) + "=" + parsed.values.getProperty (id, {}).toString());
+        if (got.joinIntoString (" ") != c.expected)
+        {
+            std::cerr << "[FAIL] when: " << c.hex << " should read " << c.expected << ", got " << (parsed.ok ? got.joinIntoString (" ") : parsed.error) << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] when :: a field read only when the byte that selects it holds its value\n";
+    return failures;
+}
+
+int runS21MsbFirstTests()
+{
+    // A signed value in 21 bits, two's complement, most significant byte first: the KRONOS's
+    // parameter change (`valueH 0scccccc, valueM, valueL`). Encoded into a SysEx template and read
+    // back from a dump; the KingKORG's s21-lsb-msb is the same bits the other way round. Beside it
+    // a bit field read `signed`, as the KRONOS's dump keeps -99~+99 in a byte, and the same byte
+    // read without. The JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-s21", "name": "Probe", "manufacturer": "Probe",
+      "variables": { "channel": 1, "deviceId": 48 },
+      "parameters": [
+        { "id": "tune", "name": "Tune", "messageRecipe": "pc", "type": "integer",
+          "range": { "min": -1200, "max": 1200 }, "encoding": { "type": "s21-msb-lsb" }, "access": { "canWrite": true, "canRead": true } },
+        { "id": "intensity", "name": "Intensity", "messageRecipe": "pc", "type": "integer",
+          "range": { "min": -64, "max": 63 }, "encoding": { "type": "s21-msb-lsb" }, "access": { "canWrite": true, "canRead": true } },
+        { "id": "level", "name": "Level", "messageRecipe": "pc", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "s21-msb-lsb" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "pc", "kind": "sysex", "template": ["F0", "42", "$deviceId", "68", "43", "02", "00", "00", "05", "00", "$encodedValue", "F7"] } ],
+      "dumpDefinitions": [
+        { "id": "probe", "kind": "sysex", "matcher": { "prefix": ["F0", "42", "30", "68", "4C"], "suffix": ["F7"] }, "payload": { "offset": 5, "size": 4 },
+          "completion": { "expectedBytes": 10 }, "mappings": [ { "parameter": "tune", "offset": 0 },
+            { "parameter": "intensity", "offset": 3, "codec": { "type": "bitfields", "signed": true, "parts": [ { "at": 0, "from": 0, "bits": 7 } ] } },
+            { "parameter": "level", "offset": 3, "codec": { "type": "bitfields", "parts": [ { "at": 0, "from": 0, "bits": 7 } ] } } ] }
+      ]
+    })JSON";
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] s21 MSB first: probe did not load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const struct { int value; const char* hex; } cases[] = { { -50, "7F 7F 4E" }, { 300, "00 02 2C" }, { 0, "00 00 00" }, { -1, "7F 7F 7F" } };
+    for (const auto& c : cases)
+    {
+        const auto compiled = engine.compileSetParameter ("mainSynth", "tune", c.value, true);
+        if (! compiled.ok || compiled.transaction.encodedValueHex != c.hex)
+        {
+            std::cerr << "[FAIL] s21 MSB first: " << c.value << " should encode as " << c.hex << ", got "
+                      << (compiled.ok ? compiled.transaction.encodedValueHex : compiled.error) << "\n";
+            ++failures;
+        }
+    }
+    const auto parsed = engine.parseDumpMessage ("F0 42 30 68 4C 7F 7F 4E 4E F7");
+    const auto read = [&parsed] (const char* id) { return parsed.ok ? parsed.values.getProperty (id, {}).toString() : parsed.error; };
+    if (! parsed.ok || (int) parsed.values.getProperty ("tune", 0) != -50)
+    {
+        std::cerr << "[FAIL] s21 MSB first: 7F 7F 4E should read back as -50, got " << read ("tune") << "\n";
+        ++failures;
+    }
+    if (read ("intensity") != "-50" || read ("level") != "78")
+    {
+        std::cerr << "[FAIL] signed bit field: 4E over 7 bits should read -50 signed and 78 not, got "
+                  << read ("intensity") << " and " << read ("level") << "\n";
+        ++failures;
+    }
+    if (failures == 0)
+        std::cout << "[PASS] s21 MSB first :: two's complement over 21 bits, high byte first, both ways; a signed bit field\n";
+    return failures;
+}
+
+int runS17MsbFirstTests()
+{
+    // A signed value in 17 bits, two's complement, most significant byte first, the first byte
+    // carrying bits 14 - 16 only: the Alesis A6's MIDI Editing (opcode 0E), whose <data2> holds the
+    // mix channel above them. The document's own examples are the vectors: Filter 2 Offset to -0.02
+    // is 07 7F 70 (-16), Osc 2 Mod 3 on is 00 00 01. Read back with the channel bits set, which are
+    // not the value's. The JavaScript engine's twin is in deviceProfileCollection.test.js.
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-s17", "name": "Probe", "manufacturer": "Probe",
+      "variables": { "channel": 1 },
+      "parameters": [
+        { "id": "offset", "name": "Offset", "messageRecipe": "edit", "type": "integer",
+          "range": { "min": -65534, "max": 65535 }, "encoding": { "type": "s17-msb-lsb" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "edit", "kind": "sysex", "template": ["F0", "00", "00", "0E", "1D", "0E", "13", "08", "$encodedValue", "F7"] } ],
+      "dumpDefinitions": [
+        { "id": "probe", "kind": "sysex", "matcher": { "prefix": ["F0", "00", "00", "0E", "1D", "0E", "13", "08"], "suffix": ["F7"] }, "payload": { "offset": 8, "size": 3 },
+          "completion": { "expectedBytes": 12 }, "mappings": [ { "parameter": "offset", "offset": 0 } ] }
+      ]
+    })JSON";
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] s17 MSB first: probe did not load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const struct { int value; const char* hex; } cases[] = { { -16, "07 7F 70" }, { 1, "00 00 01" }, { 65535, "03 7F 7F" }, { -65534, "04 00 02" }, { -1, "07 7F 7F" } };
+    for (const auto& c : cases)
+    {
+        const auto compiled = engine.compileSetParameter ("mainSynth", "offset", c.value, true);
+        if (! compiled.ok || compiled.transaction.encodedValueHex != c.hex)
+        {
+            std::cerr << "[FAIL] s17 MSB first: " << c.value << " should encode as " << c.hex << ", got "
+                      << (compiled.ok ? compiled.transaction.encodedValueHex : compiled.error) << "\n";
+            ++failures;
+        }
+    }
+    const auto compiled = engine.compileSetParameter ("mainSynth", "offset", -16, true);
+    const auto whole = compiled.ok && compiled.transaction.messages.size() == 1
+                           ? ceditor::device::DeviceProfileEngine::bytesToHex (compiled.transaction.messages.getReference (0).bytes)
+                           : compiled.error;
+    if (whole != "F0 00 00 0E 1D 0E 13 08 07 7F 70 F7")
+    {
+        std::cerr << "[FAIL] s17 MSB first: -16 should be the document's F0 00 00 0E 1D 0E 13 08 07 7F 70 F7, got "
+                  << whole << "\n";
+        ++failures;
+    }
+    for (const auto* input : { "F0 00 00 0E 1D 0E 13 08 07 7F 70 F7", "F0 00 00 0E 1D 0E 13 08 7F 7F 70 F7" })
+    {
+        const auto parsed = engine.parseDumpMessage (input);
+        if (! parsed.ok || (int) parsed.values.getProperty ("offset", 0) != -16)
+        {
+            std::cerr << "[FAIL] s17 MSB first: " << input << " should read back as -16, got "
+                      << (parsed.ok ? parsed.values.getProperty ("offset", {}).toString() : parsed.error) << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] s17 MSB first :: two's complement over 17 bits, the first byte's other bits not the value's\n";
+    return failures;
+}
+
+int runCcPairTests()
+{
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-ccpair", "name": "Probe", "manufacturer": "Probe",
+      "variables": { "channel": 1 },
+      "parameters": [
+        { "id": "cutoff", "name": "Cutoff", "messageRecipe": "cc19", "type": "integer",
+          "range": { "min": 0, "max": 16383 }, "encoding": { "type": "u14-msb-lsb" }, "access": { "canWrite": true } },
+        { "id": "volume", "name": "Volume", "messageRecipe": "cc7", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true } },
+        { "id": "bad", "name": "Bad", "messageRecipe": "cc8", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true } }
+      ],
+      "messageRecipes": [
+        { "id": "cc19", "kind": "cc", "channel": "$channel", "controller": 19, "lsbController": 51, "value": "$encodedValue" },
+        { "id": "cc7", "kind": "cc", "channel": "$channel", "controller": 7, "lsbController": 39, "value": "$encodedValue" },
+        { "id": "cc8", "kind": "cc", "channel": "$channel", "controller": 8, "lsbController": 8, "value": "$encodedValue" }
+      ],
+      "tests": [{ "name": "Cutoff 1000", "parameter": "cutoff", "value": 1000, "expectedHex": "B0 13 07\nB0 33 68" }]
+    })JSON";
+
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] CC pair: probe profile load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const auto hexOf = [] (const ceditor::device::CompileResult& result)
+    {
+        juce::StringArray parts;
+        for (const auto& message : result.transaction.messages)
+            parts.add (ceditor::device::DeviceProfileEngine::bytesToHex (message.bytes));
+        return parts.joinIntoString (" | ");
+    };
+    const auto expect = [&] (const char* id, int value, const juce::String& want, const char* what)
+    {
+        const auto result = engine.compileSetParameter ("mainSynth", id, value, true);
+        if (! result.ok || hexOf (result) != want)
+        {
+            std::cerr << "[FAIL] CC pair: " << what << ": got " << (result.ok ? hexOf (result) : result.error) << ", want " << want << "\n";
+            ++failures;
+        }
+    };
+    expect ("cutoff", 1000, "B0 13 07 | B0 33 68", "1000 as MSB 7 then LSB 104");
+    expect ("cutoff", 16383, "B0 13 7F | B0 33 7F", "the top of the range");
+    expect ("volume", 100, "B0 07 64 | B0 27 00", "a 7-bit encoder sends the coarse half, its fine half 0");
+    const auto refused = engine.compileSetParameter ("mainSynth", "bad", 1, true);
+    if (refused.ok || ! refused.error.contains ("lsbController"))
+    {
+        std::cerr << "[FAIL] CC pair: an LSB on the MSB's own controller should be refused\n";
+        ++failures;
+    }
+    if (failures == 0)
+        std::cout << "[PASS] CC pair :: MSB then LSB, a 7-bit value as its coarse half, a bad lsbController refused\n";
+    return failures;
+}
+
 int runDumpShapeAndCodecTests (const juce::File& file)
 {
     ceditor::device::DeviceProfileEngine engine;
@@ -4130,7 +4590,276 @@ int main (int argc, char** argv)
         root.getChildFile ("sequential-mopho.ceditor-device.json"),
         root.getChildFile ("sequential-mopho-keyboard.ceditor-device.json"),
         root.getChildFile ("sequential-mopho-x4.ceditor-device.json"),
-        root.getChildFile ("sequential-prophet-08.ceditor-device.json")
+        root.getChildFile ("sequential-prophet-08.ceditor-device.json"),
+        root.getChildFile ("oberheim-ob-6.ceditor-device.json"),
+        root.getChildFile ("oberheim-ob-x8.ceditor-device.json"),
+        root.getChildFile ("oberheim-teo-5.ceditor-device.json"),
+        root.getChildFile ("korg-minilogue.ceditor-device.json"),
+        root.getChildFile ("korg-minilogue-xd.ceditor-device.json"),
+        root.getChildFile ("korg-monologue.ceditor-device.json"),
+        root.getChildFile ("korg-prologue.ceditor-device.json"),
+        root.getChildFile ("korg-minikorg-700sm.ceditor-device.json"),
+        root.getChildFile ("korg-volca-bass.ceditor-device.json"),
+        root.getChildFile ("korg-volca-beats.ceditor-device.json"),
+        root.getChildFile ("korg-volca-keys.ceditor-device.json"),
+        root.getChildFile ("korg-volca-kick.ceditor-device.json"),
+        root.getChildFile ("korg-volca-nubass.ceditor-device.json"),
+        root.getChildFile ("korg-volca-fm2.ceditor-device.json"),
+        root.getChildFile ("korg-nts-1-mk2.ceditor-device.json"),
+        root.getChildFile ("korg-microkorg-s.ceditor-device.json"),
+        root.getChildFile ("korg-kingkorg.ceditor-device.json"),
+        root.getChildFile ("korg-kingkorg-neo.ceditor-device.json"),
+        root.getChildFile ("korg-microkorg2.ceditor-device.json"),
+        root.getChildFile ("korg-microkorg.ceditor-device.json"),
+        root.getChildFile ("korg-nts-1.ceditor-device.json"),
+        root.getChildFile ("korg-ps-3300.ceditor-device.json"),
+        root.getChildFile ("korg-vox-continental.ceditor-device.json"),
+        root.getChildFile ("korg-kronos.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus.ceditor-device.json"),
+        root.getChildFile ("korg-kronos-combination.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus-combination.ceditor-device.json"),
+        root.getChildFile ("korg-kronos-exi.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus-exi.ceditor-device.json"),
+        root.getChildFile ("korg-kronos-global.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus-global.ceditor-device.json"),
+        root.getChildFile ("korg-kronos-wave-sequence.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus-wave-sequence.ceditor-device.json"),
+        root.getChildFile ("korg-kronos-drum-kit.ceditor-device.json"),
+        root.getChildFile ("korg-nautilus-drum-kit.ceditor-device.json"),
+        root.getChildFile ("novation-peak.ceditor-device.json"),
+        root.getChildFile ("novation-summit.ceditor-device.json"),
+        root.getChildFile ("novation-bass-station-ii.ceditor-device.json"),
+        root.getChildFile ("novation-circuit-mono-station.ceditor-device.json"),
+        root.getChildFile ("novation-circuit-tracks.ceditor-device.json"),
+        root.getChildFile ("novation-circuit-rhythm.ceditor-device.json"),
+        root.getChildFile ("novation-mininova.ceditor-device.json"),
+        root.getChildFile ("novation-k-station.ceditor-device.json"),
+        root.getChildFile ("novation-ks-series.ceditor-device.json"),
+        root.getChildFile ("moog-claravox-centennial.ceditor-device.json"),
+        root.getChildFile ("moog-grandmother.ceditor-device.json"),
+        root.getChildFile ("moog-little-phatty.ceditor-device.json"),
+        root.getChildFile ("moog-matriarch.ceditor-device.json"),
+        root.getChildFile ("moog-messenger.ceditor-device.json"),
+        root.getChildFile ("moog-minitaur.ceditor-device.json"),
+        root.getChildFile ("moog-muse.ceditor-device.json"),
+        root.getChildFile ("moog-sirin.ceditor-device.json"),
+        root.getChildFile ("moog-slim-phatty.ceditor-device.json"),
+        root.getChildFile ("moog-sub-37.ceditor-device.json"),
+        root.getChildFile ("moog-subharmonicon.ceditor-device.json"),
+        root.getChildFile ("moog-subsequent-25.ceditor-device.json"),
+        root.getChildFile ("moog-subsequent-37.ceditor-device.json"),
+        root.getChildFile ("moog-taurus-3.ceditor-device.json"),
+        root.getChildFile ("yamaha-reface-cs.ceditor-device.json"),
+        root.getChildFile ("yamaha-reface-dx.ceditor-device.json"),
+        root.getChildFile ("yamaha-reface-cp.ceditor-device.json"),
+        root.getChildFile ("yamaha-reface-yc.ceditor-device.json"),
+        root.getChildFile ("yamaha-modx.ceditor-device.json"),
+        root.getChildFile ("yamaha-modx-plus.ceditor-device.json"),
+        root.getChildFile ("yamaha-moxf.ceditor-device.json"),
+        root.getChildFile ("yamaha-mx.ceditor-device.json"),
+        root.getChildFile ("yamaha-modx-m.ceditor-device.json"),
+        root.getChildFile ("yamaha-montage-m.ceditor-device.json"),
+        root.getChildFile ("yamaha-montage.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif-xf.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif-xs.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif-rack-xs.ceditor-device.json"),
+        root.getChildFile ("yamaha-mox.ceditor-device.json"),
+        root.getChildFile ("yamaha-s90xs.ceditor-device.json"),
+        root.getChildFile ("yamaha-mo.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif-es.ceditor-device.json"),
+        root.getChildFile ("yamaha-s90-es.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif-rack-es.ceditor-device.json"),
+        root.getChildFile ("yamaha-motif.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp1.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp5.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp50.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp4-stage.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp40-stage.ceditor-device.json"),
+        root.getChildFile ("yamaha-cp88-cp73.ceditor-device.json"),
+        root.getChildFile ("yamaha-yc61.ceditor-device.json"),
+        root.getChildFile ("yamaha-yc88-yc73.ceditor-device.json"),
+        root.getChildFile ("waldorf-blofeld.ceditor-device.json"),
+        root.getChildFile ("waldorf-microwave-2.ceditor-device.json"),
+        root.getChildFile ("waldorf-microq.ceditor-device.json"),
+        root.getChildFile ("waldorf-microwave.ceditor-device.json"),
+        root.getChildFile ("waldorf-pulse.ceditor-device.json"),
+        root.getChildFile ("waldorf-rocket.ceditor-device.json"),
+        root.getChildFile ("waldorf-streichfett.ceditor-device.json"),
+        root.getChildFile ("waldorf-wave.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-four.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-four-mkii.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-heat.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-heat-fx.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-heat-mkii.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-keys.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-rytm.ceditor-device.json"),
+        root.getChildFile ("elektron-analog-rytm-mkii.ceditor-device.json"),
+        root.getChildFile ("elektron-digitakt.ceditor-device.json"),
+        root.getChildFile ("elektron-digitakt-ii.ceditor-device.json"),
+        root.getChildFile ("elektron-digitone.ceditor-device.json"),
+        root.getChildFile ("elektron-digitone-ii.ceditor-device.json"),
+        root.getChildFile ("elektron-digitone-keys.ceditor-device.json"),
+        root.getChildFile ("elektron-model-cycles.ceditor-device.json"),
+        root.getChildFile ("elektron-model-samples.ceditor-device.json"),
+        root.getChildFile ("elektron-octatrack.ceditor-device.json"),
+        root.getChildFile ("elektron-octatrack-mkii.ceditor-device.json"),
+        root.getChildFile ("elektron-syntakt.ceditor-device.json"),
+        root.getChildFile ("elektron-tonverk.ceditor-device.json"),
+        root.getChildFile ("behringer-aks-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-cz-1-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-d-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-deepmind-12.ceditor-device.json"),
+        root.getChildFile ("behringer-jn-80.ceditor-device.json"),
+        root.getChildFile ("behringer-jn-80-nrpn.ceditor-device.json"),
+        root.getChildFile ("behringer-jt-4000-micro.ceditor-device.json"),
+        root.getChildFile ("behringer-jt-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-polyeight.ceditor-device.json"),
+        root.getChildFile ("behringer-pro-800.ceditor-device.json"),
+        root.getChildFile ("behringer-pro-vs-mini.ceditor-device.json"),
+        root.getChildFile ("behringer-spice.ceditor-device.json"),
+        root.getChildFile ("behringer-ub-1-micro.ceditor-device.json"),
+        root.getChildFile ("behringer-wave.ceditor-device.json"),
+        root.getChildFile ("arturia-matrixbrute.ceditor-device.json"),
+        root.getChildFile ("arturia-microfreak.ceditor-device.json"),
+        root.getChildFile ("arturia-minifreak.ceditor-device.json"),
+        root.getChildFile ("arturia-polybrute.ceditor-device.json"),
+        root.getChildFile ("arturia-polybrute-12.ceditor-device.json"),
+        root.getChildFile ("asm-hydrasynth.ceditor-device.json"),
+        root.getChildFile ("asm-hydrasynth-deluxe.ceditor-device.json"),
+        root.getChildFile ("asm-hydrasynth-explorer.ceditor-device.json"),
+        root.getChildFile ("asm-leviasynth.ceditor-device.json"),
+        root.getChildFile ("asm-leviasynth-desktop.ceditor-device.json"),
+        root.getChildFile ("nord-c1.ceditor-device.json"),
+        root.getChildFile ("nord-c2d.ceditor-device.json"),
+        root.getChildFile ("nord-drum-2.ceditor-device.json"),
+        root.getChildFile ("nord-drum-3p.ceditor-device.json"),
+        root.getChildFile ("nord-electro-3.ceditor-device.json"),
+        root.getChildFile ("nord-electro-4-hp-sw.ceditor-device.json"),
+        root.getChildFile ("nord-electro-4d.ceditor-device.json"),
+        root.getChildFile ("nord-electro-5.ceditor-device.json"),
+        root.getChildFile ("nord-electro-6.ceditor-device.json"),
+        root.getChildFile ("nord-electro-7.ceditor-device.json"),
+        root.getChildFile ("nord-grand.ceditor-device.json"),
+        root.getChildFile ("nord-grand-2.ceditor-device.json"),
+        root.getChildFile ("nord-lead.ceditor-device.json"),
+        root.getChildFile ("nord-lead-2.ceditor-device.json"),
+        root.getChildFile ("nord-lead-2x.ceditor-device.json"),
+        root.getChildFile ("nord-lead-3.ceditor-device.json"),
+        root.getChildFile ("nord-lead-4.ceditor-device.json"),
+        root.getChildFile ("nord-lead-a1.ceditor-device.json"),
+        root.getChildFile ("nord-organ-3.ceditor-device.json"),
+        root.getChildFile ("nord-piano-3.ceditor-device.json"),
+        root.getChildFile ("nord-piano-4.ceditor-device.json"),
+        root.getChildFile ("nord-piano-5.ceditor-device.json"),
+        root.getChildFile ("nord-piano-6.ceditor-device.json"),
+        root.getChildFile ("nord-stage-2.ceditor-device.json"),
+        root.getChildFile ("nord-stage-2-ex.ceditor-device.json"),
+        root.getChildFile ("nord-stage-3.ceditor-device.json"),
+        root.getChildFile ("nord-stage-4.ceditor-device.json"),
+        root.getChildFile ("nord-wave.ceditor-device.json"),
+        root.getChildFile ("nord-wave-2.ceditor-device.json"),
+        root.getChildFile ("modal-002.ceditor-device.json"),
+        root.getChildFile ("modal-008.ceditor-device.json"),
+        root.getChildFile ("modal-argon8.ceditor-device.json"),
+        root.getChildFile ("modal-argon8m.ceditor-device.json"),
+        root.getChildFile ("modal-argon8x.ceditor-device.json"),
+        root.getChildFile ("modal-carbon8.ceditor-device.json"),
+        root.getChildFile ("modal-carbon8m.ceditor-device.json"),
+        root.getChildFile ("modal-carbon8x.ceditor-device.json"),
+        root.getChildFile ("modal-cobalt5s.ceditor-device.json"),
+        root.getChildFile ("modal-cobalt8.ceditor-device.json"),
+        root.getChildFile ("modal-cobalt8m.ceditor-device.json"),
+        root.getChildFile ("modal-cobalt8x.ceditor-device.json"),
+        root.getChildFile ("modal-craftsynth-2.ceditor-device.json"),
+        root.getChildFile ("modal-element-one.ceditor-device.json"),
+        root.getChildFile ("modal-skulptsynth-se.ceditor-device.json"),
+        root.getChildFile ("dreadbox-artemis.ceditor-device.json"),
+        root.getChildFile ("dreadbox-murmux-adept.ceditor-device.json"),
+        root.getChildFile ("dreadbox-nymphes.ceditor-device.json"),
+        root.getChildFile ("udo-super-6.ceditor-device.json"),
+        root.getChildFile ("udo-super-8.ceditor-device.json"),
+        root.getChildFile ("udo-super-gemini.ceditor-device.json"),
+        root.getChildFile ("groove-synthesis-3rd-wave.ceditor-device.json"),
+        root.getChildFile ("te-ep-133.ceditor-device.json"),
+        root.getChildFile ("te-ep-40.ceditor-device.json"),
+        root.getChildFile ("te-op-1-field.ceditor-device.json"),
+        root.getChildFile ("te-op-xy.ceditor-device.json"),
+        root.getChildFile ("te-op-z.ceditor-device.json"),
+        root.getChildFile ("te-tx-6.ceditor-device.json"),
+        root.getChildFile ("sonicware-cydrums.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-8bit-warps.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-ambient-0.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-bass-and-beats.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-lofi-12.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-lofi-6.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-mega-synthesis.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-texture-lab.ceditor-device.json"),
+        root.getChildFile ("sonicware-liven-xfm.ceditor-device.json"),
+        root.getChildFile ("sonicware-lofi-12-xt.ceditor-device.json"),
+        root.getChildFile ("sonicware-smpltrek.ceditor-device.json"),
+        root.getChildFile ("black-corporation-deckards-dream-mk2.ceditor-device.json"),
+        root.getChildFile ("black-corporation-ise-nin.ceditor-device.json"),
+        root.getChildFile ("black-corporation-kijimi-mk2.ceditor-device.json"),
+        root.getChildFile ("black-corporation-xerxes-mk2.ceditor-device.json"),
+        root.getChildFile ("erica-lxr-02.ceditor-device.json"),
+        root.getChildFile ("erica-perkons-hd-01.ceditor-device.json"),
+        root.getChildFile ("expressive-e-osmose.ceditor-device.json"),
+        root.getChildFile ("alesis-a6-andromeda.ceditor-device.json"),
+        root.getChildFile ("gamechanger-motor-synth.ceditor-device.json"),
+        root.getChildFile ("gamechanger-motor-synth-mkii.ceditor-device.json"),
+        root.getChildFile ("hammond-sk1-sk2.ceditor-device.json"),
+        root.getChildFile ("hammond-skx.ceditor-device.json"),
+        root.getChildFile ("hammond-xk-1c.ceditor-device.json"),
+        root.getChildFile ("tasty-chips-arduino-piggyback.ceditor-device.json"),
+        root.getChildFile ("tasty-chips-gr-1.ceditor-device.json"),
+        root.getChildFile ("tasty-chips-gr-2.ceditor-device.json"),
+        root.getChildFile ("tasty-chips-gr-mega.ceditor-device.json"),
+        root.getChildFile ("tasty-chips-st-4.ceditor-device.json"),
+        root.getChildFile ("jomox-airbase-99.ceditor-device.json"),
+        root.getChildFile ("jomox-alpha-base-mk2.ceditor-device.json"),
+        root.getChildFile ("jomox-alpha-base.ceditor-device.json"),
+        root.getChildFile ("jomox-mbase-01.ceditor-device.json"),
+        root.getChildFile ("jomox-mbase-11.ceditor-device.json"),
+        root.getChildFile ("jomox-mbrane-11.ceditor-device.json"),
+        root.getChildFile ("jomox-mod-fm.ceditor-device.json"),
+        root.getChildFile ("jomox-modbase-09-mk2.ceditor-device.json"),
+        root.getChildFile ("jomox-modbase-09.ceditor-device.json"),
+        root.getChildFile ("jomox-modbrane-11.ceditor-device.json"),
+        root.getChildFile ("jomox-moonwind-mk2.ceditor-device.json"),
+        root.getChildFile ("jomox-moonwind.ceditor-device.json"),
+        root.getChildFile ("jomox-sunsyn-mk2.ceditor-device.json"),
+        root.getChildFile ("jomox-xbase-09.ceditor-device.json"),
+        root.getChildFile ("jomox-xbase-888.ceditor-device.json"),
+        root.getChildFile ("jomox-xbase-999.ceditor-device.json"),
+        root.getChildFile ("twisted-electrons-ay3.ceditor-device.json"),
+        root.getChildFile ("twisted-electrons-blastbeats.ceditor-device.json"),
+        root.getChildFile ("twisted-electrons-deton8.ceditor-device.json"),
+        root.getChildFile ("twisted-electrons-hapines-l.ceditor-device.json"),
+        root.getChildFile ("twisted-electrons-megafm.ceditor-device.json"),
+        root.getChildFile ("twisted-electrons-therapsid.ceditor-device.json"),
+        root.getChildFile ("twisted-electrons-twistfm.ceditor-device.json"),
+        root.getChildFile ("dexibell-j7.ceditor-device.json"),
+        root.getChildFile ("dexibell-s10.ceditor-device.json"),
+        root.getChildFile ("dexibell-s8.ceditor-device.json"),
+        root.getChildFile ("dexibell-s9.ceditor-device.json"),
+        root.getChildFile ("dexibell-sx8.ceditor-device.json"),
+        root.getChildFile ("vermona-kick-lancet.ceditor-device.json"),
+        root.getChildFile ("vermona-mono-lancet-15.ceditor-device.json"),
+        root.getChildFile ("modor-dr-2.ceditor-device.json"),
+        root.getChildFile ("modor-nf-1.ceditor-device.json"),
+        root.getChildFile ("modor-nf-1k.ceditor-device.json"),
+        root.getChildFile ("gotharman-anamono.ceditor-device.json"),
+        root.getChildFile ("gotharman-ld-zero.ceditor-device.json"),
+        root.getChildFile ("gotharman-ld3.ceditor-device.json"),
+        root.getChildFile ("gotharman-spazeboard6.ceditor-device.json"),
+        root.getChildFile ("gotharman-tiny-ld.ceditor-device.json"),
+        root.getChildFile ("radikal-delta-cep-a.ceditor-device.json"),
+        root.getChildFile ("kodamo-mask1.ceditor-device.json"),
+        root.getChildFile ("gamechanger-auto-chorus.ceditor-device.json"),
+        root.getChildFile ("gamechanger-auto-delay.ceditor-device.json"),
+        root.getChildFile ("gamechanger-auto-reverb.ceditor-device.json"),
+        root.getChildFile ("gamechanger-bigsby.ceditor-device.json"),
+        root.getChildFile ("gamechanger-motor-pedal.ceditor-device.json")
     };
 
     auto failures = 0;
@@ -4140,6 +4869,14 @@ int main (int argc, char** argv)
     failures += runPolicyTests (root.getChildFile ("test-cc-synth.ceditor-device.json"));
     failures += runNrpnTimingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runLsbFirstEncodingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
+    failures += runCcPairTests();
+    failures += runCollectionEndsWithTests();
+    failures += runChecksumAlsoAcceptTests();
+    failures += runDumpNameTextTests();
+    failures += runDumpRecordTests();
+    failures += runS21MsbFirstTests();
+    failures += runS17MsbFirstTests();
+    failures += runDumpWhenTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runCatalogSummaryTests (root);

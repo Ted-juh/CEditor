@@ -1,0 +1,24 @@
+{
+  "sources": [
+    {"title":"SPICE Quick Start Guide","file":"QSG_BE_0718-ACD_SPICE_WW.pdf","sha256":"29ad064d0f70faa36a6ac91d796865534c8b9b8ffa89adbc8d144903692cbd24","url":"https://cdn-media.empowertribe.com/108510958295485e8671ea86848f76f4/QSG_BE_0718-ACD_SPICE_WW.pdf"}
+  ],
+  "rows": [
+    {"page":21,"cc":4,"name":"VCO 1 Frequency MSB (use with CC 36)","range":"0 – 127"},
+    {"page":21,"cc":12,"name":"VCO 2 Frequency MSB (use with CC 44)","range":"0 – 127"},
+    {"page":21,"cc":23,"name":"VCF EG Attack MSB (use with CC 55)","range":"0 – 127"},
+    {"page":21,"cc":24,"name":"VCF EG Decay MSB (use with CC 56)","range":"0 – 127"},
+    {"page":21,"cc":28,"name":"VCA EG Attack MSB (use with CC 60)","range":"0 – 127"},
+    {"page":21,"cc":29,"name":"VCA EG Decay MSB (use with CC 61)","range":"0 – 127"},
+    {"page":21,"cc":36,"name":"VCO 1 Frequency LSB","range":"0 – 127"},
+    {"page":21,"cc":44,"name":"VCO 2 Frequency LSB","range":"0 – 127"},
+    {"page":21,"cc":55,"name":"VCF EG Attack LSB","range":"0 – 127"},
+    {"page":21,"cc":56,"name":"VCF EG Decay LSB","range":"0 – 127"},
+    {"page":21,"cc":60,"name":"VCA EG Attack LSB","range":"0 – 127"},
+    {"page":21,"cc":61,"name":"VCA EG Decay LSB","range":"0 – 127"},
+    {"page":21,"cc":103,"name":"VCO 1 Sub 1 Frequency","range":"0 – 7 Divide by 16 8 – 15 Divide by 15 16 – 23 Divide by 14 24 – 31 Divide by 13 32 – 39 – Divide by 12 40 – 47 – Divide by 11 48 – 55 – Divide by 10 56 – 63 – Divide by 9 64 – 71 – Divide by 8 72 – 79 – Divide by 7 80 – 87 – Divide by 6 88 – 95 – Divide by 5 96 – 103 – Divide by 4 104 – 111 – Divide by 3 112 – 119 – Divide by 2 120 – 127 - Unison"},
+    {"page":21,"cc":104,"name":"VCO 1 Sub 2 Frequency","range":"0 – 7 Divide by 16 8 – 15 Divide by 15 16 – 23 Divide by 14 24 – 31 Divide by 13 32 – 39 – Divide by 12 40 – 47 – Divide by 11 48 – 55 – Divide by 10 56 – 63 – Divide by 9 64 – 71 – Divide by 8 72 – 79 – Divide by 7 80 – 87 – Divide by 6 88 – 95 – Divide by 5 96 – 103 – Divide by 4 104 – 111 – Divide by 3 112 – 119 – Divide by 2 120 – 127 – Unison"},
+    {"page":21,"cc":105,"name":"VCO 2 Sub 1 Frequency","range":"0 – 7 Divide by 16 8 – 15 Divide by 15 16 – 23 Divide by 14 24 – 31 Divide by 13 32 – 39 – Divide by 12 40 – 47 – Divide by 11 48 – 55 – Divide by 10 56 – 63 – Divide by 9 64 – 71 – Divide by 8 72 – 79 – Divide by 7 80 – 87 – Divide by 6 88 – 95 – Divide by 5 96 – 103 – Divide by 4 104 – 111 – Divide by 3 112 – 119 – Divide by 2 120 – 127 - Unison"},
+    {"page":21,"cc":106,"name":"VCO 2 Sub 2 Frequency","range":"0 – 7 Divide by 16 8 – 15 Divide by 15 16 – 23 Divide by 14 24 – 31 Divide by 13 32 – 39 – Divide by 12 40 – 47 – Divide by 11 48 – 55 – Divide by 10 56 – 63 – Divide by 9 64 – 71 – Divide by 8 72 – 79 – Divide by 7 80 – 87 – Divide by 6 88 – 95 – Divide by 5 96 – 103 – Divide by 4 104 – 111 – Divide by 3 112 – 119 – Divide by 2 120 – 127 – Unison"},
+    {"page":21,"cc":113,"name":"Rhythm Generator Logic Switch","range":"0 – 63 OR Logic (all clocks advance sequencers) 64 – 127 – XOR logic (sequences only advanced when a single clock is detected)"}
+  ]
+}

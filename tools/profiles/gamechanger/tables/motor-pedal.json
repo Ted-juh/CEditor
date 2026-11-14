@@ -1,0 +1,17 @@
+{
+  "source": {"title":"Motor Pedal manual (v05)","file":"MP_manual_v05_WEB_lo.pdf","sha256":"8c40a84165af03ecbb782e2b5c638dda4e252d3cb654181bbedcfd82dda589de","url":"https://gamechangeraudio.com/wp-content/uploads/2025/08/MP_manual_v05_WEB_lo.pdf","linkedFrom":"https://gamechangeraudio.com/motor-pedal/","pages":[9,9]},
+  "bands": [
+    {"page":9,"cc":1,"name":"MOD (MODWHEEL)","msb":"[0...127] = [min MOD...max MOD]","pair":"[0...16383] = [min MOD...max MOD]"},
+    {"page":9,"cc":8,"name":"SHIFT","msb":"[0...17] = [-Oct], [18...35] = [-5th], [36...53] = [-4th], [54...72] = [0], [73...90] = [+4th], [91...108] = [+5th], [109...127] = [+Oct]","pair":"[0...2340] = [-Oct], [2341...4680] = [-5th], [4681...7021] = [-4th], [7022...9361] = [0], [9362...11702] = [+4th], [11703...14042] = [+5th], [14043...16383] = [+Oct]"},
+    {"page":9,"cc":9,"name":"RELEASE","msb":"[0...127] = [min RELEASE...max RELEASE]","pair":"[0...16383] = [min RELEASE...max RELEASE]"},
+    {"page":9,"cc":10,"name":"VIBR/GLIDE","msb":"[0...63] = [max VIBR...min VIBR], [64...127] = [min ACCEL...max ACCEL]","pair":"[0...8192] = [max VIBR...min VIBR], [8193...16383] = [min ACCEL...max ACCEL]"},
+    {"page":9,"cc":11,"name":"MOD","msb":"[0...127] = [min MOD ..max MOD]","pair":"[0...16383] = [min MOD...max MOD]"},
+    {"page":9,"cc":12,"name":"ENGINE","msb":"[0...25] = [ENGINE 1: MOTOR], [26...51] = [ENGINE 2: MxD], [52...76] = [ENGINE 3: MWAVE], [77...102] = [ENGINE 4: COIL], [103...127] = [ENGINE 5: VOCODER],","pair":"[0...3276] = [ENGINE 1: MOTOR], [3277...6553] = [ENGINE 2: MxD], [6554...9829] = [ENGINE 3: MWAVE], [9830...13106] = [ENGINE 4: COIL], [13107...16383] = [ENGINE 5: VOCODER],"},
+    {"page":9,"cc":13,"name":"PEDAL","msb":"[0...25] = [PEDAL MODE 1: ACCEL], [26...51] = [PEDAL MODE 2: BRAKE], [52...76] = [PEDAL MODE 3: CLUTCH], [77...102] = [PEDAL MODE 4: DRIFT], [103...127] = [PEDAL MODE 5: VOLUME],","pair":"[0...3276] = [PEDAL MODE 1: ACCEL], [3277...6553] = [PEDAL MODE 2: BRAKE], [6554...9829] = [PEDAL MODE 3: CLUTCH], [9830...13106] = [PEDAL MODE 4: DRIFT], [13107...16383] = [PEDAL MODE 5: VOLUME],"},
+    {"page":9,"cc":14,"name":"EFFECT ON (FSW)","msb":"[0...63] = OFF, [64...127] = ON","pair":"[0...8191] = OFF, [8192...16383] = ON"},
+    {"page":9,"cc":15,"name":"PEDAL VALUE","msb":"[0...127] = [off ... fully pressed (normal range)]","pair":"[0...16383] = [off ... fully pressed (normal range)]"},
+    {"page":9,"cc":16,"name":"FLOOR-IT VALUE","msb":"[0...127] = [pressed...max pressure (floor-it)]","pair":"[0...16383] = [pressed...max pressure (floor-it)]"},
+    {"page":9,"cc":17,"name":"MIDI NOTE ONLY MODE (disable instrument input pitchtracker e.g. for vocoding)","msb":"[0...63] = OFF, [64...127] = ON","pair":"[0...8191] = OFF, [8192...16383] = ON"},
+    {"page":9,"cc":18,"name":"PEDAL + PRESSURE VALUE","msb":"[0...90] = [off...fully pressed (normal range)], [91...102] = [deadzone], [103...127] = [pressed...max pressure (floor-it)]","pair":"[0...11469] = [off...fully pressed (normal range)], [11470...13106] = [deadzone], [13107...16383] = [pressed...max pressure (floor-it)]"}
+  ]
+}

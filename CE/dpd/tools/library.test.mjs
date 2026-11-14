@@ -82,5 +82,15 @@ const libD3 = new Library();
 libD3.submit(mk('nd.syn', [cutoff]), '@a');
 eq(libD3.canonical('nd.syn').verifiedFullDump, null, 'no dumps -> verifiedFullDump null (nothing to verify)');
 
+// The validator allows exactly the values dpd.schema.json allows: schema-enums.mjs, which it
+// imports, is written from the schema and must be fresh.
+{
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  let fresh = true;
+  try { execFileSync(process.execPath, [fileURLToPath(new URL('./make-schema-enums.mjs', import.meta.url)), '--check'], { stdio: 'pipe' }); } catch { fresh = false; }
+  eq(fresh, true, 'schema-enums.mjs is fresh with dpd.schema.json');
+}
+
 console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'} — ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

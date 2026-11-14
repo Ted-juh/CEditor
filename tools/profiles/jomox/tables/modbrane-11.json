@@ -1,0 +1,30 @@
+{
+  "source": {"title":"Mod.Brane 11 Operating Manual","file":"ModBrane11_E.pdf","sha256":"616bea4abeada5e94ad01e27c0a75074894758880f08b1e105ba30f51341a859","url":"https://www.jomox.de/upload/manuals/ModBrane11_E.pdf","linkedFrom":"https://www.jomox.de/support.php?lang=2&product_id=17","pages":[29,30]},
+  "rows": [
+    {"page":29,"section":null,"name":"M1 Pitch","cc":108,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"M1 Dampen","cc":93,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"M2 Pitch","cc":111,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"M2 Dampen","cc":97,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"M1_2 Couplg","cc":101,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"M2_1 Couplg","cc":103,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"Noise","cc":109,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"Decay","cc":110,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"Noise Filter","cc":112,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"Metal Noise I","cc":107,"range":"0..127","internal":"499"},
+    {"page":29,"section":null,"name":"Metal Noise II","cc":116,"range":"0..127","internal":"499"},
+    {"page":29,"section":null,"name":"MetalNze II Mask","cc":115,"range":"0..15","internal":"16"},
+    {"page":29,"section":null,"name":"Gate","cc":114,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"Volume","cc":117,"range":"0..127","internal":"256"},
+    {"page":29,"section":null,"name":"LFO 1 Wave","cc":119,"range":"0..15","internal":"Sup/Sdo/Sin/Si-/tri/tri-/rCt/rC-/PL1-PL8"},
+    {"page":29,"section":null,"name":"LFO 1 Intensity","cc":121,"range":"0..127","internal":"128"},
+    {"page":29,"section":null,"name":"LFO 1 Speed","cc":122,"range":"0..127","internal":"128"},
+    {"page":29,"section":null,"name":"LFO 2 Wave","cc":123,"range":"0..15","internal":"Sup/Sdo/Sin/Si-/tri/tri-/rCt/rC-/PL1-PL8"},
+    {"page":29,"section":null,"name":"LFO 2 Intensity","cc":124,"range":"0..127","internal":"128"},
+    {"page":29,"section":null,"name":"LFO 2 Speed","cc":125,"range":"0..127","internal":"128"},
+    {"page":29,"section":null,"name":"M1 Pitch","cc":108,"range":"0..127","internal":"Snare Tune"},
+    {"page":29,"section":null,"name":"Noise","cc":109,"range":"0..127","internal":"Snare Snappy"},
+    {"page":29,"section":null,"name":"Decay","cc":110,"range":"0..127","internal":"Snare Decay"},
+    {"page":29,"section":null,"name":"M2 Pitch","cc":111,"range":"0..127","internal":"Snare Detune"},
+    {"page":29,"section":null,"name":"Noise Filter","cc":112,"range":"0..127","internal":"Snare Noise Tune"}
+  ]
+}

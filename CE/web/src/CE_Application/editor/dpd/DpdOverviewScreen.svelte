@@ -3,13 +3,14 @@
   // completeness meter (from provenance), and a settings table tagging each value inherited-vs-yours.
   import { familyLabel as familyLabelOf, byteOrderLabel, checksumLabel, shapeById } from './dpdLabels.js';
   import { dumpRoundTrip } from '../../generated/dpd/dumps.mjs';
-  let { model, merged } = $props();
+  // `shown`: mounted with every other screen; a dump's round trip is checked only when this one shows.
+  let { model, merged, shown = true } = $props();
 
   // Full-dump verification is EARNED, not declared: a dump counts only if it carries a real byte map
   // (matcher + layout) AND its assemble→parse round-trip is lossless (dumps.mjs). Falls back to the
   // provenance flag when the profile declares no mapped dumps.
   let mappedDumps = $derived((merged?.dumps ?? []).filter((d) => d.message?.matcher && d.layout?.length));
-  let fullDumpOk = $derived(mappedDumps.length > 0
+  let fullDumpOk = $derived(!shown ? false : mappedDumps.length > 0
     ? mappedDumps.every((d) => { try { return dumpRoundTrip(d, merged).ok; } catch { return false; } })
     : (model?.provenance?.verifiedFullDump === true));
 

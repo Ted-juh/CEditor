@@ -830,9 +830,10 @@ choices; the MIDI message that changes each one (CC, NRPN or SysEx); how the syn
 whole sound in one go (a **dump**); and its banks of presets. With a profile, you bind controls by
 choosing a parameter by name, and CEditor builds the right message.
 
-CEditor comes with over ninety profiles: a generic MIDI CC profile, the Yamaha AN1x, Roland synths
-from the JD-Xi, INTEGRA-7 and FANTOM to the Boutiques and the TR drum machines, and Sequential and
-Dave Smith Instruments synths from the Mopho to the Prophet-6, most of them read out of the maker's
+CEditor comes with over a hundred profiles: a generic MIDI CC profile, the Yamaha AN1x, reface synths, MONTAGE, MODX, MOTIF, MOXF, MX and CP and YC stage keyboards, Roland synths
+from the JD-Xi, INTEGRA-7 and FANTOM to the Boutiques and the TR drum machines, Novation's Peak, Summit, Bass Station II and Circuits, Moog's Sub 37, Subsequent, Matriarch, Grandmother and Muse, Korg's minilogue,
+prologue and volca families, Sequential and Dave Smith Instruments synths from the Mopho to the Prophet-6, the Oberheim OB-6, OB-X8 and
+TEO-5, the Waldorf Blofeld, Microwave, Microwave II/XT, Wave, micro Q, Pulse, Rocket and Streichfett, and Elektron's Digitone, Digitakt, Syntakt, Analog Four, Rytm, Heat, Octatrack, Tonverk and Model:Cycles and :Samples, Behringer's UB-1 Micro, PRO-800, JN-80, CZ-1 Mini, Spice and minis, Arturia's MiniFreak, MicroFreak, MatrixBrute and PolyBrute, and ASM's Hydrasynth and Leviasynth, most of them read out of the maker's
 own MIDI documentation. All of them are marked experimental, and none has been
 tried on a real instrument yet. [The device profile library](device-profile-library.md) lists them
 and says what each kind covers. **File → Import Device Profile...** loads a profile from a file.
@@ -861,16 +862,36 @@ the top, search with **Search parameters**, and bind by selecting a control and 
 the panel to the synth, or both, all the time. **Scan presets** asks the synth for its preset names, and
 **Designer** opens the profile beside the panel.
 
+Some synths send a knob as two controllers, a coarse one and a fine one, for 16,384 steps instead of
+128 (the Moog profiles do this wherever the manual prints both). CEditor sends both, and when you turn
+the knob on the synth the control follows either: the coarse controller on its own, the fine one
+together with it.
+
 ### The Device Profile Designer
 
 Open it with **Designer** in the Device tool, **DPD** under the context bar's **Device** button, or **File → Open
 Device Profile**. Its screens are listed on the left:
 
 - **Overview** — what the profile is based on, and how complete it is.
-- **Parameters** — every parameter, its message and its range. **+ Add parameter** adds one; the lists
-  of choices of a parameter can be edited in the drawer on the right.
+- **Parameters** — every parameter, its message and its range. A parameter of a repeated block (a
+  part, a drum key) is listed once, marked with how many there are (×37). Type in the search box to
+  find one by name, group, message or address (`cutoff`, `CC 74`, `19 01 00`). **+ Add parameter**
+  adds one. Click a row to edit it in the drawer on the right: its name and group, value type,
+  range and default, the message it is sent with (controller, NRPN or RPN number, or SysEx shape and
+  address), whether it is sent as it moves or once set, and its list of choices. An edit to a row
+  marked ×37 applies to all 37. Each field takes effect when you leave it, and the validator's
+  complaints about that parameter are listed under its fields. Below them the drawer lists each
+  instance (each of the 37 keys) with its own name, message and default; a name or default typed
+  there belongs to that instance alone, and emptying it goes back to the block's. A block that does
+  not number its instances lists them without letting them be edited.
 - **Bulk dumps** — the dumps the synth sends, with a map of which byte holds which parameter.
-- **Device structure** and **Message shapes** — how the synth's SysEx messages are built.
+- **Device structure** — how CEditor talks to the synth: its device ID and channel, the pause between
+  messages, how it answers a device inquiry, its parameters' blocks and how often each repeats, what
+  it can be asked (each request, and the dump that answers it) and what is asked when it connects.
+  The device ID, channel, pause, identity codes and each block's count, base address and stride can
+  be edited here; a value the format does not allow is put back, and an emptied field falls back to
+  what the profile inherits. The requests are shown as they are.
+- **Message shapes** — how the synth's SysEx messages are built.
 - **Advanced** — the whole profile as text, to edit anything the other screens cannot, with
   **Validate** and **Apply**.
 - **Share & impact** — what a change would break in panels that already use the profile.

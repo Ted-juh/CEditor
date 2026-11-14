@@ -1,0 +1,31 @@
+{
+  "sources": [
+    {"title":"Model:Samples User Manual, OS 1.13","file":"Model-Samples-User-Manual_ENG_OS1.13_241030.pdf","sha256":"2f0414b1771ba88775d2f474ee7c5043e7555608ff62ea1c838ff331c8855948","url":"https://www.elektron.se/wp-content/uploads/2024/10/Model-Samples-User-Manual_ENG_OS1.13_241030.pdf"}
+  ],
+  "rows": [
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Note","cc":3},
+    {"page":51,"section":"A.3 LFO PARAMETERS","table":"LFO PARAMETERS","name":"Speed","cc":102},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Mute","cc":94},
+    {"page":51,"section":"A.3 LFO PARAMETERS","table":"LFO PARAMETERS","name":"Multiplier","cc":103},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Track level","cc":95},
+    {"page":51,"section":"A.3 LFO PARAMETERS","table":"LFO PARAMETERS","name":"Fade In/Out","cc":104},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Pan","cc":10},
+    {"page":51,"section":"A.3 LFO PARAMETERS","table":"LFO PARAMETERS","name":"Destination","cc":105},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Pitch","cc":16},
+    {"page":51,"section":"A.3 LFO PARAMETERS","table":"LFO PARAMETERS","name":"Waveform","cc":106},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Decay Time","cc":80},
+    {"page":51,"section":"A.3 LFO PARAMETERS","table":"LFO PARAMETERS","name":"Start Phase","cc":107},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Sample Start","cc":19},
+    {"page":51,"section":"A.3 LFO PARAMETERS","table":"LFO PARAMETERS","name":"Reset","cc":108},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Sample Length","cc":20},
+    {"page":51,"section":"A.3 LFO PARAMETERS","table":"LFO PARAMETERS","name":"Depth","cc":109,"ccLsb":110},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Cutoff","cc":74},
+    {"page":51,"section":"A.1 TRACK PARAMETERS","table":"TRACK PARAMETERS","name":"Resonance","cc":71},
+    {"page":51,"section":"A.4 FX PARAMETERS","table":"FX PARAMETERS","name":"Delay Time","cc":85},
+    {"page":51,"section":"A.4 FX PARAMETERS","table":"FX PARAMETERS","name":"Delay Feedback","cc":86},
+    {"page":51,"section":"A.4 FX PARAMETERS","table":"FX PARAMETERS","name":"Reverb Size","cc":87},
+    {"page":51,"section":"A.4 FX PARAMETERS","table":"FX PARAMETERS","name":"Reverb Tone","cc":88},
+    {"page":51,"section":"A.2 PLAYBACK PARAMETERS","table":"PLAYBACK PARAMETERS","name":"Loop","cc":17},
+    {"page":51,"section":"A.2 PLAYBACK PARAMETERS","table":"PLAYBACK PARAMETERS","name":"Reverse","cc":18}
+  ]
+}

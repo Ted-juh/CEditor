@@ -102,6 +102,9 @@ export function buildCcProfile(chart, synth) {
         id: unique(`${part.id ? `${part.id}.` : ''}${camel(group)}.${camel(leaf) || `cc${row.cc}`}`, row.cc),
         name: part.id ? `${part.name} ${name}` : name,
         group: part.id ? `${part.name} ${group}` : group,
+        // The page of the document its row is printed on: the reader's, or the layout's for a
+        // controller the layout adds from elsewhere in the same document.
+        ...(row.page ? { source: { page: row.page } } : {}),
         ...(describe.length ? { description: describe.join(' ') } : {}),
         access: { canRead: false, canWrite: !sendsOnly, realtimeSafe: true, source: 'singleParameter' },
         messageRecipe: recipeFor(row.cc, part.channel),

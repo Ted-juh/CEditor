@@ -19,6 +19,7 @@
   import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
   import { validateProfile } from '../generated/dpd/validate.mjs';
   import { buildLegacyProfile } from '../generated/dpd/emit-legacy-core.mjs';
+  import { legacyToDpd } from '../generated/dpd/from-legacy-core.mjs';
   import { saveProfileSource, requestProfileSource, latestProfileSourceSave, profileSources } from '../stores/deviceProfiles.js';
   import { familyLabel as familyLabelOf } from './dpd/dpdLabels.js';
   import { createDeviceProfileHistory, designerOwnsUndo } from './dpd/dpdHistory.js';
@@ -26,6 +27,7 @@
   import { untrack } from 'svelte';
   import { get } from 'svelte/store';
 
+  import { modelToEmbed } from './dpd/saveEmbed.js';
   import { deepClone } from '../utils/deepClone.js';
   let { profileId = '' } = $props();
 
@@ -45,6 +47,8 @@
   let loadedFor = '__none__';
   let appliedSavedFor = null;
   let openingModelJson = null;
+  // Whether the model was converted from the profile on opening (dpd/saveEmbed.js).
+  let convertedOpening = false;
   $effect(() => {
     const pid = profileId;
     if (pid === loadedFor) return;
@@ -52,12 +56,18 @@
     appliedSavedFor = null;
     saveStatus = '';
     const id = resolveDpdId(pid);
-    model = id ? deepClone(dpdLibrary[id]) : null;
-    openingModelJson = model ? JSON.stringify($state.snapshot(model)) : null;
+    const opening = id ? deepClone(dpdLibrary[id]) : null;
+    openingModelJson = opening ? JSON.stringify(opening) : null;
+    convertedOpening = false;
+    model = opening;
     if (pid) requestProfileSource(pid); // ask the engine for the saved source (no-op without the bridge)
   });
 
   // When the engine returns a saved source that embeds a dpdModel, adopt it once (round-trips edits).
+  // A profile with none, generated from its maker's document (tools/profiles), is converted into its
+  // DPD model here (generated/dpd/from-legacy-core.mjs): emitting that model gives the profile back,
+  // which CE/web/test/dpdConvertedModels.test.js proves for every one, so nothing converted is stored
+  // and the profile stays the one source. The hand-made models' ids stay theirs.
   $effect(() => {
     const pid = profileId;
     const entry = $profileSources?.[pid];
@@ -65,7 +75,7 @@
     appliedSavedFor = pid;
     // The bridge may answer well after the bundled model is already editable. Never replace a
     // draft the user has changed while that request was in flight.
-    const currentJson = model ? JSON.stringify($state.snapshot(model)) : null;
+    const currentJson = model ? JSON.stringify(untrack(() => plain)) : null;
     if (currentJson !== openingModelJson) return;
     try {
       const parsed = JSON.parse(entry.source);
@@ -73,6 +83,15 @@
         // A different document arriving late, not an edit — see startsNewDocument().
         untrack(() => designerHistory?.startsNewDocument());
         model = deepClone(parsed.dpdModel);
+        convertedOpening = false;
+      } else if (!model && parsed?.parameters && !parsed.dpdSource) {
+        const { model: converted } = legacyToDpd(parsed, { handMade: new Set(Object.keys(dpdLibrary)) });
+        if (converted) {
+          untrack(() => designerHistory?.startsNewDocument());
+          openingModelJson = JSON.stringify(converted);
+          convertedOpening = true;
+          model = converted;
+        }
       }
     } catch { /* keep the bundled model */ }
   });
@@ -125,12 +144,11 @@
 
   $effect(() => {
     const history = designerHistory;
-    // The deep read IS the subscription: walking every leaf is what makes this
-    // effect run again when a screen edits one five levels down. It costs one
-    // plain copy of the model per edit — the same walk `merged` above already
-    // does, and the one history would have had to make anyway to compare two
-    // states.
-    const snapshot = model ? $state.snapshot(model) : null;
+    // The deep read IS the subscription: `plain` walks every leaf, which is what
+    // makes this effect run again when a screen edits one five levels down. It is
+    // the one copy per edit that resolution and validation read too, and the one
+    // history would have had to make anyway to compare two states.
+    const snapshot = plain;
     if (!history) return;
     untrack(() => { dirty = history.observe(snapshot); });
   });
@@ -155,10 +173,16 @@
     };
   });
 
-  let resolved = $derived(model ? resolveParams(model) : []);
-  let validation = $derived(model ? validateProfile(model) : { ok: true, errors: [] });
-  // $state.snapshot before resolve — resolveModel's internal structuredClone can't process the $state proxy.
-  let merged = $derived(model ? resolveModel($state.snapshot(model), dpdLibrary) : null);
+  // One plain copy of the model per change, which everything below reads instead of the live proxy.
+  // It is the deep read that makes them follow an edit five levels down. Not $state.snapshot: that
+  // calls structuredClone on every string and number, and a KRONOS drum kit's model, copied three
+  // times over on opening (history, resolution, the opening state), cost 2 of its 8 seconds; and
+  // resolving through the proxy rather than a copy cost 1.3 more. Nothing may write to it: history
+  // keeps it, and `merged` is it when the model inherits nothing.
+  let plain = $derived(model ? deepClone(model) : null);
+  let resolved = $derived(plain ? resolveParams(plain) : []);
+  let validation = $derived(plain ? validateProfile(plain) : { ok: true, errors: [] });
+  let merged = $derived(plain ? resolveModel(plain, dpdLibrary) : null);
 
   // --- Save: resolve the new-schema model -> legacy engine profile -> persist via the bridge. ---
   let saveStatus = $state('');
@@ -171,7 +195,7 @@
       // $state.snapshot -> a plain (non-proxy) deep copy; the resolver/clone can't handle the $state proxy.
       const plain = $state.snapshot(model);
       const merged = resolveModel(plain, dpdLibrary);
-      const legacy = buildLegacyProfile(merged, { legacyId: profileId, embedDpdModel: plain });
+      const legacy = buildLegacyProfile(merged, { legacyId: profileId, embedDpdModel: modelToEmbed({ converted: convertedOpening, openingJson: openingModelJson, model: plain }) });
       const requestId = `profile_save_${profileId}_${++saveSequence}`;
       pendingSave = { requestId, model: deepClone(plain) };
       saveProfileSource(profileId, JSON.stringify(legacy, null, 2), requestId);
@@ -212,6 +236,8 @@
   }
 
   let paramCount = $derived(resolved.length);
+  // The Parameters screen's rows: a repeated block's parameters once (685 for a JD-Xi's 6,199).
+  let rowCount = $derived(resolved.filter((p) => p.instance === 0).length);
   let dumpCount = $derived(model?.dumps?.length ?? 0);
   let familyLabel = $derived(familyLabelOf(model));
 
@@ -219,7 +245,7 @@
     { group: 'Profile', items: [
       { id: 'detect', icon: '◉', label: 'Detect devices' },
       { id: 'overview', icon: '◉', label: 'Overview' },
-      { id: 'params', icon: '▦', label: 'Parameters', count: paramCount },
+      { id: 'params', icon: '▦', label: 'Parameters', count: rowCount },
       { id: 'capture', icon: '◎', label: 'Capture' },
       { id: 'dumps', icon: '⬓', label: 'Bulk dumps', count: dumpCount || undefined },
       { id: 'device', icon: '⚙', label: 'Device structure' },
@@ -298,28 +324,28 @@
           <DpdDiscoveryScreen onPick={adoptModel} />
         </div>
         <div class={['screen', activeScreen === 'params' && 'active']}>
-          <DpdParametersScreen {model} {resolved} {validation} />
+          <DpdParametersScreen {model} {resolved} {validation} shown={activeScreen === 'params'} />
         </div>
         <div class={['screen', activeScreen === 'overview' && 'active']}>
-          <DpdOverviewScreen {model} {merged} />
+          <DpdOverviewScreen {model} {merged} shown={activeScreen === 'overview'} />
         </div>
         <div class={['screen', activeScreen === 'device' && 'active']}>
-          <DpdDeviceStructureScreen {model} {merged} />
+          <DpdDeviceStructureScreen {model} {merged} shown={activeScreen === 'device'} />
         </div>
         <div class={['screen', activeScreen === 'messages' && 'active']}>
           <DpdMessageShapesScreen {merged} />
         </div>
         <div class={['screen', activeScreen === 'dumps' && 'active']}>
-          <DpdBulkDumpsScreen {model} {merged} />
+          <DpdBulkDumpsScreen {model} {merged} shown={activeScreen === 'dumps'} />
         </div>
         <div class={['screen', activeScreen === 'advanced' && 'active']}>
           <DpdAdvancedScreen {model} {profileId} active={activeScreen === 'advanced'} onApplyModel={(m) => { model = m; appliedSavedFor = profileId; }} />
         </div>
         <div class={['screen', activeScreen === 'presets' && 'active']}>
-          <DpdPresetsScreen {model} {merged} {profileId} />
+          <DpdPresetsScreen {model} {merged} {profileId} shown={activeScreen === 'presets'} />
         </div>
         <div class={['screen', activeScreen === 'share' && 'active']}>
-          <DpdShareImpactScreen {model} {merged} {profileId} />
+          <DpdShareImpactScreen {model} {merged} {profileId} shown={activeScreen === 'share'} />
         </div>
         <div class={['screen', activeScreen === 'capture' && 'active']}>
           <DpdCaptureScreen {model} {profileId} />

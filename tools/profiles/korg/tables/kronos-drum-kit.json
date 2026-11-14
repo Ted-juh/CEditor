@@ -1,0 +1,1017 @@
+{
+  "source": {
+    "title": "KRONOS MIDI Implementation",
+    "archive": "KRONOS_MIDIimp.zip",
+    "archiveDate": "2025-07-24",
+    "url": "https://www.korg.com/us/support/download/manual/0/988/5480/",
+    "file": "DrumKit.txt",
+    "printed": null,
+    "sha256": "f66128231627afba485fc3eee8861c9b21bdab8229e1622321d45090863b39e3"
+  },
+  "files": [
+    {
+      "file": "KRONOS_MIDI_SysEx.txt",
+      "printed": "Version 1.27 (Oct 22, 2016)",
+      "sha256": "5592a0b807dbd3b25c50c3a77596e13457dc0412991d7ceb1795dff0b4de55e5"
+    },
+    {
+      "file": "SysExParams/VoiceModels/HD-1.txt",
+      "sha256": "6dcf848406966f67f22d028e19412824428160c1c01810eeb87b43671b852239"
+    },
+    {
+      "file": "KRONOS_MIDI_Implementation.pdf",
+      "sha256": "96b2f3e31e498594ebf6c78d1ddf64d72cf1648c44f1e8724856ad3f9d96cd43"
+    }
+  ],
+  "object": {
+    "title": "Drum Kit",
+    "size": 38424,
+    "objectVersion": 3
+  },
+  "messages": {
+    "53": [
+      "[53] Drum Kit Parameter Change (integer)                                  Receive/Transmit",
+      "        F0, 42, 3g, 68          Excl Header",
+      "        53                      Function",
+      "        VSP                     velocity split (see DrumKit.txt)",
+      "        note                    midi note # (0-7F)",
+      "        PID                     part of parameter id (see DrumKit.txt)",
+      "        valueH                  Value   (bit14-20)   (*4)",
+      "        valueM                  Value   (bit7-13)    (*4)",
+      "        valueL                  Value   (bit0-6)     (*4)",
+      "        F7                      End of Excl",
+      "",
+      " See DrumKit.txt for details.",
+      ""
+    ],
+    "parameterChange": [
+      "[43] Parameter Change (integer)                                           Receive/Transmit",
+      "        F0, 42, 3g, 68          Excl Header",
+      "        43                      Function",
+      "        TYP                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        SOC                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        SUB                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        PID                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        IDX                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        valueH                  Value   (bit14-20)   (*4)",
+      "        valueM                  Value   (bit7-13)    (*4)",
+      "        valueL                  Value   (bit0-6)     (*4)",
+      "        F7                      End of Excl",
+      "",
+      " or",
+      "",
+      "        DEPRECATED",
+      "",
+      "        F0, 42, 3g, 68          Excl Header",
+      "        43                      Function",
+      "        TYP                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        SOC                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        SUB                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        7F                      part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        PIDH                    (bits 7-14) part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        PIDL                    (bits 0-6) part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        IDX                     part of parameter id (see CombiAndSongTimbreSet.txt, etc)",
+      "        valueH                  Value   (bit14-20)   (*4)",
+      "        valueM                  Value   (bit7-13)    (*4)",
+      "        valueL                  Value   (bit0-6)     (*4)",
+      "        F7                      End of Excl",
+      "",
+      "        DEPRECATED",
+      "",
+      " Most of the instrument's parameters (mainly those that control the synthesis",
+      " engine) can be edited with this kind of message. There are some other special",
+      " case parameter messages (e.g., Drum Kit Parameter Change, Wave Seq Parameter",
+      " Change, etc) for controlling other specific sets of parameters. Which",
+      " parameters are currently available for editing depends on the instrument's mode",
+      " (e.g., combi parameters are only allowed while in combi mode).",
+      "",
+      " The first form is used for parameter ids 0..126, the second form is for",
+      " parameter ids 127..16383. As a convenience, the instrument accepts either form",
+      " for parameter ids 0..126.",
+      "",
+      " Note: the second form has been deprecated for lack of use. The instrument will",
+      " continue to receive it, but not transmit it.",
+      ""
+    ],
+    "currentObjectDumpRequest": [
+      "[74] Current Object Dump Request                                          Receive",
+      "        F0, 42, 3g, 68          Excl Header",
+      "        74                      Function",
+      "        obj                     *1",
+      "        F7                      End of Excl",
+      "",
+      " Requests the instrument to send the contents of the edit buffer for the",
+      " specified object type as a Current Object Dump message (function 75).",
+      " Instrument responds with a Reply message (function 24) for invalid requests.",
+      ""
+    ],
+    "currentObjectDump": [
+      "[75] Current Object Dump                                                  Receive/Transmit",
+      "        F0, 42, 3g, 68          Excl Header",
+      "        75                      Function",
+      "        obj                     *1",
+      "        version                 obj's version number",
+      "        data                    *3",
+      "        F7                      End of Excl",
+      "",
+      " This message type is sent in response to a Current Object Dump Request. There",
+      " is no method to send messages of this type from the instrument's user",
+      " interface. Instrument sends a Reply message (function 24) on receipt of",
+      " messages of this type. When receiving this message type, the contents of the",
+      " specified object type's edit buffer is resplaced. The object is not stored",
+      " however until the user writes the object using the instrument's menus or front",
+      " panel.",
+      "",
+      " See the files in SysExDumps for data structure details.",
+      ""
+    ],
+    "objects": [
+      "*1",
+      "        obj = 00 : Program (Prog_EXi_Common.txt, Prog_EXi.txt, Prog_HD-1.txt)",
+      "              01 : Combination (CombiAndSongTimbreSet.txt)",
+      "              02 : Song Timbre Set (CombiAndSongTimbreSet.txt)",
+      "              03 : Global (Global.txt)",
+      "              04 : Drum Kit (DrumKit.txt)",
+      "              05 : Wave Seq (WaveSequence.txt)",
+      "              06 : KARMA GE (NOTE: GEs are not edited on the instrument, so",
+      "                   there is no edit buffer)",
+      "              07 : KARMA Template",
+      "              08 : Song Control (SongControl.txt)",
+      "              09 : Song Event (currently disabled)",
+      "              0A : Song Region",
+      "              0B : Reserved",
+      "              0C : KARMA GE RTP Info (KARMA_GE_RTP.txt)",
+      "              0D : Set List (index=set list) (SetList.txt)",
+      "              0E : Drum Track Pattern (DrumTrackPattern.txt)",
+      "              0F : Drum Track Pattern Event (DrumTrackPatternEvent.txt)",
+      "              10 : Set List Slot Comments (bank=set list, index=slot)",
+      "              11 : Set List Slot Name (bank=set list, index=slot)",
+      "              12 : Combi Name",
+      "              13 : Program Name",
+      "              14 : Song Name",
+      "              15 : Wave Seq Name",
+      "              16 : Drum Kit Name",
+      "              17 : Set List Name (index=set list)",
+      "              18 : Song (Song Timbre Set and Song Control in a single object. Song.txt)",
+      " The table above includes the names of associated documentation files in SysExDumps."
+    ],
+    "banks": [
+      "*2",
+      " The meaning of bank depends on the object type.",
+      " Program, Program Name:",
+      "        bank =  0 -  5 : INT-A - F",
+      "               10 - 1A : GM, g(1)-g(9), g(d) (read-only)",
+      "               40 - 4d : USER-A - G, AA - GG",
+      " Combi, Combi Name:",
+      "        bank =  0 -  6 : INT-A - G",
+      "               40 - 46 : USER-A - G",
+      " Drum Kit, Drum Kit Name:",
+      "        bank =       0 : INT",
+      "                    10 : GM (read-only)",
+      "               40 - 4d : USER-A - G, AA - GG",
+      " Wave Seq, Wave Seq Name:",
+      "        bank =       0 : INT",
+      "               40 - 4d : USER-A - G, AA - GG",
+      " KARMA GE:",
+      "        bank =  0 -  B : USER-A - L",
+      " KARMA Template:",
+      "        bank =  0 -  3 : USER-A - D",
+      " KARMA GE RTP Info:",
+      "        bank =  0",
+      "        index = 0 - 2047: Preset",
+      "                2048 -  : U-A000 -",
+      " Set List Slot Comments, Set List Slot Name",
+      "        bank =  0 - 7F : set list #",
+      " For all other types (e.g., Song, Set List, etc) bank must be 0."
+    ],
+    "packing": [
+      "*3",
+      " The detailed information about \"data,\" see the text files specific to HD-1, EXi, etc.",
+      " Internal data is converted to MIDI data using following method.",
+      "+----------------------------------------------------------------------------------------+",
+      "|  Internal 7byte data <--convert--> MIDI 8 byte data                                    |",
+      "|  example) Internal data(bit image) MIDI data(bit image)                                |",
+      "|                Aaaaaaaa            0GFEDCBA                                            |",
+      "|                Bbbbbbbb            0aaaaaaa                                            |",
+      "|                Cccccccc            0bbbbbbb                                            |",
+      "|                Dddddddd            0ccccccc                                            |",
+      "|                Eeeeeeee            0ddddddd                                            |",
+      "|                Ffffffff            0eeeeeee                                            |",
+      "|                Gggggggg            0fffffff                                            |",
+      "|                Hhhhhhhh            0ggggggg                                            |",
+      "|                Iiiiiiii            0NMLKJIH                                            |",
+      "|                   :                0hhhhhhh                                            |",
+      "|                   :                   :                                                |",
+      "|                Vvvvvvvv            000000WV                                            |",
+      "|                Wwwwwwww            0vvvvvvv                                            |",
+      "|                                    0wwwwwww                                            |",
+      "|                                    11110111 (EOX=F7H)                                  |",
+      "+----------------------------------------------------------------------------------------+",
+      " binarySize: number of 8-bit binary data bytes in memory",
+      " sysExSize: number of 7-bit sys/ex data bytes",
+      " sysExSize = binarySize + (binarySize+6)/7",
+      " binarySize = (sysExSize/8)*7 + (sysExSize%8 ? sysExSize%8-1 : 0)"
+    ],
+    "value": [
+      "*4",
+      " The format is 21-bit 2's complement. Typical use is to convert this to a 32-bit",
+      " signed integer:",
+      "         valueH : 0scccccc",
+      "         valueM : 0bbbbbbb",
+      "         valueL : 0aaaaaaa",
+      "         int    : ssssssss sssscccc ccbbbbbb baaaaaaa"
+    ]
+  },
+  "voiceModel": {
+    "messageFormats": [
+      "Message Formats:",
+      "  F0 42 3g 68 43 <type> <comp> <sub> <param id> <index> <value> F7",
+      "  <type>",
+      "        09: HD-1 patch 1",
+      "        0A: HD-1 patch 2",
+      "        0B: EXi patch 1",
+      "        0C: EXi patch 2",
+      "  <comp>, <sub>",
+      "        single-byte values from table",
+      "  <param id>",
+      "        pp: (7-bit) for parameter ids in the range of 0..126",
+      "        7F pp pp: (14-bit, MSB first) for parameter ids in the range of 127..16383 (deprecated)",
+      "  <index>",
+      "        single-byte value from table",
+      "  <value>",
+      "        vv vv vv: 21-bit signed value, MSB first"
+    ],
+    "amsSources": [
+      {
+        "value": 0,
+        "label": "Off"
+      },
+      {
+        "value": 1,
+        "label": "AMS Mixer 1"
+      },
+      {
+        "value": 2,
+        "label": "AMS Mixer 2"
+      },
+      {
+        "value": 3,
+        "label": "Wave Seq AMS1"
+      },
+      {
+        "value": 4,
+        "label": "Wave Seq AMS2"
+      },
+      {
+        "value": 5,
+        "label": "Pitch EG"
+      },
+      {
+        "value": 6,
+        "label": "Filter EG"
+      },
+      {
+        "value": 7,
+        "label": "AMP EG"
+      },
+      {
+        "value": 8,
+        "label": "LFO1"
+      },
+      {
+        "value": 9,
+        "label": "LFO2"
+      },
+      {
+        "value": 10,
+        "label": "Common LFO"
+      },
+      {
+        "value": 11,
+        "label": "Filter Keytrack"
+      },
+      {
+        "value": 12,
+        "label": "Amp Keytrack"
+      },
+      {
+        "value": 13,
+        "label": "Keytrack 1"
+      },
+      {
+        "value": 14,
+        "label": "Keytrack 2"
+      },
+      {
+        "value": 15,
+        "label": "Note Number"
+      },
+      {
+        "value": 16,
+        "label": "Velocity"
+      },
+      {
+        "value": 17,
+        "label": "Exp Velocity"
+      },
+      {
+        "value": 18,
+        "label": "Poly Aftertouch"
+      },
+      {
+        "value": 19,
+        "label": "Aftertouch"
+      },
+      {
+        "value": 20,
+        "label": "JSX"
+      },
+      {
+        "value": 21,
+        "label": "JS+Y (CC#1)"
+      },
+      {
+        "value": 22,
+        "label": "JS-Y (CC#2)"
+      },
+      {
+        "value": 23,
+        "label": "JS+Y + AT/2"
+      },
+      {
+        "value": 24,
+        "label": "JS-Y + AT/2"
+      },
+      {
+        "value": 25,
+        "label": "Pedal (CC#4)"
+      },
+      {
+        "value": 26,
+        "label": "Ribbon (CC#16)"
+      },
+      {
+        "value": 27,
+        "label": "Slider (CC#18)"
+      },
+      {
+        "value": 28,
+        "label": "Knob5 (CC#17)"
+      },
+      {
+        "value": 29,
+        "label": "Knob6 (CC#19)"
+      },
+      {
+        "value": 30,
+        "label": "Knob7 (CC#20)"
+      },
+      {
+        "value": 31,
+        "label": "Knob8 (CC#21)"
+      },
+      {
+        "value": 32,
+        "label": "Knob5 [+]"
+      },
+      {
+        "value": 33,
+        "label": "Knob6 [+]"
+      },
+      {
+        "value": 34,
+        "label": "Knob7 [+]"
+      },
+      {
+        "value": 35,
+        "label": "Knob8 [+]"
+      },
+      {
+        "value": 36,
+        "label": "Damper (CC#64)"
+      },
+      {
+        "value": 37,
+        "label": "PortaSW (CC#65)"
+      },
+      {
+        "value": 38,
+        "label": "Sostenuto (CC#66)"
+      },
+      {
+        "value": 39,
+        "label": "Soft Pdl (CC#67)"
+      },
+      {
+        "value": 40,
+        "label": "SW1 (CC#80)"
+      },
+      {
+        "value": 41,
+        "label": "SW2 (CC#81)"
+      },
+      {
+        "value": 42,
+        "label": "FootSW (CC#82)"
+      },
+      {
+        "value": 43,
+        "label": "MIDI Ctl (CC#83)"
+      },
+      {
+        "value": 44,
+        "label": "Vector JS+X (CC#85)"
+      },
+      {
+        "value": 45,
+        "label": "Vector JS-X (CC#86)"
+      },
+      {
+        "value": 46,
+        "label": "Vector JS+Y (CC#87)"
+      },
+      {
+        "value": 47,
+        "label": "Vector JS-Y (CC#88)"
+      },
+      {
+        "value": 48,
+        "label": "Tempo"
+      },
+      {
+        "value": 49,
+        "label": "Gate1"
+      },
+      {
+        "value": 50,
+        "label": "Gate1Damper"
+      },
+      {
+        "value": 51,
+        "label": "Gate2"
+      },
+      {
+        "value": 52,
+        "label": "Gate2Damper"
+      },
+      {
+        "value": 53,
+        "label": "Off"
+      },
+      {
+        "value": 54,
+        "label": "Off"
+      },
+      {
+        "value": 55,
+        "label": "Off"
+      },
+      {
+        "value": 56,
+        "label": "Off"
+      },
+      {
+        "value": 57,
+        "label": "Off"
+      },
+      {
+        "value": 58,
+        "label": "Off"
+      },
+      {
+        "value": 59,
+        "label": "Off"
+      },
+      {
+        "value": 60,
+        "label": "Off"
+      },
+      {
+        "value": 61,
+        "label": "Off"
+      },
+      {
+        "value": 62,
+        "label": "Off"
+      },
+      {
+        "value": 63,
+        "label": "Off"
+      },
+      {
+        "value": 64,
+        "label": "Off"
+      },
+      {
+        "value": 65,
+        "label": "Off"
+      },
+      {
+        "value": 66,
+        "label": "Off"
+      },
+      {
+        "value": 67,
+        "label": "Off"
+      },
+      {
+        "value": 68,
+        "label": "Off"
+      },
+      {
+        "value": 69,
+        "label": "Off"
+      },
+      {
+        "value": 70,
+        "label": "Off"
+      },
+      {
+        "value": 71,
+        "label": "Off"
+      },
+      {
+        "value": 72,
+        "label": "Off"
+      },
+      {
+        "value": 73,
+        "label": "Off"
+      },
+      {
+        "value": 74,
+        "label": "Off"
+      },
+      {
+        "value": 75,
+        "label": "Off"
+      },
+      {
+        "value": 76,
+        "label": "Off"
+      },
+      {
+        "value": 77,
+        "label": "Off"
+      }
+    ]
+  },
+  "identity": {
+    "reply": [
+      "F0",
+      "7E",
+      "0g",
+      "06",
+      "02",
+      "42",
+      "68",
+      "00",
+      "mm",
+      "00",
+      "vv",
+      "ww",
+      "xx",
+      "00",
+      "F7"
+    ],
+    "members": [
+      {
+        "model": "KRONOS/KRONOS2 61Keys",
+        "code": "05"
+      },
+      {
+        "model": "KRONOS/KRONOS2 73Keys",
+        "code": "0E"
+      },
+      {
+        "model": "KRONOS/KRONOS2 88Keys",
+        "code": "17"
+      },
+      {
+        "model": "KRONOS3        61Keys",
+        "code": "1D"
+      },
+      {
+        "model": "KRONOS3        73Keys",
+        "code": "26"
+      },
+      {
+        "model": "KRONOS3        88Keys",
+        "code": "2F"
+      }
+    ]
+  },
+  "banks": [
+    {
+      "msb": "00",
+      "lsb": "00",
+      "program": {
+        "label": "INT-A",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "INT-A",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "01",
+      "program": {
+        "label": "INT-B",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "INT-B",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "02",
+      "program": {
+        "label": "INT-C",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "INT-C",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "03",
+      "program": {
+        "label": "INT-D",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "INT-D",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "04",
+      "program": {
+        "label": "INT-E",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "INT-E",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "05",
+      "program": {
+        "label": "INT-F",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "INT-F",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "06",
+      "program": null,
+      "combination": {
+        "label": "INT-G",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "08",
+      "program": {
+        "label": "USER-A",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "USER-A",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "09",
+      "program": {
+        "label": "USER-B",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "USER-B",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0A",
+      "program": {
+        "label": "USER-C",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "USER-C",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0B",
+      "program": {
+        "label": "USER-D",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "USER-D",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0C",
+      "program": {
+        "label": "USER-E",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "USER-E",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0D",
+      "program": {
+        "label": "USER-F",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "USER-F",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0E",
+      "program": {
+        "label": "USER-G",
+        "first": 0,
+        "last": 127
+      },
+      "combination": {
+        "label": "USER-G",
+        "first": 0,
+        "last": 127
+      }
+    },
+    {
+      "msb": "00",
+      "lsb": "0F",
+      "program": {
+        "label": "USER-AA",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "10",
+      "program": {
+        "label": "USER-BB",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "11",
+      "program": {
+        "label": "USER-CC",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "12",
+      "program": {
+        "label": "USER-DD",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "13",
+      "program": {
+        "label": "USER-EE",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "14",
+      "program": {
+        "label": "USER-FF",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "00",
+      "lsb": "15",
+      "program": {
+        "label": "USER-GG",
+        "first": 0,
+        "last": 127
+      },
+      "combination": null
+    },
+    {
+      "msb": "79",
+      "lsb": "00",
+      "program": {
+        "label": "G",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    },
+    {
+      "msb": "79",
+      "lsb": "01",
+      "lsbTo": "09",
+      "program": {
+        "label": "g(1)-g(9)",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    },
+    {
+      "msb": "78",
+      "lsb": "00",
+      "program": {
+        "label": "g(d)",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    },
+    {
+      "msb": "38",
+      "lsb": "00",
+      "program": {
+        "label": "G",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    },
+    {
+      "msb": "3E",
+      "lsb": "00",
+      "program": {
+        "label": "g(d)",
+        "first": 1,
+        "last": 128
+      },
+      "combination": null
+    }
+  ],
+  "rows": [
+    {"line":6,"ofs":0,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":7,"ofs":1,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":8,"ofs":2,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":9,"ofs":3,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":10,"ofs":4,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":11,"ofs":5,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":12,"ofs":6,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":13,"ofs":7,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":14,"ofs":8,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":15,"ofs":9,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":16,"ofs":10,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":17,"ofs":11,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":18,"ofs":12,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":19,"ofs":13,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":20,"ofs":14,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":21,"ofs":15,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":22,"ofs":16,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":23,"ofs":17,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":24,"ofs":18,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":25,"ofs":19,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":26,"ofs":20,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":27,"ofs":21,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":28,"ofs":22,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":29,"ofs":23,"group":"Common","name":"Name","data":"00~FF","value":"~"},
+    {"line":31,"ofs":24,"group":"Note1 Zone1 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":0,"PID":6}},
+    {"line":32,"ofs":25,"group":"Note1 Zone1 DS","name":"Sample Bank UUID","data":"","value":"UUID","key":{"note":0,"VSP":0,"PID":30},"note":"use binary param change (function 0x54)"},
+    {"line":36,"ofs":42,"group":"Note1 Zone1 DS","name":"Sample Id","data":"0000~FFFE","value":"0~65534","key":{"note":0,"VSP":0,"PID":4}},
+    {"line":38,"ofs":44,"group":"Note1 Zone1 DS","name":"Level","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":0,"PID":9}},
+    {"line":39,"ofs":45,"bit":"3~0","group":"Note1 Zone1 DS","name":"Start Offset","data":"00~08","value":"Off~8th","key":{"note":0,"VSP":0,"PID":7}},
+    {"line":40,"ofs":45,"bit":"7","group":"Note1 Zone1 DS","name":"Sample Reverse","data":"00~01","value":"Off~On","key":{"note":0,"VSP":0,"PID":8}},
+    {"line":41,"ofs":46,"group":"Note1 Zone1 DS","name":"Transpose","data":"C0~3F","value":"-64~+63","key":{"note":0,"VSP":0,"PID":10}},
+    {"line":42,"ofs":47,"group":"Note1 Zone1 DS","name":"Tune","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":0,"PID":11}},
+    {"line":43,"ofs":48,"group":"Note1 Zone1 DS","name":"Attack","data":"C0~3F","value":"-64~+63","key":{"note":0,"VSP":0,"PID":14}},
+    {"line":44,"ofs":49,"group":"Note1 Zone1 DS","name":"Decay","data":"C0~3F","value":"-64~+63","key":{"note":0,"VSP":0,"PID":15}},
+    {"line":45,"ofs":50,"group":"Note1 Zone1 DS","name":"Cutoff","data":"C0~3F","value":"-64~+63","key":{"note":0,"VSP":0,"PID":12}},
+    {"line":46,"ofs":51,"group":"Note1 Zone1 DS","name":"Resonance","data":"C0~3F","value":"-64~+63","key":{"note":0,"VSP":0,"PID":13}},
+    {"line":47,"ofs":52,"group":"Note1 Zone1 DS","name":"EQ High Gain","data":"B8~48","value":"-72.0~+72.0","key":{"note":0,"VSP":0,"PID":18}},
+    {"line":48,"ofs":53,"group":"Note1 Zone1 DS","name":"EQ Mid Gain","data":"B8~48","value":"-72.0~+72.0","key":{"note":0,"VSP":0,"PID":19}},
+    {"line":49,"ofs":54,"group":"Note1 Zone1 DS","name":"EQ Low Gain","data":"B8~48","value":"-72.0~+72.0","key":{"note":0,"VSP":0,"PID":20}},
+    {"line":50,"ofs":55,"group":"Note1 Zone1 DS","name":"Drive","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":0,"PID":16}},
+    {"line":51,"ofs":56,"group":"Note1 Zone1 DS","name":"Low Boost","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":0,"PID":17}},
+    {"line":54,"ofs":58,"group":"Note1 Zone2 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":1,"PID":6}},
+    {"line":56,"ofs":90,"group":"Note1 Zone2 DS","name":"Low Boost","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":1,"PID":17}},
+    {"line":59,"ofs":92,"group":"Note1 Zone3 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":2,"PID":6}},
+    {"line":61,"ofs":124,"group":"Note1 Zone3 DS","name":"Low Boost","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":2,"PID":17}},
+    {"line":64,"ofs":126,"group":"Note1 Zone4 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":3,"PID":6}},
+    {"line":66,"ofs":158,"group":"Note1 Zone4 DS","name":"Low Boost","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":3,"PID":17}},
+    {"line":69,"ofs":160,"group":"Note1 Zone5 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":4,"PID":6}},
+    {"line":71,"ofs":192,"group":"Note1 Zone5 DS","name":"Low Boost","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":4,"PID":17}},
+    {"line":74,"ofs":194,"group":"Note1 Zone6 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":5,"PID":6}},
+    {"line":76,"ofs":226,"group":"Note1 Zone6 DS","name":"Low Boost","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":5,"PID":17}},
+    {"line":79,"ofs":228,"group":"Note1 Zone7 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":6,"PID":6}},
+    {"line":81,"ofs":260,"group":"Note1 Zone7 DS","name":"Low Boost","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":6,"PID":17}},
+    {"line":84,"ofs":262,"group":"Note1 Zone8 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":7,"PID":6}},
+    {"line":86,"ofs":294,"group":"Note1 Zone8 DS","name":"Low Boost","data":"9D~63","value":"-99~+99","key":{"note":0,"VSP":7,"PID":17}},
+    {"line":89,"ofs":296,"group":"Note1 Zone1 - 2 Velocity Control","name":"Bottom Velocity","data":"01~7F","value":"1~127","key":{"note":0,"VSP":0,"PID":0}},
+    {"line":90,"ofs":297,"group":"Note1 Zone1 - 2 Velocity Control","name":"Velocity XFade Range","data":"00~7F","value":"Off~127","key":{"note":0,"VSP":0,"PID":2}},
+    {"line":91,"ofs":298,"bit":"1~0","group":"Note1 Zone1 - 2 Velocity Control","name":"Velocity XFade Shape","data":"00~02","value":"Linear~Layer","key":{"note":0,"VSP":0,"PID":1}},
+    {"line":93,"ofs":299,"group":"Note1 Zone2 - 3 Velocity Control","name":"Bottom Velocity","data":"01~7F","value":"1~127","key":{"note":0,"VSP":1,"PID":0}},
+    {"line":94,"ofs":300,"group":"Note1 Zone2 - 3 Velocity Control","name":"Velocity XFade Range","data":"00~7F","value":"Off~127","key":{"note":0,"VSP":1,"PID":2}},
+    {"line":95,"ofs":301,"bit":"1~0","group":"Note1 Zone2 - 3 Velocity Control","name":"Velocity XFade Shape","data":"00~02","value":"Linear~Layer","key":{"note":0,"VSP":1,"PID":1}},
+    {"line":97,"ofs":302,"group":"Note1 Zone3 - 4 Velocity Control","name":"Bottom Velocity","data":"01~7F","value":"1~127","key":{"note":0,"VSP":2,"PID":0}},
+    {"line":98,"ofs":303,"group":"Note1 Zone3 - 4 Velocity Control","name":"Velocity XFade Range","data":"00~7F","value":"Off~127","key":{"note":0,"VSP":2,"PID":2}},
+    {"line":99,"ofs":304,"bit":"1~0","group":"Note1 Zone3 - 4 Velocity Control","name":"Velocity XFade Shape","data":"00~02","value":"Linear~Layer","key":{"note":0,"VSP":2,"PID":1}},
+    {"line":101,"ofs":305,"group":"Note1 Zone4 - 5 Velocity Control","name":"Bottom Velocity","data":"01~7F","value":"1~127","key":{"note":0,"VSP":3,"PID":0}},
+    {"line":102,"ofs":306,"group":"Note1 Zone4 - 5 Velocity Control","name":"Velocity XFade Range","data":"00~7F","value":"Off~127","key":{"note":0,"VSP":3,"PID":2}},
+    {"line":103,"ofs":307,"bit":"1~0","group":"Note1 Zone4 - 5 Velocity Control","name":"Velocity XFade Shape","data":"00~02","value":"Linear~Layer","key":{"note":0,"VSP":3,"PID":1}},
+    {"line":105,"ofs":308,"group":"Note1 Zone5 - 6 Velocity Control","name":"Bottom Velocity","data":"01~7F","value":"1~127","key":{"note":0,"VSP":4,"PID":0}},
+    {"line":106,"ofs":309,"group":"Note1 Zone5 - 6 Velocity Control","name":"Velocity XFade Range","data":"00~7F","value":"Off~127","key":{"note":0,"VSP":4,"PID":2}},
+    {"line":107,"ofs":310,"bit":"1~0","group":"Note1 Zone5 - 6 Velocity Control","name":"Velocity XFade Shape","data":"00~02","value":"Linear~Layer","key":{"note":0,"VSP":4,"PID":1}},
+    {"line":109,"ofs":311,"group":"Note1 Zone6 - 7 Velocity Control","name":"Bottom Velocity","data":"01~7F","value":"1~127","key":{"note":0,"VSP":5,"PID":0}},
+    {"line":110,"ofs":312,"group":"Note1 Zone6 - 7 Velocity Control","name":"Velocity XFade Range","data":"00~7F","value":"Off~127","key":{"note":0,"VSP":5,"PID":2}},
+    {"line":111,"ofs":313,"bit":"1~0","group":"Note1 Zone6 - 7 Velocity Control","name":"Velocity XFade Shape","data":"00~02","value":"Linear~Layer","key":{"note":0,"VSP":5,"PID":1}},
+    {"line":113,"ofs":314,"group":"Note1 Zone7 - 8 Velocity Control","name":"Bottom Velocity","data":"01~7F","value":"1~127","key":{"note":0,"VSP":6,"PID":0}},
+    {"line":114,"ofs":315,"group":"Note1 Zone7 - 8 Velocity Control","name":"Velocity XFade Range","data":"00~7F","value":"Off~127","key":{"note":0,"VSP":6,"PID":2}},
+    {"line":115,"ofs":316,"bit":"1~0","group":"Note1 Zone7 - 8 Velocity Control","name":"Velocity XFade Shape","data":"00~02","value":"Linear~Layer","key":{"note":0,"VSP":6,"PID":1}},
+    {"line":117,"ofs":317,"group":"Note1 Common","name":"Pan","data":"00~7F","value":"0~127","key":{"note":0,"VSP":0,"PID":27}},
+    {"line":118,"ofs":318,"bit":"4~0","group":"Note1 Common","name":"Bus Select","data":"00~19","value":"0~25","key":{"note":0,"VSP":0,"PID":26}},
+    {"line":119,"ofs":318,"bit":"6~5","group":"Note1 Common","name":"FX Control Bus","data":"00~02","value":"Off~FX Control2","key":{"note":0,"VSP":0,"PID":5}},
+    {"line":120,"ofs":319,"group":"Note1 Common","name":"Send 1 Level","data":"00~7F","value":"0~127","key":{"note":0,"VSP":0,"PID":28}},
+    {"line":121,"ofs":320,"group":"Note1 Common","name":"Send 2 Level","data":"00~7F","value":"0~127","key":{"note":0,"VSP":0,"PID":29}},
+    {"line":122,"ofs":321,"group":"Note1 Common","name":"Exclusive Group","data":"00~7F","value":"0~127","key":{"note":0,"VSP":0,"PID":23}},
+    {"line":123,"ofs":322,"bit":"0","group":"Note1 Common","name":"Assign","data":"00~01","value":"Off~On","key":{"note":0,"VSP":0,"PID":21}},
+    {"line":124,"ofs":322,"bit":"1","group":"Note1 Common","name":"Single Trigger","data":"00~01","value":"Off~On","key":{"note":0,"VSP":0,"PID":22}},
+    {"line":125,"ofs":322,"bit":"2","group":"Note1 Common","name":"Receive Note On","data":"00~01","value":"Off~On","key":{"note":0,"VSP":0,"PID":24}},
+    {"line":126,"ofs":322,"bit":"3","group":"Note1 Common","name":"Receive Note Off","data":"00~01","value":"Off~On","key":{"note":0,"VSP":0,"PID":25}},
+    {"line":129,"ofs":324,"group":"Note2 Zone1 DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":1,"VSP":0,"PID":6}},
+    {"line":131,"ofs":622,"bit":"0","group":"Note2 Common","name":"Assign","data":"00~01","value":"Off~On","key":{"note":1,"VSP":0,"PID":21}},
+    {"line":132,"ofs":622,"bit":"1","group":"Note2 Common","name":"Single Trigger","data":"00~01","value":"Off~On","key":{"note":1,"VSP":0,"PID":22}},
+    {"line":133,"ofs":622,"bit":"2","group":"Note2 Common","name":"Receive Note On","data":"00~01","value":"Off~On","key":{"note":1,"VSP":0,"PID":24}},
+    {"line":134,"ofs":622,"bit":"3","group":"Note2 Common","name":"Receive Note Off","data":"00~01","value":"Off~On","key":{"note":1,"VSP":0,"PID":25}},
+    {"line":139,"ofs":38124,"group":"Note128 High DS","name":"Sample On/Off","data":"00~01","value":"Off~On","key":{"note":127,"VSP":0,"PID":6}},
+    {"line":141,"ofs":38422,"bit":"0","group":"Note128 Common","name":"Assign","data":"00~01","value":"Off~On","key":{"note":127,"VSP":0,"PID":21}},
+    {"line":142,"ofs":38422,"bit":"1","group":"Note128 Common","name":"Single Trigger","data":"00~01","value":"Off~On","key":{"note":127,"VSP":0,"PID":22}},
+    {"line":143,"ofs":38422,"bit":"2","group":"Note128 Common","name":"Receive Note On","data":"00~01","value":"Off~On","key":{"note":127,"VSP":0,"PID":24}},
+    {"line":144,"ofs":38422,"bit":"3","group":"Note128 Common","name":"Receive Note Off","data":"00~01","value":"Off~On","key":{"note":127,"VSP":0,"PID":25}}
+  ]
+}

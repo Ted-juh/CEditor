@@ -1,4 +1,4 @@
-# Sequential and Dave Smith Instruments profiles, read from their own manuals
+# Sequential, Dave Smith Instruments and Oberheim profiles, read from their own manuals
 
 ```bash
 node tools/profiles/sequential/make-profiles.mjs            # rebuild every profile from tables/ + synths/
@@ -40,9 +40,16 @@ the lines beneath (`0 = Off`). So a profile is read out of the manual, not retyp
 | `sequential-mopho` | Mopho Manual 1.2 | 117 | 9 | yes |
 | `sequential-mopho-keyboard` | Mopho Keyboard Manual 1.1 (also the Mopho SE) | 126 | 15 | yes |
 | `sequential-mopho-x4` | Mopho x4 Operation Manual 1.0 | 127 | 17 | yes |
+| `oberheim-ob-6` | OB-6 Operation Manual 1.2 | 872 | 12 | yes |
+| `oberheim-ob-x8` | OB-X8 Manual V2.2 | 113 | 0 | — |
+| `oberheim-teo-5` | TEO-5 MIDI Implementation Document v2 | 184 | 21 | — |
+
+Sequential writes the Oberheim instruments' manuals too, in the same style, so the same reader takes
+them; they are listed under Oberheim in the program, and the TEO-5 answers to Oberheim's own SysEx ID
+(02) where the rest answer as DSI (01).
 
 Each profile has every parameter of the manual's program, global and control tables; the identity
-reply, so CEditor can tell which instrument is connected; and, where the manual's Bank Select line
+reply, so CEditor can tell which instrument is connected (except the OB-6 and OB-X8, below); and, where the manual's Bank Select line
 is unambiguous, preset recall by Bank Select (CC 32) and Program Change. Layered instruments (Rev2,
 Prophet 12, Prophet X, Prophet '08, Tetra) have every parameter twice, `A:` and `B:`.
 
@@ -79,6 +86,24 @@ Recorded in the profiles rather than guessed at:
 - **Bank Select**: the Rev2, Prophet X and Fourm print "1 - 4 select user banks" where their own
   transmitted list says 0 - 9, and the Prophet-5's Bank Select and Program Change lines disagree.
   No preset recall is offered for those four until an instrument settles which.
+- **Identity replies copied from a sibling.** The OB-6's Device Inquiry reply prints its family code
+  as 2DH, the Prophet-6's, where every other SysEx message on the same pages addresses it as 2EH;
+  the OB-X8's prints 33H where its other messages use 31H, exactly as the Prophet-5's own document
+  does (33H in the reply, 31H elsewhere), and the Trigon-6 User's Guide prints 2DH where its MIDI
+  Implementation prints 39H. The OB-6 and OB-X8 profiles do not try to recognise the instrument
+  until one settles it; the Prophet-5's keeps 33H, as printed and not someone else's.
+- **OB-X8**: its NRPN chapter is the Prophet-5's, headings included ("not saved as part of a
+  program" over every program parameter); NRPN 56 and 57 are both printed "MOD BOX LFO 2 DEST OSC
+  2"; three ranges look misprinted and are kept, said on the parameter (CHORD KEY LIMIT 0-1207, PORTA
+  MODE 0-66, LFO 1 MOD 2 RAMP UP 0-27 where MOD 1's is 0-127); two split rows print a second NRPN
+  under the first (1090 under 1122, 1092 under 1123) without saying which half is which, and only
+  the first is offered. Its Bank Select and Program Change lines are the Prophet-5's, and disagree
+  the same way.
+- **TEO-5**: Master Coarse Tune is printed 0-100 and Fine 0-24, the other way round from the OB-6
+  and Prophet-6; Filter Res 0-265; the Program table is headed "parameters 0-352" and prints 1 - 187;
+  and banks are numbered three ways (received 1 - 12, transmitted 0 - 9, a dump request 0 - 15), so
+  it has no preset recall. Filter Cutoff and Filter State print their MSB halves (35, 39) as
+  parameters of their own, which are left out: 34 and 38 carry the whole value.
 - **Footnote marks change meaning by table**: the Pro 2's `†` is "transmitted, but ignored when
   received" under its globals and "the first 7 bits set the slew value" under its sequencer. Each
   mark is resolved against its own table's footnote.
@@ -96,4 +121,3 @@ and LFO 3 Amt: the same off-by-a-row slip its Roland CC lists showed.
   on the Pro 3 Support page").
 - **Evolver family** (Evolver, Mono Evolver, Poly Evolver): SysEx parameter numbers, not NRPN.
 - **Tempest**: no NRPN table.
-- **OB-6, OB-X8, TEO-5**: documented on oberheim.com, which this environment does not reach yet.

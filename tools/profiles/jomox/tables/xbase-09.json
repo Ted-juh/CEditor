@@ -1,0 +1,26 @@
+{
+  "source": {"title":"XBase 09 Operating Manual","file":"XBase09_209Engl.pdf","sha256":"7197b1873dcc1f3b25b724b4e865d5d1266bc52ac316d7aae9a8071337c091f0","url":"https://www.jomox.de/upload/manuals/XBase09_209Engl.pdf","linkedFrom":"https://www.jomox.de/support.php?lang=2&product_id=6","pages":[35,35]},
+  "rows": [
+    {"page":35,"section":"BASS DRUM","name":"Tune","cc":100,"range":"0..127","internal":"256"},
+    {"page":35,"section":"BASS DRUM","name":"Pitch","cc":101,"range":"0..127","internal":"256"},
+    {"page":35,"section":"BASS DRUM","name":"Decay","cc":102,"range":"0..127","internal":"64"},
+    {"page":35,"section":"BASS DRUM","name":"Harmonics","cc":103,"range":"0..127","internal":"64"},
+    {"page":35,"section":"BASS DRUM","name":"Pulse","cc":104,"range":"0..127","internal":"16"},
+    {"page":35,"section":"BASS DRUM","name":"Noise","cc":105,"range":"0..127","internal":"16"},
+    {"page":35,"section":"BASS DRUM","name":"Attack","cc":106,"range":"0..127","internal":"16"},
+    {"page":35,"section":"BASS DRUM","name":"EQ","cc":107,"range":"0..127","internal":"8"},
+    {"page":35,"section":"SNARE DRUM","name":"Tune","cc":108,"range":"0..127","internal":"128"},
+    {"page":35,"section":"SNARE DRUM","name":"Xsnapp","cc":109,"range":"0..127","internal":"64"},
+    {"page":35,"section":"SNARE DRUM","name":"Decay","cc":110,"range":"0..127","internal":"64"},
+    {"page":35,"section":"SNARE DRUM","name":"Detune","cc":111,"range":"0..127","internal":"64"},
+    {"page":35,"section":"SNARE DRUM","name":"Noise Tune","cc":112,"range":"0..127","internal":"64"},
+    {"page":35,"section":"HI HAT","name":"Tune","cc":113,"range":"0..127","internal":"256"},
+    {"page":35,"section":"HI HAT","name":"HH Balance","cc":114,"range":"0..127","internal":"16"},
+    {"page":35,"section":"HI HAT","name":"CH Decay","cc":115,"range":"0..127","internal":"64"},
+    {"page":35,"section":"HI HAT","name":"OH Decay","cc":116,"range":"0..127","internal":"64"},
+    {"page":35,"section":"HI HAT","name":"BD Level","cc":117,"range":"0..127","internal":"255"},
+    {"page":35,"section":"HI HAT","name":"SD Level","cc":118,"range":"0..127","internal":"255"},
+    {"page":35,"section":"HI HAT","name":"HH Level","cc":119,"range":"0..127","internal":"255"},
+    {"page":35,"section":"HI HAT","name":"Midi Volume (Global)","cc":7,"range":"0..127","internal":"255"}
+  ]
+}

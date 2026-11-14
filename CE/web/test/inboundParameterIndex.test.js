@@ -316,3 +316,43 @@ test('GAIA hardware CCs use their measured value conversion and tone', () => {
       { parameterId: `tone${tone}.lfo.rate`, value: 64 });
   }
 });
+
+// A 14-bit CC pair is sent as two CCs, the MSB's and then the LSB's, and arrives the same way: two
+// messages, each matched on its own. The Sub 37's filter cutoff is CC 19 with its LSB on CC 51.
+test('a 14-bit CC pair: indexed on both controllers, the coarse half alone, the fine half on the coarse', () => {
+  const sub37 = profile('moog-sub-37');
+  const cutoff = sub37.parameters.find((p) => p.name === 'FILTER CUTOFF' && !p.group.endsWith('(NRPN)'));
+  assert.equal(localCompileParameter(sub37, { parameterId: cutoff.id, value: 1000 }).hex, 'B0 13 07 B0 33 68');
+
+  const index = buildInboundIndex(sub37);
+  assert.deepEqual(matchInbound(index, 'B0 13 07'), { parameterId: cutoff.id, prefixLength: 2 });
+  assert.deepEqual(matchInbound(index, 'B5 33 68'), { parameterId: cutoff.id, prefixLength: 2 }, 'the LSB, on any channel');
+  assert.equal(index.collisions.length, 0);
+
+  // The coarse half is a value on its own: MIDI resets the fine half when the coarse one arrives.
+  assert.deepEqual(decodeInbound(index, 'B0 13 07'), { parameterId: cutoff.id, value: 7 << 7 });
+  // The fine half joins the coarse half the parameter has...
+  assert.deepEqual(decodeInbound(index, 'B0 33 68', { [cutoff.id]: 7 << 7 }), { parameterId: cutoff.id, value: 1000 });
+  assert.deepEqual(decodeInbound(index, 'B0 33 00', { [cutoff.id]: 16383 }), { parameterId: cutoff.id, value: 16256 });
+  // ...and with no coarse half known it is not read against one made up.
+  assert.equal(decodeInbound(index, 'B0 33 68'), null);
+
+  const { ccIn } = inboundLookupMaps(index);
+  assert.equal(ccIn['19'], cutoff.id);
+  assert.equal(ccIn['51'], cutoff.id, 'learn names the fine controller too');
+});
+
+test('a 14-bit CC pair on a 7-bit encoder: the coarse half is the value, the fine one is ignored', () => {
+  const probe = {
+    id: 'probe',
+    variables: { channel: 1 },
+    messageRecipes: [{ id: 'cc7', kind: 'cc', channel: '$channel', controller: 7, lsbController: 39, value: '$encodedValue' }],
+    parameters: [{ id: 'volume', type: 'integer', range: { min: 0, max: 127 }, encoding: { type: 'u7' }, messageRecipe: 'cc7' }],
+  };
+  assert.equal(localCompileParameter(probe, { parameterId: 'volume', value: 100 }).hex, 'B0 07 64 B0 27 00', 'the coarse half, its fine half 0');
+  const index = buildInboundIndex(probe);
+  assert.deepEqual(decodeInbound(index, 'B0 07 64'), { parameterId: 'volume', value: 100 });
+  assert.equal(decodeInbound(index, 'B0 27 10', { volume: 100 }), null);
+  const bad = { ...probe, messageRecipes: [{ ...probe.messageRecipes[0], lsbController: 7 }] };
+  assert.match(localCompileParameter(bad, { parameterId: 'volume', value: 1 }).error, /lsbController/);
+});
