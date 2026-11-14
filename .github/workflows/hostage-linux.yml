@@ -1,0 +1,78 @@
+name: HoSTage Linux standalone
+on:
+  push:
+    branches: [codex/hostage-linux-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  standalone:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install build and display dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends wine64 libgtk-3-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev libasound2-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev libgl1-mesa-dev xvfb xauth xdotool imagemagick
+      - name: Build the embedded web interface
+        working-directory: CE/web
+        run: |
+          npm ci
+          npm run build
+      - name: Configure and build the Linux executable and scanner
+        env:
+          WINEDEBUG: -all
+          WINEARCH: win64
+        run: |
+          helpers="$RUNNER_TEMP/juce-tools"
+          mkdir -p "$helpers"
+          for name in juceaide juce_lv2_helper juce_vst3_helper; do
+            printf '#!/bin/sh\nexec /usr/lib/wine/wine64 "%s" "$@"\n' "$PWD/JUCE/bin/JUCE-8.0.7/$name.exe" > "$helpers/$name.exe"
+            chmod +x "$helpers/$name.exe"
+          done
+          cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCEDITOR_BUILD_APP=ON -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCANNER_WORKER=ON \
+            -DCEDITOR_JUCE_HELPER_DIR="$helpers" -DCE_HOST_PRODUCT_NAME=HoSTage
+          cmake --build build/linux --parallel 2 --target CEHostStandalone CEditorPluginScanner
+      - name: Stage binaries outside the checkout
+        run: |
+          mkdir "$RUNNER_TEMP/hostage"
+          cp build/linux/CEHostStandalone_artefacts/Release/HoSTage build/linux/CEditorPluginScanner "$RUNNER_TEMP/hostage/"
+          tar -C "$RUNNER_TEMP/hostage" -czf "$GITHUB_WORKSPACE/hostage-linux-x64.tar.gz" HoSTage CEditorPluginScanner
+      - name: Capture standalone window on a virtual display
+        env:
+          WEBKIT_DISABLE_DMABUF_RENDERER: 1
+          WEBKIT_DISABLE_COMPOSITING_MODE: 1
+          LIBGL_ALWAYS_SOFTWARE: 1
+        run: |
+          cd "$RUNNER_TEMP/hostage"
+          xvfb-run -a bash -euc '
+            ./HoSTage > "$GITHUB_WORKSPACE/hostage-startup.log" 2>&1 &
+            app=$!
+            trap "kill $app 2>/dev/null || true" EXIT
+            window=$(timeout 120 xdotool search --sync --onlyvisible --name "^HoSTage$" | head -1)
+            test -n "$window"
+            for attempt in {1..90}; do
+              kill -0 "$app"
+              import -window "$window" "$GITHUB_WORKSPACE/hostage-window.png"
+              colors=$(convert "$GITHUB_WORKSPACE/hostage-window.png" -gravity center -crop 75%x75%+0+0 +repage -format "%k" info:)
+              if (( colors > 64 )); then exit 0; fi
+              sleep 2
+            done
+            echo "The window interior remained blank or nearly uniform."
+            exit 1
+          '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hostage-linux-x64-development
+          path: |
+            hostage-linux-x64.tar.gz
+            hostage-window.png
+            hostage-startup.log

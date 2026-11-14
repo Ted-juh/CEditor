@@ -707,6 +707,8 @@ if(CEDITOR_BUILD_APP)
     )
 
     juce_add_gui_app(CEHostStandalone
+        NEEDS_WEB_BROWSER TRUE
+        NEEDS_CURL TRUE
         PRODUCT_NAME "${CE_HOST_PRODUCT_NAME}"
         VERSION "${CE_HOST_PRODUCT_VERSION}"
         COMPANY_NAME "${CE_HOST_COMPANY_NAME}"
@@ -730,8 +732,8 @@ if(CEDITOR_BUILD_APP)
 
     target_compile_definitions(CEHostStandalone PRIVATE
         JUCE_WEB_BROWSER=1
-        JUCE_USE_WIN_WEBVIEW2=1
-        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+        $<$<PLATFORM_ID:Windows>:JUCE_USE_WIN_WEBVIEW2=1>
+        $<$<PLATFORM_ID:Windows>:JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1>
         JUCE_PLUGINHOST_VST3=1
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
         CEHOST_PRODUCT_NAME="${CE_HOST_PRODUCT_NAME}"
@@ -739,7 +741,7 @@ if(CEDITOR_BUILD_APP)
     )
 
     target_include_directories(CEHostStandalone PRIVATE
-        "${WEBVIEW2_INCLUDE}"
+        "$<$<PLATFORM_ID:Windows>:${WEBVIEW2_INCLUDE}>"
         "${CE_ROOT}/src"
         "${CMAKE_BINARY_DIR}/PlayerWebData"
     )
@@ -762,7 +764,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_graphics
         juce::juce_gui_basics
         juce::juce_gui_extra
-        "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+        "$<$<PLATFORM_ID:Windows>:${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib>"
         $<$<PLATFORM_ID:Windows>:dwmapi>
         PlayerWebData
     )
