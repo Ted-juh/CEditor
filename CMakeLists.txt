@@ -2148,6 +2148,19 @@ ce_configure_test(CEditorPlayerScriptTests)
     message(STATUS "CEditor: build target CEditorScriptingTests and run it to verify the engine.")
 endif()
 
+if(WIN32 AND TARGET CEHostStandalone AND TARGET CEditorPluginScanner AND TARGET CEditorPluginWorker)
+    # Refresh both helpers even on an incremental build that does not relink the host.
+    add_custom_target(HoSTageWindows
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:CEditorPluginScanner>"
+            "$<TARGET_FILE:CEditorPluginWorker>"
+            "$<TARGET_FILE_DIR:CEHostStandalone>"
+        DEPENDS CEHostStandalone CEditorPluginScanner CEditorPluginWorker
+        COMMENT "Staging HoSTage standalone runtime helpers"
+        VERBATIM
+    )
+endif()
+
 # --- Value/parameter layer (Milestone 2): host-automatable parameters + DAW state ---------------
 # ON by default (verified to compile) so the normal CEditorPlayerVST build includes it with no extra
 # flags. CEditorPlayerVST builds a juce::AudioProcessorValueTreeState from the panel's baked

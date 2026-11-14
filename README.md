@@ -76,6 +76,19 @@ npm install
 cd ../..
 ```
 
+### Build standalone HoSTage for Windows x64
+
+From PowerShell at the repository root, run:
+
+```powershell
+.\tools\scripts\build-native.ps1 -HoSTageOnly
+```
+
+This builds the production web UI, then the Release standalone and its two plug-in
+helpers with MSVC and Ninja. The program is in
+`build/hostage-windows/CEHostStandalone_artefacts/Release/Hostage.exe`.
+Keep `CEditorPluginScanner.exe` and `CEditorPluginWorker.exe` beside it.
+
 ### Running in Development
 
 You need two things running side by side: the Vite dev server (serves the Svelte UI with hot reload) and the JUCE application (the native window with WebView).
