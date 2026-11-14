@@ -329,7 +329,7 @@ async function sha256File(file) {
 /** The ISCC argument list (no shell, execFile-style — spaces in values need no quoting). Every
     /D here has an #ifndef default in HostProductTemplate.iss; the drift test holds the two
     files together. */
-export function isccArgs({ project, stageDir, outDir, artifacts, templatePath }) {
+export function isccArgs({ project, stageDir, outDir, artifacts, templatePath, prerequisitesDir }) {
   const args = [
     `/DMyAppName=${project.productName}`,
     `/DMyAppVersion=${project.version}`,
@@ -343,6 +343,7 @@ export function isccArgs({ project, stageDir, outDir, artifacts, templatePath })
   ];
   if (artifacts.standaloneExe) args.push(`/DMyAppExeName=${path.basename(artifacts.standaloneExe)}`);
   if (artifacts.vst3Bundle) args.push(`/DMyVst3BundleName=${path.basename(artifacts.vst3Bundle)}`);
+  if (prerequisitesDir) args.push(`/DWindowsPrerequisitesDir=${path.resolve(prerequisitesDir)}`);
   args.push(templatePath);
   return args;
 }
@@ -501,12 +502,12 @@ async function main() {
   const installerDir = path.join(args.out, 'installer');
   mkdirSync(installerDir, { recursive: true });
   const templatePath = path.join(REPO, 'tools', 'installer', 'HostProductTemplate.iss');
-  const compileArgs = isccArgs({ project, stageDir, outDir: installerDir, artifacts, templatePath });
+  const compileArgs = isccArgs({ project, stageDir, outDir: installerDir, artifacts, templatePath,
+    prerequisitesDir: rawProject.bundleWindowsRuntimes ? args.prerequisitesDir : undefined });
 
   const iscc = findIscc(args.iscc);
   if (rawProject.bundleWindowsRuntimes) {
     if (!iscc) throw new Error('Inno Setup is required to compile the official installer. Use --stage-only to stage files.');
-    compileArgs.unshift(`/DWindowsPrerequisitesDir=${path.resolve(args.prerequisitesDir)}`);
   }
   if (iscc == null) {
     console.log('ISCC not found — staged the product folder, skipped the installer compile.');
