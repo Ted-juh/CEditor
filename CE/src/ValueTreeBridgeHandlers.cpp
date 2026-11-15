@@ -9,7 +9,7 @@
 #include "InstrumentHost/PluginEditorHost.h"
 #include "InstrumentHost/FloatingEditorWindows.h"
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
-#include "ControlSurface/Ctrl49WindowsEndpoints.h"
+#include "ControlSurface/Ctrl49Endpoints.h"
 #include "ControlSurface/Ctrl49EmbeddedAssets.h"
 #include "UpdateCheck.h"
 
@@ -1938,7 +1938,7 @@ void ValueTreeBridge::ensureInstrumentHost()
     {
         namespace surface = ceditor::ctrl49;
         surface::Ctrl49SurfaceBroker::Options surfaceOptions;
-        surfaceOptions.discover = &surface::discoverCtrl49WindowsEndpoints;
+        surfaceOptions.discover = &surface::discoverCtrl49Endpoints;
         // Same marshal-and-guard as the service's emit above, same documented raw `this`.
         surfaceOptions.emit = [this] (const juce::String& eventName, const juce::var& payload)
         {

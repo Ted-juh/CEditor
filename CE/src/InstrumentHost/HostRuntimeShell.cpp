@@ -1,6 +1,6 @@
 #include "HostRuntimeShell.h"
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
-#include "ControlSurface/Ctrl49WindowsEndpoints.h"
+#include "ControlSurface/Ctrl49Endpoints.h"
 #include "ControlSurface/Ctrl49EmbeddedAssets.h"
 
 namespace ceditor::host
@@ -181,7 +181,7 @@ HostRuntimeShell::HostRuntimeShell()
     {
         namespace surface = ceditor::ctrl49;
         surface::Ctrl49SurfaceBroker::Options surfaceOptions;
-        surfaceOptions.discover = &surface::discoverCtrl49WindowsEndpoints;
+        surfaceOptions.discover = &surface::discoverCtrl49Endpoints;
         surfaceOptions.emit = [safe = juce::Component::SafePointer<HostRuntimeShell> (this)]
                               (const juce::String& eventName, const juce::var& payload)
         {

@@ -9125,7 +9125,14 @@ void InstrumentHostService::startAudio()
     deviceManager.addMidiInputDeviceCallback ({}, &playerGate);
     deviceManager.addMidiInputDeviceCallback ({}, &midiObserver);
     for (const auto& input : juce::MidiInput::getAvailableDevices())
+    {
+       #if JUCE_LINUX
+        // The surface broker reads the VIP controls and screen replies on USB cable 2.
+        if (input.name == "CTRL49 MIDI 3")
+            continue;
+       #endif
         deviceManager.setMidiInputDeviceEnabled (input.identifier, true);
+    }
 
     audioRunning = true;
 
