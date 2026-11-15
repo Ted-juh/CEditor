@@ -7613,7 +7613,14 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (record.name.isEmpty())
             record.name = rack.getPerformance().name.isNotEmpty() ? rack.getPerformance().name
                                                                   : juce::String ("Rack capture");
-        record.rackManifestJson = juce::JSON::toString (rack.captureState().toVar());
+        juce::String captureError;
+        const auto captured = rack.captureState (&captureError);
+        if (captureError.isNotEmpty())
+        {
+            emitError ("Rack was not saved: " + captureError);
+            return;
+        }
+        record.rackManifestJson = juce::JSON::toString (captured.toVar());
         record.fingerprint = juce::String::toHexString (record.rackManifestJson.hashCode64());
 
         // What each part sounded like, harvested from the library record it was playing. This

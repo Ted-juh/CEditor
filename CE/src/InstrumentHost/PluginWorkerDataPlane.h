@@ -20,7 +20,7 @@ namespace ceditor::host::plugin_worker
 {
 
 inline constexpr juce::uint32 dataPlaneMagic = 0x48534450; // "HSDP"
-inline constexpr juce::uint16 dataPlaneVersion = 1;
+inline constexpr juce::uint16 dataPlaneVersion = 2;
 inline constexpr juce::uint16 dataPlaneSlotCount = 2;
 inline constexpr juce::uint32 maxSupportedFrames = 16'384;
 inline constexpr juce::uint32 maxSupportedChannels = 64;
@@ -60,9 +60,11 @@ struct ParameterEvent
     juce::uint32 sampleOffset = 0;
     float normalizedValue = 0.0f;
     juce::uint32 flags = parameterValue;
+    // Host writes can reach the worker by audio block or by save-time control request.
+    juce::uint32 revision = 0;
 };
 
-static_assert (sizeof (ParameterEvent) == 16);
+static_assert (sizeof (ParameterEvent) == 20);
 
 enum class BlockStatus : juce::uint32
 {

@@ -403,7 +403,7 @@ public:
 
     // -- state --------------------------------------------------------------------------
     /** The document with every live instrument's state freshly captured into its blob. */
-    Performance captureState();
+    Performance captureState (juce::String* freshCaptureError = nullptr);
 
     struct UnresolvedPart
     {
@@ -451,8 +451,8 @@ private:
     void createLiveNodes (const RackPart& part);
     void applyPartToLive (const RackPart& part, LivePart& live);
     void applyMixerState();
-    void refreshStateBlob (RackPart& part);
-    void refreshEffectBlobs (juce::Array<EffectSlot>& effects);
+    void refreshStateBlob (RackPart& part, juce::String* error = nullptr);
+    void refreshEffectBlobs (juce::Array<EffectSlot>& effects, juce::String* error);
     /** Stereo-adapting hop: mono fans out, stereo folds into mono, sums where several
         sources meet one input. */
     void connectAudio (juce::AudioProcessorGraph::Node* from, juce::AudioProcessorGraph::Node* to);

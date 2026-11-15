@@ -217,6 +217,36 @@ juce::AudioProcessor* unwrapAvailable (juce::AudioProcessor* processor)
         return guarded->isDisabled() ? nullptr : guarded->getInner();
     return processor;
 }
+void captureBlob (juce::AudioProcessor& wrapper, juce::String& blob, juce::String* error)
+{
+    auto* processor = unwrapAvailable (&wrapper);
+    if (processor == nullptr)
+    {
+        if (error) *error = "A loaded plug-in is unavailable.";
+        return;
+    }
+    juce::MemoryBlock state;
+    auto* worker = dynamic_cast<PluginWorkerBoundary*> (processor);
+    if (error && worker)
+    {
+        juce::String workerError;
+        if (! worker->readFreshState (state, workerError))
+        {
+            *error = processor->getName() + ": " + workerError;
+            return;
+        }
+    }
+    else
+    {
+        wrapper.getStateInformation (state);
+        if (! unwrapAvailable (&wrapper))
+        {
+            if (error) *error = "A plug-in failed to return its state.";
+            return;
+        }
+    }
+    blob = juce::Base64::toBase64 (state.getData(), state.getSize());
+}
 } // namespace
 
 InstrumentRackHost::InstrumentRackHost()
@@ -1796,41 +1826,30 @@ juce::AudioProcessor* InstrumentRackHost::getInstrument (const juce::String& par
              ? unwrapAvailable (lp->instrumentNode->getProcessor()) : nullptr;
 }
 
-Performance InstrumentRackHost::captureState()
+Performance InstrumentRackHost::captureState (juce::String* freshCaptureError)
 {
     for (auto& part : model.parts)
     {
-        refreshStateBlob (part);
-        refreshEffectBlobs (part.effects);
+        refreshStateBlob (part, freshCaptureError);
+        refreshEffectBlobs (part.effects, freshCaptureError);
     }
-    refreshEffectBlobs (model.masterEffects);
+    refreshEffectBlobs (model.masterEffects, freshCaptureError);
     for (auto& chain : model.returns)
-        refreshEffectBlobs (chain.effects);
+        refreshEffectBlobs (chain.effects, freshCaptureError);
     // Group buses carry inserts like everything else, and a capture that skipped them would
     // save a bus chain that comes back empty — found while building chain presets on top.
     for (auto& bus : model.buses)
-        refreshEffectBlobs (bus.effects);
+        refreshEffectBlobs (bus.effects, freshCaptureError);
     return model;
 }
 
-void InstrumentRackHost::refreshEffectBlobs (juce::Array<EffectSlot>& effects)
+void InstrumentRackHost::refreshEffectBlobs (juce::Array<EffectSlot>& effects, juce::String* error)
 {
     for (auto& slot : effects)
         if (const auto it = liveEffects.find (slot.effectId);
             it != liveEffects.end() && it->second.node != nullptr)
         {
-            auto* wrapper = it->second.node->getProcessor();
-            const auto* guarded = dynamic_cast<GuardedPluginProcessor*> (wrapper);
-            if (guarded != nullptr && guarded->isDisabled())
-                continue;
-            auto* processor = unwrap (wrapper);
-            if (processor == nullptr)
-                continue;
-            juce::MemoryBlock state;
-            wrapper->getStateInformation (state);
-            if (guarded != nullptr && guarded->isDisabled())
-                continue;
-            slot.stateBlobBase64 = juce::Base64::toBase64 (state.getData(), state.getSize());
+            captureBlob (*it->second.node->getProcessor(), slot.stateBlobBase64, error);
         }
 }
 
@@ -2385,22 +2404,10 @@ void InstrumentRackHost::notifyInstrumentWillBeRemoved (const juce::String& part
         onInstrumentWillBeRemoved (partId, *unwrap (lp.instrumentNode->getProcessor()));
 }
 
-void InstrumentRackHost::refreshStateBlob (RackPart& part)
+void InstrumentRackHost::refreshStateBlob (RackPart& part, juce::String* error)
 {
     if (auto* lp = findLive (part.partId); lp != nullptr && lp->instrumentNode != nullptr)
-    {
-        if (const auto* guarded = dynamic_cast<GuardedPluginProcessor*> (
-                lp->instrumentNode->getProcessor());
-            guarded != nullptr && guarded->isDisabled())
-            return;
-        juce::MemoryBlock state;
-        lp->instrumentNode->getProcessor()->getStateInformation (state);
-        if (const auto* guarded = dynamic_cast<GuardedPluginProcessor*> (
-                lp->instrumentNode->getProcessor());
-            guarded != nullptr && guarded->isDisabled())
-            return;
-        part.stateBlobBase64 = juce::Base64::toBase64 (state.getData(), state.getSize());
-    }
+        captureBlob (*lp->instrumentNode->getProcessor(), part.stateBlobBase64, error);
 }
 
 } // namespace ceditor::host
