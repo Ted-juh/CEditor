@@ -202,9 +202,19 @@ target_link_libraries(ce_sqlite PUBLIC Threads::Threads)
 # ------------------------------------------------------------------ the app, the player, the VST
 # Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.
 
-# CTRL49 embedded assets (Lua pages, knob filmstrip, defaults) — generated once and
-# compiled into every target that talks to the hardware: the bridge exe AND, since the
-# broker moved the surface into the product, the editor and both host targets.
+# HoSTage uses three CTRL49 assets. CEditor and its bridge also use device-specific defaults.
+set(HOSTAGE_CTRL49_INPUTS
+    "${CMAKE_SOURCE_DIR}/tools/ctrl49/Hostage_MultiKnob.lua"
+    "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
+    "${CMAKE_SOURCE_DIR}/tools/ctrl49/hostage_logo.png")
+set(HOSTAGE_CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/HostageCtrl49Assets.cpp")
+add_custom_command(
+    OUTPUT "${HOSTAGE_CTRL49_EMBED_OUT}"
+    COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR} -DOUT=${HOSTAGE_CTRL49_EMBED_OUT}
+        -DHOSTAGE_ONLY=ON -P ${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake
+    DEPENDS "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake" ${HOSTAGE_CTRL49_INPUTS}
+    COMMENT "Embedding HoSTage CTRL49 page and graphics"
+    VERBATIM)
 set(CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/Ctrl49EmbeddedAssets.cpp")
 add_custom_command(
     OUTPUT "${CTRL49_EMBED_OUT}"
@@ -215,10 +225,9 @@ add_custom_command(
     DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
-        "${CMAKE_SOURCE_DIR}/tools/ctrl49/Hostage_MultiKnob.lua"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_Bridge.lua"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
-        "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
-        "${CMAKE_SOURCE_DIR}/tools/ctrl49/hostage_logo.png"
+        ${HOSTAGE_CTRL49_INPUTS}
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
         "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
@@ -696,7 +705,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
-        "${CTRL49_EMBED_OUT}"
+        "${HOSTAGE_CTRL49_EMBED_OUT}"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
