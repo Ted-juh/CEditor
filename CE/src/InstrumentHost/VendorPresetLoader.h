@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VendorPreset.h"
+#include "SpirePresetState.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 namespace ceditor::host
@@ -111,6 +112,7 @@ inline bool applyVendorPresetInWorker (juce::AudioPluginInstance& instrument, co
         }
         // Resolve the complete map before touching the instance. Spire exposes its SPF2
         // parameter keys verbatim, avoiding a version-dependent binary-state layout.
+        setSpirePresetName (instrument, preset.name);
         for (const auto& assignment : assignments)
             assignment.parameter->setValueNotifyingHost (assignment.value);
         return true;
