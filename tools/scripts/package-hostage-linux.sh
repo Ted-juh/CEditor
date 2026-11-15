@@ -28,12 +28,14 @@ export LD_LIBRARY_PATH=/usr/lib/hostage/web-libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_
 exec /usr/lib/hostage/HoSTage "$@"
 LAUNCH
 chmod 755 "$root/usr/bin/hostage"
+install -Dm644 "$repo/tools/installer/hostage.svg" "$root/usr/share/icons/hicolor/scalable/apps/hostage.svg"
 cat > "$root/usr/share/applications/hostage.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
 Name=HoSTage
 Exec=/usr/bin/hostage
-Icon=audio-x-generic
+Icon=hostage
+StartupWMClass=HoSTage
 Terminal=false
 Categories=AudioVideo;Audio;
 DESKTOP
