@@ -300,6 +300,9 @@ void Ctrl49SurfaceBroker::tick()
                     return;
                 }
 
+               #if JUCE_LINUX
+                service.reopenCtrl49PlayingInputs();
+               #endif
                 endpoints = std::move (found);
                 deviceError.clear();
                 deviceRefusals = 0;

@@ -958,6 +958,9 @@ public:
         category; empty is every kind. */
     SurfaceDiscover surfaceDiscover (const juce::String& kind, int count);
 
+   #if JUCE_LINUX
+    void reopenCtrl49PlayingInputs();
+   #endif
     bool ownsHardwareSurface() const;
     /** Claims the surface for this instance, taking it from an instance whose heartbeat has
         gone stale. Returns false when another live instance holds it. */
@@ -2406,6 +2409,10 @@ private:
     void refreshMidiPickups();
     void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
                         int cc, int channel, int note = -1);
+   #if JUCE_LINUX
+    static bool isCtrl49PlayingInput (const juce::String& name);
+    juce::StringArray openedCtrl49Inputs, disabledCtrl49Inputs;
+   #endif
     bool audioRunning = false;
 
     // Cleared in the destructor so an asynchronous instantiate callback that outlives this

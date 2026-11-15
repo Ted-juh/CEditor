@@ -1325,14 +1325,32 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         const auto id = payload.getProperty ("id", {}).toString();
         const bool enabled = payload.getProperty ("enabled", true);
         deviceManager.setMidiInputDeviceEnabled (id, enabled);
-        if (! enabled)
-            for (const auto& device : juce::MidiInput::getAvailableDevices())
-                if (device.identifier == id)
+        for (const auto& device : juce::MidiInput::getAvailableDevices())
+            if (device.identifier == id)
+            {
+               #if JUCE_LINUX
+                if (isCtrl49PlayingInput (device.name))
+                {
+                    if (enabled)
+                    {
+                        disabledCtrl49Inputs.removeString (device.name);
+                        openedCtrl49Inputs.addIfNotAlreadyThere (id);
+                    }
+                    else
+                    {
+                        disabledCtrl49Inputs.addIfNotAlreadyThere (device.name);
+                        openedCtrl49Inputs.removeString (id);
+                    }
+                }
+               #endif
+                if (! enabled)
                 {
                     const std::scoped_lock lock (midiActivityLock);
                     if (auto found = midiInputHealth.find (device.name); found != midiInputHealth.end())
                         found->second.heldNotes.clear();
                 }
+                break;
+            }
         emitAudioDevices();
         return;
     }
@@ -9106,6 +9124,30 @@ int InstrumentHostService::neededInputChannels() const
     return needed;
 }
 
+#if JUCE_LINUX
+bool InstrumentHostService::isCtrl49PlayingInput (const juce::String& name)
+{
+    return name == "CTRL49 MIDI 1" || name == "CTRL49 MIDI 2" || name == "CTRL49 MIDI 4";
+}
+
+void InstrumentHostService::reopenCtrl49PlayingInputs()
+{
+    if (! audioRunning) return;
+
+    // ALSA tears down subscriptions on unplug. JUCE can still report the old
+    // input enabled, even when the returning device gets the very same address.
+    for (const auto& id : openedCtrl49Inputs)
+        deviceManager.setMidiInputDeviceEnabled (id, false);
+    openedCtrl49Inputs.clear();
+    for (const auto& device : juce::MidiInput::getAvailableDevices())
+        if (isCtrl49PlayingInput (device.name) && ! disabledCtrl49Inputs.contains (device.name))
+        {
+            deviceManager.setMidiInputDeviceEnabled (device.identifier, true);
+            openedCtrl49Inputs.add (device.identifier);
+        }
+}
+#endif
+
 void InstrumentHostService::startAudio()
 {
     // The simplest honest Preview Runtime: default output (inputs only where a hardware
@@ -9128,8 +9170,9 @@ void InstrumentHostService::startAudio()
     {
        #if JUCE_LINUX
         // The surface broker reads the VIP controls and screen replies on USB cable 2.
-        if (input.name == "CTRL49 MIDI 3")
+        if (input.name == "CTRL49 MIDI 3" || disabledCtrl49Inputs.contains (input.name))
             continue;
+        if (isCtrl49PlayingInput (input.name)) openedCtrl49Inputs.addIfNotAlreadyThere (input.identifier);
        #endif
         deviceManager.setMidiInputDeviceEnabled (input.identifier, true);
     }
