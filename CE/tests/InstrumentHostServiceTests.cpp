@@ -6146,6 +6146,9 @@ void testCtrl49StagePagesRemembered()
         h.cmd ("getState");
         check (! h.service->metersOnSurface() && ! h.service->cueOnSurface() && ! h.service->layersOnSurface(),
                "a first session has no stage pages until they are asked for");
+        h.cmd ("setControlScreenSkin", { { "skin", 13.0 } });
+        h.cmd ("setControlScreenSkin", { { "skin", 15 } });
+        check (h.service->controlScreenSkin() == 13, "a valid skin survives an out-of-range selection");
         h.cmd ("metersOnSurface", { { "on", true } });
         h.cmd ("cueOnSurface", { { "on", true } });
         h.cmd ("layersOnSurface", { { "on", true } });
@@ -6162,6 +6165,8 @@ void testCtrl49StagePagesRemembered()
                "a page switched off again, or never on, stays off");
         check (! h.service->browsingOnSurface(), "the browser is not remembered: every start shows the pages");
         const auto pages = h.emits.lastState()->getProperty ("surfacePages", {});
+        check (h.service->controlScreenSkin() == 13 && (int) pages.getProperty ("skin", -1) == 13,
+               "the keyboard and app recover the same control page skin after restarting");
         check ((bool) pages.getProperty ("meters", false) && (bool) pages.getProperty ("cue", false)
                  && ! (bool) pages.getProperty ("layers", true),
                "and the app's state says so from the start");

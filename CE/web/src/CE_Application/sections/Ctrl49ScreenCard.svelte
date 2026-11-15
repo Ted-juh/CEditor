@@ -21,11 +21,12 @@
    * harness serving only CE/web) loses this card and nothing else.
    */
   import { onDestroy } from 'svelte';
+  import skinNames from '../../../../../tools/ctrl49/live_skin_names.json';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import { ctrl49Screen, hostSurface, hostState, surfaceInput, setControlSlotValue, surfaceStatusText,
            layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface,
-           metersOnSurface, liveOnSurface } from '../stores/instrumentHost.js';
+           metersOnSurface, liveOnSurface, setControlScreenSkin } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
   import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload,
            readMetersPayload, readLivePayload, readRackStateExtension, ARP_MODE_NAMES } from '../screen/ctrl49Payloads.js';
@@ -48,13 +49,14 @@
     let cancelled = false;
     let made = null;
     (async () => {
-      const [lua, strip, logo] = await Promise.all([
+      const [lua, strip, logo, skins] = await Promise.all([
         import('../../../../../tools/ctrl49/Hostage_MultiKnob.lua?raw'),
         import('../../../../../tools/ctrl49/knob_strip.png?url'),
         import('../../../../../tools/ctrl49/hostage_logo.png?url'),
+        import('../../../../../tools/ctrl49/live_knobs.png?url'),
       ]);
       // The object ids the broker uploads them under before binding the page.
-      return createCtrl49Screen(canvas, { lua: lua.default, assets: { 0x0200: strip.default, 0x0210: logo.default },
+      return createCtrl49Screen(canvas, { lua: lua.default, assets: { 0x0200: strip.default, 0x0210: logo.default, 0x0220: skins.default },
                                           redrawOnAsk: true });
     })()
       .then((s) => { if (cancelled) s.dispose(); else { made = s; runtime = s; } })
@@ -77,6 +79,7 @@
     if (!runtime) return;
     try {
       runtime.call('init', []);
+      runtime.call('set_skin', [$hostState.surfacePages?.skin ?? 0]);
       if (showSplash) {
         runtime.call('set_mode', [0]);
       } else {
@@ -347,6 +350,12 @@
 <section class="ctrl49-screen" data-testid="ctrl49-screen-card" aria-label="CTRL49 screen">
   <div class="head">
     <strong>CTRL49 screen</strong>
+    <label>Control page skin
+      <select value={$hostState.surfacePages?.skin ?? 0}
+              onchange={(e) => setControlScreenSkin(Number(e.currentTarget.value))}>
+        {#each skinNames as name, index}<option value={index}>{name}</option>{/each}
+      </select>
+    </label>
     <span class="status" class:live={$hostSurface.state === 'connected'} data-testid="ctrl49-screen-status">{status}</span>
   </div>
 

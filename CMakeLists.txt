@@ -206,6 +206,7 @@ target_link_libraries(ce_sqlite PUBLIC Threads::Threads)
 set(HOSTAGE_CTRL49_INPUTS
     "${CMAKE_SOURCE_DIR}/tools/ctrl49/Hostage_MultiKnob.lua"
     "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
+    "${CMAKE_SOURCE_DIR}/tools/ctrl49/live_knobs.png"
     "${CMAKE_SOURCE_DIR}/tools/ctrl49/hostage_logo.png")
 set(HOSTAGE_CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/HostageCtrl49Assets.cpp")
 add_custom_command(

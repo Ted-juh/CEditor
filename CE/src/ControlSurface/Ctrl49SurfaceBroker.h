@@ -213,6 +213,7 @@ private:
     // set_labels + set_values. Sending one kind clears the other's cache: the page on the
     // keyboard switches kind on the call, so a knob page left unchanged while a stage page was
     // up still has to be sent whole when it comes back.
+    int lastSkin = 0;
     Bytes lastStage, shownStage;
     std::string lastStageCall;
     // The stage pages' own cursors: the song SOUNDCHECK shows in full and the part LAYERS edits.

@@ -23,6 +23,7 @@ endfunction()
 
 embed_file(kHostagePageLua     "${ROOT}/tools/ctrl49/Hostage_MultiKnob.lua")
 embed_file(kKnobStripPng       "${ROOT}/tools/ctrl49/knob_strip.png")
+embed_file(kLiveKnobsPng       "${ROOT}/tools/ctrl49/live_knobs.png")
 embed_file(kHostageLogoPng     "${ROOT}/tools/ctrl49/hostage_logo.png")
 if(NOT HOSTAGE_ONLY)
     embed_file(kBridgePageLua      "${ROOT}/tools/ctrl49/CEditor_Bridge.lua")
