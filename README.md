@@ -78,6 +78,13 @@ cd ../..
 
 ### Build standalone HoSTage for Windows x64
 
+Run `build-hostage.cmd` from the repository root to update the current branch,
+run the HoSTage web and packaging tests, rebuild the standalone app and both
+helpers, and create `build/package/installer/HoSTage-Setup-<version>.exe`.
+The version comes from `tools/installer/hostage-windows.json`. The build log
+is `build/build-hostage.log`. The script uses Inno Setup 6, the Visual Studio
+x64 redistributable and the WebView2 offline installer in `tools/installer/thirdparty`.
+
 From PowerShell at the repository root, run:
 
 ```powershell

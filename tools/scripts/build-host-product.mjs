@@ -379,6 +379,7 @@ function parseArgs(argv) {
     else if (flag === '--iscc') out.iscc = next();
     else if (flag === '--stage-only') out.stageOnly = true;
     else if (flag === '--prerequisites-dir') out.prerequisitesDir = next();
+    else if (flag === '--installer-dir') out.installerDir = next();
     else if (flag === '--performance') out.performance = next();
     else if (flag === '--show') out.show = next();
     else throw new Error(`unknown argument: ${flag}`);
@@ -499,7 +500,7 @@ async function main() {
     return;
   }
 
-  const installerDir = path.join(args.out, 'installer');
+  const installerDir = args.installerDir ? path.resolve(args.installerDir) : path.join(args.out, 'installer');
   mkdirSync(installerDir, { recursive: true });
   const templatePath = path.join(REPO, 'tools', 'installer', 'HostProductTemplate.iss');
   const compileArgs = isccArgs({ project, stageDir, outDir: installerDir, artifacts, templatePath,
