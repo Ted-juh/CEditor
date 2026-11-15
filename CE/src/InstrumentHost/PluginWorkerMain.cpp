@@ -574,7 +574,9 @@ private:
         // Off-screen until Hostage places it: the window exists at the plug-in's size
         // the moment it is created, and without this it appeared at the host window's
         // origin for up to a poll tick before jumping to where it belonged.
+        #if ! JUCE_LINUX
         frame->setTopLeftPosition (-32000, -32000);
+        #endif
         // On the prewarm path the parent is HWND_MESSAGE; on a cold explicit open it is
         // the Hostage peer. Both make a child with no taskbar button or foreground claim.
         frame->addToDesktop (0, reinterpret_cast<void*> (
@@ -606,7 +608,9 @@ private:
         if (frame != nullptr)
         {
             frameHostWindow = hostWindow;
+            #if ! JUCE_LINUX
             frame->setTopLeftPosition (-32000, -32000);
+            #endif
             frame->setVisible (true);
             publishHandle();
             publishSize();

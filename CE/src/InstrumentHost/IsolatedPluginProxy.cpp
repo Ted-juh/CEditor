@@ -16,6 +16,7 @@
  #endif
  #include <windows.h>
 #elif JUCE_LINUX
+ #include <juce_gui_extra/juce_gui_extra.h>
  #include <unistd.h>
 #endif
 
@@ -160,6 +161,9 @@ public:
         : juce::AudioProcessorEditor (&ownerToUse), owner (ownerToUse)
     {
         setOpaque (true);
+       #if JUCE_LINUX
+        addAndMakeVisible (socket);
+       #endif
         setSize (420, 240);     // until the worker says what the editor measures
         watcher = std::make_unique<Watcher> (*this);
     }
@@ -171,7 +175,7 @@ public:
         // Close also cancels/parks an editor that is still opening and has not published its
         // child handle yet. Otherwise the worker can finish into a parent that has just died.
         if (hostWindow != 0)
-            owner.sendEditorClose();
+            closeWorkerEditor();
     }
 
     // The worker's window, for the thumbnail capture: the pixels are there, not in this.
@@ -205,12 +209,31 @@ private:
         RemoteEditor& editor;
     };
 
-    juce::int64 currentPeerHandle() const
+   #if JUCE_LINUX
+    juce::XEmbedComponent socket;
+
+    void resized() override { socket.setBounds (getLocalBounds()); }
+   #endif
+
+    juce::int64 currentPeerHandle()
     {
+       #if JUCE_LINUX
+        return getPeer() != nullptr ? static_cast<juce::int64> (socket.getHostWindowID()) : 0;
+       #else
         if (auto* peer = getPeer())
             return static_cast<juce::int64> (
                 reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()));
         return 0;
+       #endif
+    }
+
+    void closeWorkerEditor()
+    {
+       #if JUCE_LINUX
+        // Detach while the worker still owns a live X11 window.
+        socket.removeClient();
+       #endif
+        owner.sendEditorClose();
     }
 
     // A new peer means a new parent for the child. Close asks the worker to park the native
@@ -226,7 +249,7 @@ private:
         if (hostWindow != 0)
         {
             stopTimer();
-            owner.sendEditorClose();
+            closeWorkerEditor();
             child = 0;
             childPixelSize = {};
         }
@@ -1287,13 +1310,7 @@ float IsolatedPluginProxy::parameterValueFromText (int index, const juce::String
 
 juce::AudioProcessorEditor* IsolatedPluginProxy::createEditor()
 {
-   #if JUCE_LINUX
-    // The vendor view needs native embedding. The JUCE parameter editor talks to
-    // the live worker using the same parameter mirror as the rack controls.
-    return metadata.hasEditor ? new juce::GenericAudioProcessorEditor (*this) : nullptr;
-   #else
     return metadata.hasEditor ? new RemoteEditor (*this) : nullptr;
-   #endif
 }
 
 bool IsolatedPluginProxy::prewarmEditorIfIdle (int quietMs) noexcept
