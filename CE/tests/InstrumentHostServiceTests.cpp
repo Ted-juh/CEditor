@@ -14190,6 +14190,20 @@ void testLibrary()
                 rackId = r.getProperty ("recordId", {}).toString();
         check (rackId.isNotEmpty(), "the whole rack captures as one record");
 
+        h.cmd ("renameSavedRack", { { "recordId", rackId }, { "name", "Renamed Rig" } });
+        h.cmd ("duplicateSavedRack", { { "recordId", rackId }, { "name", "Rig copy" } });
+        juce::String copyId;
+        bool keptOriginalId = false;
+        const auto rows = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {});
+        for (const auto& r : *rows.getArray())
+        {
+            if (r["name"].toString() == "Rig copy") copyId = r["recordId"].toString();
+            if (r["name"].toString() == "Renamed Rig") keptOriginalId = r["recordId"].toString() == rackId;
+        }
+        check (keptOriginalId && copyId.isNotEmpty() && copyId != rackId,
+               "renaming keeps the rack identity and duplicating creates an independent record");
+        h.cmd ("removeLibraryRecord", { { "recordId", copyId } });
+
         // A show-level Setlist row can point at that complete capture. Once the current row
         // is established, the next rack is constructed and prepared without replacing what
         // is sounding; advancing consumes those exact warm instances.

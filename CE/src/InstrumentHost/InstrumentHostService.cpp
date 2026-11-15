@@ -7630,6 +7630,45 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "renameSavedRack" || cmd == "duplicateSavedRack")
+    {
+        ensureLibrary();
+        const auto id = payload.getProperty ("recordId", {}).toString();
+        const auto* source = library.find (id);
+        const auto name = payload.getProperty ("name", {}).toString().trim();
+        if (source == nullptr || source->type != "rack" || source->factory)
+        {
+            emitError ("Select a saved rack in the sound library.");
+            return;
+        }
+        if (name.isEmpty())
+        {
+            emitError ("Enter a rack name.");
+            return;
+        }
+
+        if (cmd == "renameSavedRack")
+        {
+            library.edit (id, LibraryChanges::identity)->name = name;
+            saveLibrary();
+        }
+        else
+        {
+            LibraryRecord copy;
+            copy.type = "rack";
+            copy.sourceType = "rackCapture";
+            copy.name = name;
+            copy.rackManifestJson = source->rackManifestJson;
+            copy.fingerprint = source->fingerprint;
+            copy.parts = source->parts;
+            copy.user = source->user;
+            if (saveCapturedLibraryRecord (std::move (copy)).isEmpty())
+                return;
+        }
+        emitLibrary (libraryView);
+        return;
+    }
+
     if (cmd == "saveRackToLibrary")
     {
         ensureLibrary();

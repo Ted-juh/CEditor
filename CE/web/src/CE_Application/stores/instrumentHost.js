@@ -9443,6 +9443,20 @@ function send(payload) {
       hostLibrary.set(mockHostLibrary(mockLibraryView));
       return;
     }
+    if (payload?.cmd === 'renameSavedRack' || payload?.cmd === 'duplicateSavedRack') {
+      const lib = get(hostLibrary);
+      const source = lib.records.find(r => r.recordId === payload.recordId && r.type === 'rack' && !r.factory);
+      const name = payload.name?.trim();
+      if (!source || !name) { hostLastError.set('Select a saved rack and enter a name.'); return; }
+      if (payload.cmd === 'renameSavedRack') {
+        hostLibrary.set({ ...lib, records: lib.records.map(r => r === source ? { ...r, name } : r) });
+      } else {
+        hostLibrary.set({ ...lib, records: [...lib.records, { ...source, recordId: nextMockId('lib-user'), name }],
+          counts: { ...lib.counts, racks: lib.counts.racks + 1, total: lib.counts.total + 1 } });
+        showLibrarySaved({ name });
+      }
+      return;
+    }
     if (payload?.cmd === 'removeLibraryRecord') {
       hostLibrary.update((lib) => ({
         ...lib,
@@ -10092,6 +10106,8 @@ export const browseStateFolder = (ceId) => send({ cmd: 'browseStateFolder', ceId
 export const addStateFolder = (path, ceId) => send({ cmd: 'addStateFolder', path, ceId });
 export const removeStateFolder = (path) => send({ cmd: 'removeStateFolder', path });
 export const saveUserPreset = (partId, name) => send({ cmd: 'saveUserPreset', partId, name });
+export const renameSavedRack = (recordId, name) => send({ cmd: 'renameSavedRack', recordId, name });
+export const duplicateSavedRack = (recordId, name) => send({ cmd: 'duplicateSavedRack', recordId, name });
 export const saveRackToLibrary = (name) => send({ cmd: 'saveRackToLibrary', name });
 export const requestSurfaceLayout = (profileId) =>
   send(profileId ? { cmd: 'getSurfaceLayout', profileId } : { cmd: 'getSurfaceLayout' });
