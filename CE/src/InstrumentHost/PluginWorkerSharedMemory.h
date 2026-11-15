@@ -61,6 +61,10 @@ public:
 private:
     void moveFrom (SharedDataPlaneMapping&&) noexcept;
 
+   #if JUCE_LINUX
+    bool mapLinux (const SharedMemoryNames&, size_t bytesToCreate, juce::String& error);
+    bool ownsLinuxName = false;
+   #endif
     SharedMemoryNames resourceNames;
     void* mappingHandle = nullptr;
     void* inputEventHandle = nullptr;

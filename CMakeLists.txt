@@ -716,6 +716,8 @@ if(CEDITOR_BUILD_APP)
     )
 
     juce_add_gui_app(CEHostStandalone
+        NEEDS_WEB_BROWSER TRUE
+        NEEDS_CURL TRUE
         PRODUCT_NAME "${CE_HOST_PRODUCT_NAME}"
         VERSION "${CE_HOST_PRODUCT_VERSION}"
         COMPANY_NAME "${CE_HOST_COMPANY_NAME}"
@@ -739,8 +741,8 @@ if(CEDITOR_BUILD_APP)
 
     target_compile_definitions(CEHostStandalone PRIVATE
         JUCE_WEB_BROWSER=1
-        JUCE_USE_WIN_WEBVIEW2=1
-        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+        $<$<PLATFORM_ID:Windows>:JUCE_USE_WIN_WEBVIEW2=1>
+        $<$<PLATFORM_ID:Windows>:JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1>
         JUCE_PLUGINHOST_VST3=1
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
         CEHOST_PRODUCT_NAME="${CE_HOST_PRODUCT_NAME}"
@@ -748,7 +750,7 @@ if(CEDITOR_BUILD_APP)
     )
 
     target_include_directories(CEHostStandalone PRIVATE
-        "${WEBVIEW2_INCLUDE}"
+        "$<$<PLATFORM_ID:Windows>:${WEBVIEW2_INCLUDE}>"
         "${CE_ROOT}/src"
         "${CMAKE_BINARY_DIR}/PlayerWebData"
     )
@@ -771,7 +773,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_graphics
         juce::juce_gui_basics
         juce::juce_gui_extra
-        "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+        "$<$<PLATFORM_ID:Windows>:${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib>"
         $<$<PLATFORM_ID:Windows>:dwmapi>
         PlayerWebData
     )
@@ -1631,7 +1633,7 @@ if (WIN32)
         juce::juce_core
         juce::juce_audio_basics
         juce::juce_audio_processors
-        dbghelp
+        $<$<PLATFORM_ID:Windows>:dbghelp>
     )
     ce_configure_test(CEditorPluginWorkerCrashStub)
 
@@ -1939,10 +1941,9 @@ if (CEDITOR_SCANNER_WORKER)
     message(STATUS "CEditor: VST3 scanner worker ENABLED (CEditorPluginScanner).")
 endif()
 
-# The persistent live worker is Windows-only because its data plane uses named file mappings
-# and events. Unlike the scanner it owns one prepared processor and stays alive for audio.
+# The persistent live worker uses native shared memory and wake events on Windows and Linux. Unlike the scanner it owns one prepared processor and stays alive for audio.
 option(CEDITOR_PLUGIN_WORKER "Build the crash-isolated live VST3 worker (CEditorPluginWorker)" ${CEDITOR_BUILD_APP_DEFAULT})
-if (CEDITOR_PLUGIN_WORKER AND WIN32)
+if (CEDITOR_PLUGIN_WORKER AND (WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
     add_executable(CEditorPluginWorker
         "${CE_ROOT}/src/InstrumentHost/PluginWorkerMain.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginWorkerCrashReporter.cpp"
@@ -1960,7 +1961,7 @@ if (CEDITOR_PLUGIN_WORKER AND WIN32)
     target_link_libraries(CEditorPluginWorker PRIVATE
         juce::juce_audio_processors
         juce::juce_gui_basics
-        dbghelp
+        $<$<PLATFORM_ID:Windows>:dbghelp>
     )
     ce_enable_private_release_symbols(CEditorPluginWorker)
     foreach(host_target CEditor CEHostStandalone CEHostVST3 CEHostVST3_VST3 Ctrl49RackDemo)
@@ -1969,14 +1970,14 @@ if (CEDITOR_PLUGIN_WORKER AND WIN32)
             add_custom_command(TARGET ${host_target} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "$<TARGET_FILE:CEditorPluginWorker>"
-                    "$<TARGET_FILE_DIR:${host_target}>/CEditorPluginWorker.exe"
+                    "$<TARGET_FILE_DIR:${host_target}>/$<TARGET_FILE_NAME:CEditorPluginWorker>"
                 COMMENT "Staging the live plug-in worker beside ${host_target}"
             )
         endif()
     endforeach()
     message(STATUS "CEditor: live VST3 worker ENABLED (CEditorPluginWorker).")
 elseif (CEDITOR_PLUGIN_WORKER)
-    message(STATUS "CEditor: live VST3 worker is Windows-only; target not added.")
+    message(STATUS "CEditor: live VST3 worker is unavailable on this platform.")
 endif()
 
 # A machine-dependent acceptance harness for the real scanner -> worker -> VST3 path. It is
@@ -1986,8 +1987,8 @@ endif()
 option(CEDITOR_REAL_VST_SMOKE
     "Add the opt-in real-VST3 isolated-worker acceptance harness (never a default CTest)" OFF)
 if (CEDITOR_REAL_VST_SMOKE)
-    if (NOT WIN32)
-        message(FATAL_ERROR "CEDITOR_REAL_VST_SMOKE requires Windows live-worker isolation.")
+    if (NOT WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        message(FATAL_ERROR "The isolation smoke test requires a supported live worker.")
     elseif (NOT TARGET CEditorPluginScanner OR NOT TARGET CEditorPluginWorker)
         message(FATAL_ERROR
             "CEDITOR_REAL_VST_SMOKE requires CEDITOR_SCANNER_WORKER=ON and CEDITOR_PLUGIN_WORKER=ON.")

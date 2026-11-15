@@ -15,6 +15,8 @@
   #define NOMINMAX
  #endif
  #include <windows.h>
+#elif JUCE_LINUX
+ #include <unistd.h>
 #endif
 
 namespace ceditor::host
@@ -27,6 +29,8 @@ juce::uint32 currentProcessId() noexcept
 {
 #if JUCE_WINDOWS
     return static_cast<juce::uint32> (GetCurrentProcessId());
+#elif JUCE_LINUX
+    return static_cast<juce::uint32> (::getpid());
 #else
     return 0;
 #endif
@@ -638,7 +642,7 @@ void IsolatedPluginProxy::launchAsync (const juce::File& workerExecutable,
             std::unique_ptr<juce::AudioProcessor> result;
             juce::String pluginName;
             LiveWorkerDiagnostics::append (diagnosticLog, "launch_requested", generation);
-#if JUCE_WINDOWS
+#if JUCE_WINDOWS || JUCE_LINUX
             if (! std::isfinite (sampleRate) || sampleRate <= 0.0 || blockSize <= 0
                 || blockSize > static_cast<int> (maxSupportedFrames))
                 error = "invalid live plug-in worker audio configuration";
@@ -682,8 +686,11 @@ void IsolatedPluginProxy::launchAsync (const juce::File& workerExecutable,
                     connection->diagnosticLog = diagnosticLog;
                     connection->pluginName = pluginName;
                     const auto jobName = connection->names.mapping + "-job";
-                    const auto ipcReady = connection->job->createHost (jobName, error)
-                        && connection->mapping->createHost (
+                    const auto ipcReady =
+                       #if JUCE_WINDOWS
+                        connection->job->createHost (jobName, error) &&
+                       #endif
+                        connection->mapping->createHost (
                             connection->names, config, generation, error)
                         && connection->control->createHost (connection->names.controlPipe, error);
                     if (ipcReady)
@@ -753,10 +760,14 @@ void IsolatedPluginProxy::launchAsync (const juce::File& workerExecutable,
                                             LiveWorkerDiagnostics::append (
                                                 diagnosticLog, "worker_ready", generation,
                                                 pluginName,
+                                               #if JUCE_WINDOWS
                                                 "Windows job limit "
                                                     + juce::String (PluginWorkerJob::
                                                         maximumAssociatedProcesses)
                                                     + " processes; minidumps "
+                                               #else
+                                                juce::String ("Linux process isolation; minidumps ")
+                                               #endif
                                                     + (metadata.crashDumpsAvailable
                                                          ? juce::String ("ready")
                                                          : juce::String ("unavailable: ")
@@ -1276,7 +1287,13 @@ float IsolatedPluginProxy::parameterValueFromText (int index, const juce::String
 
 juce::AudioProcessorEditor* IsolatedPluginProxy::createEditor()
 {
+   #if JUCE_LINUX
+    // The vendor view needs native embedding. The JUCE parameter editor talks to
+    // the live worker using the same parameter mirror as the rack controls.
+    return metadata.hasEditor ? new juce::GenericAudioProcessorEditor (*this) : nullptr;
+   #else
     return metadata.hasEditor ? new RemoteEditor (*this) : nullptr;
+   #endif
 }
 
 bool IsolatedPluginProxy::prewarmEditorIfIdle (int quietMs) noexcept

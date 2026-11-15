@@ -25,6 +25,10 @@
   #define NOMINMAX
  #endif
  #include <windows.h>
+#elif JUCE_LINUX
+ #include <poll.h>
+ #include <sys/syscall.h>
+ #include <unistd.h>
 #endif
 
 namespace
@@ -1327,6 +1331,29 @@ private:
     HANDLE handle = nullptr;
 };
 
+#elif JUCE_LINUX
+class ParentProcessHandle
+{
+public:
+    explicit ParentProcessHandle (juce::uint32 processId)
+        : fd (processId == static_cast<juce::uint32> (::getppid())
+              ? static_cast<int> (::syscall (SYS_pidfd_open, processId, 0)) : -1) {}
+    ~ParentProcessHandle() { if (fd >= 0) ::close (fd); }
+    bool isValid() const noexcept { return fd >= 0; }
+    bool isAlive() const noexcept
+    {
+        pollfd event { fd, POLLIN, 0 };
+        if (fd < 0) return false;
+        int status;
+        do { status = ::poll (&event, 1, 0); } while (status < 0 && errno == EINTR);
+        return status == 0;
+    }
+private:
+    int fd;
+};
+#endif
+
+#if JUCE_WINDOWS || JUCE_LINUX
 class ParentProcessWatchdog final : public juce::Thread
 {
 public:
@@ -1351,7 +1378,9 @@ public:
                 // This thread is deliberately independent of JUCE's message loop and the audio
                 // worker. If vendor construction, state code, or an editor has wedged either of
                 // those, a dead Hostage parent must still reap this orphan and its OS handles.
+               #if JUCE_WINDOWS
                 if (TerminateProcess (GetCurrentProcess(), 73) == FALSE)
+               #endif
                     std::_Exit (73);
                 return;
             }
@@ -1423,11 +1452,13 @@ int main (int argc, char* argv[])
         || ! mapping.openWorker (names, error) || ! control.openWorker (names.controlPipe, error)
         || mapping.dataPlane().getHeader()->workerGeneration != generation)
         return 65;
+   #if JUCE_WINDOWS
     if (! PluginWorkerJob::joinCurrentProcess (workerJobName, error))
     {
         control.send (errorReply (generation, 0, error), 1000, error);
         return 65;
     }
+   #endif
     if (! parentWatchdog.startThread (juce::Thread::Priority::normal))
         return 65;
 
