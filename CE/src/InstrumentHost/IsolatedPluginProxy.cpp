@@ -18,6 +18,7 @@
 #elif JUCE_LINUX
  #include <juce_gui_extra/juce_gui_extra.h>
  #include <unistd.h>
+ #include <X11/extensions/shape.h>
 #endif
 
 namespace ceditor::host
@@ -211,6 +212,7 @@ private:
 
    #if JUCE_LINUX
     juce::XEmbedComponent socket;
+    std::unique_ptr<Display, decltype (&XCloseDisplay)> shapeDisplay { XOpenDisplay (nullptr), XCloseDisplay };
 
     void resized() override { socket.setBounds (getLocalBounds()); }
    #endif
@@ -425,7 +427,38 @@ private:
     // the workspace, which is the useful pane behaviour rather than squeezing the plug-in.
     void place()
     {
-       #if JUCE_WINDOWS
+       #if JUCE_LINUX
+        auto* peer = getPeer();
+        if (child == 0 || peer == nullptr)
+            return;
+
+        // XEmbed observes the socket itself. A JUCE viewport scroll or dock resize
+        // moves its ancestors without changing the socket's local bounds.
+        const auto area = peer->getAreaCoveredBy (*this);
+        auto clip = getLocalBounds();
+        for (auto* parent = getParentComponent(); parent != nullptr; parent = parent->getParentComponent())
+            clip = clip.getIntersection (getLocalArea (parent, parent->getLocalBounds()));
+
+        const auto scale = peer->getPlatformScaleFactor() * peer->getComponent().getDesktopScaleFactor();
+        const auto pixelClip = (clip * scale);
+        const auto showing = isShowing() && ! pixelClip.isEmpty();
+        if (area == placedArea && pixelClip == placedClipArea && showing == placedShowing)
+            return;
+
+        socket.updateEmbeddedBounds();
+        if (shapeDisplay != nullptr)
+        {
+            XRectangle rect { static_cast<short> (pixelClip.getX()), static_cast<short> (pixelClip.getY()),
+                              static_cast<unsigned short> (pixelClip.getWidth()),
+                              static_cast<unsigned short> (pixelClip.getHeight()) };
+            XShapeCombineRectangles (shapeDisplay.get(), socket.getHostWindowID(), ShapeBounding,
+                                     0, 0, &rect, showing ? 1 : 0, ShapeSet, Unsorted);
+            XFlush (shapeDisplay.get());
+        }
+        placedArea = area;
+        placedClipArea = pixelClip;
+        placedShowing = showing;
+       #elif JUCE_WINDOWS
         if (child == 0)
             return;
         auto* peer = getPeer();

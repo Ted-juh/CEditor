@@ -256,7 +256,10 @@ int main (int argc, char* argv[])
                 juce::DocumentWindow window ("HoSTage editor smoke", juce::Colours::black, 0);
                 auto* editor = processor->createEditorIfNeeded();
                 auto* native = dynamic_cast<ceditor::host::editorSnapshot::ForeignWindowSource*> (editor);
-                window.setContentOwned (editor, true);
+                auto* viewport = new juce::Viewport();
+                viewport->setViewedComponent (editor, true);
+                viewport->setSize (320, 200);
+                window.setContentOwned (viewport, true);
                 window.setVisible (true);
                 const auto deadline = juce::Time::getMillisecondCounterHiRes() + 8000.0;
                 while (native != nullptr && native->foreignWindowHandle() == 0
@@ -266,6 +269,11 @@ int main (int argc, char* argv[])
                     throw std::runtime_error ("Worker did not supply a native editor window");
                 std::cout << "Native editor window " << native->foreignWindowHandle()
                           << " size " << editor->getWidth() << "x" << editor->getHeight() << std::endl;
+                viewport->setSize (juce::jmax (40, editor->getWidth() / 2),
+                                   juce::jmax (40, editor->getHeight() / 2));
+                viewport->setViewPosition (editor->getWidth(), editor->getHeight());
+                if (! viewport->getHorizontalScrollBar().isVisible() || viewport->getViewPositionX() <= 0)
+                    throw std::runtime_error ("Oversized native editor could not scroll horizontally");
                 juce::MessageManager::getInstance()->runDispatchLoopUntil (1000);
             }
         }

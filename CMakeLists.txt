@@ -2241,6 +2241,17 @@ if (TARGET CEditor)
     endif()
 endif()
 
+# The isolated Linux editor uses the X Shape extension to clip its native
+# child to the visible part of the JUCE viewport.
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    foreach(host_target CEditor CEHostStandalone CEHostVST3 Ctrl49RackDemo CEditorPluginWorkerRealVstSmoke)
+        if (TARGET ${host_target})
+            find_package(X11 REQUIRED COMPONENTS Xext)
+            target_link_libraries(${host_target} PRIVATE X11::X11 X11::Xext)
+        endif()
+    endforeach()
+endif()
+
 # JUCE handles the entry point via START_JUCE_APPLICATION
 # Run this from the CE/web/ directory:
 # cd CE/web && npm run dev
