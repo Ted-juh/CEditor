@@ -1250,6 +1250,7 @@ private:
     /** True when the plug-in had a list and it went into the library - the caller re-emits
         the library then, because a merge nobody is told about is a browser that does not
         show the sounds until something unrelated refreshes it. */
+    bool syncTyrellPresetName (const juce::String& partId);
     bool ingestProgramList (const juce::String& partId);
     void loadRackRecord (const LibraryRecord& record);
     void attachParameters (const juce::String& partId);
@@ -2113,6 +2114,7 @@ private:
     struct PartParameters
     {
         ParameterInventory inventory;
+        double presetNameCheckDue = 0;
         std::unique_ptr<PartParameterSync> sync;
         std::map<juce::String, float> lastKnownValues;
     };
@@ -2432,6 +2434,7 @@ private:
 
     std::thread scanThread;
     std::thread libraryScanThread;
+    bool checkedTyrellPresetLibrary = false;
     bool libraryScanBusy = false;
     bool libraryScanFinished = false;
     juce::Array<juce::var> libraryScanReport;

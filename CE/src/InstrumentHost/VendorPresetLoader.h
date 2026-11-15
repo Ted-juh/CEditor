@@ -81,7 +81,7 @@ inline bool applyVendorPresetInWorker (juce::AudioPluginInstance& instrument, co
         if (component == nullptr || ! text.fromBase64Encoding (component->getAllSubText())) return false;
         const auto lines = juce::StringArray::fromLines (text.toString());
         return lines.contains ("#pgm=" + file.getFileName().removeCharacters ("\r\n"))
-            && lines.contains ("#AM=Zebra3");
+            && lines.contains ("#AM=" + preset.instrument);
     }
 
     if (preset.sourceType == "spire")

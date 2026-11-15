@@ -8835,6 +8835,19 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             // browser only knows if it is told, and emitState does not carry the library.
             if (ingestProgramList (partId))
                 emitLibrary (libraryView);
+            if (info.name.equalsIgnoreCase ("TyrellN6") && info.vendor.equalsIgnoreCase ("u-he"))
+            {
+                syncTyrellPresetName (partId);
+                if (! checkedTyrellPresetLibrary && options.includeDefaultScanRoots)
+                {
+                    checkedTyrellPresetLibrary = true;
+                    bool hasFiles = false;
+                    for (const auto& record : library.allRecords())
+                        if (record.targetCeId == info.ceId && record.sourceType == "h2p" && ! record.missing)
+                        { hasFiles = true; break; }
+                    if (! hasFiles) scanVstPresets();
+                }
+            }
             if (const auto* loadedPart = rack.getPerformance().findPart (partId);
                 loadedPart != nullptr && loadedPart->microtuningEnabled
                     && rack.getPerformance().microtuning.enabled)
@@ -12695,7 +12708,7 @@ void InstrumentHostService::scanVstPresets()
             juce::StringArray slots;
             for (const auto& record : library.allRecords())
                 if (record.sourceType == "programList"
-                    && isZebra3ProgramSlot (record.instrument, record.manufacturer, record.name))
+                    && isUheProgramSlot (record.instrument, record.manufacturer, record.name))
                     slots.add (record.recordId);
             for (const auto& id : slots) library.removeRecord (id);
             saveLibrary();
@@ -12718,6 +12731,8 @@ void InstrumentHostService::scanCataloguePrograms (
         refreshScanReportCounts();
         libraryScanBusy = false;
         libraryScanFinished = true;
+        for (const auto& part : rack.getPerformance().parts)
+            if (syncTyrellPresetName (part.partId)) emitState();
         emitLibrary (libraryView);
         return;
     }
@@ -12740,7 +12755,7 @@ void InstrumentHostService::scanCataloguePrograms (
         int unnamedPrograms = 0;
         if (processor != nullptr)
             for (int i = 0; i < processor->getNumPrograms(); ++i)
-                if (isZebra3ProgramSlot (plugin.name, plugin.vendor, processor->getProgramName (i))) ++unnamedPrograms;
+                if (isUheProgramSlot (plugin.name, plugin.vendor, processor->getProgramName (i))) ++unnamedPrograms;
         if (processor != nullptr) ingestProcessorPrograms (*processor, plugin);
         processor.reset(); // Release this isolated instance before starting the next one.
         int count = 0, files = 0, programs = 0, unavailable = 0;
@@ -12776,6 +12791,46 @@ void InstrumentHostService::scanCataloguePrograms (
         finish (nullptr, refusal.isNotEmpty() ? refusal : "Program discovery is unavailable in this build");
     else
         options.instantiate (plugin.descriptionXml, options.sampleRate, options.blockSize, std::move (finish));
+}
+
+bool InstrumentHostService::syncTyrellPresetName (const juce::String& partId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr || ! part->pluginName.equalsIgnoreCase ("TyrellN6")
+        || ! part->pluginVendor.equalsIgnoreCase ("u-he")) return false;
+    // Preserve user-named HoSTage snapshots. Native preset selections are identified
+    // by the filename in the live component state, never by a MIDI slot number.
+    const auto* previous = library.find (part->lastPresetRecordId);
+    if (previous != nullptr && previous->sourceType != "programList" && previous->sourceType != "h2p")
+        return false;
+    auto* processor = rack.getInstrument (partId);
+    if (processor == nullptr) return false;
+    juce::MemoryBlock state;
+    if (auto* worker = dynamic_cast<PluginWorkerBoundary*> (processor))
+    {
+        juce::String error;
+        if (! worker->readFreshState (state, error)) return false;
+    }
+    else processor->getStateInformation (state);
+    const auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    auto* component = xml != nullptr ? xml->getChildByName ("IComponent") : nullptr;
+    juce::MemoryBlock native;
+    if (! component || ! native.fromBase64Encoding (component->getAllSubText())) return false;
+    const auto header = native.toString().upToFirstOccurrenceOf ("\n", false, false).trim();
+    if (! header.startsWith ("#pgm=") || ! header.endsWithIgnoreCase (".h2p")) return false;
+    const auto name = header.substring (5).dropLastCharacters (4);
+    if (name.isEmpty()) return false;
+    if (previous != nullptr && previous->sourceType == "h2p" && previous->name == name) return false;
+    juce::String id;
+    for (const auto& record : library.allRecords())
+        if (record.targetCeId == part->pluginCeId && record.sourceType == "h2p"
+            && ! record.missing && record.name == name)
+        {
+            if (id.isNotEmpty()) { id.clear(); break; } // duplicate filenames in different banks
+            id = record.recordId;
+        }
+    return (part->lastPresetName != name || part->lastPresetRecordId != id)
+        && rack.setPartLastPreset (partId, id, name);
 }
 
 bool InstrumentHostService::ingestProgramList (const juce::String& partId)
@@ -12818,7 +12873,7 @@ bool InstrumentHostService::ingestProcessorPrograms (juce::AudioProcessor& proce
         const auto lower = name.trim().toLowerCase();
         return lower.isEmpty() || lower == "empty" || lower == "(empty)" || lower == "<empty>"
             || lower == "[empty]" || lower.containsOnly ("-_.…")
-            || isZebra3ProgramSlot (plugin.name, plugin.vendor, name);
+            || isUheProgramSlot (plugin.name, plugin.vendor, name);
     };
 
     ensureLibrary();
@@ -18499,12 +18554,22 @@ void InstrumentHostService::drainParameterEvents()
 
         juce::SortedSet<int> changed;
         juce::Array<PartParameterSync::Gesture> gestures;
+        if (part.presetNameCheckDue > 0 && juce::Time::getMillisecondCounterHiRes() >= part.presetNameCheckDue)
+        {
+            part.presetNameCheckDue = 0;
+            if (syncTyrellPresetName (partId)) emitState();
+        }
         if (! part.sync->drain (changed, gestures))
             continue;
 
         auto* processor = targetProcessor (partId);
         if (processor == nullptr)
             continue;
+
+        if (changed.size() > 1 && processor->getName().equalsIgnoreCase ("TyrellN6")
+            && (editorTargetIds.contains (partId) || floatingEditorIds.contains (partId))
+            && part.presetNameCheckDue == 0)
+            part.presetNameCheckDue = juce::Time::getMillisecondCounterHiRes() + 250;
 
         const auto& processorParams = processor->getParameters();
         const auto idFor = [&part] (int index) -> juce::String
