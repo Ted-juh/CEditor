@@ -502,6 +502,31 @@ public:
         prewarmedOut = prewarmed.load (std::memory_order_acquire);
     }
 
+    // Spire reads its preset label when it constructs its view. Keep the host's
+    // native frame and live processor, and replace just the vendor view. Post this
+    // after the control reply so the host can service native window messages.
+    void refreshSpireView()
+    {
+        juce::MessageManager::callAsync ([this]
+        {
+            if (frame == nullptr)
+                return;
+            if (frameHostWindow == 0)
+            {
+                destroyNow(); // Parked editor: the next open builds the current preset's view.
+                return;
+            }
+            try
+            {
+                if (frame->recreateEditor (processor))
+                    return;
+            }
+            catch (...) {}
+            destroyNow();
+            state.store (State::failed, std::memory_order_release);
+        });
+    }
+
     void closeNow() { closeOnMessageThread(); }
     void destroyNow()
     {
@@ -685,21 +710,41 @@ private:
         {
             // The editor dies before the frame it sits in, and before the processor that
             // created it — the same ordering the host's own editor windows keep.
-            editor->removeComponentListener (this);
-            removeChildComponent (editor.get());
-            editor.reset();
+            detachEditor();
+        }
+
+        bool recreateEditor (juce::AudioProcessor& processor)
+        {
+            detachEditor();
+            editor.reset (processor.createEditorIfNeeded());
+            if (editor == nullptr)
+                return false;
+            addAndMakeVisible (*editor);
+            editor->addComponentListener (this);
+            setSize (editor->getWidth(), editor->getHeight());
+            owner.publishSize();
+            return true;
         }
 
         void paint (juce::Graphics& graphics) override { graphics.fillAll (juce::Colours::black); }
-        void resized() override { editor->setTopLeftPosition (0, 0); }
+        void resized() override { if (editor != nullptr) editor->setTopLeftPosition (0, 0); }
 
         juce::Point<int> contentSize() const noexcept
         {
+            if (editor == nullptr) return { getWidth(), getHeight() };
             return { juce::jmax (1, editor->getWidth()),
                      juce::jmax (1, editor->getHeight()) };
         }
 
     private:
+        void detachEditor()
+        {
+            if (editor == nullptr) return;
+            editor->removeComponentListener (this);
+            removeChildComponent (editor.get());
+            editor.reset();
+        }
+
         void componentMovedOrResized (juce::Component&, bool, bool wasResized) override
         {
             if (wasResized)
@@ -1064,6 +1109,8 @@ public:
                                 reply = makeJsonMessage (MessageType::applyVstPreset, generation,
                                     received.message.requestId, processorSnapshot (processor));
                             });
+                        if (applied && preset.hasFileExtension ("spf2"))
+                            editor.refreshSpireView();
                         if (! applied)
                             reply = errorReply (generation, received.message.requestId,
                                                 "worker could not apply the vendor preset");
