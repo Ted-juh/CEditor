@@ -309,6 +309,7 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     $installerDst = Join-Path $toolsDst "installer"
     New-Item -ItemType Directory -Path $installerDst -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $toolsSrc "installer\HostProductTemplate.iss") -Destination $installerDst -Force
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "installer\hostage.ico") -Destination $installerDst -Force
 
     # Toolchain provisioning scripts only: the top-level files (manifest.json, *.mjs, provision.cmd/.sh,
     # *.cmake, README). Get-ChildItem -File skips the provisioned binary subdirs (llvm-mingw/, dotnet/, ...).

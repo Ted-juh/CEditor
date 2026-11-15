@@ -729,6 +729,13 @@ if(CEDITOR_BUILD_APP)
         # JUCE 8.0.7 reads the target metadata to generate this resource, but
         # omits that input dependency, leaving Explorer metadata stale on rebuild.
         get_target_property(host_rc_dir CEHostStandalone JUCE_GENERATED_SOURCES_DIRECTORY)
+        string(TOLOWER "${CE_HOST_PRODUCT_NAME}" host_icon_product)
+        if(host_icon_product STREQUAL "hostage")
+            configure_file(tools/installer/hostage-icon.rc.in "${host_rc_dir}/hostage-icon.rc" @ONLY)
+            set_source_files_properties("${host_rc_dir}/hostage-icon.rc" PROPERTIES
+                OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/installer/hostage.ico")
+            target_sources(CEHostStandalone PRIVATE "${host_rc_dir}/hostage-icon.rc")
+        endif()
         get_target_property(host_info CEHostStandalone JUCE_INFO_FILE)
         add_custom_command(OUTPUT "${host_rc_dir}/CEHostStandalone_resources.rc"
             APPEND DEPENDS "${host_info}")

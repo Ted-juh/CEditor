@@ -49,6 +49,9 @@
 #endif
 
 [Setup]
+#if MyAppId == "65AA2836-54F6-4465-A9E1-C2DB912EED34"
+SetupIconFile=hostage.ico
+#endif
 AppId={{{#MyAppId}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
