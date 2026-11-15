@@ -256,10 +256,13 @@ int main (int argc, char* argv[])
                 juce::DocumentWindow window ("HoSTage editor smoke", juce::Colours::black, 0);
                 auto* editor = processor->createEditorIfNeeded();
                 auto* native = dynamic_cast<ceditor::host::editorSnapshot::ForeignWindowSource*> (editor);
-                auto* viewport = new juce::Viewport();
-                viewport->setViewedComponent (editor, true);
-                viewport->setSize (320, 200);
-                window.setContentOwned (viewport, true);
+                juce::Component rack;
+                juce::Viewport dock;
+                rack.addAndMakeVisible (dock);
+                dock.setViewedComponent (editor, true);
+                dock.setSize (320, 200);
+                rack.setSize (900, 500);
+                window.setContentNonOwned (&rack, true);
                 window.setVisible (true);
                 const auto deadline = juce::Time::getMillisecondCounterHiRes() + 8000.0;
                 while (native != nullptr && native->foreignWindowHandle() == 0
@@ -269,10 +272,12 @@ int main (int argc, char* argv[])
                     throw std::runtime_error ("Worker did not supply a native editor window");
                 std::cout << "Native editor window " << native->foreignWindowHandle()
                           << " size " << editor->getWidth() << "x" << editor->getHeight() << std::endl;
-                viewport->setSize (juce::jmax (40, editor->getWidth() / 2),
+                dock.setSize (juce::jmax (40, editor->getWidth() / 2),
                                    juce::jmax (40, editor->getHeight() / 2));
-                viewport->setViewPosition (editor->getWidth(), editor->getHeight());
-                if (! viewport->getHorizontalScrollBar().isVisible() || viewport->getViewPositionX() <= 0)
+                rack.setSize (editor->getWidth() + 40, editor->getHeight() + 40);
+                dock.setTopLeftPosition (rack.getWidth() - dock.getWidth(), 0);
+                dock.setViewPosition (editor->getWidth(), editor->getHeight());
+                if (! dock.getHorizontalScrollBar().isVisible() || dock.getViewPositionX() <= 0)
                     throw std::runtime_error ("Oversized native editor could not scroll horizontally");
                 juce::MessageManager::getInstance()->runDispatchLoopUntil (1000);
             }

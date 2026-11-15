@@ -437,7 +437,14 @@ private:
         const auto area = peer->getAreaCoveredBy (*this);
         auto clip = getLocalBounds();
         for (auto* parent = getParentComponent(); parent != nullptr; parent = parent->getParentComponent())
-            clip = clip.getIntersection (getLocalArea (parent, parent->getLocalBounds()));
+        {
+            const auto bounds = getLocalArea (parent, parent->getLocalBounds());
+            // The right-hand dock pans a wide editor out over the rack, just as
+            // on Windows. The peer itself is still the outermost left edge.
+            const auto left = parent == &peer->getComponent() ? bounds.getX()
+                                                              : juce::jmin (0, bounds.getX());
+            clip = clip.getIntersection (bounds.withLeft (left));
+        }
 
         const auto scale = peer->getPlatformScaleFactor() * peer->getComponent().getDesktopScaleFactor();
         const auto pixelClip = (clip * scale);
