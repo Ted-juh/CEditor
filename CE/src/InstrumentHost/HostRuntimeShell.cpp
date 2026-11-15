@@ -55,6 +55,7 @@ HostRuntimeShell::HostRuntimeShell()
     // knows which it is, never another product's (HostageManifest.h). Its catalogue, scan paths
     // and session live and die with the product.
     configureForThisProgram (options);
+    const auto keyboardViewFile = options.dataDirectory.getChildFile ("keyboard-view.json");
     options.confirmRackChangesOnClose = true;
     options.workerExecutable = findHostScannerWorker ({ options.dataDirectory });
     options.factoryPerformanceFile = findFactoryPerformance();
@@ -250,6 +251,13 @@ HostRuntimeShell::HostRuntimeShell()
         {
             if (safe != nullptr && safe->service != nullptr)
                 safe->service->handleCommand (payload);
+        });
+
+    webViewOptions = webViewOptions
+        .withInitialisationData ("hostKeyboardView", juce::JSON::parse (keyboardViewFile))
+        .withEventListener ("saveHostKeyboardView", [keyboardViewFile] (const juce::var& view)
+        {
+            keyboardViewFile.replaceWithText (juce::JSON::toString (view));
         });
 
     if (juce::WebBrowserComponent::areOptionsSupported (webViewOptions))

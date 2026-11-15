@@ -1,3 +1,8 @@
+<script module>
+  const nativeView = globalThis.window?.__JUCE__?.initialisationData?.hostKeyboardView;
+  let savedView = nativeView?.[0];
+</script>
+
 <script>
   /**
    * HostKeyboard.svelte — the one keyboard on screen, in two sizes.
@@ -35,8 +40,13 @@
            playKeyboardWidthPercent }
     from '../utils/pianoGeometry.js';
 
-  let baseOctave = $state(4);   // C4 at the left edge in play mode
-  let playOctaves = $state(4);
+  const count = savedView?.playOctaves;
+  const initialCount = count === FULL_KEYBOARD ||
+    (Number.isInteger(count) && count >= 1 && count <= MAX_COMPLETE_OCTAVES) ? count : 4;
+  let playOctaves = $state(initialCount);
+  const maxSavedBase = maxPlayBaseOctave(initialCount === FULL_KEYBOARD ? 1 : initialCount);
+  let baseOctave = $state(Math.max(-1, Math.min(maxSavedBase,
+    Number.isInteger(savedView?.baseOctave) ? savedView.baseOctave : 4)));
   const PLAY_OCTAVE_OPTIONS = Array.from({ length: MAX_COMPLETE_OCTAVES }, (_, i) => i + 1);
 
   let mode = $derived($hostKeyboardMode.mode);
@@ -157,15 +167,22 @@
     if (key in KEYMAP) release(`key:${event.code || key}`);
   }
 
+  function saveKeyboardView() {
+    savedView = { baseOctave, playOctaves };
+    if (nativeView) window.__JUCE__.backend.emitEvent('saveHostKeyboardView', savedView);
+  }
+
   function shiftOctave(amount) {
     if (playOctaves === FULL_KEYBOARD) return;
     baseOctave = Math.max(-1, Math.min(maxBaseOctave, baseOctave + amount));
+    saveKeyboardView();
   }
 
   function setPlayOctaves(value) {
     playOctaves = value === FULL_KEYBOARD ? FULL_KEYBOARD : Number(value);
     if (playOctaves !== FULL_KEYBOARD)
       baseOctave = Math.min(baseOctave, maxPlayBaseOctave(playOctaves));
+    saveKeyboardView();
   }
 
   // --- the range, on the rim -------------------------------------------------------------
