@@ -22,13 +22,15 @@
 class HostRuntimeWindow : public juce::DocumentWindow
 {
 public:
-    explicit HostRuntimeWindow (const juce::String& name)
-        : DocumentWindow (name, juce::Colour (0xFF1E1E1E), DocumentWindow::allButtons)
+    HostRuntimeWindow (const juce::String& name, juce::File stateFile)
+        : DocumentWindow (name, juce::Colour (0xFF1E1E1E), DocumentWindow::allButtons),
+          windowStateFile (std::move (stateFile))
     {
         setUsingNativeTitleBar (true);
         setContentOwned (new ceditor::host::HostRuntimeShell(), true);
         setResizable (true, true);
-        centreWithSize (getWidth(), getHeight());
+        if (! restoreWindowStateFromString (windowStateFile.loadFileAsString()))
+            centreWithSize (getWidth(), getHeight());
         setVisible (true);
 
        #if JUCE_WINDOWS
@@ -42,10 +44,18 @@ public:
        #endif
     }
 
+    ~HostRuntimeWindow() override
+    {
+        windowStateFile.replaceWithText (getWindowStateAsString());
+    }
+
     void closeButtonPressed() override
     {
         juce::JUCEApplication::getInstance()->systemRequestedQuit();
     }
+
+private:
+    const juce::File windowStateFile;
 };
 
 class CEHostApplication : public juce::JUCEApplication
@@ -59,8 +69,12 @@ public:
     {
         // A player is called what it was named when it was made (hostage.json), not what the
         // program it was copied from was compiled as.
-        const auto named = ceditor::host::readHostageManifest().productName;
-        mainWindow = std::make_unique<HostRuntimeWindow> (named.isNotEmpty() ? named : getApplicationName());
+        const auto manifest = ceditor::host::readHostageManifest();
+        const auto programDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+        const auto dataDir = ceditor::host::dataDirectoryFor (manifest, programDir, ceditor::host::hostDataRoot());
+        mainWindow = std::make_unique<HostRuntimeWindow> (
+            manifest.productName.isNotEmpty() ? manifest.productName : getApplicationName(),
+            dataDir.getChildFile ("window-state.txt"));
     }
 
     void shutdown() override { mainWindow = nullptr; }
