@@ -26,6 +26,7 @@
    * There used to be a second keyboard for this under the rack, linear in semitones, which
    * never lined up with the piano above it. One keyboard, one geometry (pianoGeometry.js).
    */
+  import { hardwareKeyboardNotes } from '../stores/hostMeters.js';
   import { onDestroy } from 'svelte';
   import { hostNote, hostState, hostKeyboardMode, showKeyboardPlay, showPartRange,
            setPartMidiRules, partColor } from '../stores/instrumentHost.js';
@@ -314,7 +315,7 @@
          style:width={mode === 'play' ? `${playWidth}%` : '100%'}>
       {#each slots as slot (slot.note)}
         <div class="white-slot">
-          <button type="button" class="piano-key white" class:down={pressed.has(slot.note)}
+          <button type="button" class="piano-key white" class:down={pressed.has(slot.note) || $hardwareKeyboardNotes.includes(slot.note)}
                   class:in-range={inRange(slot.note)}
                   style={inRange(slot.note) ? `--part-color:${rangeColor}` : ''}
                   data-note={slot.note} aria-label={`Note ${slot.note}`}
@@ -335,7 +336,7 @@
             {/if}
           </button>
           {#if slot.sharp >= 0}
-            <button type="button" class="piano-key black" class:down={pressed.has(slot.sharp)}
+            <button type="button" class="piano-key black" class:down={pressed.has(slot.sharp) || $hardwareKeyboardNotes.includes(slot.sharp)}
                     class:in-range={inRange(slot.sharp)}
                     style={inRange(slot.sharp) ? `--part-color:${rangeColor}` : ''}
                     data-note={slot.sharp} aria-label={`Note ${slot.sharp}`}

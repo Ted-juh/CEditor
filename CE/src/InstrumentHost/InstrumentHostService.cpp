@@ -1322,8 +1322,17 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "setMidiInputEnabled")
     {
-        deviceManager.setMidiInputDeviceEnabled (payload.getProperty ("id", {}).toString(),
-                                                 (bool) payload.getProperty ("enabled", true));
+        const auto id = payload.getProperty ("id", {}).toString();
+        const bool enabled = payload.getProperty ("enabled", true);
+        deviceManager.setMidiInputDeviceEnabled (id, enabled);
+        if (! enabled)
+            for (const auto& device : juce::MidiInput::getAvailableDevices())
+                if (device.identifier == id)
+                {
+                    const std::scoped_lock lock (midiActivityLock);
+                    if (auto found = midiInputHealth.find (device.name); found != midiInputHealth.end())
+                        found->second.heldNotes.clear();
+                }
         emitAudioDevices();
         return;
     }
@@ -17188,6 +17197,7 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
 
         if (message.isNoteOn())
         {
+            keyboardAttacksSinceDrain.set (static_cast<size_t> (message.getNoteNumber()));
             health.heldNotes[(channel << 8) | message.getNoteNumber()] = nowMs;
             health.heldVelocities[(channel << 8) | message.getNoteNumber()] = message.getVelocity();
         }
@@ -18215,6 +18225,22 @@ void InstrumentHostService::drainParameterEvents()
             channels.add (juce::var (channel));
         }
         auto* packet = new juce::DynamicObject();
+        // Hardware feedback is display-only. Include attacks since the previous
+        // tick so a tap shorter than a UI frame still lights the key once.
+        std::bitset<128> lit;
+        {
+            const std::scoped_lock lock (midiActivityLock);
+            for (const auto& [device, health] : midiInputHealth)
+                if (! health.listed || lastPresentInputs.contains (device))
+                    for (const auto& entry : health.heldNotes)
+                        lit.set (static_cast<size_t> (entry.first & 127));
+            lit |= keyboardAttacksSinceDrain;
+            keyboardAttacksSinceDrain.reset();
+        }
+        juce::Array<juce::var> keyboardNotes;
+        for (int note = 0; note < 128; ++note)
+            if (lit.test (static_cast<size_t> (note))) keyboardNotes.add (note);
+        packet->setProperty ("keyboardNotes", keyboardNotes);
         packet->setProperty ("channels", juce::var (channels));
         options.emit ("instrumentHostMeters", juce::var (packet));
     }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bitset>
+
 #include <array>
 #include <atomic>
 #include <deque>
@@ -2149,6 +2151,7 @@ private:
     // Written on the MIDI thread, drained on the controlling thread; the mutex spans a few
     // string copies, far from any audio path.
     std::mutex midiActivityLock;
+    std::bitset<128> keyboardAttacksSinceDrain;
 
     // -- MIDI health (see evaluateMidiHealth) --------------------------------------------
     // Per input, what it has sent that could still be wrong: the notes it has not released,
