@@ -8325,8 +8325,13 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
         const auto sourceText = performanceSource == performanceFile()
                                   ? performanceBaselineText : performanceSource.loadFileAsString();
         Performance restored;
-        if (Performance::fromVar (juce::JSON::parse (sourceText), restored))
+        const auto document = juce::JSON::parse (sourceText);
+        if (Performance::fromVar (document, restored))
+        {
+            if (options.confirmRackChangesOnClose)
+                openingRackDocument = document;
             applyPerformance (std::move (restored));
+        }
         else
         {
             if (performanceSource == performanceFile())
@@ -8341,6 +8346,13 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
     // A product's very first start, with no session yet: the show it was built with.
     if (includePerformance && performanceSource == juce::File())
         openFirstBuiltInShow();
+
+    if (options.confirmRackChangesOnClose)
+    {
+        if (! openingRackDocument.isObject())
+            openingRackDocument = rack.getPerformance().toVar().clone();
+        openingRackComparison = juce::JSON::toString (rack.captureState().toVar());
+    }
 
     checkStateDigests();
 
@@ -22268,6 +22280,42 @@ juce::var InstrumentHostService::performancePayload() const
     return juce::var (root);
 }
 
+bool InstrumentHostService::rackChangedForClose()
+{
+    if (! openingRackDocument.isObject())
+        return false;
+    juce::String error;
+    const auto live = rack.captureState (&error);
+    return historyPendingLoads > 0 || error.isNotEmpty()
+        || juce::JSON::toString (live.toVar()) != openingRackComparison;
+}
+
+juce::Result InstrumentHostService::finishRackClose (bool keepChanges)
+{
+    if (openingRackDocument.isObject())
+    {
+        auto document = openingRackDocument;
+        if (keepChanges)
+        {
+            if (historyPendingLoads > 0)
+                return juce::Result::fail ("A plug-in is still loading. Close the rack again once it finishes.");
+            juce::String error;
+            document = rack.captureState (&error).toVar();
+            if (error.isNotEmpty())
+                return juce::Result::fail (error);
+        }
+
+        if ((keepChanges || sessionWrittenThisRun) && ! writePerformanceDocument (document))
+            return juce::Result::fail ("Could not write the startup rack. Check the session error in HoSTage.");
+    }
+
+    // An earlier autosave may still be queued on the message thread.
+    ++performanceSaveGeneration;
+    performanceSavePending.store (false);
+    options.persistSession = false;
+    return juce::Result::ok();
+}
+
 void InstrumentHostService::savePerformance()
 {
     noteShowChanged();
@@ -22375,6 +22423,7 @@ bool InstrumentHostService::writePerformanceDocument (const juce::var& document)
         performanceBaselineKnown = true;
         performanceBaselineExisted = true;
         performanceBaselineText = text;
+        sessionWrittenThisRun = true;
         performanceWriteErrorReported = false;
         return true;
     }

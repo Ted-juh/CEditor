@@ -440,6 +440,7 @@ public:
         // mutation; the outer VST3 sets this false because the DAW owns the session through
         // get/setStateInformation — a host file would fight the project file over the truth.
         bool persistSession = true;
+        bool confirmRackChangesOnClose = false;
         /** Whether a scan also sweeps the standard system VST3 folders (§8.6.5) on top of the
             user's own scan paths. The product wants them; a TEST must not, because a test that
             reads whatever the developer happens to have installed is not a test — it passes on
@@ -500,6 +501,8 @@ public:
         no user session exists. Runs once — getState calls it lazily so plug-in code only
         ever loads after the UI is up and asking. */
     void restoreSession();
+    bool rackChangedForClose();
+    juce::Result finishRackClose (bool keepChanges);
 
     const InstrumentRackHost& getRackHost() const     { return rack; }
     bool isScanning() const                           { return scanBusy.load(); }
@@ -2408,6 +2411,9 @@ private:
     std::atomic<juce::uint64> performanceSaveGeneration { 0 };
     std::atomic<bool> performanceSavePending { false };
     bool performanceWriteErrorReported = false;
+    juce::String openingRackComparison;
+    juce::var openingRackDocument;
+    bool sessionWrittenThisRun = false;
     bool performanceBaselineKnown = false;
     bool performanceBaselineExisted = false;
     bool performanceSavesBlocked = false;

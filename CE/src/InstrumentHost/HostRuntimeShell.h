@@ -33,6 +33,7 @@ public:
     ~HostRuntimeShell() override;
 
     void resized() override;
+    void requestClose();
 
 private:
     // The UI-rate pump for parameter deltas: vendor edits land on audio-thread listeners in
@@ -40,6 +41,7 @@ private:
     void timerCallback() override;
     void emitToWebView (const juce::String& eventName, const juce::var& payload);
 
+    bool closePromptOpen = false;
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<InstrumentHostService> service;
     // Floating vendor-editor windows — declared after the service so they are destroyed

@@ -7732,6 +7732,40 @@ void testScan (const juce::File& stubWorker)
 // VST3 is the demanding one: the DAW owns the session (persistSession=false, state through
 // capture/restore vars), announces its own rate, and destroys/recreates the editor window at
 // will. Each of those contracts is asserted here so the wrappers stay thin glue.
+void testStandaloneRackClose()
+{
+    const auto dir = freshDataDir ("standalone-close");
+    seedCatalog (dir);
+    const auto standalone = [] (InstrumentHostService::Options& o) { o.confirmRackChangesOnClose = true; };
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        check (! h.service->rackChangedForClose(), "untouched rack closes without a prompt");
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+        h.lastStub->patch = 7;
+        check (h.service->rackChangedForClose(), "rack edits trigger the close prompt");
+        check (h.service->finishRackClose (true).wasOk(), "Yes saves the live rack for startup");
+    }
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        check (h.lastStub != nullptr && h.lastStub->patch == 7, "startup recalls the saved plug-in edit");
+        check (! h.service->rackChangedForClose(), "freshly restored rack is clean");
+        h.lastStub->patch = 9;
+        check (h.service->rackChangedForClose(), "plug-in-only edit triggers the close prompt");
+        h.cmd ("addPart");
+        check (h.service->finishRackClose (false).wasOk(), "No rolls back even after autosave");
+    }
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        check (parts.size() == 1 && h.lastStub != nullptr && h.lastStub->patch == 7,
+               "startup after No recalls the opening rack and plug-in state");
+    }
+}
+
 void testWrapperContext()
 {
     std::cout << "\nwrapper context (the generated targets)" << std::endl;
@@ -16414,6 +16448,7 @@ int main (int argc, char* argv[])
     testStateFolders();
     testSectionsMigration();
     testScan (stubWorker);
+    testStandaloneRackClose();
     testWrapperContext();
     testParameterModel();
     testControlPages();
