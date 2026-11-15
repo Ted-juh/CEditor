@@ -6461,6 +6461,18 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "setControlScreenSkin")
+    {
+        const auto id = payload.getProperty ("skin", -1);
+        if ((! id.isInt() && ! id.isInt64() && ! id.isDouble())
+            || ! juce::isPositiveAndBelow ((double) id, (double) numControlSkins)
+            || (double) id != (int) id) return;
+        surfaceSkin = (int) id;
+        if (! saveSurfacePages()) emitError ("Could not save the CTRL49 control page skin.");
+        emitState();
+        return;
+    }
+
     if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface" || cmd == "discoverOnSurface"
         || cmd == "cueOnSurface" || cmd == "changesOnSurface" || cmd == "metersOnSurface"
         || cmd == "liveOnSurface")
@@ -14704,6 +14716,8 @@ void InstrumentHostService::loadSurfacePages()
 void InstrumentHostService::applySurfacePagesVar (const juce::var& stored)
 {
     const auto on = [&stored] (const char* key) { return (bool) stored.getProperty (key, false); };
+    const int skin = stored.getProperty ("skin", 0);
+    surfaceSkin = juce::isPositiveAndBelow (skin, numControlSkins) ? skin : 0;
     surfaceSoundcheckPage = on ("soundcheck");
     surfaceLayersPage     = on ("layers");
     surfaceDiscoverPage   = on ("discover");
@@ -14721,6 +14735,7 @@ bool InstrumentHostService::saveSurfacePages() const
 juce::var InstrumentHostService::surfacePagesVar() const
 {
     auto* root = new juce::DynamicObject();
+    root->setProperty ("skin", surfaceSkin);
     root->setProperty ("soundcheck", surfaceSoundcheckPage);
     root->setProperty ("layers",     surfaceLayersPage);
     root->setProperty ("discover",   surfaceDiscoverPage);
@@ -19556,17 +19571,7 @@ juce::var InstrumentHostService::buildStatePayload()
     }());
     root->setProperty ("performance", performancePayload());
     root->setProperty ("soundcheck", soundcheckPayload());
-    {
-        auto* surfacePages = new juce::DynamicObject();
-        surfacePages->setProperty ("soundcheck", surfaceSoundcheckPage);
-        surfacePages->setProperty ("layers", surfaceLayersPage);
-        surfacePages->setProperty ("discover", surfaceDiscoverPage);
-        surfacePages->setProperty ("cue", surfaceCuePage);
-        surfacePages->setProperty ("changes", surfaceChangesPage);
-        surfacePages->setProperty ("meters", surfaceMetersPage);
-        surfacePages->setProperty ("live", surfaceLivePage);
-        root->setProperty ("surfacePages", juce::var (surfacePages));
-    }
+    root->setProperty ("surfacePages", surfacePagesVar());
     // Which program the page is drawing: the editor, or a player (installed as one, or the
     // editor trying its show as one). The page hides what a player lacks; the refusal above is
     // what makes it true.

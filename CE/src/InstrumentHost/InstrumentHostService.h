@@ -843,6 +843,7 @@ public:
 
     // -- the CTRL49's stage pages (Ctrl49StagePages.h) --------------------------------------
     // Each is a page the surface has only once it is asked for, like the browser.
+    int controlScreenSkin() const { return surfaceSkin; }
     bool soundcheckOnSurface() const             { return surfaceSoundcheckPage; }
     bool layersOnSurface() const                 { return surfaceLayersPage; }
     bool discoverOnSurface() const               { return surfaceDiscoverPage; }
@@ -1724,6 +1725,8 @@ private:
     // becomes a browser under somebody's hands is a surface that stopped doing what they had
     // it doing.
     bool surfaceBrowsing = false;
+    static constexpr int numControlSkins = 15; // Classic plus live_skin_names.json entries 1–14
+    int surfaceSkin = 0;
     bool surfaceSoundcheckPage = false;
     bool surfaceLayersPage = false;
     bool surfaceDiscoverPage = false;

@@ -2824,6 +2824,7 @@ export const finishSoundcheck = () => send({ cmd: 'finishSoundcheck' });
 /** The CTRL49's two stage pages, off until asked for like browsing on the controller: the set's
     soundcheck (turning it on checks the set, so the page opens on fresh results) and every
     part's zone over the keys. `on` omitted flips the page. */
+export const setControlScreenSkin = (skin) => send({ cmd: 'setControlScreenSkin', skin });
 export const soundcheckOnSurface = (on) =>
   send(on === undefined ? { cmd: 'soundcheckOnSurface' } : { cmd: 'soundcheckOnSurface', on });
 export const layersOnSurface = (on) =>
@@ -4762,7 +4763,7 @@ export function normalizeHostState(payload) {
     product: normalizeProduct(p.product),
     reliability: normalizeReliability(p.reliability),
     soundcheck: normalizeSoundcheck(p.soundcheck),
-    surfacePages: { soundcheck: p.surfacePages?.soundcheck === true, layers: p.surfacePages?.layers === true,
+    surfacePages: { skin: Number(p.surfacePages?.skin ?? 0), soundcheck: p.surfacePages?.soundcheck === true, layers: p.surfacePages?.layers === true,
                     discover: p.surfacePages?.discover === true, cue: p.surfacePages?.cue === true,
                     changes: p.surfacePages?.changes === true, meters: p.surfacePages?.meters === true,
                     live: p.surfacePages?.live === true },
@@ -6098,6 +6099,10 @@ export function applyMockCommand(state, payload) {
     if (target)
       for (const key of ['enabled', 'mute', 'solo', 'volume', 'pan'])
         if (payload[key] !== undefined) target[key] = payload[key];
+    return next;
+  }
+  if (cmd === 'setControlScreenSkin') {
+    next.surfacePages.skin = payload.skin;
     return next;
   }
   if (cmd === 'soundcheckOnSurface' || cmd === 'layersOnSurface' || cmd === 'discoverOnSurface' || cmd === 'cueOnSurface'

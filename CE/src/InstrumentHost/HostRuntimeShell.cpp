@@ -198,6 +198,9 @@ HostRuntimeShell::HostRuntimeShell()
         surfaceOptions.pngAssets.push_back ({ 0x0200,
             surface::Bytes (surface::assets::kKnobStripPng,
                             surface::assets::kKnobStripPng + surface::assets::kKnobStripPngSize) });
+        surfaceOptions.pngAssets.push_back ({ 0x0220,
+            surface::Bytes (surface::assets::kLiveKnobsPng,
+                            surface::assets::kLiveKnobsPng + surface::assets::kLiveKnobsPngSize) });
         surfaceOptions.pngAssets.push_back ({ 0x0210,
             surface::Bytes (surface::assets::kHostageLogoPng,
                             surface::assets::kHostageLogoPng + surface::assets::kHostageLogoPngSize) });

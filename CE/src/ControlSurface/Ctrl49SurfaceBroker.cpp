@@ -362,6 +362,7 @@ void Ctrl49SurfaceBroker::tick()
             lastLabels.clear();
             lastState.clear();
             lastStage.clear();
+            lastSkin = 0; // freshly uploaded Lua starts in Classic
             forgetPadState();
             enter (State::connected, endpoints->description);
             lastDisplayMs = 0.0;   // paint immediately
@@ -1446,6 +1447,12 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     // Only bytes that changed travel — the display link is slow and redraws flicker.
     if (toHardware && session != nullptr)
     {
+        const auto skin = service.controlScreenSkin();
+        if (skin != lastSkin)
+        {
+            session->callLua ("set_skin", { static_cast<std::uint8_t> (skin) }, true);
+            lastSkin = skin;
+        }
         if (! stage.empty())
         {
             if (stage != lastStage || stageCall != lastStageCall)

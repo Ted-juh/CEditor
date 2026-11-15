@@ -288,3 +288,26 @@ test('LIVE draws a lane shorter than sixteen: the places past its end empty, the
   assert.ok(rects.some((c) => c.x === 8 + 10 * 29 && c.y === 30 && c.w === 27 && c.h === 90), 'the cursor\'s place is still lit');
   p.close();
 });
+
+test('all live skins retain real control values and switching back restores Classic', async () => {
+  const names = JSON.parse(fs.readFileSync(new URL('../../../tools/ctrl49/live_skin_names.json', import.meta.url)));
+  const p = await page();
+  try {
+    p.call('set_labels', rackLabelPayload('Filter', SLOTS));
+    p.call('set_values', rackStatePayload(0, SLOTS, { number: 2, count: 5 }));
+    for (let id = 1; id < names.length; id++) {
+      p.call('set_skin', [id]);
+      const calls = p.draw();
+      assert.ok(said(calls).includes('Cutoff   2.40 kHz'), names[id]);
+      assert.ok(said(calls).includes('PAGE 2 / 5'), names[id]);
+      const knob = calls.find(c => c.id === 0x0221);
+      assert.equal(knob.sy, (id - 1) * 44);
+      assert.equal(knob.sx, Math.round(88 * 15 / 127) * 44);
+    }
+    p.call('set_skin', [0]);
+    assert.equal(frameOf(p.draw(), 0), 88);
+    assert.equal(p.asked(), 0);
+  } finally {
+    p.close();
+  }
+});
