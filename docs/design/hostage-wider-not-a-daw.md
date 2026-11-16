@@ -13,6 +13,8 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **The rule that keeps it from becoming a DAW**: [The line](#the-line).
 - **What is decided**: all thirteen questions, each with its reason, in
   [Decisions](#decisions).
+- **Features proposed but not decided yet**:
+  [More features](#more-features-proposed-not-decided).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -322,6 +324,36 @@ replacing it, because the player is playing with those in-ears, and it never dim
 never saved.
 
 The "silenced by Solo" warning, which uses the headphone icon now, gets another icon.
+
+### More features, proposed (not decided)
+
+Proposed on 2026-11-16 after the decisions above, for the owner to choose from. Each passes the line,
+and none exists today (checked on `main`). A song's tempo can already change by section, because a
+section recalls a scene and a scene can carry a tempo (`PatternModel.h`), so that is not listed.
+
+1. **Song changes without a gap.** When the next song loads another rig, the last chord and the
+   reverb tails of the old one keep ringing while the new one starts. Nothing in the code carries
+   notes or tails across a song change today. It matters most in a set played without pauses.
+2. **Lyrics and chord charts that follow the song.** Song notes exist (large type on the Stage
+   screen). Lyrics and chords would move on with each section, at cues, not along a timeline, and
+   show on the tablet remote for the singer and bandmates. For "anyone on stage" (decision 2).
+3. **Transpose the whole set.** One setting that moves every instrument part up or down for a
+   song or the whole night, when the singer's voice needs it. Backing tracks stay as they are,
+   since changing their pitch means processing the file.
+4. **MIDI backing files, play-only.** A `.mid` file per song played through the rig's own
+   instruments and hardware synths, under the same rules as audio backing tracks (decision 1).
+   Many keyboard players use these instead of audio stems.
+5. **Line check before the doors open.** One walk through every connection of the show: speak into
+   each mic and its input lights, send a short tone to each output and confirm it. Small with a
+   handful of inputs; essential once HoSTage is the desk (decision 9).
+6. **Simple lights from the show.** For bands without a lighting operator: a colour or light scene
+   per HoSTage scene, sent over DMX (a USB interface) or Art-Net (the network, decision 4). Fires
+   at cues, like show control.
+7. **A guitar that plays a synth.** An input part's pitch-to-MIDI plug-in drives an instrument
+   part, through the existing "MIDI from" choice. Needs MIDI out of an insert, the reverse of the
+   MIDI-to-inserts gap above.
+8. **Show history.** The show as it was played at each gig, kept, and what changed since: useful
+   when a song sounded wrong, and when one band member hands the show to another.
 
 ## Order of work
 
