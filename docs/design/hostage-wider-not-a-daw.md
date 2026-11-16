@@ -19,7 +19,10 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **Ten new ideas, parked for later**: [New ideas](#new-ideas-parked).
 - **Four Build-mode features**, taken: [Build mode](#build-mode). The owner wants Build-mode
   features now rather than more for playing live.
-- **Ease of use, proposed but not decided**: [Ease of use](#ease-of-use-proposed-not-decided).
+- **Seven ease-of-use features**, taken: [Ease of use](#ease-of-use). The kind of feature the owner
+  wants most.
+- **More ease of use, proposed but not decided**:
+  [More ease of use](#more-ease-of-use-proposed-not-decided).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -480,10 +483,12 @@ are out. "More like this" in Sounds already exists
 8. **Import from another live host**: at least the song list, tempos and program changes from
    MainStage, Gig Performer or a plain text list, so moving to HoSTage does not start from nothing.
 
-### Ease of use, proposed (not decided)
+### Ease of use
 
 Proposed on 2026-11-16, when the owner asked about dragging instruments and effects onto the rack
-instead of pressing Load, and for more ideas like it. Checked on `main`: only the Canvas view takes
+instead of pressing Load, and for more ideas like it. **The owner took all seven** (all Pro): "All,
+more like this.. this is what I meant.." This is the kind of feature the owner wants most: making
+Build mode easier. Checked on `main`: only the Canvas view takes
 drops (`HostRackCanvas.svelte`); in the List view, the default, an instrument is loaded with its
 Load button, and the only drag reorders effects. Nothing duplicates a part, selects several, or
 follows what is played.
@@ -502,6 +507,23 @@ follows what is played.
 6. **The dock follows what you play.** Play a key and the dock shows the part it sounds on, so
    editing what you hear needs no clicking around.
 7. **Touch to find.** Move a knob on the controller and the screen shows what it controls.
+
+### More ease of use, proposed (not decided)
+
+Proposed on 2026-11-16, more of the same kind. Checked on `main`: an effect can be dragged only
+within its own chain (`fxDrop` in `InstrumentHostView.svelte` refuses anything else); part rows move
+with up and down buttons, not by dragging; nothing accepts files dropped from the computer.
+
+1. **Drag to reorder parts**, instead of the up and down buttons.
+2. **Drag between parts.** Drag an effect or a MIDI module onto another part to move it there;
+   hold Ctrl to copy it.
+3. **Drag a part into the Sounds list to save it**, instead of pressing Save preset or Save chain.
+4. **Drop files from the computer**: a preset file onto a part, a `.syx` patch onto a hardware
+   part, a Scala `.scl` scale onto Tuning, a show file onto the window to open it.
+5. **Try a MIDI module before adding it.** Hovering a module in "+ Add module…" plays it on the
+   selected part while a chord is held, so the arpeggiator or strum is heard before it is chosen.
+6. **Starred knobs on the part's row.** Parameters pinned with ☆ in the Params tab show as knobs on
+   the part's row in the rack, so the few that matter are there without opening the dock.
 
 ## Order of work
 
@@ -530,7 +552,8 @@ go with the tablet remote. From the effects: tails that ring out (3) beside song
 gap, the drum map (7), and the new effects screen in the dock (8), which the owner already finds
 lacking. From still more: two keyboards with their own parts (1) and the gig-ready check (3).
 From Build mode: undo that covers everything (1), even levels (3), control pages from what you use
-(6) and the command palette (7). **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
+(6) and the command palette (7). All seven ease-of-use features; they are screen work and need
+nothing else. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
 rack. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
 that:** the mixing desk (decision 9).
 
