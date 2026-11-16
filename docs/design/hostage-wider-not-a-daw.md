@@ -23,6 +23,8 @@ port of HoSTage was not pushed when this was written, so check that branch befor
   wants most.
 - **Four more ease-of-use features**, taken: [More ease of use](#more-ease-of-use).
 - **Eight more ease-of-use features**, taken: [Even more ease of use](#even-more-ease-of-use).
+- **More Build mode, proposed but not decided**:
+  [Build mode, further](#build-mode-further-proposed-not-decided).
 - **A practice mode with falling notes**, for learning any song: [Practice mode](#practice-mode).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
@@ -554,6 +556,30 @@ profiles can (`DeviceProfileEngine.cpp`).
    offers to scan them, instead of the user having to remember Scan.
 8. **Drag to assign in Performance.** Drop a saved rack or sound on a song to make it that song's
    rig; drop a control page on a scene to make it that scene's page.
+
+### Build mode, further, proposed (not decided)
+
+Proposed on 2026-11-16, when the owner asked for more Build-mode features, going the extra mile.
+Checked on `main`: no CPU figure per part (only the whole program's, in the header), controller
+knobs do not follow the selected part, a part whose plug-in is replaced leaves its control
+assignments unresolved, and there is no search for sounds from an audio file.
+
+1. **Knobs follow the selection.** Select a part and the controller's knobs control its main
+   parameters at once, without making a page. Pages stay for the show; this is for building.
+2. **A macro by moving.** Press "learn macro", turn several of the plug-in's knobs to where they
+   should end up, and press again: one macro now moves all of them from where they were to there.
+3. **Swap a plug-in, keep the mappings.** When a part's plug-in is replaced, its knob and macro
+   assignments are offered to the new plug-in's parameters with the same or similar names
+   ("Cutoff" to "Filter Cutoff"), instead of all becoming unresolved.
+4. **Find a sound from a recording.** Drop a few seconds of audio (a song, a demo) and the library
+   lists the sounds you own that are nearest to it. The library already compares sounds with each
+   other; this compares them with a recording.
+5. **What each part costs.** The processor load of each part shown on its row, so the heavy one is
+   found without guessing. Each plug-in already runs in a worker of its own, so its time can be
+   measured.
+6. **Tidy the rig.** A list of what is not doing anything: parts no song plays, effects bypassed in
+   every scene, control pages for plug-ins that are gone, the same sound loaded twice. Each with a
+   button to remove it, and undo to bring it back.
 
 ### Practice mode
 
