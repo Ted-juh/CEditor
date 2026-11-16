@@ -680,6 +680,7 @@ juce::var Performance::toVar() const
         auto* pg = new juce::DynamicObject();
         pg->setProperty ("pageId", page.pageId);
         pg->setProperty ("name",   page.name);
+        pg->setProperty ("surfaceNameVersion", 1);
         pg->setProperty ("generated", page.generated);
         pg->setProperty ("generatedForPartId", page.generatedForPartId);
         if (page.presetRecordId.isNotEmpty())
@@ -1674,6 +1675,10 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
 
             page.name = pg.getProperty ("name", {}).toString();
             page.generated = (bool) pg.getProperty ("generated", false);
+            const auto number = juce::String (seenPageIds.size());
+            if (! page.generated && ! pg.hasProperty ("surfaceNameVersion")
+                && ((seenPageIds.size() == 1 && page.name == "Surface") || page.name == "Page " + number))
+                page.name = "Surface - " + number;
             page.generatedForPartId = pg.getProperty ("generatedForPartId", {}).toString();
             page.presetRecordId = pg.getProperty ("presetRecordId", {}).toString();
             page.presetName = pg.getProperty ("presetName", {}).toString();

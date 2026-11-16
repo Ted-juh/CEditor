@@ -22,10 +22,12 @@
    */
   import { onDestroy } from 'svelte';
   import skinNames from '../../../../../tools/ctrl49/live_skin_names.json';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Settings from 'lucide-svelte/icons/settings';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import { ctrl49Screen, hostSurface, hostState, surfaceInput, setControlSlotValue, surfaceStatusText,
-           layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface,
+           showControlPage, renameControlPage, showSurfaceStagePage, layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface,
            metersOnSurface, liveOnSurface, setControlScreenSkin } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
   import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload,
@@ -340,6 +342,29 @@
                                        || (cuePick && index === 0));
   const setlists = $derived(($hostState.licence?.features ?? [])
     .find((f) => f.feature === 'scenesAndSetlists')?.allowed !== false);
+  const pages = $derived($hostState.rack?.pages ?? []);
+  const kind = $derived($ctrl49Screen.pageKind);
+  const activePage = $derived(kind === 'control' ? pages.find(p => p.pageId === $ctrl49Screen.pageId) : null);
+  let strip = $state();
+  let editingPage = $state('');
+  let draft = $state('');
+  let managing = $state(false);
+  $effect(() => {
+    const id = activePage?.pageId;
+    if (!strip || !id) return;
+    const button = [...strip.children].find(el => el.dataset.page === id);
+    if (button) {
+      const rect = button.getBoundingClientRect(), view = strip.getBoundingClientRect();
+      if (rect.left < view.left) strip.scrollLeft += rect.left - view.left;
+      else if (rect.right > view.right) strip.scrollLeft += rect.right - view.right;
+    }
+  });
+  function finishRename() {
+    const page = pages.find(p => p.pageId === editingPage);
+    editingPage = '';
+    if (page && draft.trim() && draft.trim() !== page.name) renameControlPage(page.pageId, draft.trim());
+  }
+  const optionalKinds = ['cue', 'live', 'layers', 'meters', 'soundcheck', 'discover', 'changes'];
   const HINT = {
     presets: 'Scroll with the big dial or Up/Down. Press the dial to open a group or load a preset. Browse opens the menu. Left goes back one level.',
     rack: 'Use the cursor or big dial to highlight a rack part. Press the dial to select it. Control returns to your last control page.',
@@ -383,15 +408,47 @@
         <button type="button" title="Page Left" aria-label="Page Left" data-testid="ctrl49-page-left"
                 onclick={() => surfaceInput(39, 127)}><ChevronLeft size={16} /></button>
         <span class="page" data-testid="ctrl49-page">
-          <b>{$ctrl49Screen.pageIndex + 1}</b> / {$ctrl49Screen.pageCount}
-          <em>{KIND[$ctrl49Screen.pageKind]}</em>
+          {#if activePage}<b>{$ctrl49Screen.pageIndex + 1} / {pages.length}</b> <em>{activePage.name}</em>
+          {:else}{kind === 'presets' ? 'Browse' : KIND[kind]}{/if}
         </span>
         <button type="button" title="Page Right" aria-label="Page Right" data-testid="ctrl49-page-right"
                 onclick={() => surfaceInput(40, 127)}><ChevronRight size={16} /></button>
       </div>
 
-      <div class="stage-pages" role="group" aria-label="Stage pages on the keyboard">
-        <span class="group-label">After Performance</span>
+      {#if pages.length}
+        <div class="page-tools"><span class="group-label">Control pages</span>
+          {#if editingPage}
+            <input aria-label="Control page name" bind:value={draft} use:focusAndSelect onblur={finishRename}
+                   onkeydown={(e) => { if (e.key === 'Enter') finishRename(); if (e.key === 'Escape') editingPage = ''; }} />
+          {:else if activePage && !$hostState.player && !$hostState.stageLocked}
+            <button aria-label="Rename selected control page" title="Rename selected control page"
+                    onclick={() => { editingPage = activePage.pageId; draft = activePage.name; }}><Pencil size={14} /></button>
+          {/if}
+        </div>
+        <div class="page-strip" bind:this={strip} role="group" aria-label="Control pages">
+          {#each pages as p (p.pageId)}
+            <button data-page={p.pageId} aria-pressed={activePage?.pageId === p.pageId}
+                    onclick={() => showControlPage(p.pageId)}>{p.name}</button>
+          {/each}
+        </div>
+      {/if}
+      <div class="page-tools">
+        <button aria-pressed={kind === 'performance'} onclick={() => showSurfaceStagePage('performance')}>Performance</button>
+      </div>
+      <div class="page-tools"><span class="group-label">After Performance</span>
+        <button title="Manage pages" aria-label="Manage pages" aria-expanded={managing}
+                onclick={() => managing = !managing}><Settings size={14} /></button>
+      </div>
+      <div class="page-tools" role="group" aria-label="After Performance">
+        <button aria-pressed={kind === 'rack'} onclick={() => surfaceInput(35, 127)}>Rack</button>
+        <button aria-pressed={kind === 'presets'} onclick={() => surfaceInput(36, 127)}>Browse</button>
+        {#each optionalKinds.filter(k => pagesOn[k]) as k}
+          <button aria-pressed={kind === k} onclick={() => showSurfaceStagePage(k)}>{KIND[k]}</button>
+        {/each}
+      </div>
+      {#if managing}
+      <div class="stage-pages" role="group" aria-label="Manage pages">
+        <span class="group-label">Show on keyboard</span>
         <button type="button" aria-pressed={pagesOn.cue} class:on={pagesOn.cue} data-testid="ctrl49-cue-toggle"
                 disabled={!setlists && !pagesOn.cue}
                 title={setlists ? 'The setlist read mid-show: the song, its section, its clock, what is next' : 'Needs scenes and setlists'}
@@ -416,6 +473,8 @@
                 title="The focused part's sound against its saves: what moved, heard and put back"
                 onclick={() => changesOnSurface(!pagesOn.changes)}>Changes</button>
       </div>
+
+      {/if}
 
       <div class="encoders" role="group" aria-label="Encoders">
         {#each slots as s, slot}
@@ -559,6 +618,14 @@
     --host-line: #75b8eb;
     --host-text: #fff;
     background: var(--host-surface-raised); color: var(--host-text); border-color: var(--host-line);
+  }
+  .page-tools, .page-strip { display: flex; align-items: center; gap: 6px; }
+  .page-tools { flex-wrap: wrap; }
+  .page-tools .group-label { margin: 0; }
+  .page-strip { overflow-x: auto; }
+  .page-strip button { flex: none; white-space: nowrap; }
+  .page-strip button[aria-pressed="true"], .page-tools button[aria-pressed="true"] {
+    border-color: var(--host-accent, #ff9408); background: var(--host-accent-surface, #2a2116);
   }
   .stage-pages { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .stage-pages .group-label { margin: 0 4px 0 0; }

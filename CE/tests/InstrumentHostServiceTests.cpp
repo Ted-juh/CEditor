@@ -4871,6 +4871,13 @@ void testCtrl49AppScreen()
            "the app is still sent the page, in the bytes the keyboard would get: a control page's "
            "nine bytes, then which page it is and each knob's value as the plug-in writes it");
 
+    h.cmd ("showSurfaceStagePage", { { "kind", "performance" } });
+    tickPast();
+    check (broker.currentPage() == broker.pages().performance, "picker jumps directly to Performance");
+    h.cmd ("showControlPage", { { "pageId", firstPage } });
+    tickPast();
+    check (broker.currentPage() == 0, "picker returns to the selected control page by ID");
+
     const auto cutoffBefore = synth->cutoff->get();
     for (int i = 0; i < 10; ++i)
         press (11, 1);                          // encoder 1, clockwise
@@ -11129,7 +11136,7 @@ void testPadsAndFaders()
         h.cmd ("assignSurfaceControl", { { "pageId", "" }, { "kind", "pad" }, { "index", 0 },
                                          { "partId", partId }, { "parameterId", "cutoff" } });
         const auto pages = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
-        check (pages.size() == 1 && pages[0].getProperty ("name", {}).toString() == "Surface",
+        check (pages.size() == 1 && pages[0].getProperty ("name", {}).toString() == "Surface - 1",
                "the first drop on the drawing mints a page named for it");
         bool landed = false;
         if (pages.size() == 1)

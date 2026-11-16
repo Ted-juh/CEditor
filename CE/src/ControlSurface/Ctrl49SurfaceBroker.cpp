@@ -528,6 +528,7 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         for (int i = 0; i < controlPages; ++i)
             if (performance.pages.getReference (i).pageId == requested)
             {
+                browsingPartPresets = false;
                 lastControlPage = requested;
                 if (reducer.setPage (i))
                 {
@@ -545,9 +546,11 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         const auto target = shown == "cue" ? layout.cue : shown == "live" ? layout.live
                           : shown == "layers" ? layout.layers : shown == "meters" ? layout.meters
                           : shown == "soundcheck" ? layout.soundcheck : shown == "discover" ? layout.discover
-                          : shown == "changes" ? layout.changes : -1;
+                          : shown == "changes" ? layout.changes : shown == "performance" ? layout.performance
+                          : shown == "browse" ? layout.browse : -1;
         if (target >= 0 && reducer.setPage (target))
         {
+            browsingPartPresets = false;
             lastLabels.clear();
             lastState.clear();
             lastStage.clear();

@@ -111,7 +111,7 @@ try {
   });
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the card ran the display page');
   assert.match(await host.getByTestId('ctrl49-screen-status').innerText(), /No CTRL49 connected — shown here only/);
-  assert.match(await host.getByTestId('ctrl49-page').innerText(), /1\s*\/\s*1\s*Performance/,
+  assert.match(await host.getByTestId('ctrl49-page').innerText(), /^Performance$/,
     'a rack with no control pages shows the performance page, as the keyboard would');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-card.png` });
 
@@ -124,11 +124,12 @@ try {
     return lit;
   });
   const pageLabel = () => host.getByTestId('ctrl49-page').innerText();
+  await host.getByRole('button', { name: 'Manage pages' }).click();
   assert.equal(await host.getByTestId('ctrl49-layers-toggle').getAttribute('aria-pressed'), 'false', 'Layers starts off');
   const performanceLit = await canvasLit();
   // Switching a page on shows it: the switch is how it is asked for (the owner, 2026-10-08).
   await host.getByTestId('ctrl49-layers-toggle').click();
-  await host.waitForFunction(() => /2\s*\/\s*2\s*Layers/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Layers$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   // The stand-in is the Free edition, which has no setlists to check, so SOUNDCHECK is offered
   // and refused in one place: the switch says why it is off. The licence a paid edition would
   // carry is then put into the store, as the native side reports one it has verified.
@@ -141,7 +142,7 @@ try {
       features: s.licence.features.map((f) => ({ ...f, allowed: true })) } }));
   });
   await soundcheckToggle.click();
-  await host.waitForFunction(() => /3\s*\/\s*3\s*Soundcheck/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Soundcheck$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await card.locator('.encoder').nth(7).locator('.label').innerText(), 'Check again');
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_check');
   assert.ok(await canvasLit() > 2000, 'and draws something');
@@ -149,7 +150,7 @@ try {
 
   await host.getByTestId('ctrl49-page-left').click();
   await host.waitForFunction(() => /Layers/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
-  assert.match(await pageLabel(), /2\s*\/\s*3\s*Layers/, 'Page Left walks back to LAYERS, between the performance page and SOUNDCHECK');
+  assert.match(await pageLabel(), /^Layers$/, 'Page Left walks back to LAYERS, between the performance page and SOUNDCHECK');
   assert.match(await host.getByTestId('ctrl49-hint').innerText(), /Encoder 1 picks the part/);
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_layers');
   await host.waitForFunction((before) => {
@@ -165,16 +166,16 @@ try {
 
   await host.getByTestId('ctrl49-page-right').click();
   await host.waitForFunction(() => /Soundcheck/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
-  assert.match(await pageLabel(), /3\s*\/\s*3\s*Soundcheck/, 'and Page Right on to SOUNDCHECK again');
+  assert.match(await pageLabel(), /^Soundcheck$/, 'and Page Right on to SOUNDCHECK again');
 
   await host.getByTestId('ctrl49-soundcheck-toggle').click();
   await host.getByTestId('ctrl49-layers-toggle').click();
-  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Performance$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // DISCOVER: the demo library has a taste in it, so the page lists what it would suggest, and
   // its pads are live (each auditions its row) where the other two pages' are not.
   await host.getByTestId('ctrl49-discover-toggle').click();
-  await host.waitForFunction(() => /2\s*\/\s*2\s*Discover/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Discover$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_discover');
   assert.equal(await encoderOne.locator('.label').innerText(), 'Pick');
   assert.match(await encoderOne.locator('.value').innerText(), /^1 \/ \d+$/, 'and says where in the list it is');
@@ -188,29 +189,29 @@ try {
   await host.waitForFunction(() => document.querySelectorAll('[data-testid=ctrl49-screen-card] .encoder .value')[2].innerText === 'Pad');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-discover.png` });
   await host.getByTestId('ctrl49-discover-toggle').click();
-  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Performance$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // CUE: the setlist read mid-show (the licence above allows setlists). Encoder 1 is the pick.
   await host.getByTestId('ctrl49-cue-toggle').click();
-  await host.waitForFunction(() => /2\s*\/\s*2\s*Cue/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Cue$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_cue');
   assert.equal(await encoderOne.locator('.label').innerText(), 'Pick a song');
   assert.ok(await canvasLit() > 2000, 'and draws something');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-cue.png` });
   await host.getByTestId('ctrl49-cue-toggle').click();
-  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Performance$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // CHANGES: the preview has no plug-in to read changes through, and the page says so.
   await host.getByTestId('ctrl49-changes-toggle').click();
-  await host.waitForFunction(() => /2\s*\/\s*2\s*Changes/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Changes$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_changes');
   assert.ok(await canvasLit() > 1000, 'and draws why there is nothing to compare');
   await host.getByTestId('ctrl49-changes-toggle').click();
-  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Performance$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // LIVE: the mock rack's focused part, its lane plain until drawn; encoder 2 draws one.
   await host.getByTestId('ctrl49-live-toggle').click();
-  await host.waitForFunction(() => /2\s*\/\s*2\s*Live/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Live$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_live');
   assert.ok(await canvasLit() > 1000, 'and draws the lane and the keys');
   // Shift + pad ends the lane at that step (here a Shift-click on the card's pad); the cursor
@@ -228,16 +229,32 @@ try {
   await host.waitForFunction(() => document.querySelector('[data-testid=ctrl49-encoder-1-value]').innerText === '6 / 8');
   assert.equal(await liveValue(2).innerText(), '100', 'made longer again, the step under the cursor is one of the lane\'s');
   await host.getByTestId('ctrl49-live-toggle').click();
-  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Performance$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // METERS: the demo plays no audio, so the strips are silent; encoder 1 moves the first fader.
   await host.getByTestId('ctrl49-meters-toggle').click();
-  await host.waitForFunction(() => /2\s*\/\s*2\s*Meters/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Meters$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_meters');
   assert.ok(await canvasLit() > 1000, 'and draws the strips');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-meters.png` });
   await host.getByTestId('ctrl49-meters-toggle').click();
-  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  await host.waitForFunction(() => /^Performance$/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+
+  await host.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addControlPage();
+    store.addControlPage();
+  });
+  const tabs = card.getByRole('group', { name: 'Control pages', exact: true });
+  await tabs.getByRole('button', { name: 'Surface - 2' }).click();
+  await card.getByRole('button', { name: 'Rename selected control page' }).click();
+  const nameInput = card.getByRole('textbox', { name: 'Control page name' });
+  await nameInput.fill('Tyrell Filters');
+  await nameInput.press('Enter');
+  assert.equal(await tabs.getByRole('button', { name: 'Tyrell Filters' }).getAttribute('aria-pressed'), 'true');
+  assert.match(await pageLabel(), /2\s*\/\s*2\s*Tyrell Filters/);
+  await card.getByRole('button', { name: 'Performance', exact: true }).click();
+  await host.waitForFunction(() => document.querySelector('[data-testid=ctrl49-page]').innerText === 'Performance');
 
   // The rest of the firmware's Lua surface, through the real runtime: padding and the font table,
   // draw_system_text, clear_errors, asset_get_valid, and the note hook (hook 2 calls note(args)).

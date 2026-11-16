@@ -189,7 +189,7 @@ namespace
             "startPerformanceRecording", "finishPerformanceRecording",
             "cancelPerformanceRecording", "removePerformanceTake",
             "replayPerformanceTake", "stopPerformanceReplay", "surfacePerformanceEncoder",
-            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage",
+            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage", "showSurfaceStagePage",
             "chordPad", "chordStep", "retryFailedProcessor", "dismissFailoverEvent",
 
             // Escape/cancellation actions must never be trapped behind the lock. Closing a
@@ -910,6 +910,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         emitState();
         return;
     }
+    if (cmd == "showSurfaceStagePage")
+    {
+        requestedSurfaceStagePage = payload.getProperty ("kind", {}).toString();
+        requestedSurfacePageId.clear();
+        return;
+    }
     if (cmd == "showControlPage")
     {
         // One shown page for everything: the keyboard (or its screen card) moves to it, the
@@ -917,6 +923,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         const auto pageId = payload.getProperty ("pageId", {}).toString();
         if (rack.getPerformance().findPage (pageId) == nullptr)
             return;
+        requestedSurfaceStagePage.clear();
         currentSurfacePageId = pageId;
         requestedSurfacePageId = pageId;
         requestedSurfacePageForSong = false;
@@ -1989,7 +1996,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         const auto name = payload.getProperty ("name", {}).toString().trim();
         rack.addControlPage (name.isNotEmpty() ? name
-                                               : "Page " + juce::String (rack.getPerformance().pages.size() + 1));
+                                               : "Surface - " + juce::String (rack.getPerformance().pages.size() + 1));
         savePerformance();
         emitState();
         return;
@@ -2058,7 +2065,6 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         {
             auto* mint = new juce::DynamicObject();
             mint->setProperty ("cmd", "addControlPage");
-            mint->setProperty ("name", "Surface");
             handleCommand (juce::var (mint));
         }
         if (pageId.isEmpty() && ! rack.getPerformance().pages.isEmpty())

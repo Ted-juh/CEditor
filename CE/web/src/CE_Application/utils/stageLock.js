@@ -18,7 +18,7 @@ export const STAGE_SAFE_COMMANDS = new Set([
   'startGestureRecording', 'finishGestureRecording', 'cancelGestureRecording',
   'startPerformanceRecording', 'finishPerformanceRecording', 'cancelPerformanceRecording',
   'removePerformanceTake', 'replayPerformanceTake', 'stopPerformanceReplay',
-  'surfacePerformanceEncoder', 'surfaceStepPad', 'surfaceInput', 'setSurfaceActive', 'showControlPage',
+  'surfacePerformanceEncoder', 'surfaceStepPad', 'surfaceInput', 'setSurfaceActive', 'showControlPage', 'showSurfaceStagePage',
   'retryFailedProcessor', 'dismissFailoverEvent',
   'closeEditor', 'cancelHardwarePatchCapture', 'cancelKeyChordLearn', 'cancelLearnControlSlotParameter',
   'cancelMidiLearn', 'disarmCapture',

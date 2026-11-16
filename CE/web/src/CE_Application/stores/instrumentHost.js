@@ -360,6 +360,7 @@ export const hostSurfaceScreen = writable(emptySurfaceScreen());
     1-8 pads). The broker cannot tell these from the real keyboard, which is the point. */
 /** Shows a control page: the keyboard (or its screen card) moves there, the drawing follows,
     and knobs learned on several pages drive this one. */
+export const showSurfaceStagePage = (kind) => send({ cmd: 'showSurfaceStagePage', kind });
 export const showControlPage = (pageId) => send({ cmd: 'showControlPage', pageId });
 
 /** Ties a page to the preset `partId` has loaded now, so loading that preset shows it; with no
@@ -6905,7 +6906,7 @@ export function applyMockCommand(state, payload) {
     const pageId = nextMockId('mock-page');
     next.rack.pages.push(normalizeHostState({ rack: { pages: [{
       pageId,
-      name: payload.name || `Page ${next.rack.pages.length + 1}`,
+      name: payload.name || `Surface - ${next.rack.pages.length + 1}`,
       slots: Array.from({ length: 8 }, (_, i) => ({ slotId: `s${i + 1}` })),
     }] } }).rack.pages[0]);
     return next;
@@ -7041,7 +7042,7 @@ export function applyMockCommand(state, payload) {
     // page-add returns a NEW state, so everything after works on whichever holds the page.
     let working = next;
     if (!payload.pageId && working.rack.pages.length === 0)
-      working = applyMockCommand(working, { cmd: 'addControlPage', name: 'Surface' });
+      working = applyMockCommand(working, { cmd: 'addControlPage' });
     const page = working.rack.pages.find((p) => p.pageId === payload.pageId)
       ?? (payload.pageId ? null : working.rack.pages[0]);
     if (!page) return working;
@@ -8729,6 +8730,13 @@ function send(payload) {
     }
     if (payload?.cmd === 'surfaceInput') {
       mockSurfaceInput(payload.data);
+      return;
+    }
+    if (payload?.cmd === 'showSurfaceStagePage') {
+      const state = get(hostState);
+      const index = mockStagePages(state).indexOf(payload.kind);
+      if (index >= 0 || payload.kind === 'performance')
+        mockSurfaceCursor.update((c) => ({ ...c, page: state.rack.pages.length + index + 1, active: 0 }));
       return;
     }
     if (payload?.cmd === 'showControlPage') {
