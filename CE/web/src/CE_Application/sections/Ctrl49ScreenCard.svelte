@@ -331,6 +331,9 @@
                                                         meters: false, live: false });
   // The pads do nothing on LAYERS and SOUNDCHECK; on DISCOVER each auditions the row beside it,
   // and on CUE pad 1 goes to the song E1 picked.
+  const live = $derived($ctrl49Screen.pageKind === 'live' ? readLivePayload($ctrl49Screen.payload) : null);
+  const firstStep = $derived(live && live.cursor >= 8 ? 8 : 0);
+  const rowLabel = $derived(live ? 'Sequencer steps' : 'Performance pads');
   const cuePick = $derived($ctrl49Screen.pageKind === 'cue' && readCuePayload($ctrl49Screen.payload).pickedSong !== '');
   const padIdle = (index) => stage && !($ctrl49Screen.pageKind === 'discover' || $ctrl49Screen.pageKind === 'live'
                                        || (cuePick && index === 0));
@@ -339,7 +342,7 @@
   const HINT = {
     layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
     soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',
-    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. Pad N turns a step of the cursor\'s half on or off; Shift + pad N ends the pattern at that step (Shift-click here).',
+    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. The performance pads below the encoders and blue B1–B8 below the faders toggle the same eight steps. Shift-click a step to set the pattern length.',
     meters: 'Encoders 1–5 are the faders of the parts shown, 6 the master; 7 shows the next parts when there are more than five.',
     cue: 'Encoder 1 picks a song; pad 1 goes to it. Shift + Page steps the set from any page.',
     changes: 'Encoder 1 listens between the save and now, 2 picks a change, 3 puts it back (the other way takes it back), 4 walks back through the saves.',
@@ -446,16 +449,26 @@
         {/each}
       </div>
 
-      <span class="group-label">Pads</span>
-      <div class="pads" role="group" aria-label="Pads">
+      <span class="group-label">{rowLabel}</span>
+      <div class="pads" role="group" aria-label={rowLabel}>
         {#each Array(8) as _, index}
-          <button type="button" class="pad" disabled={padIdle(index)}
+          {@const step = live?.steps[firstStep + index]}
+          {@const enabled = step && step.velocity > 0}
+          <button type="button" class="pad" disabled={padIdle(index) || (live && !live.zones.length)}
+                  class:step-on={live && enabled}
+                  aria-pressed={live && step ? enabled : undefined}
                   title={padIdle(index) ? 'The pads do nothing on this page'
                          : $ctrl49Screen.pageKind === 'discover' ? `Audition row ${index + 1}`
                          : $ctrl49Screen.pageKind === 'cue' ? 'Go to the song encoder 1 picked'
                          : $ctrl49Screen.pageKind === 'live' ? 'Click: this step on or off. Shift-click: the pattern ends here'
                          : `Pad ${index + 1}`}
-                  onclick={(event) => pad(index, event.shiftKey)}>{index + 1}</button>
+                  onclick={(event) => pad(index, event.shiftKey)}>
+            {#if live}
+              {firstStep + index + 1} · {step ? (enabled ? 'On' : 'Off') : 'Outside pattern'}
+            {:else}
+              {index + 1}
+            {/if}
+          </button>
         {/each}
       </div>
 
@@ -537,6 +550,13 @@
   span.value:focus-visible { outline: 2px solid var(--host-accent, #ff9408); outline-offset: 1px; }
   .group-label { font-size: 11px; color: var(--host-text-dim, #8791a0); margin-bottom: -4px; }
   .pad { min-height: 34px; padding: 0; }
+  .ctrl49-screen .pads button.step-on {
+    --host-surface-raised: #245783;
+    --host-surface-hover: #306b9b;
+    --host-line: #75b8eb;
+    --host-text: #fff;
+    background: var(--host-surface-raised); color: var(--host-text); border-color: var(--host-line);
+  }
   .stage-pages { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .stage-pages .group-label { margin: 0 4px 0 0; }
   /* A light on each switch, lit when the page is on the keyboard. */
