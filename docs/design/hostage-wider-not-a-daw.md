@@ -376,6 +376,64 @@ from a loopback: a cable from an output to an input, a click out, the time it ta
 - **A pedalboard on the Stage screen:** big switches for the input part's inserts. And the keyboard
   strip, which sits above four workspaces, can be hidden; for a guitarist it is clutter.
 
+### The Mixer: meters, and what else changes
+
+*Added after the owner asked whether this means extra meters in the Mixer. It does, and Solo has to
+change too.*
+
+**What is there** (`mixer-metering.md`): one stereo peak meter per strip, read after the strip's
+inserts, fader and pan (`GainPanProcessor`), on parts, buses, returns and the master. The master
+meter covers output 1–2 only; a part routed to another pair is metered nowhere at the output, and
+sends and extra-output gain nodes are not metered. Peak only, with OVER latched at 0 dBFS, which on
+a floating-point bus means "reached full scale", not "clipped". Soundcheck measures peak and RMS on
+output 1–2 only.
+
+**What decision 2 adds:**
+
+1. **An input meter on every input part, before anything else.** The strip's meter is after the
+   chain and the fader, so turning the fader down hides an input that is clipping. The input meter
+   is the one a singer's preamp gain is set by. OVER means something else here, too: at the input,
+   0 dBFS is the converter's ceiling, a real clip nothing downstream can undo. Show it as **CLIP**,
+   not OVER. It reads *before* the mute, so a muted mic (input parts open muted) still shows it is
+   arriving: the singer checks the mic without the PA hearing it.
+2. **A meter per output pair**, front of house, in-ears and click each, at the very end where the
+   signal leaves for the interface. There, too, 0 dBFS is a real clip.
+3. **The limiter's gain reduction** on each output strip, and a count per song ("limited 14 times
+   in Song 3"). A limiter that works silently hides a gain problem; one that says how often it
+   worked turns it into a soundcheck note.
+4. **Numbers beside the meters:** each input strip's latency in milliseconds, the way buses and the
+   master already show theirs.
+5. **The tuner** on the input strip, as well as on the Stage screen.
+
+**What else changes:**
+
+- **Solo becomes listen.** Today Solo is solo-in-place: any soloed part silences every other part at
+  its gain node (`InstrumentRackHost::applyMixerState`), which is every output, front of house
+  included, and Stage Lock allows it (`setPartMixer` is on `stageLock.js`'s allow-list). On a
+  keyboard rig that is one stray click from silence; with a singer in the rig, soloing a synth takes
+  the voice out of the PA. Once there is a monitor output, Solo should send the soloed strip to the
+  in-ears and leave front of house alone, as on any live desk. Decision 10.
+- **A monitor mix is a view of the mixer.** Sends to returns are knobs on each strip today. A monitor
+  mix wants faders, because "more me" is adjusted mid-song: one view per output (Main, In-ears,
+  Click) with each strip's send to that output on its fader.
+- **Input strips look different**: an input trim, the input meter, the latency, the tuner; no
+  instrument, no MIDI.
+- **The Meters page** on the CTRL49 and the Stage screen gets the inputs and the output pairs. "Is
+  my mic arriving?" is a stage question.
+- **Soundcheck** measures per input and per output pair, not only output 1–2: how hard the singer
+  sings in the loudest song is what the input gain should be set for, not the first song. Still
+  measurement, never automatic gain (`setlist-soundcheck.md`).
+
+**What stays out**, the line applied to meters: LUFS loudness, spectrum analysers, phase
+correlation, loudness history. They are for making a file, or the engineer's job at the desk
+(decision 9). Ringing out the monitors belongs to the desk too.
+
+**Cost.** Small per meter. `StereoPeakMeter` is a lock-free atomic per point, and the
+`instrumentHostMeters` event already carries the whole roster at UI rate, so more points are more
+entries, not a new mechanism. The new tap points are before an input part's chain, and after each
+output pair's gain node, which `mixer-metering.md` says does not measure today. The input meters
+come with the input part, the output meters with the output pairs.
+
 ### In the library
 
 - A chain preset already keeps an instrument, its modules and its inserts; an **input chain** is a
@@ -445,6 +503,8 @@ instrument; the DAW is where its recordings go.
    low-latency mode if the measurement says that is enough?
 9. **Not a mixing desk.** Confirm the second line: HoSTage processes the sound of the people who
    play through it, and front of house belongs to the desk.
+10. **Solo.** Once there is a monitor output, should Solo become listen-in-the-ears and never touch
+    front of house? Today it silences everything else at every output, under Stage Lock too.
 
 ## Where to start
 
@@ -454,9 +514,10 @@ Revised after decision 2. A recommendation, not a ranking of everything:
    [latency](#first-latency-because-it-decides-whether-an-input-part-is-worth-having) that decides
    whether an input part is worth having and which of (a) to (d) it needs. Small, and nothing else
    in decision 2's section should start before it.
-2. **Audio & MIDI:** inputs, buffer size and rate chosen; output pairs in the standalone; ASIO after
-   decision 8.
-3. **The input part**, with MIDI to inserts, the tuner, mute inputs and the output limiter.
+2. **Audio & MIDI:** inputs, buffer size and rate chosen; output pairs in the standalone, each with
+   its own meter; ASIO after decision 8.
+3. **The input part**, with its input meter, MIDI to inserts, the tuner, mute inputs and the output
+   limiter with its gain reduction; Solo as listen (decision 10) once the in-ears exist.
 4. **Foot controllers and stomp mode** (direction 5 and the tools above).
 5. **The audio looper, and input chains in the library** with their reference signal.
 
