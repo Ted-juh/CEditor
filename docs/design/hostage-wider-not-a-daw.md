@@ -2,8 +2,9 @@
 
 *Discussion record, started 2026-11-16. Nothing in it is built. One decision is taken: **HoSTage is
 for anyone on stage** (decision 2, 2026-11-16; see
-[Decision 2, taken](#decision-2-taken-anyone-on-stage)). The other decisions at the end are the
-owner's. Written from `main`: the owner's Linux standalone port of
+[Decision 2, taken](#decision-2-taken-anyone-on-stage)). Step 2 of the work, Audio & MIDI, is
+[worked through](#step-2-worked-through-audio--midi), not built. The other decisions at the end are
+the owner's. Written from `main`: the owner's Linux standalone port of
 HoSTage is not pushed yet, so where this says something is Windows-only or missing, that branch may
 already have moved it. When this and the code disagree, the code is right.*
 
@@ -593,6 +594,12 @@ instrument; the DAW is where its recordings go.
    play through it, and front of house belongs to the desk.
 10. **Solo.** Once there is a monitor output, should Solo become listen-in-the-ears and never touch
     front of house? Today it silences everything else at every output, under Stage Lock too.
+11. **Mappings per interface or per computer?** Step 2b recommends per interface: the same
+    interface on another computer then needs no mapping, and a stick player carries it.
+12. **The VST3's input bus.** Add one, so input parts and hardware returns work in a DAW, and
+    when? Some DAWs list the plug-in differently once it has one.
+13. **When the interface goes on stage.** Wait for that interface and reopen it (recommended), or
+    fall back to the default device?
 
 ## Where to start
 
@@ -601,10 +608,12 @@ Revised after decision 2. A recommendation, not a ranking of everything:
 1. **The latency measurement.** Not a feature: the table under
    [latency](#first-latency-because-it-decides-whether-an-input-part-is-worth-having) that decides
    whether an input part is worth having and which of (a) to (d) it needs. Small, and nothing else
-   in decision 2's section should start before it.
-2. **Audio & MIDI:** inputs, buffer size and rate chosen; inputs and outputs named in the show and
-   mapped per machine (which fixes the hardware return's bare channel number too); output pairs in
-   the standalone, each with its own meter; ASIO after decision 8.
+   in decision 2's section should start before it. *Found in step 2: it cannot run until HoSTage
+   can be told a buffer size and a device type, which is step 2a. So 2a goes first of all.*
+2. **Audio & MIDI**, [worked through below](#step-2-worked-through-audio--midi): the set-up
+   remembered (2a); inputs, outputs and MIDI ports named in the show and mapped once per interface
+   (2b, which fixes the hardware return's channel number and its port id too); output strips and
+   monitor mixes (2c); the device watched on stage (2d); the VST3 (2e); JACK and ASIO (2f).
 3. **The input part**, with its input meter, MIDI to inserts, the tuner, mute inputs and the output
    limiter with its gain reduction; Solo as listen (decision 10) once the in-ears exist.
 4. **Foot controllers and stomp mode** (direction 5 and the tools above).
@@ -616,6 +625,151 @@ program can do. **The remote page (5)** follows; singers want their lyrics on it
 it anyway.
 
 Backing tracks wait for decision 1. Everything under "What stays out" waits for good.
+
+## Step 2, worked through: Audio & MIDI
+
+*Worked through on 2026-11-16 at the owner's request ("go to step 2"), read from the code first,
+as decision 2 was. Nothing built. Step 1, the latency measurement, needs the owner's interfaces;
+and, as it turned out, the first part of this step.*
+
+### What is there today
+
+- **Nothing about the device is remembered.** `startAudio` calls
+  `initialiseWithDefaultDevices (neededInputChannels(), 2)` on every start: the system's default
+  device, two outputs, and only as many inputs as hardware returns need. Choosing an output in the
+  utility (`setAudioDevice`) lasts until the program closes. The code says as much: "explicit
+  device selection is a later step".
+- **The device type is never chosen.** On Windows JUCE offers Windows Audio (shared), Windows Audio
+  (Exclusive Mode), Windows Audio (Low Latency Mode) and DirectSound
+  (`juce_AudioDeviceManager.cpp`), and the first is the default: the one that goes through Windows'
+  own mixer, with the most latency of the four. The utility lists the output devices of whichever
+  type opened. ASIO is not built (`JUCE_ASIO` defaults to 0 and nothing sets it); on Linux only
+  ALSA is (`JUCE_JACK` defaults to 0).
+- **The buffer size and the sample rate are the device's own**, and shown only in the header's
+  status line.
+- **The MIDI input switches are forgotten.** Nothing saves them, and `startAudio` switches on every
+  input it finds. Strictly, that is a bug today.
+- **A hardware part's MIDI port is found by its system id alone** (`openHardwareMidi`); the port's
+  name is kept only for the error message. Port ids differ between computers (and on Windows not
+  always only between computers), so a show opened elsewhere fails each hardware part with "Cannot
+  open MIDI output. (Juno)". Its audio return is a bare channel number (see the inventory above).
+- **Outputs.** The rack has one to eight output pairs (`RackModel::outputPairs`). A part on any
+  pair but the first leaves through it directly, past the master chain and fader: written for a
+  DAW's stems (`RackModel.h`). The standalone opens two outputs, so whatever is on pair two or
+  above goes nowhere there. Routing is exclusive, one pair per part; returns always feed the
+  master (`ReturnChain` has no destination); sends tap after the fader.
+- **The VST3 takes no audio in.** `HostPluginProcessor::isBusesLayoutSupported` refuses any main
+  input, so a hardware part's return cannot work in a DAW today, and neither could an input part.
+- **Nothing watches the device.** The service registers for none of the device manager's
+  notifications. If the interface is unplugged mid-song, whatever JUCE's device manager does
+  happens, and nothing tells the player. MIDI inputs, by contrast, have "MIDI, right now".
+- **Stage Lock** allows `getAudioDevices` and refuses `setAudioDevice` and `setMidiInputEnabled`.
+  Right as it is.
+- **One thing to keep:** `neededInputChannels` opens no input when nothing needs one, so a keyboard
+  player's HoSTage never asks the system for the microphone. Input parts keep that rule: inputs
+  open when an input part or a hardware return asks for them.
+
+### 2a. Remember the machine's audio set-up
+
+The device type, the input and output device, the sample rate and the buffer size, saved in the
+data folder (a portable player's in its `Data/`) and restored at start. The default device only on
+a first start, so HoSTage still makes sound out of the box. The MIDI input switches saved the same
+way, which fixes the bug above.
+
+The utility shows the type, with a line saying what each means ("shared with other programs",
+"this program only, lower latency"), the sample rate, and the buffer **in milliseconds as well as
+samples**, because milliseconds are what a singer feels.
+
+No change to the rack model; small. **It comes before step 1**: the latency measurement needs
+HoSTage at a chosen buffer and a chosen device type, and today it can be told neither.
+
+### 2b. Name what the show needs; map it once per interface
+
+The show stops holding channel numbers and port ids. It names its **connections**: inputs ("Vocal
+mic", "Guitar DI", "Juno return"), output pairs ("Main", "In-ears", "Click") and MIDI ports ("Keys",
+"Juno"). The data folder holds the mapping, and holds it **per interface, not per computer**: "on
+this Scarlett, Vocal mic is input 1". The same interface on another computer then needs nothing; a
+different interface asks once. A portable player carries its mappings on the stick.
+
+- **Opening a show** whose connections this interface has not mapped: one screen, the show's
+  connections on one side and the interface's channels on the other, each input with a signal
+  light. **Map by playing**: sing into the mic, and the channel that lights is chosen, the way
+  "Count them for me" counts a controller's knobs. For an output, a short, quiet ident on the pair
+  being mapped, never on Main without asking.
+- **MIDI ports** resolve by id, then by name, then ask. Two ports with the same name always ask.
+- **Check setlist** checks every connection the set uses, as it checks plug-ins.
+- **Old shows**: a hardware part's return and port become connections named after the part, mapped
+  to what they held on this machine. An addition to the show format; nothing old breaks.
+- **Roles**: mapping is the player's (a stick player on a new computer must map), and Stage Lock
+  refuses it, as it refuses `setAudioDevice` now.
+
+### 2c. Outputs a stage can use
+
+- **The standalone opens as many outputs as the mapped pairs need**, as it already opens only the
+  inputs it needs.
+- **Every pair ends in an output strip**: level, the safety limiter, the meter. Pair one's master
+  chain and fader stay ahead of its strip. Today pairs two and up have no gain node at all
+  (`mixer-metering.md`).
+- **A mix, not only a route.** A part going to one pair is what a DAW stem wants. A monitor mix
+  needs the same part on Main and in the ears, at different levels. The machinery nearly exists: a
+  return is a bus fed by sends. Two changes make it a monitor mix. A return may leave through a
+  pair of its own instead of the master. A send may tap before the fader, so moving the PA fader
+  leaves the singer's ears alone. "In-ears" is then a return with no effects, on the In-ears pair,
+  fed by pre-fader sends. Whether a part's mute reaches its pre-fader sends is a choice; on most
+  desks it does.
+- **The click** goes to its pair by exclusive routing, as parts are routed today, so it can never
+  reach Main.
+- **Solo as listen** (decision 10) needs one pair marked as the listen output: the in-ears.
+- **The Mixer's new meters** (above) hang off the output strips.
+
+### 2d. The device on stage
+
+An audio counterpart to "MIDI, right now":
+
+- **The interface goes**: a Stage banner, and HoSTage waits for *that* interface, reopening it when
+  it is back, inputs muted, outputs fading in. Never a jump to the laptop's speakers mid-song, and
+  never staying on them when the interface returns. In Build, offer the switch instead. Decision 13.
+- **An input that opens but sends only digital silence.** On Windows, when microphone access is off
+  for desktop programs, a shared-mode input opens and delivers zeros. Health says where the switch
+  is.
+- **Dropouts per song**, so a Soundcheck run says which song is too heavy for this buffer.
+- **Another program holds the interface.** In exclusive mode or under ASIO, CEditor's tab and a
+  product cannot both open it. Say so in those words, as the CTRL49's status does.
+
+### 2e. The VST3
+
+In a DAW the device is the DAW's; the connections map to the plug-in's buses instead, in the
+Product utility. Input parts and hardware returns need an input bus, which the plug-in refuses
+today. Adding one changes how some DAWs list the plug-in (as an effect, or as an instrument with an
+input), so it is decision 12, and better taken before products sit in many people's projects.
+
+### 2f. Backends
+
+- **JACK on Linux.** `JUCE_JACK=1` needs the JACK headers to build (`libjack-dev`;
+  `juce_audio_devices.cpp` says so where it includes them) and loads `libjack` at run time
+  (`dlopen` in `juce_JackAudio.cpp`), so a machine without JACK simply does not list it. Under
+  PipeWire, HoSTage then appears as a JACK client beside everything else. The Linux build notes in
+  `CLAUDE.md` gain the package.
+- **ASIO on Windows**, after decision 8.
+
+### Tests it brings
+
+- **The mapping is a pure function**: the show's connections, the interface's channels and the
+  saved mappings in; a resolution, or the list of what to ask, out. Testable on any machine without
+  a device, like Soundcheck's reference walk.
+- **The device needs a hook.** The service already takes its MIDI ports through hooks
+  (`options.listMidiOutputs`, `options.openMidiOutput`) so tests need no devices. The audio device
+  wants the same, so that "the interface went and came back" is a test and not a hope.
+- **Outputs**: in `RackHostTests`, a tone through a part with its fader at zero still reaching the
+  in-ears through a pre-fader send, and a click never reaching Main.
+- **The two command lists**: every new command placed (`stageSafeParity.test.js`,
+  `hostagePlayerRole.test.js`).
+
+### Order inside step 2
+
+**2a first**, before step 1: small, no model change, fixes a bug, and it is what the measurement
+needs. Then 2b (the model and the show), 2c (outputs), 2d alongside 2c, 2e after decision 12, and
+2f whenever.
 
 ## Where this comes from
 
