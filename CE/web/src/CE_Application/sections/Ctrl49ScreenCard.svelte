@@ -341,7 +341,7 @@
   const setlists = $derived(($hostState.licence?.features ?? [])
     .find((f) => f.feature === 'scenesAndSetlists')?.allowed !== false);
   const HINT = {
-    presets: 'Scroll with the big dial or Up/Down. Press the dial to load the highlighted preset. Left returns to the rack.',
+    presets: 'Scroll with the big dial or Up/Down. Press the dial to open a group or load a preset. Browse opens the menu. Left goes back one level.',
     rack: 'Use the cursor or big dial to highlight a rack part. Press the dial to select it. Control returns to your last control page.',
     layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
     soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',

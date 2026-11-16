@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ControlSurface/Ctrl49PresetBrowser.h"
 #include <bitset>
 
 #include <array>
@@ -836,7 +837,7 @@ public:
 
         A surface that declares nothing gets a zeroed BrowseSurface, which every function in
         SurfaceBrowse.h handles by refusing rather than by inventing. */
-    struct SurfacePreset { juce::String id, name; };
+    using SurfacePreset = ctrl49::BrowserPreset;
     std::vector<SurfacePreset> surfacePartPresets (const juce::String& partId);
     void loadSurfacePartPreset (const juce::String& partId, const juce::String& recordId);
     surface::BrowseSurface browseSurface() const;
@@ -1827,6 +1828,8 @@ private:
     juce::String requestedSurfaceStagePage;
     std::vector<std::vector<std::uint8_t>> virtualSurfaceInput;
     // Each part's loaded preset as last seen, so a change can show that preset's page.
+    struct H2pGroups { juce::String fingerprint, bank; std::vector<juce::StringArray> categories; };
+    std::map<juce::String, H2pGroups> surfaceH2pGroups;
     std::map<juce::String, juce::String> seenPartPresets;
     void followPresetPages();
     bool surfaceWanted = true;

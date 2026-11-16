@@ -469,15 +469,9 @@ void Ctrl49SurfaceBroker::openPartPresets()
     browsingPartPresets = true;
     const auto& performance = service.getRackHost().getPerformance();
     presetPartId = performance.focusedPartId;
-    partPresets = service.surfacePartPresets (presetPartId);
-    presetCursor = partPresets.empty() ? -1 : 0;
-    if (const auto* part = performance.findPart (presetPartId))
-        for (int i = 0; i < (int) partPresets.size(); ++i)
-            if (partPresets[i].id == part->lastPresetRecordId)
-            {
-                presetCursor = i;
-                break;
-            }
+    const auto* part = performance.findPart (presetPartId);
+    presetBrowser.open (service.surfacePartPresets (presetPartId),
+                       part ? part->lastPresetRecordId : juce::String(), presetRoutes[presetPartId]);
 }
 
 int Ctrl49SurfaceBroker::rackCursorIndex() const
@@ -601,18 +595,26 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
             const bool inRack = previousPage == layout.rack;
             if (cc == 36 && value == 127)
             {
-                openPartPresets();
+                if (inRack && browsingPartPresets && presetPartId == performance.focusedPartId)
+                    presetBrowser.show ({});
+                else
+                    openPartPresets();
                 reducer.setPage (layout.rack);
                 action.emplace();
             }
             else if (inRack && browsingPartPresets && cc == 33 && value == 127)
             {
-                if (juce::isPositiveAndBelow (presetCursor, (int) partPresets.size()))
-                    service.loadSurfacePartPreset (presetPartId, partPresets[presetCursor].id);
+                const auto id = presetBrowser.select();
+                if (id.isNotEmpty())
+                {
+                    presetRoutes[presetPartId] = presetBrowser.path;
+                    service.loadSurfacePartPreset (presetPartId, id);
+                }
                 return;
             }
             else if (inRack && browsingPartPresets && cc == 29 && value == 127)
             {
+                if (presetBrowser.back()) return;
                 browsingPartPresets = false;
                 rackCursorPart = presetPartId;
                 return;
@@ -646,8 +648,8 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 const int delta = cc == 32 ? -1 : cc == 30 ? 1 : value < 64 ? value : value - 128;
                 if (browsingPartPresets)
                 {
-                    if (! partPresets.empty())
-                        presetCursor = juce::jlimit (0, (int) partPresets.size() - 1, presetCursor + delta);
+                    if (presetBrowser.size() > 0)
+                        presetBrowser.cursor = juce::jlimit (0, presetBrowser.size() - 1, presetBrowser.cursor + delta);
                 }
                 else if (! performance.parts.isEmpty())
                     rackCursorPart = performance.parts.getReference (
@@ -1274,21 +1276,30 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     if (reducer.page() == layout.rack && browsingPartPresets)
     {
         const auto* part = performance.findPart (presetPartId);
-        const int total = part ? (int) partPresets.size() : 0;
+        const int total = part ? presetBrowser.size() : 0;
+        const int presetCursor = presetBrowser.cursor;
         int number = 0;
         for (const auto& candidate : performance.parts)
         {
             ++number;
             if (candidate.partId == presetPartId) break;
         }
-        const auto title = part ? juce::String (number).paddedLeft ('0', 2) + "  "
+        const auto& path = presetBrowser.path;
+        juce::StringArray breadcrumb;
+        for (const auto& element : path)
+            if (element.isNotEmpty()) breadcrumb.add (element);
+        const auto title = part ? juce::String (number).paddedLeft ('0', 2) + " "
                                   + (part->hardware ? part->midiOutputName : part->pluginName) : "No part";
         const int first = juce::jlimit (0, juce::jmax (0, total - 5), presetCursor - 2);
         std::vector<std::pair<std::string, std::string>> rows;
         for (int i = first; i < juce::jmin (first + 5, total); ++i)
-            rows.emplace_back (partPresets[i].name.toStdString(),
-                               partPresets[i].id == part->lastPresetRecordId ? "Loaded" : "");
-        stage = buildRackListPayload (title.toStdString(), total ? presetCursor : -1, total, first, rows, true);
+        {
+            const auto& row = presetBrowser.rows[i];
+            const auto detail = row.id.isEmpty() ? juce::String (row.count) : juce::String (row.id == part->lastPresetRecordId ? "Loaded" : "");
+            rows.emplace_back (row.label.toStdString(), detail.toStdString());
+        }
+        stage = buildRackListPayload (title.toStdString(), total ? presetCursor : -1, total, first, rows, true,
+                                      path.empty() ? "Browse menu" : breadcrumb.joinIntoString (" > ").toStdString());
         stageCall = "set_presets";
     }
     else if (reducer.page() == layout.rack)

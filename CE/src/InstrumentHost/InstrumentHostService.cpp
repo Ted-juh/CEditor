@@ -8311,7 +8311,46 @@ std::vector<InstrumentHostService::SurfacePreset> InstrumentHostService::surface
     if (const auto* part = rack.getPerformance().findPart (partId))
         for (const auto* record : orderedPartPresets (*part))
             if (! record->hidden)
-                result.push_back ({ record->recordId, record->name });
+            {
+                SurfacePreset sound { record->recordId, record->name, {}, {}, {} };
+                if (juce::File::isAbsolutePath (record->sourceLocator))
+                    sound.folder = juce::File (record->sourceLocator).getParentDirectory().getFileName();
+                if (record->sourceType == "h2p")
+                {
+                    auto& groups = surfaceH2pGroups[record->recordId];
+                    if (groups.fingerprint != record->fingerprint || groups.fingerprint.isEmpty())
+                    {
+                        groups = {};
+                        juce::FileInputStream input { juce::File (record->sourceLocator) };
+                        juce::MemoryBlock header;
+                        if (input.openedOk()) input.readIntoMemoryBlock (header, 16384);
+                        const auto text = header.toString();
+                        if (text.trimStart().startsWith ("/*@Meta") && text.contains ("*/"))
+                        {
+                            const auto lines = juce::StringArray::fromLines (text.upToFirstOccurrenceOf ("*/", false, false));
+                            for (int i = 1; i < lines.size(); ++i)
+                            {
+                                const auto value = lines[i].trim().unquoted().trim();
+                                if (lines[i - 1].trim() == "Bank:") groups.bank = value;
+                                if (lines[i - 1].trim() != "Categories:") continue;
+                                for (const auto& tag : juce::StringArray::fromTokens (value, ",", ""))
+                                {
+                                    auto levels = juce::StringArray::fromTokens (tag, ":", "");
+                                    levels.trim();
+                                    levels.removeEmptyStrings();
+                                    if (! levels.isEmpty()) groups.categories.push_back (levels);
+                                }
+                            }
+                        }
+                        if (input.openedOk()) groups.fingerprint = record->fingerprint;
+                    }
+                    sound.bank = groups.bank;
+                    sound.categories = groups.categories;
+                }
+                else if (record->category.isNotEmpty() && record->category != sound.folder)
+                    sound.categories.push_back ({ record->category });
+                result.push_back (std::move (sound));
+            }
     return result;
 }
 

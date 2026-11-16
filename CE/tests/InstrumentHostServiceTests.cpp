@@ -4932,8 +4932,14 @@ void testCtrl49AppScreen()
            && rackState.parts.getReference (0).lastPresetRecordId == firstPreset, "dial loads Bright only on part two");
     press (36, 127);
     tickPast();
+    const auto menuPayload = h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("payload", {});
+    check ((int) menuPayload[0] == 0, "second Browse opens the group menu");
+    press (37, 127);
+    press (36, 127);
+    tickPast();
     const auto presetPayload = h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("payload", {});
     check ((int) presetPayload[0] == 1, "reopening highlights the loaded preset");
+    press (29, 127);
     press (29, 127);
     tickPast();
     check (h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("pageKind", {}).toString() == "rack",
@@ -13788,7 +13794,7 @@ void testSavedLibraryAndLoadResults()
     const auto dir = freshDataDir ("library-load-results");
     seedCatalog (dir);
     const auto file = dir.getChildFile ("Fixture.h2p");
-    file.replaceWithText ("fixture");
+    file.replaceWithText ("/*@Meta\nBank:\n'Factory 1'\nCategories:\n'Pads:Synth, Keys:Synth, Pads:Airy'\n*/");
     Library library;
     LibraryRecord record;
     record.type = "preset"; record.sourceType = "h2p"; record.sourceLocator = file.getFullPathName();
@@ -13821,6 +13827,23 @@ void testSavedLibraryAndLoadResults()
     check (result != nullptr && result->getProperty ("recordId", {}).toString() == second
            && result->getProperty ("phase", {}).toString() == "loaded",
            "a late result cannot overwrite feedback for the newer preset selection");
+    const auto sounds = h.service->surfacePartPresets (h.firstPartId());
+    ceditor::ctrl49::PresetBrowser browser;
+    browser.open (sounds, second, {});
+    check (browser.path == ceditor::ctrl49::PresetBrowser::Path { "Categories", "Pads", "Synth" }
+           && browser.rows.at (browser.cursor).id == second, "H2P opens on the loaded sound's first category");
+    browser.show ({});
+    check (browser.size() == 4 && browser.rows[0].count == 2 && browser.rows[1].count == 1,
+           "browser counts categories and banks independently of folder names");
+    browser.select();
+    check (browser.size() == 2 && browser.rows[0].count == 2 && browser.rows[1].count == 2,
+           "presets with multiple tags in one category count once");
+    browser.show ({ "Banks", "Factory 1" });
+    check (browser.size() == 2, "bank contains both fixture presets");
+    browser.open (sounds, second, { "Categories", "Keys", "Synth" });
+    check (browser.path[1] == "Keys" && browser.select() == second,
+           "reopening remembers an alternate route to the same loaded sound");
+
 }
 
 void testBuildEditHistory()

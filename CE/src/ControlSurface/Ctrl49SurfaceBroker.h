@@ -232,8 +232,8 @@ private:
     void openPartPresets();
     bool browsingPartPresets = false;
     juce::String presetPartId;
-    int presetCursor = -1;
-    std::vector<host::InstrumentHostService::SurfacePreset> partPresets;
+    PresetBrowser presetBrowser;
+    std::map<juce::String, PresetBrowser::Path> presetRoutes;
     std::array<juce::String, 8> heldRackPadPages;
     int liveCursor = 0;
     std::array<int, 8> blueLights { -1, -1, -1, -1, -1, -1, -1, -1 };

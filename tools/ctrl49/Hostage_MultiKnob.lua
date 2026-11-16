@@ -1385,6 +1385,7 @@ function set_rack(args)
         row.preset, i = read_string(args, i)
         rack_screen.rows[r] = row
     end
+    rack_screen.path = i < #args and read_string(args, i) or ""
 end
 
 function set_presets(args)
@@ -1405,7 +1406,8 @@ local function draw_rack()
         say(ROWTXT, row.instrument, WHITE, 12, y + 7, presets and 365 or 215, 24)
         say(ROWTXT, row.preset, GREY, presets and 386 or 230, y + 7, presets and 86 or 240, 24)
     end
-    say(SMALL, presets and "TURN: BROWSE     PRESS: LOAD     LEFT: RACK" or "UP/DOWN OR DIAL: BROWSE     PRESS DIAL: SELECT     CONTROL: BACK", GREY, 8, 250, 464, 16)
+    if presets then say(SMALL, rack_screen.path, GREY, 8, 228, 464, 18) end
+    say(SMALL, presets and "PRESS: OPEN/LOAD    LEFT: BACK    BROWSE: MENU" or "UP/DOWN OR DIAL: BROWSE     PRESS DIAL: SELECT     CONTROL: BACK", GREY, 8, 250, 464, 16)
 end
 
 function draw(args)

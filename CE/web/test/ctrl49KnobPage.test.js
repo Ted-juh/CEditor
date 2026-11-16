@@ -325,10 +325,10 @@ test('rack screen draws separate rows and presets for two instances of the same 
 test('preset screen identifies the part and distinguishes loaded from highlighted', async () => {
   const p = await page();
   try {
-    const strings = ['PRESETS  02  TyrellN6', '2 / 2', '80s Polypad', 'Loaded', 'Lifeform Lead', ''];
+    const strings = ['PRESETS  02  TyrellN6', '2 / 2', '80s Polypad', 'Loaded', 'Lifeform Lead', '', 'Categories > Keys > Synth'];
     p.call('set_presets', [1, 2, ...strings.flatMap(s => [s.length, ...Buffer.from(s)])]);
     const texts = said(p.draw());
     for (const value of strings.filter(Boolean)) assert.ok(texts.includes(value));
-    assert.ok(texts.some(s => s.includes('PRESS: LOAD')));
+    assert.ok(texts.some(s => s.includes('BROWSE: MENU')));
   } finally { p.close(); }
 });
