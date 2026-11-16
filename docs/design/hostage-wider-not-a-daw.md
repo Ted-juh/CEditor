@@ -1,7 +1,9 @@
 # HoSTage, wider — and the line before a DAW
 
-*Discussion record, started 2026-11-16. Nothing in it is built and nothing in it is decided; the
-decisions at the end are the owner's. Written from `main`: the owner's Linux standalone port of
+*Discussion record, started 2026-11-16. Nothing in it is built. One decision is taken: **HoSTage is
+for anyone on stage** (decision 2, 2026-11-16; see
+[Decision 2, taken](#decision-2-taken-anyone-on-stage)). The other decisions at the end are the
+owner's. Written from `main`: the owner's Linux standalone port of
 HoSTage is not pushed yet, so where this says something is Windows-only or missing, that branch may
 already have moved it. When this and the code disagree, the code is right.*
 
@@ -31,8 +33,20 @@ What it does not have, read from the code rather than the manual:
 - **No clock out, no Link, no OSC.** EXT follows an incoming clock (`Performance/Transport.h`);
   nothing sends one. There is no Ableton Link, and no OSC in the host.
 - **No built-in audio processors** of any kind.
-- **Isolation adds one block of latency** (`plugin-process-isolation.md`, rule 6). Irrelevant for a
-  synth; relevant for a voice.
+- **Every plug-in on a path adds a block of latency, and the whole rig waits for the slowest
+  path.** Each isolated plug-in reports its own latency plus one block
+  (`IsolatedPluginProxy.cpp`, `setLatencySamples (metadata.latencySamples + blockSize)`), a part's
+  inserts add up in series (`InstrumentRackHost::partLatencySamples`), and JUCE's graph delays every
+  shorter path to meet the longest (`modular-chain.md`, pinned by
+  `RackHostTests::testLatencyCompensation`). Hardly noticed on a synth; decisive for a voice. *The
+  first version of this record said "one block" in total; it is one block per plug-in.*
+- **No insert receives MIDI.** The graph wires MIDI into a part's filter, its MIDI send and its
+  instrument, nothing else (`InstrumentRackHost.cpp`, the connections around lines 2223-2255). A
+  vocoder or a harmoniser in an insert slot hears no notes.
+- **No ASIO.** `JUCE_ASIO` is set nowhere outside the vendored JUCE, so on Windows HoSTage plays
+  through WASAPI or DirectSound. And only the output device is chosen; the buffer size and sample
+  rate are the device's own, and inputs are not chosen at all (`hostage-manual.md`, Known limits).
+- **The looper records MIDI.** It is a pattern layer (`looperLayer`, `PatternModel.h`), not audio.
 - **A hardware part has no panel.** It sends and captures patches, but nothing opens a CEditor
   panel for it the way a plug-in part opens its plug-in's window.
 
@@ -99,16 +113,13 @@ It is smaller than it sounds. A hardware part already takes an audio return into
 (`audioReturnChannel`), and the rack graph already has its audio input node
 (`InstrumentRackHost.cpp`). A live input part is a hardware part without the MIDI half.
 
-The hard part is latency, and the number should be known before anything is promised. Isolation
-adds one block: at 128 samples and 48 kHz that is 2.7 ms on top of the interface's own round trip,
-which a singer will not notice; at 512 samples it is 10.7 ms more, which they will. The plug-in must
-stay in its worker: `hostProductBuild.test.js` holds that line, and a "trusted, in-process"
-exception for inputs would be the first crack in it. So: measure the real round trip on the
-interfaces people use, show it on the input part's strip, and say plainly that a vocalist on
-in-ears wants a small buffer.
+The hard part is latency, and it is harder than the first version of this record said: one block
+*per plug-in* on the path, and the rest of the rig held back to match. It has a section of its own
+under [Decision 2, taken](#decision-2-taken-anyone-on-stage), because it decides whether an input
+part is worth having at all.
 
-To check before designing: whether an insert receives the part's MIDI. A vocoder or a harmoniser
-on a vocal part needs the keyboard's notes.
+Checked since: no insert receives MIDI today (see the list above), so a vocoder or a harmoniser on a
+vocal part needs MIDI wired to inserts first.
 
 **Outputs beyond one pair.** A stage has more than one destination: front of house, the in-ear
 mix, a click only the drummer hears. The standalone should get the VST3's output pairs, plus a
@@ -255,6 +266,148 @@ Now that the standalone runs on Linux:
   real-time priority for the user, a CPU governor scaling down mid-song. Health already explains
   Windows problems; it should check these and say what to change.
 
+## Decision 2, taken: anyone on stage
+
+> Live inputs: yes, HoSTage is for anyone on stage.
+>
+> — the owner, 2026-11-16
+
+Until now HoSTage was a keyboard player's program that could also play a hardware synth. From here
+it is for whoever stands on the stage. What that asks for, by who is standing there:
+
+| Who | What they need from HoSTage | Built on |
+|---|---|---|
+| Singer | A vocal chain per song, a harmoniser that follows the keys, an in-ear mix with the click, lyrics on a tablet | Input part, MIDI to inserts, outputs, direction 5 |
+| Guitarist, bassist | Amp and pedal chains per song and scene, switched by foot; a tuner; an audio looper | Input part, foot controllers, built-ins |
+| Keyboard player | What HoSTage already is | — |
+| Drummer | Click and count-in in the ears only; pads that fire samples; the drum machine on the set's tempo | Outputs, file player, show control |
+| Whoever runs the set | The setlist the others follow; the cues for lights and words | Directions 3 and 6 |
+
+### First, latency, because it decides whether an input part is worth having
+
+A pedal adds next to nothing. An input part adds three things, and the third is easy to miss:
+
+1. **The interface's round trip**, in and out, at the chosen buffer.
+2. **One block per isolated plug-in on the path**, in series. A vocal chain of EQ, compressor and
+   reverb at 128 samples and 48 kHz is three blocks: 8 ms before the interface's own share.
+3. **The rest of the rig, held back to match.** The graph aligns every path to the slowest, so
+   that vocal chain also delays the keyboard player's piano by two more blocks than it costs on
+   its own. This is already true between keyboard parts today; inputs make it matter.
+
+For a scale: sound travels about 34 cm in a millisecond, so 15 ms is a guitarist standing five
+metres from the amp. Guitarists put up with a few metres. A singer on in-ears is the hard case: they
+hear their own voice through the bone at once, and a late copy in their ears colours it, so the
+budget there is a few milliseconds, not fifteen.
+
+The ways out, which are not exclusive:
+
+- **(a) Same-block processing for an input part's plug-ins.** The proxy hands block N to the worker
+  and waits for block N back, behind a deadline, instead of returning block N−1 at once.
+  `plugin-process-isolation.md` rule 3 forbids waiting *without* a deadline, not waiting; rule 2
+  (a worker per instance) still holds. What it costs: the workers on that path run one after
+  another inside the callback rather than side by side, so less of the block is left over, and a
+  missed deadline is an audible dry block rather than nothing. The pipeline was chosen because it
+  keeps the audio thread from waiting at all; this spends some of that margin where latency
+  matters more.
+- **(b) One worker for a whole chain.** One block for the chain instead of one per plug-in. It
+  gives up rule 2's exact identity: a crash takes the chain, and the evidence has to say which.
+- **(c) Built-ins, which run in HoSTage's own process.** No isolation, so no block. A gate, an EQ
+  and a compressor of HoSTage's own on a vocal cost nothing; direction 8 gets a second reason to
+  exist.
+- **(d) Do not align paths that are not one sound.** A singer and a keyboard part are different
+  people metres apart; lining them up to the sample helps nobody and delays one of them. Alignment
+  matters where two paths *are* one sound: a layer, parallel processing on a bus. The rule would
+  be: **an input never waits for the rig, and the rig never waits for an input** (and a reverb on a
+  return no longer holds back the dry voice it is fed from). JUCE's graph aligns every path into a
+  node, so this is work at the graph, not a setting. `testLatencyCompensation` keeps its job for
+  layered parts and gets a sibling proving an input path is not delayed.
+
+The plug-in stays in its worker whichever way this goes: `hostProductBuild.test.js` holds that, and
+a "trusted, in-process" exception for inputs would be the first crack in it.
+
+**Before anything is built, a measurement.** The round trip on two or three common interfaces, at
+64, 128 and 256 samples, through 0, 1 and 3 isolated inserts, pipelined and same-block. That one
+table decides the design. My expectation is (a), (c) and (d) together, but the table should say so,
+not this paragraph.
+
+And the number should be on the screen afterwards: each input part's strip saying how late its
+player hears themselves. Devices often report their own latency wrongly, so the honest figure comes
+from a loopback: a cable from an output to an input, a click out, the time it takes to come back.
+
+### The audio set-up it needs
+
+- **Inputs, buffer and rate.** Today only the output device is chosen. An input part needs the input
+  device and its channels, and a buffer size the player picks, because the buffer is the latency.
+- **Output pairs in the standalone** (direction 1), for front of house, in-ears and the click.
+- **ASIO on Windows.** It is how most interfaces reach their small buffers there, and it is not
+  enabled. JUCE also has WASAPI's low-latency mode; whether that is good enough for a singer belongs
+  in the measurement. ASIO's SDK comes from Steinberg on its own terms, so enabling it is a
+  decision of its own (decision 8).
+- **JACK and PipeWire on Linux** (direction 9) give inputs, outputs and small buffers natively.
+
+### The input part itself
+
+- **Its source** is one input channel (mono) or a pair (stereo). Mono stays mono until a stereo
+  plug-in widens it.
+- **No Zone and no MIDI chain of its own, but MIDI to its inserts.** "MIDI from" chooses whose notes
+  its inserts hear (the keyboard part's, for a harmoniser or a vocoder). Not wired for any insert
+  today.
+- **When a plug-in fails.** A failed effect passes its dry input today. Right for a vocal reverb;
+  wrong for an amp simulator, where "dry" is a thin, harsh DI straight into the PA. Per insert:
+  pass through, or go quiet.
+- **Opening a show.** A show that opens with a live microphone into a big reverb can howl before
+  anyone touches anything. Input parts open muted, until the song starts or the player unmutes them.
+- **Mute inputs.** Panic silences notes, and an input has none. A separate **mute inputs** (on the
+  Stage screen, a key, a footswitch) is for the howl Panic cannot stop. Stage Lock keeps input
+  levels and mutes available, as it does part levels.
+- **The output limiter** (direction 8) stops being an extra once there are microphones: it is
+  protection for ears and speakers.
+
+### Tools for whoever is not at the keyboard
+
+- **A tuner** that mutes the part's output while it is open, as a pedal does; shown on the Stage
+  screen, the CTRL49 and the remote; opened by a footswitch.
+- **Stomp mode:** a footswitch on an insert's **Byp**. The manual's list of what a control can move
+  (a part's gain, pan, morph and sends, a MIDI module's amount, a macro, a plug-in parameter) has
+  no insert bypass in it. A plug-in's own bypass parameter can be learned where it has one, but that
+  is a different switch from the one HoSTage shows and controls.
+- **An audio looper.** It passes the question under the looper's existing row: record, overdub,
+  undo, clear, in time with the transport. Never a set of takes to arrange.
+- **A pedalboard on the Stage screen:** big switches for the input part's inserts. And the keyboard
+  strip, which sits above four workspaces, can be hidden; for a guitarist it is clutter.
+
+### In the library
+
+- A chain preset already keeps an instrument, its modules and its inserts; an **input chain** is a
+  chain with no instrument. A guitarist's tones and a singer's vocal chains live in the library like
+  any other sound.
+- **Auditioning has nothing to play.** The auditioner plays notes into an instrument; an input chain
+  takes no notes. It needs a reference signal: a phrase of the player's own guitar or voice,
+  recorded once in HoSTage and played through every chain. Previews made that way are in the
+  player's own sound, which is the point.
+
+### A second line: not a mixing desk
+
+"Anyone on stage" can slide into "everyone's sound goes through HoSTage", and that is a mixing
+console: channel strips for the whole band, a console's scene recall, the band recorded on many
+tracks (which is the DAW line again).
+
+The proposed line: **HoSTage processes the sound of the people who play through it.** One machine
+can serve several players (a singer and a keyboard player on one laptop, say). It does not take the
+drum microphones and mix the band. Front of house belongs to the desk, and HoSTage sends it a pair
+or stems. HoSTage's monitor outputs are its own players' in-ear mix: their sound, the click, the
+cues, and at most a feed back from the desk. Decision 9.
+
+### What it does to the other decisions
+
+- **Decision 3 (built-ins) is pushed.** A tuner and an output limiter are hard to do without once
+  there are microphones and guitars, and built-ins are the zero-latency answer for a vocal chain.
+  The rest of the list stays open.
+- **Decision 6 (editions) has a hole in it.** The Free edition limits instrument plug-ins and lets
+  effects through. A singer or a guitarist has no instruments, so the Free edition is their whole
+  HoSTage. That may be the right answer, a generous free tier for everyone who is not at a
+  keyboard, but it should be chosen, not stumbled into.
+
 ## What stays out
 
 Said once, plainly, so nobody has to argue it again:
@@ -274,28 +427,43 @@ instrument; the DAW is where its recordings go.
 ## Decisions for the owner
 
 1. **Backing tracks.** In, under direction 2's rules, or out?
-2. **Live inputs.** Is HoSTage for the keyboard player, or for anyone on the stage? This sets the
-   order of nearly everything above.
-3. **Built-ins.** Keep "no built-in effects", or allow direction 8's short list?
+2. ~~**Live inputs.** Is HoSTage for the keyboard player, or for anyone on the stage?~~ **Decided,
+   2026-11-16: anyone on stage.** See [Decision 2, taken](#decision-2-taken-anyone-on-stage).
+3. **Built-ins.** Keep "no built-in effects", or allow direction 8's short list? Decision 2 pushes
+   this toward at least a tuner and an output limiter.
 4. **The network.** A remote page, band follow and OSC all open a port. The same rule as `ce.osc`:
    nothing until the user says yes, once?
 5. **Linux formats.** LV2 (JUCE has it), CLAP (our own code), both, or neither for now?
 6. **Editions.** Which of these are Pro? Pro today is patterns, scenes, setlists, buses and script
    actions. Show control and band follow look like Pro; live inputs and the limiter look like
-   everyone's.
+   everyone's. And, since decision 2: the Free edition's limit counts instruments only, so a
+   singer or a guitarist never meets it. Intended?
+7. **Aligning paths.** Should an input stop waiting for the rig, and the rig for an input (way (d)
+   under latency)? It changes a behaviour a test pins today, for layers' sake, so it is the owner's
+   call, not a refactor.
+8. **ASIO.** Enable it on Windows, with Steinberg's SDK and its terms, or rely on WASAPI's
+   low-latency mode if the measurement says that is enough?
+9. **Not a mixing desk.** Confirm the second line: HoSTage processes the sound of the people who
+   play through it, and front of house belongs to the desk.
 
 ## Where to start
 
-A recommendation, not a ranking of everything:
+Revised after decision 2. A recommendation, not a ranking of everything:
 
-1. **Show control (3).** The cheapest, it builds almost entirely on what exists, and it turns
-   HoSTage from the thing that plays into the thing that runs the stage. MIDI clock out and Link
-   first: they are the two everyone asks for.
-2. **The whole rig (4).** The panel as a hardware part's window, and Auto pages from a profile.
-   This is what only this program can do, and it ties CEditor's two halves together.
-3. **Live inputs and outputs (1)**, after the latency is measured on real interfaces and after
-   decision 2.
-4. **The remote page (5)**, because the Pi needs it anyway.
+1. **The latency measurement.** Not a feature: the table under
+   [latency](#first-latency-because-it-decides-whether-an-input-part-is-worth-having) that decides
+   whether an input part is worth having and which of (a) to (d) it needs. Small, and nothing else
+   in decision 2's section should start before it.
+2. **Audio & MIDI:** inputs, buffer size and rate chosen; output pairs in the standalone; ASIO after
+   decision 8.
+3. **The input part**, with MIDI to inserts, the tuner, mute inputs and the output limiter.
+4. **Foot controllers and stomp mode** (direction 5 and the tools above).
+5. **The audio looper, and input chains in the library** with their reference signal.
+
+Alongside, because they do not depend on any of that: **show control (3)**, cheap and built almost
+entirely on what exists (MIDI clock out and Link first), and **the whole rig (4)**, which only this
+program can do. **The remote page (5)** follows; singers want their lyrics on it, and the Pi needs
+it anyway.
 
 Backing tracks wait for decision 1. Everything under "What stays out" waits for good.
 
