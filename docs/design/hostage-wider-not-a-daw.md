@@ -17,8 +17,9 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **Eight effect features**, taken after that: [Effects](#effects).
 - **Four more features**: [Still more](#still-more).
 - **Ten new ideas, parked for later**: [New ideas](#new-ideas-parked).
-- **Build mode, proposed but not decided**: [Build mode](#build-mode-proposed-not-decided). The
-  owner wants Build-mode features now rather than more for playing live.
+- **Four Build-mode features**, taken: [Build mode](#build-mode). The owner wants Build-mode
+  features now rather than more for playing live.
+- **Ease of use, proposed but not decided**: [Ease of use](#ease-of-use-proposed-not-decided).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -452,10 +453,11 @@ the common live hosts either. Each passes the line.
 10. **Dep mode.** A substitute player gets the show explained song by song: which keys play which
     sound, where the changes come, what the pedals do. Made from the show itself.
 
-### Build mode, proposed (not decided)
+### Build mode
 
 Proposed on 2026-11-16, when the owner asked to move from Stage features to Build mode: making the
-rig, not playing it. Checked on `main`. "More like this" in Sounds already exists
+rig, not playing it. Checked on `main`. **The owner took 1, 3, 6 and 7** (all Pro); 2, 4, 5 and 8
+are out. "More like this" in Sounds already exists
 (`SoundsInspector.svelte`, with the sound map and shootout beside it), so it is not listed.
 
 1. **Undo that covers everything.** Loading a plug-in, a sound or a preset starts a new history
@@ -477,6 +479,29 @@ rig, not playing it. Checked on `main`. "More like this" in Sounds already exist
    finding the button.
 8. **Import from another live host**: at least the song list, tempos and program changes from
    MainStage, Gig Performer or a plain text list, so moving to HoSTage does not start from nothing.
+
+### Ease of use, proposed (not decided)
+
+Proposed on 2026-11-16, when the owner asked about dragging instruments and effects onto the rack
+instead of pressing Load, and for more ideas like it. Checked on `main`: only the Canvas view takes
+drops (`HostRackCanvas.svelte`); in the List view, the default, an instrument is loaded with its
+Load button, and the only drag reorders effects. Nothing duplicates a part, selects several, or
+follows what is played.
+
+1. **Drag and drop everywhere.** From the Instruments, Effects and Sounds lists onto a part's row
+   in the List view, onto the dock's Inserts, onto a mixer strip, or onto empty space for a new
+   part, as the Canvas already allows.
+2. **Drop on the keyboard to split or layer.** Drop a sound on a key of the keyboard strip and it
+   becomes a new part from that key up; drop it on another part's coloured band and it layers with
+   that part. Splits and layers made the way a player thinks of them.
+3. **Smart placement.** The library knows what kind of sound it is; a bass offers the left hand, a
+   pad offers a layer over what is there. Offered, never forced.
+4. **Duplicate a part**, with its effects and zone, to start a variation from it.
+5. **Select several parts and change them together**: the channel, the transpose, an effect, the
+   output.
+6. **The dock follows what you play.** Play a key and the dock shows the part it sounds on, so
+   editing what you hear needs no clicking around.
+7. **Touch to find.** Move a knob on the controller and the screen shows what it controls.
 
 ## Order of work
 
@@ -503,7 +528,9 @@ two everyone asks for), the whole rig, and three of the more features that need 
 changes without a gap (1), transposing the whole set (3) and show history (8). Lyrics and chords (2)
 go with the tablet remote. From the effects: tails that ring out (3) beside song changes without a
 gap, the drum map (7), and the new effects screen in the dock (8), which the owner already finds
-lacking. From still more: two keyboards with their own parts (1) and the gig-ready check (3). **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
+lacking. From still more: two keyboards with their own parts (1) and the gig-ready check (3).
+From Build mode: undo that covers everything (1), even levels (3), control pages from what you use
+(6) and the command palette (7). **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
 rack. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
 that:** the mixing desk (decision 9).
 
