@@ -13,8 +13,7 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **The rule that keeps it from becoming a DAW**: [The line](#the-line).
 - **What is decided**: all thirteen questions, each with its reason, in
   [Decisions](#decisions).
-- **Features proposed but not decided yet**:
-  [More features](#more-features-proposed-not-decided).
+- **Seven more features**, taken after the decisions: [More features](#more-features).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -325,11 +324,12 @@ never saved.
 
 The "silenced by Solo" warning, which uses the headphone icon now, gets another icon.
 
-### More features, proposed (not decided)
+### More features
 
-Proposed on 2026-11-16 after the decisions above, for the owner to choose from. Each passes the line,
-and none exists today (checked on `main`). A song's tempo can already change by section, because a
-section recalls a scene and a scene can carry a tempo (`PatternModel.h`), so that is not listed.
+Proposed on 2026-11-16 after the decisions above. **The owner took all but 6** ("Everything besides
+6"): all Pro (decision 6), each placed in the order of work. Each passes the line, and none exists
+today (checked on `main`). A song's tempo can already change by section, because a section recalls
+a scene and a scene can carry a tempo (`PatternModel.h`), so that was not listed.
 
 1. **Song changes without a gap.** When the next song loads another rig, the last chord and the
    reverb tails of the old one keep ringing while the new one starts. Nothing in the code carries
@@ -346,9 +346,9 @@ section recalls a scene and a scene can carry a tempo (`PatternModel.h`), so tha
 5. **Line check before the doors open.** One walk through every connection of the show: speak into
    each mic and its input lights, send a short tone to each output and confirm it. Small with a
    handful of inputs; essential once HoSTage is the desk (decision 9).
-6. **Simple lights from the show.** For bands without a lighting operator: a colour or light scene
-   per HoSTage scene, sent over DMX (a USB interface) or Art-Net (the network, decision 4). Fires
-   at cues, like show control.
+6. ~~**Simple lights from the show.**~~ **Out.** A light scene per HoSTage scene over DMX or Art-Net
+   was proposed for bands without a lighting operator. Lights stay with a lighting desk, which show
+   control (direction 3) can still reach with MIDI.
 7. **A guitar that plays a synth.** An input part's pitch-to-MIDI plug-in drives an instrument
    part, through the existing "MIDI from" choice. Needs MIDI out of an insert, the reverse of the
    MIDI-to-inserts gap above.
@@ -363,14 +363,19 @@ section recalls a scene and a scene can carry a tempo (`PatternModel.h`), so tha
    the owner's interfaces.
 3. **2e**, early, before more projects save the old plug-in shape.
 4. **2b, 2c with Listen, 2d.** 2d's silent clock first: it protects every rig with a hardware synth,
-   live inputs or not. With 2b, the list for the sound engineer (decision 9).
+   live inputs or not. With 2b, the list for the sound engineer (decision 9), and the line check
+   (more features, 5), which needs the named connections.
 5. **The input part**, with its meters, tuner, limiter, Mute inputs and MIDI to inserts, designed
-   to grow to a desk's channel count later (decision 9).
+   to grow to a desk's channel count later (decision 9). Then a guitar that plays a synth (more
+   features, 7), which needs MIDI out of an insert.
 6. **Foot controllers and stomp mode.**
-7. **Audio looper, effect chains in the library, backing tracks.**
+7. **Audio looper, effect chains in the library, backing tracks**, and MIDI backing files with them
+   (more features, 4), under the same play-only rules.
 
 **Alongside, independent of all that:** show control (MIDI clock out and Ableton Link first, the
-two everyone asks for) and the whole rig. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
+two everyone asks for), the whole rig, and three of the more features that need nothing else: song
+changes without a gap (1), transposing the whole set (3) and show history (8). Lyrics and chords (2)
+go with the tablet remote. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
 that:** the mixing desk (decision 9).
 
 ## Glossary
