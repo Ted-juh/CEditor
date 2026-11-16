@@ -16,8 +16,9 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **Seven more features**, taken after the decisions: [More features](#more-features).
 - **Eight effect features**, taken after that: [Effects](#effects).
 - **Four more features**: [Still more](#still-more).
-- **Ten new ideas, proposed but not decided**:
-  [New ideas](#new-ideas-proposed-not-decided).
+- **Ten new ideas, parked for later**: [New ideas](#new-ideas-parked).
+- **Build mode, proposed but not decided**: [Build mode](#build-mode-proposed-not-decided). The
+  owner wants Build-mode features now rather than more for playing live.
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -414,10 +415,12 @@ Proposed on 2026-11-16, when the owner asked for more features beyond effects. C
    saved, so check it on a real crash first; if it is missing, it is a fix, not a feature
    (decision 6).
 
-### New ideas, proposed (not decided)
+### New ideas, parked
 
 Proposed on 2026-11-16, when the owner asked for features "much wider", that other programs do not
-have. Each builds on something HoSTage has and other live hosts lack: CEditor's knowledge of
+have. **Parked**: "None of them or as an afterthought, not right now." Kept here for later. The
+owner also asked for fewer features for playing live and more for Build mode, which is where the
+next section goes. Each builds on something HoSTage has and other live hosts lack: CEditor's knowledge of
 hardware synths, plug-in isolation with restart, an auditioner that records and measures every
 sound, a MIDI journal that is always recording (`MidiCaptureJournal.h`), and a web UI that can use a
 camera, a microphone and motion sensors. None exists in HoSTage today; as far as known, none is in
@@ -448,6 +451,32 @@ the common live hosts either. Each passes the line.
    the earphones, it can warn before the dose becomes harmful, as a noise dosimeter does.
 10. **Dep mode.** A substitute player gets the show explained song by song: which keys play which
     sound, where the changes come, what the pedals do. Made from the show itself.
+
+### Build mode, proposed (not decided)
+
+Proposed on 2026-11-16, when the owner asked to move from Stage features to Build mode: making the
+rig, not playing it. Checked on `main`. "More like this" in Sounds already exists
+(`SoundsInspector.svelte`, with the sound map and shootout beside it), so it is not listed.
+
+1. **Undo that covers everything.** Loading a plug-in, a sound or a preset starts a new history
+   today, so it cannot be undone, and there are 20 steps (`host-edit-history.md`). Those are the
+   edits most worth undoing while building.
+2. **Rig templates.** Start from "split", "layer", "piano and organ", "vocal chain" or "pedalboard":
+   parts, zones and routing set up, sounds chosen afterwards.
+3. **Even levels.** Sounds from different plug-ins differ wildly in loudness. The auditioner
+   already measures each sound's level; one click sets a part's gain from it, so a new sound comes
+   in as loud as the rest. Offered, never automatic.
+4. **Edit across the whole set.** A song can load a rig of its own, so the same change often has to
+   be made in twenty rigs. Replace a plug-in or a sound in every song, or change one setting
+   everywhere, in one go.
+5. **Set overview.** Every song's rig side by side (parts, sounds, levels, control pages) to see
+   what differs between songs and what is the same.
+6. **Control pages from what you use.** A page built from the parameters you actually moved, rather
+   than from the plug-in's own groups. "Recently touched" already records them.
+7. **A command palette.** Type "split at C3", "load Diva", "add a reverb return", instead of
+   finding the button.
+8. **Import from another live host**: at least the song list, tempos and program changes from
+   MainStage, Gig Performer or a plain text list, so moving to HoSTage does not start from nothing.
 
 ## Order of work
 
