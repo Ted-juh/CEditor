@@ -456,6 +456,94 @@ drum microphones and mix the band. Front of house belongs to the desk, and HoSTa
 or stems. HoSTage's monitor outputs are its own players' in-ear mix: their sound, the click, the
 cues, and at most a feed back from the desk. Decision 9.
 
+### Everywhere else it reaches
+
+*Added after the owner asked whether there is more than the Mixer, Solo and the rig waiting. There
+is: an input part touches almost every workspace, the files, both command lists and the manual.*
+
+**Needed** means an input part is broken, unsafe or misleading without it; **follows** means it
+makes the input part good. What the sections above already cover is only pointed at.
+
+**The model and the files**
+
+| Where | What changes | |
+|---|---|---|
+| `RackPart` | A part gets a kind: instrument, hardware, or input. Today it is an instrument or `hardware` (a flag). Old sessions lack the field and read back as they are. | Needed |
+| Channels | **By name, not by number.** A hardware part keeps its MIDI output by id and name (`midiOutputId`, `midiOutputName`) but its audio return as a bare channel index (`audioReturnChannel`). A show moved to another interface (a USB-stick player on a venue's laptop) plays whatever is on that channel there. Inputs and output pairs should be named in the show ("Vocal mic", "Guitar DI", "In-ears") and mapped to channels once per machine, as plug-ins are scanned once per machine. This fixes the hardware return too, which has the same weakness today. | Needed |
+| Shows and Check setlist | Opening a show names the inputs and outputs it needs that this machine has not mapped, as it names missing plug-ins. Check setlist checks the mappings, as it checks hardware MIDI outputs. | Needed |
+| Session recovery, Safe startup | An input part comes back muted, whichever way the rig was restored. | Follows |
+
+**The Rack and the dock**
+
+| Where | What changes | |
+|---|---|---|
+| + Add part, Canvas | Choose instrument, hardware or input. On the canvas, inputs are boxes in a column before the parts. | Needed |
+| Part rows | The preset walker, the key-range button and Load mean nothing for an input part. It shows its input's name, a signal light, its latency and a tuner button instead. | Needed |
+| Dock | Zone and MIDI hidden for an input part; an **Input** tab (channel, mono or stereo, trim, "MIDI from" for its inserts, each insert's failure behaviour). **Params** lists the plug-in's parameters today; for an input part it lists its inserts'. | Needed |
+| The keyboard strip | Can be hidden (see Tools above). | Follows |
+
+**Effects**
+
+| Where | What changes | |
+|---|---|---|
+| MIDI to inserts | Not wired today (see the list near the top). | Follows: harmoniser, vocoder |
+| Sidechain | Nothing in the rack routes a sidechain (`RackModel.h` and `InstrumentRackHost.cpp` never mention one), though the worker's data plane can carry one when asked. A vocoder wants the voice and the synth on two inputs; a ducker wants the voice on its sidechain. | Follows |
+| On failure | Pass through or go quiet, per insert (see The input part). | Needed |
+| Latency | Same-block processing, not aligning independent paths (see latency above). | Needed |
+
+**Layers, patterns and MIDI routing.** Every picker that lists parts must leave input parts out
+where they make no sense: a layer takes instruments; a pattern's note lane plays a part; "MIDI
+from" lists sources, and an input part has no MIDI chain to be one. Parameter lanes and parameter
+locks on an input part's inserts work as they do for any plug-in. **Needed**, small.
+
+**Performance**
+
+| Where | What changes | |
+|---|---|---|
+| Instant Replay, Recorder, Capture last | All MIDI. Instant Replay is a deterministic replay of what was played *through the rig* (`startPerformanceReplay`): the keys come back, the voice and the guitar do not. It must say so, until the audio black box of direction 7 exists. | Needed (honesty) |
+| Looper | MIDI today; an audio looper (see Tools). | Follows |
+| Modulation | An input's level as a source in the Matrix (an envelope follower): the singer's voice opens the pad's filter. Within the line; it is played, not edited. | Follows |
+| Scenes and morph | An input part's inserts are plug-in parameters, so scenes and morph already reach them. Whether a scene recalls an insert's bypass ("Chorus: drive on") needs checking; a guitarist's scene is mostly that. | Follows |
+
+**The Controller workspace and the CTRL49**
+
+| Where | What changes | |
+|---|---|---|
+| Control targets | An insert's bypass, an input's trim and mute. None is on the manual's list today. | Needed for stomp mode |
+| Describe controller | Footswitches and expression pedals as kinds of control. `ControlSlot::kind` is encoder, fader, pad or button. | Needed for foot control |
+| Auto pages | Built from the selected part's plug-in; for an input part, from its inserts. | Follows |
+| CTRL49 stage pages | Meters with inputs and output pairs; the tuner; pads as stomp switches. | Follows |
+
+**Stage, and the two command lists**
+
+| Where | What changes | |
+|---|---|---|
+| Stage Lock | Every new command (mute inputs, the tuner, stomp bypass, input trim, the input mapping) needs a yes or no. `stageSafeParity.test.js` holds the browser's copy to `isStageSafeCommand`, so none can be left undecided. | Needed |
+| Player role | The same for the editor-only list; `hostagePlayerRole.test.js` fails until each is placed. The input mapping must be the player's: a stick player on a new computer has to map its inputs. | Needed |
+| Stage screen | A signal light and CLIP per input, the tuner, mute inputs, the pedalboard view; banners for an input gone quiet and an interface unplugged, beside the existing MIDI ones. | Needed (banners), follows (the rest) |
+
+**Utilities**
+
+| Where | What changes | |
+|---|---|---|
+| Audio & MIDI | Input device and channels, buffer, rate, the named inputs and outputs and their mapping, the loopback measurement, ASIO (decision 8). | Needed |
+| Health | "MIDI, right now" (`evaluateMidiHealth`) gets an audio counterpart: an input gone silent, an interface unplugged, clipping at an input, the rate changed under the rig, dropouts rising. Linux's real-time checks belong here too (direction 9). | Needed (interface gone), follows (the rest) |
+| Support bundle | The audio set-up and the input mapping go in it. | Follows |
+| Product, and the VST3 | In a DAW an input part reads the plug-in's input bus, which is the DAW track's audio; the Product utility's output pairs get input pairs beside them. Monitoring latency there is the DAW's. | Follows |
+| Edition | The Free edition's hole (below), and whether the audio looper is Pro as the looper is. | Decision 6 |
+
+**Scripting.** Script actions (Pro) that address a part's instrument have to cope with a part that
+has none. **Follows**, but it is a change to what a script can rely on, so it wants saying in the
+scripting manual when it lands.
+
+**The manual and the tests.** The manual changes in nearly every chapter: 4 (the rack), 5 (input
+chains), 6 (the Mixer), 7 (layers take no inputs), 8 (what Replay and the looper do), 9 (footswitch,
+stomp), 10 (the CTRL49 pages), 11 (Stage), 12 (Audio & MIDI, Health), 13 (editions) and 15 (known
+limits). The tests that hold lines and will need siblings: `testLatencyCompensation` (layers stay
+aligned, inputs do not wait), `mixerMeters.test.js` (input and output points), the two parity tests
+above, and `hostProductBuild.test.js`, which built-ins do not break: they are HoSTage's own code,
+in-process like `GainPanProcessor` already is, held to the same rules on the audio thread.
+
 ### What it does to the other decisions
 
 - **Decision 3 (built-ins) is pushed.** A tuner and an output limiter are hard to do without once
@@ -514,8 +602,9 @@ Revised after decision 2. A recommendation, not a ranking of everything:
    [latency](#first-latency-because-it-decides-whether-an-input-part-is-worth-having) that decides
    whether an input part is worth having and which of (a) to (d) it needs. Small, and nothing else
    in decision 2's section should start before it.
-2. **Audio & MIDI:** inputs, buffer size and rate chosen; output pairs in the standalone, each with
-   its own meter; ASIO after decision 8.
+2. **Audio & MIDI:** inputs, buffer size and rate chosen; inputs and outputs named in the show and
+   mapped per machine (which fixes the hardware return's bare channel number too); output pairs in
+   the standalone, each with its own meter; ASIO after decision 8.
 3. **The input part**, with its input meter, MIDI to inserts, the tuner, mute inputs and the output
    limiter with its gain reduction; Solo as listen (decision 10) once the in-ears exist.
 4. **Foot controllers and stomp mode** (direction 5 and the tools above).
