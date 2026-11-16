@@ -1116,13 +1116,8 @@ local function draw_live()
         say(SMALL, labels[k], DIM, x, 212, 57, 12)
         say(ROWTXT, values[k], k == 1 and WHITE or GREY, x, 226, 57, 18)
     end
-    local pads = "1-8"
-    if half == 8 then pads = "9-16" end
-    if live.flags % 4 < 2 then
-        say(SMALL, "NO LANE DRAWN: EVERY STEP PLAYS AS PLAYED. TURN E2-E5 OR A PAD TO DRAW ONE", DARK, 8, 252, 464, 14)
-    else
-        say(SMALL, "PADS: STEPS " .. pads .. " ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE", DARK, 8, 252, 464, 14)
-    end
+    local steps = half == 8 and "9-16" or "1-8"
+    say(SMALL, "BLUE B1-B8: STEPS " .. steps .. "     DRUM PADS: RACK ASSIGNMENTS", GREY, 8, 252, 464, 14)
 end
 
 -- --- METERS -----------------------------------------------------------------------------------------

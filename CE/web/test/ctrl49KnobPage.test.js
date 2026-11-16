@@ -241,7 +241,7 @@ test('LIVE draws the lane with its playhead, the zones, the held keys and the ar
   assert.ok(texts.includes('+1') && texts.includes('60%'), 'an octave and a chance that are not the plain ones');
   assert.ok(texts.includes('3 / 16') && texts.includes('+1') && texts.includes('UP') && texts.includes('50%'),
     'the cells: the step picked, its octave, the mode and the gate');
-  assert.ok(texts.includes('PADS: STEPS 1-8 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'),
+  assert.ok(texts.includes('BLUE B1-B8: STEPS 1-8     DRUM PADS: RACK ASSIGNMENTS'),
     'with a lane drawn, which steps the pads are and how the lane is made shorter');
   const ORANGE = 0xFFFF9408, TEAL = 0xFF2DD4BF;
   const rects = calls.filter((c) => c.kind === 'rect');
@@ -275,7 +275,7 @@ test('LIVE draws a lane shorter than sixteen: the places past its end empty, the
     'and a bar after the fourth step: where the lane ends and goes round');
   assert.deepEqual(rects.filter((c) => c.y === 121 && c.h === 2).map((c) => [c.x, c.w]), [[8, 230]],
     'a line under the first eight: the steps the pads are');
-  assert.ok(texts.includes('PADS: STEPS 1-8 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'));
+  assert.ok(texts.includes('BLUE B1-B8: STEPS 1-8     DRUM PADS: RACK ASSIGNMENTS'));
   assert.ok(texts.includes('100') && texts.includes('x1'), 'the cells of a step that is there');
 
   ({ texts, rects } = drawn(10));         // E1 has walked past the end, into the second half
@@ -284,7 +284,7 @@ test('LIVE draws a lane shorter than sixteen: the places past its end empty, the
     'there is no step there: its four cells are dashes');
   assert.deepEqual(rects.filter((c) => c.y === 121 && c.h === 2).map((c) => [c.x, c.w]), [[8 + 8 * 29, 230]],
     'and the line is under the second eight');
-  assert.ok(texts.includes('PADS: STEPS 9-16 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'));
+  assert.ok(texts.includes('BLUE B1-B8: STEPS 9-16     DRUM PADS: RACK ASSIGNMENTS'));
   assert.ok(rects.some((c) => c.x === 8 + 10 * 29 && c.y === 30 && c.w === 27 && c.h === 90), 'the cursor\'s place is still lit');
   p.close();
 });

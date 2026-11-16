@@ -6374,6 +6374,21 @@ void testCtrl49Live()
                "the next press enables the step and lights it again");
     }
 
+    const auto padPage = performance.pages.getReference (0).pageId;
+    const auto partId = h.firstPartId();
+    h.cmd ("assignSurfaceControl", { { "pageId", padPage }, { "kind", "pad" }, { "index", 1 },
+                                     { "partId", partId }, { "parameterId", "@gain" } });
+    bluePress (0);
+    fake.feed (0xB0, 1, 95);
+    tickPast();
+    check (performance.findPart (partId)->volume == 2.0f && focusedArp().velocityPattern[0] == 0
+           && blueLights[0] == 0, "LIVE drum pad press drives rack gain while blue step one stays off");
+    fake.feed (0xB0, 1, 0);
+    tickPast();
+    check (performance.findPart (partId)->volume == 0.0f && focusedArp().velocityPattern[0] == 0,
+           "the physical pad releases its rack assignment without toggling the step");
+    bluePress (0);
+
     press (12, 2);                                   // E2: the first step's velocity up two detents
     press (18, 1);                                   // E8: the arp on, up
     press (17, 1);                                   // E7: the rate from 1/16 to 1/16T (6 a beat)

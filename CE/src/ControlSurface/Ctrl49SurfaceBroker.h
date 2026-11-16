@@ -223,6 +223,9 @@ private:
     int layersPart = -1;
     double lastCheckMs = -1.0e12;            // E8 on SOUNDCHECK re-checks, at most once a second
     // LIVE: the step of the focused part's arp lane that E2-E5 edit.
+    juce::String rackPadPage() const;
+    juce::String lastControlPage;
+    std::array<juce::String, 8> heldRackPadPages;
     int liveCursor = 0;
     std::array<int, 8> blueLights { -1, -1, -1, -1, -1, -1, -1, -1 };
     // METERS: the first part on a strip (E7) and the strip whose encoder turned last.

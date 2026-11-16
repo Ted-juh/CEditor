@@ -342,7 +342,7 @@
   const HINT = {
     layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
     soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',
-    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. The performance pads below the encoders and blue B1–B8 below the faders toggle the same eight steps. Shift-click a step to set the pattern length.',
+    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. Blue B1–B8 below the faders toggle steps. The drum pads play their rack assignments. Shift-click a step to set the pattern length.',
     meters: 'Encoders 1–5 are the faders of the parts shown, 6 the master; 7 shows the next parts when there are more than five.',
     cue: 'Encoder 1 picks a song; pad 1 goes to it. Shift + Page steps the set from any page.',
     changes: 'Encoder 1 listens between the save and now, 2 picks a change, 3 puts it back (the other way takes it back), 4 walks back through the saves.',
