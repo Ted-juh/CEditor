@@ -15,7 +15,7 @@ port of HoSTage was not pushed when this was written, so check that branch befor
   [Decisions](#decisions).
 - **Seven more features**, taken after the decisions: [More features](#more-features).
 - **Eight effect features**, taken after that: [Effects](#effects).
-- **Five more, proposed but not decided**: [Still more](#still-more-proposed-not-decided).
+- **Three more features, and one thing to check**: [Still more](#still-more).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -388,9 +388,10 @@ setting; bypass has no crossfade; a part's inserts run in series only; no MIDI m
    most-used knobs (so the plug-in's window is rarely needed on stage), its latency and its state
    (running, restarting, failed). MIDI modules and audio inserts work the same way.
 
-### Still more, proposed (not decided)
+### Still more
 
 Proposed on 2026-11-16, when the owner asked for more features beyond effects. Checked on `main`.
+**The owner took 1, 2 and 3** (all Pro), **left out 4**, and **expects 5 to exist already**.
 
 1. **Two keyboards, each with its own parts.** A part filters incoming MIDI by channel, key and
    velocity, but not by which keyboard it came from (`PartMidiRules.h`). Two keyboards on the same
@@ -402,18 +403,20 @@ Proposed on 2026-11-16, when the owner asked for more features beyond effects. C
    not the program: on battery, a power plan that slows the processor, sleep, notifications,
    updates starting mid-set. One screen in Health that checks these and says what to change. The
    Windows partner of direction 9's Linux checks.
-4. **Stand-in sounds.** A show opened on a computer without one of its plug-ins leaves those parts
-   silent today. Instead, the part could play the nearest sound this computer has, clearly marked
-   as a stand-in. The library already finds similar sounds (the CTRL49's Discover page).
+4. ~~**Stand-in sounds.**~~ **Out.** A part whose plug-in is missing on this computer would have
+   played the nearest sound it has, marked as a stand-in. Such parts stay silent, as today, and
+   the show says which plug-ins are missing.
 5. **Back on the same song after a crash.** Recovery brings back a rig that is known to start
-   (`SessionRecovery.h`); it should also land on the song and scene that were playing, ready to
-   play on. Whether it does today needs checking on a real crash. `product-ideas.md` §7 has the
-   idea as "survive a dead laptop".
+   (`SessionRecovery.h`); it should also land on the song and scene that were playing. **The owner
+   expects this to exist already.** A quick search did not find where the playing song is saved,
+   so check it on a real crash before calling it done; if it is missing, it is a fix, not a
+   feature (decision 6).
 
 ## Order of work
 
 1. **Fixes, any time, every edition**: Solo not saved, SOLOED OUT and the banner; the MIDI input
-   switches remembered. They need nothing else, and fix things that are wrong today.
+   switches remembered. They need nothing else, and fix things that are wrong today. Also check
+   that a restart after a crash lands on the song that was playing (still more, 5).
 2. **2a, then the latency measurement.** The measurement needs a chosen buffer and device type, and
    the owner's interfaces.
 3. **2e**, early, before more projects save the old plug-in shape.
@@ -423,8 +426,9 @@ Proposed on 2026-11-16, when the owner asked for more features beyond effects. C
 5. **The input part**, with its meters, tuner, limiter, Mute inputs and MIDI to inserts, designed
    to grow to a desk's channel count later (decision 9). Then a guitar that plays a synth (more
    features, 7), which needs MIDI out of an insert.
-6. **Foot controllers and stomp mode**, with click-free bypass and dry/wet (effects 1 and 2), and
-   effect throws (effects 4), which need the new control targets.
+6. **Foot controllers and stomp mode**, with click-free bypass and dry/wet (effects 1 and 2),
+   effect throws (effects 4), which need the new control targets, and Bluetooth MIDI (still more,
+   2), since wireless pedals are the usual reason for it.
 7. **Audio looper, effect chains in the library, backing tracks**, and MIDI backing files with them
    (more features, 4), under the same play-only rules.
 
@@ -433,7 +437,7 @@ two everyone asks for), the whole rig, and three of the more features that need 
 changes without a gap (1), transposing the whole set (3) and show history (8). Lyrics and chords (2)
 go with the tablet remote. From the effects: tails that ring out (3) beside song changes without a
 gap, the drum map (7), and the new effects screen in the dock (8), which the owner already finds
-lacking. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
+lacking. From still more: two keyboards with their own parts (1) and the gig-ready check (3). **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
 rack. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
 that:** the mixing desk (decision 9).
 
