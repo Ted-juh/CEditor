@@ -15,7 +15,9 @@ port of HoSTage was not pushed when this was written, so check that branch befor
   [Decisions](#decisions).
 - **Seven more features**, taken after the decisions: [More features](#more-features).
 - **Eight effect features**, taken after that: [Effects](#effects).
-- **Three more features, and one thing to check**: [Still more](#still-more).
+- **Four more features**: [Still more](#still-more).
+- **Ten new ideas, proposed but not decided**:
+  [New ideas](#new-ideas-proposed-not-decided).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -391,7 +393,7 @@ setting; bypass has no crossfade; a part's inserts run in series only; no MIDI m
 ### Still more
 
 Proposed on 2026-11-16, when the owner asked for more features beyond effects. Checked on `main`.
-**The owner took 1, 2 and 3** (all Pro), **left out 4**, and **expects 5 to exist already**.
+**The owner took 1, 2, 3 and 5** (all Pro; 5 a fix if it turns out missing) and **left out 4**.
 
 1. **Two keyboards, each with its own parts.** A part filters incoming MIDI by channel, key and
    velocity, but not by which keyboard it came from (`PartMidiRules.h`). Two keyboards on the same
@@ -407,10 +409,45 @@ Proposed on 2026-11-16, when the owner asked for more features beyond effects. C
    played the nearest sound it has, marked as a stand-in. Such parts stay silent, as today, and
    the show says which plug-ins are missing.
 5. **Back on the same song after a crash.** Recovery brings back a rig that is known to start
-   (`SessionRecovery.h`); it should also land on the song and scene that were playing. **The owner
-   expects this to exist already.** A quick search did not find where the playing song is saved,
-   so check it on a real crash before calling it done; if it is missing, it is a fix, not a
-   feature (decision 6).
+   (`SessionRecovery.h`); it should also land on the song and scene that were playing. **In.** The
+   owner expects it to exist already, but a quick search did not find where the playing song is
+   saved, so check it on a real crash first; if it is missing, it is a fix, not a feature
+   (decision 6).
+
+### New ideas, proposed (not decided)
+
+Proposed on 2026-11-16, when the owner asked for features "much wider", that other programs do not
+have. Each builds on something HoSTage has and other live hosts lack: CEditor's knowledge of
+hardware synths, plug-in isolation with restart, an auditioner that records and measures every
+sound, a MIDI journal that is always recording (`MidiCaptureJournal.h`), and a web UI that can use a
+camera, a microphone and motion sensors. None exists in HoSTage today; as far as known, none is in
+the common live hosts either. Each passes the line.
+
+1. **The set follows you.** HoSTage learns each song from rehearsal recordings (the MIDI journal),
+   recognises where you are as you play, and moves to the next section and scene by itself. No
+   pedal to press. The pedal still works, and wins when the two disagree.
+2. **Crash cover.** When a plug-in crashes mid-song, the part falls silent until it restarts. With
+   crash cover it plays a sampled copy of the current sound in the meantime, made by the
+   auditioner when the sound was saved, so the audience hears no gap.
+3. **Sound drift check.** Before a gig, HoSTage plays every song's sounds and compares them with how
+   they sounded when saved. It flags the sound a plug-in update quietly changed, before the first
+   song does.
+4. **Backline mode.** At a festival the keyboard is the venue's. Make any keyboard usable in a
+   minute: velocity calibrated by playing soft, medium and hard; controls found by moving each once
+   ("Count them for me" already does this); splits found by playing the range.
+5. **Stand-in musician.** When a bandmate is missing, HoSTage plays their part from the last
+   rehearsal's MIDI, following the live tempo and sections (with idea 1). Play-only, like backing
+   files, but it follows the band.
+6. **Hands as a controller.** A webcam watches the hands above the keyboard: height as a filter,
+   distance as volume, like a theremin. Hand tracking runs in the web page; no extra hardware.
+7. **The phone as a controller.** Tilting the tablet or phone that runs the remote moves a macro.
+   The remote is a web page, which can read motion sensors.
+8. **Voice commands, push-to-talk on a footswitch.** "Next song", "more vocal in my ears", for a
+   player with both hands busy. Push-to-talk, so the PA never triggers it.
+9. **In-ear hearing dose.** HoSTage knows how loud the in-ear mix is all night. Calibrated once to
+   the earphones, it can warn before the dose becomes harmful, as a noise dosimeter does.
+10. **Dep mode.** A substitute player gets the show explained song by song: which keys play which
+    sound, where the changes come, what the pedals do. Made from the show itself.
 
 ## Order of work
 
