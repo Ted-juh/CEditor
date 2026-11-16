@@ -21,8 +21,9 @@ port of HoSTage was not pushed when this was written, so check that branch befor
   features now rather than more for playing live.
 - **Seven ease-of-use features**, taken: [Ease of use](#ease-of-use). The kind of feature the owner
   wants most.
-- **More ease of use, proposed but not decided**:
-  [More ease of use](#more-ease-of-use-proposed-not-decided).
+- **Four more ease-of-use features**, taken: [More ease of use](#more-ease-of-use).
+- **Even more ease of use, proposed but not decided**:
+  [Even more ease of use](#even-more-ease-of-use-proposed-not-decided).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -508,9 +509,10 @@ follows what is played.
    editing what you hear needs no clicking around.
 7. **Touch to find.** Move a knob on the controller and the screen shows what it controls.
 
-### More ease of use, proposed (not decided)
+### More ease of use
 
-Proposed on 2026-11-16, more of the same kind. Checked on `main`: an effect can be dragged only
+Proposed on 2026-11-16, more of the same kind. **The owner took 1, 2, 4 and 5** (all Pro); 3 and 6
+are out. Checked on `main`: an effect can be dragged only
 within its own chain (`fxDrop` in `InstrumentHostView.svelte` refuses anything else); part rows move
 with up and down buttons, not by dragging; nothing accepts files dropped from the computer.
 
@@ -524,6 +526,34 @@ with up and down buttons, not by dragging; nothing accepts files dropped from th
    selected part while a chord is held, so the arpeggiator or strum is heard before it is chosen.
 6. **Starred knobs on the part's row.** Parameters pinned with ☆ in the Params tab show as knobs on
    the part's row in the rack, so the few that matter are there without opening the dock.
+
+### Even more ease of use, proposed (not decided)
+
+Proposed on 2026-11-16, when the owner asked to go the extra mile on the same kind. Each takes away
+a slow or puzzling moment in Build. Checked on `main`: modulation is set up only through the
+Matrix's lists; songs and scenes accept no drops; plug-ins are scanned only when Scan is pressed
+(`hostage-manual.md`, chapter 3); HoSTage never asks a synth who it is, though CEditor's device
+profiles can (`DeviceProfileEngine.cpp`).
+
+1. **Follow the note.** Play a key and see which parts received it and, for each part that stayed
+   silent, why: outside its zone, wrong channel, outside its velocity range, muted, layered away.
+   The most common question while building is "why is this not sounding?"
+2. **Drag to modulate.** Drag an LFO, an envelope, a macro or the mod wheel onto any knob to
+   modulate it, then drag on the knob to set the depth. The Matrix stays, as the list of what is
+   connected.
+3. **Ranges by showing.** Set the range a knob or macro covers by moving the plug-in's own control
+   to each end, instead of typing numbers.
+4. **Layers set by playing.** Play the softest note that should bring in the second sound, or the
+   key where it should start, and the layer's switch point is set there.
+5. **Hold to compare.** Hold a key to hear the part as it was before this round of editing; let go
+   to come back. Uses the undo history (Build mode, 1).
+6. **Plug in a synth, get a part.** When a synth is connected, HoSTage asks it who it is and offers
+   a hardware part for it with the right port, channel and CEditor panel. Builds on the device
+   profiles' identity request.
+7. **New plug-ins noticed.** When a plug-in folder changes, HoSTage says "3 new plug-ins found" and
+   offers to scan them, instead of the user having to remember Scan.
+8. **Drag to assign in Performance.** Drop a saved rack or sound on a song to make it that song's
+   rig; drop a control page on a scene to make it that scene's page.
 
 ## Order of work
 
@@ -552,8 +582,9 @@ go with the tablet remote. From the effects: tails that ring out (3) beside song
 gap, the drum map (7), and the new effects screen in the dock (8), which the owner already finds
 lacking. From still more: two keyboards with their own parts (1) and the gig-ready check (3).
 From Build mode: undo that covers everything (1), even levels (3), control pages from what you use
-(6) and the command palette (7). All seven ease-of-use features; they are screen work and need
-nothing else. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
+(6) and the command palette (7). All seven ease-of-use features, and the four taken from "more
+ease of use"; they are mostly screen work and need nothing else. Of those, dropping files from the
+computer (more ease of use, 4) also needs the native side to accept them. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
 rack. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
 that:** the mixing desk (decision 9).
 
