@@ -1,8 +1,10 @@
 # HoSTage, wider — and the line before a DAW
 
-*Discussion record, started 2026-11-16. Nothing in it is built. One decision is taken: **HoSTage is
-for anyone on stage** (decision 2, 2026-11-16; see
-[Decision 2, taken](#decision-2-taken-anyone-on-stage)). Step 2 of the work, Audio & MIDI, is
+*Discussion record, started 2026-11-16. Nothing in it is built. Four decisions are taken, all on
+2026-11-16: **HoSTage is for anyone on stage** (decision 2, see
+[Decision 2, taken](#decision-2-taken-anyone-on-stage)), and decisions 11 to 13 on step 2, where the
+owner took the recommendations: mappings per interface, an input bus on the VST3, and waiting for
+the interface on stage (see [Decisions for the owner](#decisions-for-the-owner)). Step 2 of the work, Audio & MIDI, is
 [worked through](#step-2-worked-through-audio--midi), not built. The other decisions at the end are
 the owner's. Written from `main`: the owner's Linux standalone port of
 HoSTage is not pushed yet, so where this says something is Windows-only or missing, that branch may
@@ -594,12 +596,15 @@ instrument; the DAW is where its recordings go.
    play through it, and front of house belongs to the desk.
 10. **Solo.** Once there is a monitor output, should Solo become listen-in-the-ears and never touch
     front of house? Today it silences everything else at every output, under Stage Lock too.
-11. **Mappings per interface or per computer?** Step 2b recommends per interface: the same
-    interface on another computer then needs no mapping, and a stick player carries it.
-12. **The VST3's input bus.** Add one, so input parts and hardware returns work in a DAW, and
-    when? Some DAWs list the plug-in differently once it has one.
-13. **When the interface goes on stage.** Wait for that interface and reopen it (recommended), or
-    fall back to the default device?
+11. ~~**Mappings per interface or per computer?**~~ **Decided, 2026-11-16: per interface**, as
+    recommended. See [2b](#2b-name-what-the-show-needs-map-it-once-per-interface).
+12. ~~**The VST3's input bus.** Add one, and when?~~ **Decided, 2026-11-16: add it, and early**,
+    before products sit in many people's projects, as recommended. See [2e](#2e-the-vst3).
+13. ~~**When the interface goes on stage.** Wait, or fall back to the default device?~~ **Decided,
+    2026-11-16: wait for that interface and reopen it**, as recommended. See
+    [2d](#2d-the-device-on-stage), which also says what has to keep running while it waits.
+
+The owner's words for 11 to 13: "So the recommendations and document it."
 
 ## Where to start
 
@@ -689,7 +694,22 @@ The show stops holding channel numbers and port ids. It names its **connections*
 mic", "Guitar DI", "Juno return"), output pairs ("Main", "In-ears", "Click") and MIDI ports ("Keys",
 "Juno"). The data folder holds the mapping, and holds it **per interface, not per computer**: "on
 this Scarlett, Vocal mic is input 1". The same interface on another computer then needs nothing; a
-different interface asks once. A portable player carries its mappings on the stick.
+different interface asks once. A portable player carries its mappings on the stick. *Decided
+(decision 11), 2026-11-16.*
+
+What "an interface" is, precisely, because the system does not hand over one name for it:
+
+- **The key is the name the device type reports**: the input device's name for input connections,
+  the output device's for output connections. Under Windows Audio one interface is two devices (a
+  "Microphone (…)" and a "Speakers (…)"), so its inputs and outputs are mapped under two names;
+  under ASIO it is one.
+- **The same interface under another device type has another name**, so switching from Windows
+  Audio to ASIO maps once more. Said in the mapping screen, so it does not look like the mapping
+  was lost.
+- **Two interfaces of the same model share a name**, and so a mapping. That is what a spare wants:
+  the backup interface of the same model works at once.
+- **MIDI ports** are keyed by name in the same way, after the id (resolve by id, then by name, then
+  ask).
 
 - **Opening a show** whose connections this interface has not mapped: one screen, the show's
   connections on one side and the interface's channels on the other, each input with a signal
@@ -726,9 +746,20 @@ different interface asks once. A portable player carries its mappings on the sti
 
 An audio counterpart to "MIDI, right now":
 
-- **The interface goes**: a Stage banner, and HoSTage waits for *that* interface, reopening it when
-  it is back, inputs muted, outputs fading in. Never a jump to the laptop's speakers mid-song, and
-  never staying on them when the interface returns. In Build, offer the switch instead. Decision 13.
+- **The interface goes**: a Stage banner, and HoSTage waits for *that* interface (the same type and
+  name, as in 2b), reopening it when it is back, inputs muted, outputs fading in. Never a jump to
+  the laptop's speakers mid-song, and never staying on them when the interface returns. In Build,
+  offer the switch instead. *Decided (decision 13), 2026-11-16.*
+
+  **What has to keep running while it waits.** A hardware part's notes go out from a node in the
+  graph (`MidiSendProcessor`, `RackProcessors.h`), so they leave only while the audio device runs
+  the graph; only bank and program changes go out from the controlling thread (`sendNow`). So
+  today, when the interface goes, the hardware synths stop hearing the keyboard too, although
+  their own sound may reach the desk without passing through the interface at all. While HoSTage
+  waits, it should keep the graph running on a clock of its own with no device behind it: audio
+  thrown away, MIDI still flowing to every hardware part, the transport still counting so the
+  rig comes back in time. JUCE does not do this by itself; it is HoSTage's own small piece, and it
+  is the first half of `product-ideas.md` §7's "dumb fallback that cannot fail".
 - **An input that opens but sends only digital silence.** On Windows, when microphone access is off
   for desktop programs, a shared-mode input opens and delivers zeros. Health says where the switch
   is.
@@ -741,7 +772,23 @@ An audio counterpart to "MIDI, right now":
 In a DAW the device is the DAW's; the connections map to the plug-in's buses instead, in the
 Product utility. Input parts and hardware returns need an input bus, which the plug-in refuses
 today. Adding one changes how some DAWs list the plug-in (as an effect, or as an instrument with an
-input), so it is decision 12, and better taken before products sit in many people's projects.
+input). *Decided (decision 12), 2026-11-16: add it, and early, before products sit in many
+people's projects.*
+
+The shape that changes least for a project that never uses it:
+
+- **One stereo input bus, off by default.** A plain project then sees the plug-in it sees today: a
+  stereo instrument with optional extra outputs. `isBusesLayoutSupported` accepts the input
+  disabled or stereo, where today it accepts only disabled.
+- **Every product gets it at once**, since every product is the same plug-in to a DAW
+  (`hostage-creator-editor-player.md`, step 4). Another reason to do it while there are few.
+- **Its channels feed the rack's input node** (`prepareRuntime` gains the input count it does not
+  pass today), so hardware returns and input parts work in a DAW exactly as in the standalone.
+- **Connections map to it** in the Product utility once 2b exists; until then, the bus's two
+  channels are the rack's inputs 1 and 2, numbered as a standalone numbers its device's first two.
+- **Proved before it ships**: the hosts' conformance suites over the HoSTage VST3 with the bus off
+  and on (`docs/plugin-validation.md` says where to get them), and the DAWs the owner uses checked
+  by hand for how they list it.
 
 ### 2f. Backends
 
@@ -768,8 +815,10 @@ input), so it is decision 12, and better taken before products sit in many peopl
 ### Order inside step 2
 
 **2a first**, before step 1: small, no model change, fixes a bug, and it is what the measurement
-needs. Then 2b (the model and the show), 2c (outputs), 2d alongside 2c, 2e after decision 12, and
-2f whenever.
+needs. **2e's bus beside it**, now that decision 12 says early: it does not depend on the rest, and
+every week it waits is more projects that saved the old layout. Then 2b (the model and the show),
+2c (outputs), 2d alongside 2c (its silent clock first, since it protects every rig with hardware
+in it, input parts or not), 2e's mapping to connections once 2b exists, and 2f whenever.
 
 ## Where this comes from
 
