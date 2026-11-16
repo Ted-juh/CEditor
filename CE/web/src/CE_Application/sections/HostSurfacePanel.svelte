@@ -1093,6 +1093,8 @@
   .ctl.target { outline: 2px solid #5b9bd5; outline-offset: 1px; }
   .ctl.lit { outline: 2px solid #e0c060; outline-offset: 1px; }
   .ctl.selected { outline: 3px solid #79b9ee; outline-offset: 2px; z-index: 2; }
+  .ctl.fader.selected.assigned { outline-color: #5fcf8c; }
+  .ctl.fader.selected.assigned.unresolved { outline-color: #e06868; }
   .ctl.learning { animation: learn-pulse 0.75s ease-in-out infinite alternate; }
   @keyframes learn-pulse { from { box-shadow: 0 0 0 0 #e0b65e66; } to { box-shadow: 0 0 0 7px #e0b65e22; } }
   /* The label has to be readable at BOTH sizes, and the two differ by a factor of eight: a
@@ -1396,6 +1398,8 @@
     .page-picker select { min-width: 0; max-width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .ctl.learning { animation: none; outline: 2px solid #dfc18e; }
+    .ctl.fader.selected.assigned { outline-color: #5fcf8c; }
+  .ctl.fader.selected.assigned.unresolved { outline-color: #e06868; }
+  .ctl.learning { animation: none; outline: 2px solid #dfc18e; }
   }
 </style>
