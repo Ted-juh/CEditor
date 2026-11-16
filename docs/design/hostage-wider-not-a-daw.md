@@ -11,9 +11,8 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **The goal**, in the owner's words: "I want to extend Hostage beyond what it is now. It could be
   very wide.. but I DON'T want it to be a daw."
 - **The rule that keeps it from becoming a DAW**: [The line](#the-line).
-- **What is decided**: twelve of thirteen questions, each with its reason, in
+- **What is decided**: all thirteen questions, each with its reason, in
   [Decisions](#decisions).
-- **What is open**: one, [decision 9](#open-decision-9-a-mixing-desk).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -72,8 +71,8 @@ inside a DAW.
 
 ## Decisions
 
-All taken by the owner on 2026-11-16, except 9. "Recommended" means the owner took the
-recommendation as it stood.
+All taken by the owner on 2026-11-16. "Recommended" means the owner took the recommendation as it
+stood.
 
 1. **Backing tracks: in, play-only** (recommended). Many bands play to stems, and decision 2 makes
    them HoSTage's users. Play-only keeps it on the right side of the line: files arrive finished,
@@ -99,7 +98,10 @@ recommendation as it stood.
    are not lined up; layers still are.
 8. **ASIO on Windows: yes.** Most audio interfaces reach their low latencies on Windows through
    ASIO, and HoSTage does not build it today.
-9. **A mixing desk: open.** See below.
+9. **HoSTage is not a mixing desk** (recommended; the owner: "b, and document what it needs"). It
+   handles the sound of the people who play through it; the venue's desk mixes the band. Mainly
+   because of the size of a failure: a laptop that fails should silence only its own players, not
+   the whole band. What this needs, and what a desk would have needed, is below.
 10. **Solo stays; Listen is a separate headphone button.** The owner: "I liked the fact you could
     solo a channel/ instrument that would mute all the others. So, instead of "solo" i would prefer
     a headphone icon as an extra button." Solo keeps silencing every other part. Listen lets one
@@ -113,18 +115,37 @@ recommendation as it stood.
 13. **When the interface disconnects on stage, HoSTage waits for that interface** (recommended) and
     reopens it, instead of switching to the laptop's speakers mid-song.
 
-### Open: decision 9, a mixing desk
+### Decision 9: what "not a mixing desk" needs
 
-The owner answered "Mixing desk, if we are already there, yes", which reads two ways:
+The test for any sound on stage: **does HoSTage change it from song to song, or only its level?**
+If it changes it (a vocal chain per song, an amp per scene), the sound goes through HoSTage. If only
+its level would change, it belongs to the desk.
 
-- **(a) HoSTage may become the band's mixing desk.** Every microphone on stage goes through the
-  laptop: channel strips on every input, 16 to 32 inputs, monitor mixes for the whole band. It also
-  means the whole band goes quiet if the laptop fails.
-- **(b) HoSTage is not a mixing desk.** It handles the sound of the people who play through it,
-  sends stems or a stereo pair to the venue's desk, and takes a mix back from the desk for its
-  players' in-ears. A laptop that fails silences only its own players. This was the recommendation.
+**What HoSTage needs to work well beside a desk:**
 
-Nothing below depends on the answer: it all works under (b), and (a) would add to it.
+1. **Stems or a stereo pair to the desk.** Output pairs already exist in the rack, and a part on its
+   own pair skips the master, which is what an engineer wants from a stem. Needed: the standalone
+   opening those outputs, and the outputs named (step 2b and 2c).
+2. **A desk feed.** One input carrying a mix from the desk ("more drums, more bass") into HoSTage's
+   players' in-ears. It is an input part with no effects, sent only to the in-ear mix. This is how
+   HoSTage's players hear the band without HoSTage taking the band's microphones.
+3. **In-ear mixes for HoSTage's own players only** (step 2c). Everyone else's monitors are the
+   desk's.
+4. **An input list for the sound engineer.** A sheet saying which HoSTage output carries what ("1–2
+   Main, 3–4 Keys, 5 Vocal"), made from the show's named connections (step 2b). Small, and it is
+   what an engineer asks for first.
+5. **Soundcheck measuring HoSTage's own inputs and outputs.** Today it measures outputs 1–2 only.
+6. **Designed for a handful of inputs**, not 32: the input part, the Mixer and the mapping screen are
+   laid out for the people who play through HoSTage.
+
+**What stays out because of it:** the drum microphones and any other source HoSTage would only set
+the level of; a fixed channel strip on every input; monitor mixes for players not on HoSTage;
+feedback suppression; talkback; recording every input.
+
+**What a desk would have needed**, kept so the decision can be revisited: a built-in channel strip
+(gate, EQ, compressor) on every input, because isolated plug-ins add a block each and that is too
+slow for every channel; 16 to 32 inputs, with a Mixer and CPU to match; in-ear mixes for the whole
+band; feedback control and talkback; and the whole band's sound depending on one laptop.
 
 ## What the code does today
 
@@ -310,8 +331,9 @@ The "silenced by Solo" warning, which uses the headphone icon now, gets another 
    the owner's interfaces.
 3. **2e**, early, before more projects save the old plug-in shape.
 4. **2b, 2c with Listen, 2d.** 2d's silent clock first: it protects every rig with a hardware synth,
-   live inputs or not.
-5. **The input part**, with its meters, tuner, limiter, Mute inputs and MIDI to inserts.
+   live inputs or not. With 2b, the input list for the sound engineer (decision 9).
+5. **The input part**, with its meters, tuner, limiter, Mute inputs and MIDI to inserts; the desk
+   feed is one of these with no effects (decision 9).
 6. **Foot controllers and stomp mode.**
 7. **Audio looper, effect chains in the library, backing tracks.**
 
