@@ -311,3 +311,13 @@ test('all live skins retain real control values and switching back restores Clas
     p.close();
   }
 });
+
+test('rack screen draws separate rows and presets for two instances of the same instrument', async () => {
+  const p = await page();
+  try {
+    const strings = ['RACK', '2 / 2', '01  TyrellN6', 'Lifeform Lead', '02  TyrellN6', 'Bass'];
+    p.call('set_rack', [1, 2, ...strings.flatMap(s => [s.length, ...Buffer.from(s)])]);
+    const texts = said(p.draw());
+    for (const value of strings) assert.ok(texts.includes(value));
+  } finally { p.close(); }
+});

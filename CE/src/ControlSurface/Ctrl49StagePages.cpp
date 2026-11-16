@@ -30,6 +30,20 @@ namespace
 
 // --- SOUNDCHECK -----------------------------------------------------------------------------------
 
+Bytes buildRackListPayload (const std::string& name, int cursor, int total, int first,
+                            const std::vector<std::pair<std::string, std::string>>& rows)
+{
+    Bytes out { byte (cursor - first), byte ((int) rows.size()) };
+    appendString (out, name.empty() ? "RACK" : "RACK  " + name, 25, true);
+    appendString (out, std::to_string (cursor + 1) + " / " + std::to_string (total), 22);
+    for (const auto& row : rows)
+    {
+        appendString (out, row.first, 26, true);
+        appendString (out, row.second, 28, true);
+    }
+    return out;
+}
+
 std::uint8_t soundcheckLevelByte (bool measured, double db)
 {
     if (! measured || ! std::isfinite (db))

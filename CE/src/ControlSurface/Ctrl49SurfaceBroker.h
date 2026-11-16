@@ -147,6 +147,7 @@ public:
     struct Pages
     {
         int control = 0;       // pages [0, control)
+        int rack = -1;
         int performance = 0;
         int cue = -1;          // -1 when the page is off
         int live = -1;
@@ -225,6 +226,9 @@ private:
     // LIVE: the step of the focused part's arp lane that E2-E5 edit.
     juce::String rackPadPage() const;
     juce::String lastControlPage;
+    juce::String rackCursorPart;
+    int previousRackPage = -1;
+    int rackCursorIndex() const;
     std::array<juce::String, 8> heldRackPadPages;
     int liveCursor = 0;
     std::array<int, 8> blueLights { -1, -1, -1, -1, -1, -1, -1, -1 };

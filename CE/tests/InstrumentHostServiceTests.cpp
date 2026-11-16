@@ -4860,7 +4860,7 @@ void testCtrl49AppScreen()
     const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
     check (screen != nullptr
              && ! (bool) screen->getProperty ("onKeyboard", true)
-             && (int) screen->getProperty ("pageCount", 0) == 6
+             && (int) screen->getProperty ("pageCount", 0) == 7
              && screen->getProperty ("pageKind", {}).toString() == "control"
              && screen->getProperty ("values", {}).size() >= 14 + 8
              && (int) screen->getProperty ("values", {})[12] == 1
@@ -4886,6 +4886,30 @@ void testCtrl49AppScreen()
     tickPast();
     check (h.emits.last ("instrumentHostSurfaceScreen") == nullptr,
            "an unchanged screen is not sent again");
+
+    h.cmd ("addPart");
+    const auto& rackState = h.service->getRackHost().getPerformance();
+    h.cmd ("focusPart", { { "partId", rackState.parts.getReference (0).partId } });
+    press (35, 127);
+    tickPast();
+    check (broker.currentPage() == broker.pages().rack
+           && h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("call", {}).toString() == "set_rack",
+           "Main displays the rack list");
+    press (30, 127);
+    press (34, 127);
+    press (34, 1);
+    tickPast();
+    check (rackState.focusedPartId == rackState.parts.getReference (0).partId, "scrolling preserves focus until selection");
+    press (33, 127);
+    tickPast();
+    check (rackState.focusedPartId == rackState.parts.getReference (1).partId && broker.currentPage() == 4,
+           "dial press selects the highlighted part and recalls the last control page");
+    press (35, 127);
+    press (32, 127);
+    press (37, 127);
+    tickPast();
+    check (broker.currentPage() == 4 && rackState.focusedPartId == rackState.parts.getReference (1).partId,
+           "Control returns without committing a highlighted part");
 
     press (40, 127);                            // past the last control page
     tickPast();
@@ -4987,14 +5011,14 @@ void testCtrl49StagePages()
 
     tickPast();
     check (broker.pages().layers < 0 && broker.pages().soundcheck < 0
-             && broker.pages().count == broker.pages().performance + 1,
+             && broker.pages().count == broker.pages().performance + 2,
            "neither page is on the surface until it is asked for");
 
     h.cmd ("layersOnSurface", { { "on", true } });
     h.cmd ("soundcheckOnSurface", { { "on", true } });
     const auto layout = broker.pages();
     check (layout.layers == layout.performance + 1 && layout.soundcheck == layout.performance + 2
-             && layout.count == layout.performance + 3,
+             && layout.count == layout.performance + 4,
            "asked for, they follow the performance page: LAYERS, then SOUNDCHECK");
     const auto surfacePages = h.emits.lastState()->getProperty ("surfacePages", {});
     check ((bool) surfacePages.getProperty ("layers", false) && (bool) surfacePages.getProperty ("soundcheck", false),
@@ -6223,7 +6247,7 @@ void testCtrl49Meters()
     h.cmd ("layersOnSurface", { { "on", true } });
     h.cmd ("metersOnSurface", { { "on", true } });
     const auto layout = broker.pages();
-    check (layout.meters == layout.layers + 1 && layout.count == layout.meters + 1,
+    check (layout.meters == layout.layers + 1 && layout.count == layout.meters + 2,
            "asked for, it follows LAYERS: the pages read on stage first");
     check ((bool) h.emits.lastState()->getProperty ("surfacePages", {}).getProperty ("meters", false),
            "and the app's state says it is on");
@@ -7217,7 +7241,7 @@ void testCtrl49Broker()
         const auto pageId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
                               .getProperty ("pageId", {}).toString();
         const auto partId = h.firstPartId();
-        fake.feed (0xB0, 0x23, 0x7F);          // Main: the first control page
+        h.cmd ("showControlPage", { { "pageId", pageId } });
         broker.tick();
         check (broker.currentPage() == 0 && broker.pages().control > 0, "the keys are on a control page");
 

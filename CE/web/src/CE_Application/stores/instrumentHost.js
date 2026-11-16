@@ -330,7 +330,7 @@ export function emptySurfaceScreen() {
 
 // A stage page is one call with one payload instead of a knob page's set_labels + set_values.
 // Only these two: the name is a function the page runs, so nothing else is let through.
-export const SURFACE_STAGE_CALLS = { layers: 'set_layers', soundcheck: 'set_check', discover: 'set_discover', cue: 'set_cue',
+export const SURFACE_STAGE_CALLS = { rack: 'set_rack', layers: 'set_layers', soundcheck: 'set_check', discover: 'set_discover', cue: 'set_cue',
                                      changes: 'set_changes', meters: 'set_meters', live: 'set_live' };
 
 export function normalizeSurfaceScreen(payload) {
@@ -344,7 +344,7 @@ export function normalizeSurfaceScreen(payload) {
     payload: bytes(payload?.payload),
     pageIndex: Math.max(0, Math.min(count - 1, Math.trunc(Number(payload?.pageIndex ?? 0) || 0))),
     pageCount: count,
-    pageKind: ['control', 'performance', 'browse', 'layers', 'soundcheck', 'discover', 'cue', 'changes', 'meters', 'live']
+    pageKind: ['rack', 'control', 'performance', 'browse', 'layers', 'soundcheck', 'discover', 'cue', 'changes', 'meters', 'live']
       .includes(payload?.pageKind)
       ? payload.pageKind : 'control',
     pageId: String(payload?.pageId ?? ''),

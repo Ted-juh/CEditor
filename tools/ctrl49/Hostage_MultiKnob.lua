@@ -1370,6 +1370,38 @@ local function draw_knobs()
     end
 end
 
+local rack_screen = {}
+function set_rack(args)
+    page_kind = 10
+    rack_screen.cursor = get_byte(args, 0) + 1
+    local count = get_byte(args, 1)
+    local i = 2
+    rack_screen.title, i = read_string(args, i)
+    rack_screen.position, i = read_string(args, i)
+    rack_screen.rows = {}
+    for r = 1, count do
+        local row = {}
+        row.instrument, i = read_string(args, i)
+        row.preset, i = read_string(args, i)
+        rack_screen.rows[r] = row
+    end
+end
+
+local function draw_rack()
+    title_bar(rack_screen.title, rack_screen.position)
+    if #rack_screen.rows == 0 then say(ROWTXT, "No parts in rack", GREY, 10, 48, 450, 24) end
+    for r, row in ipairs(rack_screen.rows) do
+        local y = 36 + (r - 1) * 38
+        if r == rack_screen.cursor then
+            draw_rect(4, y, 472, 36, ROW)
+            draw_rect(4, y, 3, 36, ORANGE)
+        end
+        say(ROWTXT, row.instrument, WHITE, 12, y + 7, 215, 24)
+        say(ROWTXT, row.preset, GREY, 230, y + 7, 240, 24)
+    end
+    say(SMALL, "UP/DOWN OR DIAL: BROWSE     PRESS DIAL: SELECT     CONTROL: BACK", GREY, 8, 250, 464, 16)
+end
+
 function draw(args)
     if not initialized then init("") end
 
@@ -1381,6 +1413,7 @@ function draw(args)
         return
     end
 
+    if page_kind == 10 then draw_rack() return end
     if page_kind == 2 then
         draw_check()
         return
