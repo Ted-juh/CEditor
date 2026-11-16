@@ -6,6 +6,75 @@
 namespace ceditor::host
 {
 
+namespace
+{
+class RackClosePanel final : public juce::Component
+{
+public:
+    RackClosePanel()
+    {
+        using namespace ctrl49::assets;
+        icon = juce::Drawable::createFromImageData (kHostageIconSvg, kHostageIconSvgSize);
+        configureLabel (brand, "HoSTage", 16.0f, true, 0xffff922f);
+        configureLabel (heading, "Save rack changes?", 23.0f, true, 0xfff1f4f6);
+        configureLabel (description, "Save to reopen this rack with its current plug-in settings. "
+                                     "Discard to restore the rack you started with.", 15.0f, false, 0xffcad1d8);
+        configureButton (cancel, 0);
+        configureButton (discard, 2);
+        configureButton (save, 1);
+        setSize (450, 218);
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (juce::Colour (0xff181e23));
+        if (icon != nullptr)
+            icon->drawWithin (g, { 20, 12, 36, 36 }, juce::RectanglePlacement::centred, 1.0f);
+        g.setColour (juce::Colour (0xff36414a));
+        g.drawHorizontalLine (59, 0, (float) getWidth());
+        g.drawHorizontalLine (158, 0, (float) getWidth());
+    }
+
+    void resized() override
+    {
+        brand.setBounds (65, 12, getWidth() - 85, 36);
+        heading.setBounds (22, 69, getWidth() - 44, 31);
+        description.setBounds (22, 101, getWidth() - 44, 47);
+        auto buttons = getLocalBounds().reduced (20, 14).removeFromBottom (32);
+        save.setBounds (buttons.removeFromRight (98));
+        buttons.removeFromRight (8);
+        discard.setBounds (buttons.removeFromRight (92));
+        cancel.setBounds (buttons.removeFromLeft (78));
+    }
+
+private:
+    void configureLabel (juce::Label& label, const juce::String& text, float size, bool bold, juce::uint32 colour)
+    {
+        label.setText (text, juce::dontSendNotification);
+        label.setFont (juce::FontOptions (size, bold ? juce::Font::bold : juce::Font::plain));
+        label.setColour (juce::Label::textColourId, juce::Colour (colour));
+        label.setBorderSize (juce::BorderSize<int> (0));
+        addAndMakeVisible (label);
+    }
+
+    void configureButton (juce::TextButton& button, int choice)
+    {
+        button.setColour (juce::TextButton::buttonColourId, juce::Colour (choice == 1 ? 0xffff922f : 0xff303a43));
+        button.setColour (juce::TextButton::textColourOffId, juce::Colour (choice == 1 ? 0xff15191d : 0xfff1f4f6));
+        button.onClick = [this, choice]
+        {
+            if (auto* window = findParentComponentOfClass<juce::DialogWindow>())
+                window->exitModalState (choice);
+        };
+        addAndMakeVisible (button);
+    }
+
+    std::unique_ptr<juce::Drawable> icon;
+    juce::Label brand, heading, description;
+    juce::TextButton save { "Save rack" }, discard { "Discard" }, cancel { "Cancel" };
+};
+}
+
 void HostRuntimeShell::requestClose()
 {
     if (closePromptOpen)
@@ -23,10 +92,18 @@ void HostRuntimeShell::requestClose()
     }
 
     closePromptOpen = true;
-    juce::NativeMessageBox::showYesNoCancelBox (juce::MessageBoxIconType::QuestionIcon,
-        "Save rack changes?", "Open this rack with its current plug-in settings next time?\n\n"
-        "Yes saves the current rack for startup. No restores the rack you started with.",
-        this, juce::ModalCallbackFunction::create (
+    juce::DialogWindow::LaunchOptions options;
+    options.dialogTitle = "HoSTage";
+    options.dialogBackgroundColour = juce::Colour (0xff181e23);
+    options.componentToCentreAround = this;
+    options.resizable = false;
+    options.useNativeTitleBar = false;
+    options.content.setOwned (new RackClosePanel());
+    auto* dialog = options.create();
+    dialog->setTitleBarHeight (0);
+    dialog->setContentComponentSize (dialog->getContentComponent()->getWidth(), dialog->getContentComponent()->getHeight());
+    dialog->centreAroundComponent (this, dialog->getWidth(), dialog->getHeight());
+    dialog->enterModalState (true, juce::ModalCallbackFunction::create (
             [safe = juce::Component::SafePointer<HostRuntimeShell> (this)] (int choice)
             {
                 if (safe == nullptr)
@@ -41,7 +118,7 @@ void HostRuntimeShell::requestClose()
                 else
                     juce::NativeMessageBox::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon,
                         "Rack remains open", result.getErrorMessage(), safe.getComponent());
-            }));
+            }), true);
 }
 
 HostRuntimeShell::HostRuntimeShell()
