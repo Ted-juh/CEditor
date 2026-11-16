@@ -23,6 +23,7 @@ port of HoSTage was not pushed when this was written, so check that branch befor
   wants most.
 - **Four more ease-of-use features**, taken: [More ease of use](#more-ease-of-use).
 - **Eight more ease-of-use features**, taken: [Even more ease of use](#even-more-ease-of-use).
+- **A practice mode with falling notes**, for learning any song: [Practice mode](#practice-mode).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -554,6 +555,36 @@ profiles can (`DeviceProfileEngine.cpp`).
 8. **Drag to assign in Performance.** Drop a saved rack or sound on a song to make it that song's
    rig; drop a control page on a scene to make it that scene's page.
 
+### Practice mode
+
+**Taken, 2026-11-16** (Pro): "General practice mode to learn songs in general." Not tied to the
+set: for learning any song, the way piano-learning apps (Synthesia, Flowkey, Simply Piano) teach
+with coloured bars falling onto a keyboard. The shape is decided; the details below are the
+proposal.
+
+**Why it fits.** It is playing and practising, and nothing is edited, so it passes the line. And
+HoSTage has what those apps lack: the notes sound through the player's own rig, with their own
+sounds, instead of a built-in piano.
+
+**What it does:**
+
+- **Falling notes onto the on-screen keyboard** (`HostKeyboard.svelte`). Each bar lands on its key
+  when the note is due; its length is the note's length.
+- **Songs from MIDI files.** Open any `.mid`. Each track can be a hand; a file with one track is
+  split at a key the player chooses (middle C to begin with). HoSTage ships no songs: MIDI files of
+  published songs have their own rights.
+- **Tempo** adjustable from slow to full speed. MIDI changes tempo without changing pitch.
+- **Wait mode.** The song waits until the right notes are played, then moves on.
+- **One hand at a time.** The player chooses which hand or track they play; HoSTage plays the
+  rest through the rig, as accompaniment.
+- **Loop a passage**, with a count-in, as in Rehearse mode (direction 7).
+- **Right and wrong.** Keys light green or red as they are played, early or late shown, and a short
+  result after each run.
+
+**What it needs.** A MIDI file reader: none exists in HoSTage today, and MIDI backing files (more
+features, 4) need the same one, so they share it. What the player plays is already recorded all
+the time (`MidiCaptureJournal.h`), which is what right and wrong are measured against.
+
 ## Order of work
 
 1. **Fixes, any time, every edition**: Solo not saved, SOLOED OUT and the banner; the MIDI input
@@ -572,7 +603,8 @@ profiles can (`DeviceProfileEngine.cpp`).
    effect throws (effects 4), which need the new control targets, and Bluetooth MIDI (still more,
    2), since wireless pedals are the usual reason for it.
 7. **Audio looper, effect chains in the library, backing tracks**, and MIDI backing files with them
-   (more features, 4), under the same play-only rules.
+   (more features, 4), under the same play-only rules. **Practice mode** after the MIDI backing
+   files, since it uses the same MIDI file reader.
 
 **Alongside, independent of all that:** show control (MIDI clock out and Ableton Link first, the
 two everyone asks for), the whole rig, and three of the more features that need nothing else: song
