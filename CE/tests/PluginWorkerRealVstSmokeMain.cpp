@@ -6,6 +6,7 @@
 // outside CTest is intentional: a representative installed VST3, its licence state and any UI it
 // opens are properties of the test machine rather than deterministic repository fixtures.
 
+#include "InstrumentHost/SpirePresetState.h"
 #include "InstrumentHost/IsolatedPluginProxy.h"
 #include "InstrumentHost/PluginScannerCoordinator.h"
 #include "InstrumentHost/VendorPreset.h"
@@ -276,6 +277,10 @@ int main (int argc, char* argv[])
                     throw std::runtime_error ("H2P recall did not retain the real preset name");
             }
             if (preset.sourceType == "spire")
+            {
+                const auto controller = ceditor::host::readSpireController (after);
+                if (controller.getProperty ("preset_meta", {}).getProperty ("name", {}).toString() != preset.name)
+                    throw std::runtime_error ("Spire retained the wrong preset name");
                 for (const auto& property : preset.parameters.getDynamicObject()->getProperties())
                 {
                     bool matched = false;
@@ -284,6 +289,7 @@ int main (int argc, char* argv[])
                             matched = std::abs (parameter->getValue() - static_cast<float> (property.value)) < 0.00001f;
                     if (! matched) throw std::runtime_error ("Spire parameter differs from the preset file");
                 }
+            }
         }
 
         // Presets by ear. The checks above read state and parameters, and both can be right while

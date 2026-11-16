@@ -6146,6 +6146,9 @@ void testCtrl49StagePagesRemembered()
         h.cmd ("getState");
         check (! h.service->metersOnSurface() && ! h.service->cueOnSurface() && ! h.service->layersOnSurface(),
                "a first session has no stage pages until they are asked for");
+        h.cmd ("setControlScreenSkin", { { "skin", 13.0 } });
+        h.cmd ("setControlScreenSkin", { { "skin", 15 } });
+        check (h.service->controlScreenSkin() == 13, "a valid skin survives an out-of-range selection");
         h.cmd ("metersOnSurface", { { "on", true } });
         h.cmd ("cueOnSurface", { { "on", true } });
         h.cmd ("layersOnSurface", { { "on", true } });
@@ -6162,6 +6165,8 @@ void testCtrl49StagePagesRemembered()
                "a page switched off again, or never on, stays off");
         check (! h.service->browsingOnSurface(), "the browser is not remembered: every start shows the pages");
         const auto pages = h.emits.lastState()->getProperty ("surfacePages", {});
+        check (h.service->controlScreenSkin() == 13 && (int) pages.getProperty ("skin", -1) == 13,
+               "the keyboard and app recover the same control page skin after restarting");
         check ((bool) pages.getProperty ("meters", false) && (bool) pages.getProperty ("cue", false)
                  && ! (bool) pages.getProperty ("layers", true),
                "and the app's state says so from the start");
@@ -7732,6 +7737,40 @@ void testScan (const juce::File& stubWorker)
 // VST3 is the demanding one: the DAW owns the session (persistSession=false, state through
 // capture/restore vars), announces its own rate, and destroys/recreates the editor window at
 // will. Each of those contracts is asserted here so the wrappers stay thin glue.
+void testStandaloneRackClose()
+{
+    const auto dir = freshDataDir ("standalone-close");
+    seedCatalog (dir);
+    const auto standalone = [] (InstrumentHostService::Options& o) { o.confirmRackChangesOnClose = true; };
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        check (! h.service->rackChangedForClose(), "untouched rack closes without a prompt");
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+        h.lastStub->patch = 7;
+        check (h.service->rackChangedForClose(), "rack edits trigger the close prompt");
+        check (h.service->finishRackClose (true).wasOk(), "Yes saves the live rack for startup");
+    }
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        check (h.lastStub != nullptr && h.lastStub->patch == 7, "startup recalls the saved plug-in edit");
+        check (! h.service->rackChangedForClose(), "freshly restored rack is clean");
+        h.lastStub->patch = 9;
+        check (h.service->rackChangedForClose(), "plug-in-only edit triggers the close prompt");
+        h.cmd ("addPart");
+        check (h.service->finishRackClose (false).wasOk(), "No rolls back even after autosave");
+    }
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        check (parts.size() == 1 && h.lastStub != nullptr && h.lastStub->patch == 7,
+               "startup after No recalls the opening rack and plug-in state");
+    }
+}
+
 void testWrapperContext()
 {
     std::cout << "\nwrapper context (the generated targets)" << std::endl;
@@ -16414,6 +16453,7 @@ int main (int argc, char* argv[])
     testStateFolders();
     testSectionsMigration();
     testScan (stubWorker);
+    testStandaloneRackClose();
     testWrapperContext();
     testParameterModel();
     testControlPages();

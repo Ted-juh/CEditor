@@ -21,11 +21,12 @@
    * harness serving only CE/web) loses this card and nothing else.
    */
   import { onDestroy } from 'svelte';
+  import skinNames from '../../../../../tools/ctrl49/live_skin_names.json';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import { ctrl49Screen, hostSurface, hostState, surfaceInput, setControlSlotValue, surfaceStatusText,
            layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface,
-           metersOnSurface, liveOnSurface } from '../stores/instrumentHost.js';
+           metersOnSurface, liveOnSurface, setControlScreenSkin } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
   import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload,
            readMetersPayload, readLivePayload, readRackStateExtension, ARP_MODE_NAMES } from '../screen/ctrl49Payloads.js';
@@ -48,13 +49,14 @@
     let cancelled = false;
     let made = null;
     (async () => {
-      const [lua, strip, logo] = await Promise.all([
+      const [lua, strip, logo, skins] = await Promise.all([
         import('../../../../../tools/ctrl49/Hostage_MultiKnob.lua?raw'),
         import('../../../../../tools/ctrl49/knob_strip.png?url'),
         import('../../../../../tools/ctrl49/hostage_logo.png?url'),
+        import('../../../../../tools/ctrl49/live_knobs.png?url'),
       ]);
       // The object ids the broker uploads them under before binding the page.
-      return createCtrl49Screen(canvas, { lua: lua.default, assets: { 0x0200: strip.default, 0x0210: logo.default },
+      return createCtrl49Screen(canvas, { lua: lua.default, assets: { 0x0200: strip.default, 0x0210: logo.default, 0x0220: skins.default },
                                           redrawOnAsk: true });
     })()
       .then((s) => { if (cancelled) s.dispose(); else { made = s; runtime = s; } })
@@ -77,6 +79,7 @@
     if (!runtime) return;
     try {
       runtime.call('init', []);
+      runtime.call('set_skin', [$hostState.surfacePages?.skin ?? 0]);
       if (showSplash) {
         runtime.call('set_mode', [0]);
       } else {
@@ -347,6 +350,12 @@
 <section class="ctrl49-screen" data-testid="ctrl49-screen-card" aria-label="CTRL49 screen">
   <div class="head">
     <strong>CTRL49 screen</strong>
+    <label>Control page skin
+      <select value={$hostState.surfacePages?.skin ?? 0}
+              onchange={(e) => setControlScreenSkin(Number(e.currentTarget.value))}>
+        {#each skinNames as name, index}<option value={index}>{name}</option>{/each}
+      </select>
+    </label>
     <span class="status" class:live={$hostSurface.state === 'connected'} data-testid="ctrl49-screen-status">{status}</span>
   </div>
 
@@ -474,7 +483,18 @@
     border: 1px solid var(--host-line, #2d343e); border-radius: var(--host-radius-panel, 8px);
     background: var(--host-surface, #171b21); color: var(--host-text, #d7dde6);
   }
-  .head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .head label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+  .ctrl49-screen .head select {
+    appearance: none;
+    box-sizing: border-box;
+    min-height: 0;
+    height: 22px;
+    padding: 0 22px 0 6px;
+    font: inherit;
+    color: var(--host-text, #d9e0e6);
+    background: var(--host-field, #12171b) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='m1 1 4 4 4-4' fill='none' stroke='%23aab5be' stroke-width='1.5'/%3E%3C/svg%3E") right 6px center / 10px 6px no-repeat;
+  }
   .head strong { font-size: 13px; }
   .status { font-size: 12px; color: var(--host-text-dim, #8791a0); }
   .status.live { color: #8fd0a4; }

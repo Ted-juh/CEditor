@@ -64,7 +64,11 @@ public:
     }
 
     void shutdown() override { mainWindow = nullptr; }
-    void systemRequestedQuit() override { quit(); }
+    void systemRequestedQuit() override
+    {
+        if (mainWindow != nullptr)
+            static_cast<ceditor::host::HostRuntimeShell*> (mainWindow->getContentComponent())->requestClose();
+    }
 
 private:
     std::unique_ptr<HostRuntimeWindow> mainWindow;

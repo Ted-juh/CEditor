@@ -83,14 +83,18 @@ test('the creator compiles the installer the developer\'s script does: the same 
   const { project } = normalizeProject({
     productName: 'Super Rack', version: '1.0.0', appId: '9B2C4E86-1D2E-4F30-8A4B-000000000001',
   });
-  const script = isccArgs({
+  const inputs = {
     project, stageDir: '/s', outDir: '/o', templatePath: '/t.iss',
     artifacts: { standaloneExe: '/b/Hostage.exe', vst3Bundle: '/b/Hostage.vst3' },
-  }).filter((arg) => arg.startsWith('/D')).map((arg) => arg.slice(2, arg.indexOf('=')));
+  };
+  const defineNames = (args) => args.filter((arg) => arg.startsWith('/D')).map((arg) => arg.slice(2, arg.indexOf('=')));
+  const script = defineNames(isccArgs(inputs));
   assert.ok(native.length >= 11, `read ${native.length} switches from ProductBuilder.h`);
   assert.deepEqual(native, script);
-  assert.deepEqual([...native].sort(), [...TEMPLATE_DEFINES].sort(),
-    'and every one has its #ifndef default in HostProductTemplate.iss (hostProductBuild.test.js)');
+  const offline = defineNames(isccArgs({ ...inputs, prerequisitesDir: '/prerequisites' }));
+  assert.deepEqual(offline, [...native, 'WindowsPrerequisitesDir'],
+    'the official offline installer adds the runtime directory to the shared switches');
+  assert.deepEqual([...offline].sort(), [...TEMPLATE_DEFINES].sort());
 
   // The same product, too: the editor's manifest, its show, the installer's file name.
   assert.match(builder, /root->setProperty \("role", "editor"\)/);

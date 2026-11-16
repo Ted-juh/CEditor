@@ -88,7 +88,7 @@ juce::var metadata (float gain, bool crashDumpsAvailable,
 }
 
 bool replyToControl (PluginWorkerControlChannel& control, juce::uint32 generation,
-                     juce::MemoryBlock& state, float& gain, int& currentProgram, bool& quit)
+                     juce::MemoryBlock& state, float& gain, int& currentProgram, bool& quit, bool editorFixture)
 {
     const auto received = control.receive (2);
     if (! received)
@@ -100,16 +100,21 @@ bool replyToControl (PluginWorkerControlChannel& control, juce::uint32 generatio
     if (received.message.type == MessageType::getState)
     {
         reply.type = MessageType::stateReply;
-        reply.payload = state;
+        reply.payload = editorFixture ? juce::MemoryBlock (&gain, sizeof (gain)) : state;
     }
     else if (received.message.type == MessageType::setParameter)
     {
         juce::String jsonError;
         const auto json = decodeJsonPayload (received.message, jsonError);
-        if (const auto* values = json.getArray(); jsonError.isEmpty()
-            && values != nullptr && values->size() == 1)
-            gain = juce::jlimit (0.0f, 1.0f,
-                static_cast<float> (static_cast<double> (values->getReference (0))));
+        const auto editsValue = json.getProperty ("edits", {});
+        if (const auto* edits = editsValue.getArray())
+            for (const auto& edit : *edits)
+                if (const auto* fields = edit.getArray(); fields && fields->size() == 3
+                    && static_cast<int> ((*fields)[0]) == 0)
+                    gain = static_cast<float> ((*fields)[2]);
+        // The old save protocol sent a full mirror, including the stale cutoff.
+        if (const auto* values = json.getArray(); values && ! values->isEmpty())
+            gain = static_cast<float> ((*values)[0]);
         reply = makeJsonMessage (MessageType::setParameter, generation,
                                  received.message.requestId,
                                  processorSnapshot (gain, currentProgram));
@@ -131,6 +136,8 @@ bool replyToControl (PluginWorkerControlChannel& control, juce::uint32 generatio
     else if (received.message.type == MessageType::setState)
     {
         state = received.message.payload;
+        if (editorFixture && state.getSize() == sizeof (gain))
+            std::memcpy (&gain, state.getData(), sizeof (gain));
         if (state.getSize() == 9 && std::memcmp (state.getData(), "new-state", 9) == 0)
         {
             gain = 0.75f;
@@ -228,13 +235,15 @@ int main (int argc, char* argv[])
 
     juce::MemoryBlock state;
     state.append ("stub-state", 10);
+    const bool editorFixture = descriptionText.contains ("EditorEditStub");
+    if (editorFixture) gain = 0.875f; // worker-side editor change after the initial mirror
     bool quit = false;
     const auto idleExitDeadline = juce::Time::getMillisecondCounterHiRes() + 1000.0;
     while (! quit)
     {
         if (exitIdle && juce::Time::getMillisecondCounterHiRes() >= idleExitDeadline)
             return 98;
-        if (! replyToControl (control, generation, state, gain, currentProgram, quit))
+        if (! replyToControl (control, generation, state, gain, currentProgram, quit, editorFixture))
             return 67;
         if (mapping.waitForInput (2) != WaitResult::signalled)
             continue;

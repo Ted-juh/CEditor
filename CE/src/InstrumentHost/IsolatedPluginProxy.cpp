@@ -5,6 +5,7 @@
 #include <juce_cryptography/juce_cryptography.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <stdexcept>
 #include <thread>
@@ -75,8 +76,16 @@ public:
     float getValue() const override { return value.load (std::memory_order_acquire); }
     void setValue (float newValue) override
     {
-        value.store (juce::jlimit (0.0f, 1.0f, newValue), std::memory_order_release);
-        revision.fetch_add (1, std::memory_order_acq_rel);
+        const auto normal = juce::jlimit (0.0f, 1.0f, newValue);
+        value.store (normal, std::memory_order_release);
+        // Keep the host command separate from the display mirror, which worker feedback
+        // updates too. Both delivery paths must see the same value for a given revision.
+        auto previous = hostEdit.load();
+        juce::uint64 next;
+        do {
+            next = ((previous + (juce::uint64 { 1 } << 32)) & 0xffffffff00000000ULL)
+                 | std::bit_cast<juce::uint32> (normal);
+        } while (! hostEdit.compare_exchange_weak (previous, next));
     }
     float getDefaultValue() const override { return metadata.defaultValue; }
     juce::String getName (int maximumLength) const override
@@ -98,7 +107,14 @@ public:
     }
     juce::String getParameterID() const override { return metadata.id; }
 
-    juce::uint32 getRevision() const noexcept { return revision.load (std::memory_order_acquire); }
+    ParameterEvent hostCommand() const noexcept
+    {
+        const auto edit = hostEdit.load();
+        return { static_cast<juce::uint32> (metadata.index), 0,
+                 std::bit_cast<float> (static_cast<juce::uint32> (edit)), parameterValue,
+                 static_cast<juce::uint32> (edit >> 32) };
+    }
+    juce::uint32 flushedRevision = 0; // control thread only
     void setFromWorker (float newValue)
     {
         const auto normal = juce::jlimit (0.0f, 1.0f, newValue);
@@ -110,7 +126,7 @@ private:
     IsolatedPluginProxy& owner;
     const ParameterMetadata metadata;
     std::atomic<float> value { 0.0f };
-    std::atomic<juce::uint32> revision { 1 };
+    std::atomic<juce::uint64> hostEdit { 0 };
 };
 
 // The vendor editor, inside Hostage's window, drawn by another process.
@@ -555,13 +571,6 @@ IsolatedPluginProxy::IsolatedPluginProxy (Metadata metadataToUse,
         addParameter (remote);
         remoteParameters.push_back (remote);
     }
-    // Nothing is waiting to be sent: every value here is the one the worker just reported. Left
-    // at zero these said the opposite, and the first blocks of every new instance wrote all of its
-    // parameters back at it. On a VST3 built with JUCE that includes one parameter for every MIDI
-    // controller on every channel, and writing one sends it: a rack reopened with Vanguard on it
-    // had its state restored and was then sent volume 0 and all-sound-off, and played nothing.
-    for (size_t index = 0; index < remoteParameters.size(); ++index)
-        sentParameterRevisions[index] = remoteParameters[index]->getRevision();
     setLatencySamples (metadata.latencySamples + initialBlockSize);
 }
 
@@ -966,31 +975,30 @@ bool IsolatedPluginProxy::applyParameterValues (const juce::MemoryBlock& payload
 
 bool IsolatedPluginProxy::flushParameterValues (int timeoutMs, juce::String& error)
 {
-    juce::Array<juce::var> values;
-    values.ensureStorageAllocated (static_cast<int> (remoteParameters.size()));
-    for (const auto* parameter : remoteParameters)
-        values.add (parameter->getValue());
-
-    juce::var payload (values);
-    // Once an opaque state has been cached, a session save has a safe fallback. Ask a worker
-    // whose message thread is drawing an editor to decline this preparatory snapshot quickly,
-    // rather than retrying it for most of three seconds on Hostage's message thread.
-    if (hasLastKnownState)
+    juce::Array<juce::var> edits;
+    std::vector<ParameterEvent> pending;
+    for (auto* parameter : remoteParameters)
     {
-        auto* object = new juce::DynamicObject();
-        object->setProperty ("values", values);
-        object->setProperty ("pickUpMs", 40);
-        payload = juce::var (object);
+        const auto command = parameter->hostCommand();
+        if (command.revision == parameter->flushedRevision)
+            continue;
+        pending.push_back (command);
+        juce::Array<juce::var> entry { static_cast<int> (command.parameterIndex),
+                                      static_cast<juce::int64> (command.revision),
+                                      command.normalizedValue };
+        edits.add (juce::var (entry));
     }
+    if (pending.empty())
+        return true;
 
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("edits", edits);
     juce::MemoryBlock reply;
-    if (! request (MessageType::setParameter, jsonPayload (payload),
-                   MessageType::setParameter, reply, timeoutMs, error,
-                   ! hasLastKnownState))
+    if (! request (MessageType::setParameter, jsonPayload (juce::var (object)),
+                   MessageType::setParameter, reply, timeoutMs, error))
         return false;
-    // This is a one-way snapshot for serialization. Applying the echo here could overwrite a
-    // newer parameter edit that arrived while the control round-trip was in flight; normal
-    // audio-plane feedback will report any plug-in quantisation without that race.
+    for (const auto& edit : pending)
+        remoteParameters[edit.parameterIndex]->flushedRevision = edit.revision;
     return true;
 }
 
@@ -999,7 +1007,8 @@ bool IsolatedPluginProxy::requestAndSyncParameters (MessageType type,
                                                      int timeoutMs, juce::String& error)
 {
     juce::MemoryBlock reply;
-    if (! request (type, payload, type, reply, timeoutMs, error))
+    if (! flushParameterValues (timeoutMs, error)
+        || ! request (type, payload, type, reply, timeoutMs, error))
         return false;
     return applyParameterValues (reply, error);
 }
@@ -1087,15 +1096,14 @@ std::span<const ParameterEvent> IsolatedPluginProxy::collectParameterEvents() no
         const auto index = parameterScanCursor;
         parameterScanCursor = (parameterScanCursor + 1) % remoteParameters.size();
         ++inspected;
-        const auto revision = remoteParameters[index]->getRevision();
-        if (revision == sentParameterRevisions[index])
+        const auto command = remoteParameters[index]->hostCommand();
+        if (command.revision == sentParameterRevisions[index])
             continue;
-        pendingParameterEvents[count++] = { static_cast<juce::uint32> (index), 0,
-                                             remoteParameters[index]->getValue(), parameterValue };
+        pendingParameterEvents[count++] = command;
         // Mark only events that fit this block as sent. The round-robin cursor resumes after
         // the last emitted parameter, so an inventory larger than the shared-memory capacity
         // is delivered over later blocks without losing or starving its high indexes.
-        sentParameterRevisions[index] = revision;
+        sentParameterRevisions[index] = command.revision;
     }
     return { pendingParameterEvents.data(), count };
 }
@@ -1423,6 +1431,16 @@ void IsolatedPluginProxy::sendEditorClose() noexcept
     catch (...) {}
 }
 
+bool IsolatedPluginProxy::readFreshState (juce::MemoryBlock& state, juce::String& error)
+{
+    if (! flushParameterValues (3000, error)
+        || ! request (MessageType::getState, {}, MessageType::stateReply, state, 3000, error))
+        return false;
+    lastKnownState = state;
+    hasLastKnownState = true;
+    return true;
+}
+
 void IsolatedPluginProxy::getStateInformation (juce::MemoryBlock& state)
 {
     juce::String error;
@@ -1433,9 +1451,7 @@ void IsolatedPluginProxy::getStateInformation (juce::MemoryBlock& state)
         object->setProperty ("pickUpMs", 40);
         getStatePayload = jsonPayload (juce::var (object));
     }
-    // Audio-plane parameter changes may still be pending while transport is stopped. Push the
-    // proxy's authoritative values first so the opaque state describes what Hostage is showing,
-    // rather than the worker's preceding block.
+    // Deliver outstanding host edits. The worker owns everything changed in its editor.
     if (flushParameterValues (3000, error)
         && request (MessageType::getState, getStatePayload, MessageType::stateReply,
                     state, 3000, error, ! hasLastKnownState))

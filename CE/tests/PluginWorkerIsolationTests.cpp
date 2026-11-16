@@ -199,6 +199,44 @@ void testNormalWorker (const juce::File& stub)
     processor->releaseResources();
 }
 
+void testRackRecallsEditorEdit (const juce::File& stub)
+{
+    ceditor::host::InstrumentRackHost rack;
+    rack.prepare (48'000.0, 16);
+    const auto part = rack.addPart();
+    juce::String error;
+    auto load = [&]() -> juce::AudioProcessorParameter*
+    {
+        auto processor = launch (stub, "EditorEditStub", error);
+        if (! processor) return nullptr;
+        auto* cutoff = processor->getParameters()[0];
+        if (! rack.commitLoad (part, rack.beginLoad (part), std::move (processor),
+                              { "editor-edit", {}, "Editor Edit", "Test" }))
+            return nullptr;
+        return cutoff;
+    };
+    auto* cutoff = load();
+    check (cutoff && cutoff->getValue() == 0.5f, "host mirror predates the vendor cutoff edit");
+    if (! cutoff) return;
+    auto restore = [&]()
+    {
+        const auto saved = rack.captureState (&error);
+        check (error.isEmpty(), "explicit rack save captures fresh worker state");
+        ceditor::host::Performance decoded;
+        const auto serialized = juce::JSON::toString (saved.toVar());
+        if (! ceditor::host::Performance::fromVar (juce::JSON::parse (serialized), decoded))
+            return static_cast<juce::AudioProcessorParameter*> (nullptr);
+        rack.loadModel (std::move (decoded));
+        return load();
+    };
+    cutoff = restore();
+    check (cutoff && cutoff->getValue() == 0.875f, "a fresh worker recalls the vendor editor cutoff");
+    if (! cutoff) return;
+    cutoff->setValueNotifyingHost (0.25f);
+    cutoff = restore();
+    check (cutoff && cutoff->getValue() == 0.25f, "a host edit with no audio blocks also survives rack recall");
+}
+
 void testLargeParameterInventory (const juce::File& stub)
 {
     std::cout << "\nlarge parameter inventory" << std::endl;
@@ -436,6 +474,7 @@ int main (int argc, char* argv[])
         return 64;
     const juce::File stub (juce::String::fromUTF8 (argv[1]));
     testNormalWorker (stub);
+    testRackRecallsEditorEdit (stub);
     testProgramRefresh (stub);
     testLargeParameterInventory (stub);
     testSupportedBlockSizeSoak (stub);

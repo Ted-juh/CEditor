@@ -202,9 +202,20 @@ target_link_libraries(ce_sqlite PUBLIC Threads::Threads)
 # ------------------------------------------------------------------ the app, the player, the VST
 # Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.
 
-# CTRL49 embedded assets (Lua pages, knob filmstrip, defaults) — generated once and
-# compiled into every target that talks to the hardware: the bridge exe AND, since the
-# broker moved the surface into the product, the editor and both host targets.
+# HoSTage uses three CTRL49 assets. CEditor and its bridge also use device-specific defaults.
+set(HOSTAGE_CTRL49_INPUTS
+    "${CMAKE_SOURCE_DIR}/tools/ctrl49/Hostage_MultiKnob.lua"
+    "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
+    "${CMAKE_SOURCE_DIR}/tools/ctrl49/live_knobs.png"
+    "${CMAKE_SOURCE_DIR}/tools/ctrl49/hostage_logo.png")
+set(HOSTAGE_CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/HostageCtrl49Assets.cpp")
+add_custom_command(
+    OUTPUT "${HOSTAGE_CTRL49_EMBED_OUT}"
+    COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR} -DOUT=${HOSTAGE_CTRL49_EMBED_OUT}
+        -DHOSTAGE_ONLY=ON -P ${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake
+    DEPENDS "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake" ${HOSTAGE_CTRL49_INPUTS}
+    COMMENT "Embedding HoSTage CTRL49 page and graphics"
+    VERBATIM)
 set(CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/Ctrl49EmbeddedAssets.cpp")
 add_custom_command(
     OUTPUT "${CTRL49_EMBED_OUT}"
@@ -215,10 +226,9 @@ add_custom_command(
     DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
-        "${CMAKE_SOURCE_DIR}/tools/ctrl49/Hostage_MultiKnob.lua"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_Bridge.lua"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
-        "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
-        "${CMAKE_SOURCE_DIR}/tools/ctrl49/hostage_logo.png"
+        ${HOSTAGE_CTRL49_INPUTS}
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
         "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
@@ -655,6 +665,15 @@ if(CEDITOR_BUILD_APP)
     set(CE_HOST_MFR_CODE        "Tdjh"               CACHE STRING "Generated host 4-char manufacturer code")
     set(CE_HOST_PLUGIN_CODE     "CehR"               CACHE STRING "Generated host 4-char plugin code")
 
+    set(CE_HOST_PRODUCT_MANIFEST "" CACHE FILEPATH "Optional Host Project manifest supplying the host product identity")
+    if(CE_HOST_PRODUCT_MANIFEST)
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CE_HOST_PRODUCT_MANIFEST}")
+        file(READ "${CE_HOST_PRODUCT_MANIFEST}" host_manifest)
+        string(JSON CE_HOST_PRODUCT_NAME GET "${host_manifest}" productName)
+        string(JSON CE_HOST_PRODUCT_VERSION GET "${host_manifest}" version)
+        string(JSON CE_HOST_COMPANY_NAME GET "${host_manifest}" publisher)
+    endif()
+
     set(CE_HOST_COMMON_SOURCES
         "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
@@ -687,7 +706,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
-        "${CTRL49_EMBED_OUT}"
+        "${HOSTAGE_CTRL49_EMBED_OUT}"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
@@ -699,8 +718,25 @@ if(CEDITOR_BUILD_APP)
 
     juce_add_gui_app(CEHostStandalone
         PRODUCT_NAME "${CE_HOST_PRODUCT_NAME}"
+        VERSION "${CE_HOST_PRODUCT_VERSION}"
         COMPANY_NAME "${CE_HOST_COMPANY_NAME}"
     )
+
+    if(WIN32)
+        # JUCE 8.0.7 reads the target metadata to generate this resource, but
+        # omits that input dependency, leaving Explorer metadata stale on rebuild.
+        get_target_property(host_rc_dir CEHostStandalone JUCE_GENERATED_SOURCES_DIRECTORY)
+        string(TOLOWER "${CE_HOST_PRODUCT_NAME}" host_icon_product)
+        if(host_icon_product STREQUAL "hostage")
+            configure_file(tools/installer/hostage-icon.rc.in "${host_rc_dir}/hostage-icon.rc" @ONLY)
+            set_source_files_properties("${host_rc_dir}/hostage-icon.rc" PROPERTIES
+                OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/installer/hostage.ico")
+            target_sources(CEHostStandalone PRIVATE "${host_rc_dir}/hostage-icon.rc")
+        endif()
+        get_target_property(host_info CEHostStandalone JUCE_INFO_FILE)
+        add_custom_command(OUTPUT "${host_rc_dir}/CEHostStandalone_resources.rc"
+            APPEND DEPENDS "${host_info}")
+    endif()
 
     target_sources(CEHostStandalone PRIVATE
         "${CE_ROOT}/src/InstrumentHost/HostRuntimeMain.cpp"
@@ -2146,6 +2182,19 @@ ce_configure_test(CEditorPlayerScriptTests)
 
     message(STATUS "CEditor: scripting runtime ENABLED (link `ceditor_scripting` into your host target).")
     message(STATUS "CEditor: build target CEditorScriptingTests and run it to verify the engine.")
+endif()
+
+if(WIN32 AND TARGET CEHostStandalone AND TARGET CEditorPluginScanner AND TARGET CEditorPluginWorker)
+    # Refresh both helpers even on an incremental build that does not relink the host.
+    add_custom_target(HoSTageWindows
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:CEditorPluginScanner>"
+            "$<TARGET_FILE:CEditorPluginWorker>"
+            "$<TARGET_FILE_DIR:CEHostStandalone>"
+        DEPENDS CEHostStandalone CEditorPluginScanner CEditorPluginWorker
+        COMMENT "Staging HoSTage standalone runtime helpers"
+        VERBATIM
+    )
 endif()
 
 # --- Value/parameter layer (Milestone 2): host-automatable parameters + DAW state ---------------

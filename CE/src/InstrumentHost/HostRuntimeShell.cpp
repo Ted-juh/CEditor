@@ -6,6 +6,44 @@
 namespace ceditor::host
 {
 
+void HostRuntimeShell::requestClose()
+{
+    if (closePromptOpen)
+        return;
+
+    if (! service->rackChangedForClose())
+    {
+        const auto result = service->finishRackClose (false);
+        if (result.wasOk())
+            juce::JUCEApplication::getInstance()->quit();
+        else
+            juce::NativeMessageBox::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon,
+                "Rack remains open", result.getErrorMessage(), this);
+        return;
+    }
+
+    closePromptOpen = true;
+    juce::NativeMessageBox::showYesNoCancelBox (juce::MessageBoxIconType::QuestionIcon,
+        "Save rack changes?", "Open this rack with its current plug-in settings next time?\n\n"
+        "Yes saves the current rack for startup. No restores the rack you started with.",
+        this, juce::ModalCallbackFunction::create (
+            [safe = juce::Component::SafePointer<HostRuntimeShell> (this)] (int choice)
+            {
+                if (safe == nullptr)
+                    return;
+                safe->closePromptOpen = false;
+                if (choice != 1 && choice != 2)
+                    return;
+
+                const auto result = safe->service->finishRackClose (choice == 1);
+                if (result.wasOk())
+                    juce::JUCEApplication::getInstance()->quit();
+                else
+                    juce::NativeMessageBox::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon,
+                        "Rack remains open", result.getErrorMessage(), safe.getComponent());
+            }));
+}
+
 HostRuntimeShell::HostRuntimeShell()
 {
     addChildComponent (editorPane);
@@ -17,6 +55,7 @@ HostRuntimeShell::HostRuntimeShell()
     // knows which it is, never another product's (HostageManifest.h). Its catalogue, scan paths
     // and session live and die with the product.
     configureForThisProgram (options);
+    options.confirmRackChangesOnClose = true;
     options.workerExecutable = findHostScannerWorker ({ options.dataDirectory });
     options.factoryPerformanceFile = findFactoryPerformance();
 
@@ -158,6 +197,9 @@ HostRuntimeShell::HostRuntimeShell()
         surfaceOptions.pngAssets.push_back ({ 0x0200,
             surface::Bytes (surface::assets::kKnobStripPng,
                             surface::assets::kKnobStripPng + surface::assets::kKnobStripPngSize) });
+        surfaceOptions.pngAssets.push_back ({ 0x0220,
+            surface::Bytes (surface::assets::kLiveKnobsPng,
+                            surface::assets::kLiveKnobsPng + surface::assets::kLiveKnobsPngSize) });
         surfaceOptions.pngAssets.push_back ({ 0x0210,
             surface::Bytes (surface::assets::kHostageLogoPng,
                             surface::assets::kHostageLogoPng + surface::assets::kHostageLogoPngSize) });

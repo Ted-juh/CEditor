@@ -6434,6 +6434,18 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "setControlScreenSkin")
+    {
+        const auto id = payload.getProperty ("skin", -1);
+        if ((! id.isInt() && ! id.isInt64() && ! id.isDouble())
+            || ! juce::isPositiveAndBelow ((double) id, (double) numControlSkins)
+            || (double) id != (int) id) return;
+        surfaceSkin = (int) id;
+        if (! saveSurfacePages()) emitError ("Could not save the CTRL49 control page skin.");
+        emitState();
+        return;
+    }
+
     if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface" || cmd == "discoverOnSurface"
         || cmd == "cueOnSurface" || cmd == "changesOnSurface" || cmd == "metersOnSurface"
         || cmd == "liveOnSurface")
@@ -7613,7 +7625,14 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (record.name.isEmpty())
             record.name = rack.getPerformance().name.isNotEmpty() ? rack.getPerformance().name
                                                                   : juce::String ("Rack capture");
-        record.rackManifestJson = juce::JSON::toString (rack.captureState().toVar());
+        juce::String captureError;
+        const auto captured = rack.captureState (&captureError);
+        if (captureError.isNotEmpty())
+        {
+            emitError ("Rack was not saved: " + captureError);
+            return;
+        }
+        record.rackManifestJson = juce::JSON::toString (captured.toVar());
         record.fingerprint = juce::String::toHexString (record.rackManifestJson.hashCode64());
 
         // What each part sounded like, harvested from the library record it was playing. This
@@ -8318,8 +8337,13 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
         const auto sourceText = performanceSource == performanceFile()
                                   ? performanceBaselineText : performanceSource.loadFileAsString();
         Performance restored;
-        if (Performance::fromVar (juce::JSON::parse (sourceText), restored))
+        const auto document = juce::JSON::parse (sourceText);
+        if (Performance::fromVar (document, restored))
+        {
+            if (options.confirmRackChangesOnClose)
+                openingRackDocument = document;
             applyPerformance (std::move (restored));
+        }
         else
         {
             if (performanceSource == performanceFile())
@@ -8334,6 +8358,13 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
     // A product's very first start, with no session yet: the show it was built with.
     if (includePerformance && performanceSource == juce::File())
         openFirstBuiltInShow();
+
+    if (options.confirmRackChangesOnClose)
+    {
+        if (! openingRackDocument.isObject())
+            openingRackDocument = rack.getPerformance().toVar().clone();
+        openingRackComparison = juce::JSON::toString (rack.captureState().toVar());
+    }
 
     checkStateDigests();
 
@@ -14532,6 +14563,8 @@ void InstrumentHostService::loadSurfacePages()
 void InstrumentHostService::applySurfacePagesVar (const juce::var& stored)
 {
     const auto on = [&stored] (const char* key) { return (bool) stored.getProperty (key, false); };
+    const int skin = stored.getProperty ("skin", 0);
+    surfaceSkin = juce::isPositiveAndBelow (skin, numControlSkins) ? skin : 0;
     surfaceSoundcheckPage = on ("soundcheck");
     surfaceLayersPage     = on ("layers");
     surfaceDiscoverPage   = on ("discover");
@@ -14549,6 +14582,7 @@ bool InstrumentHostService::saveSurfacePages() const
 juce::var InstrumentHostService::surfacePagesVar() const
 {
     auto* root = new juce::DynamicObject();
+    root->setProperty ("skin", surfaceSkin);
     root->setProperty ("soundcheck", surfaceSoundcheckPage);
     root->setProperty ("layers",     surfaceLayersPage);
     root->setProperty ("discover",   surfaceDiscoverPage);
@@ -19357,17 +19391,7 @@ juce::var InstrumentHostService::buildStatePayload()
     }());
     root->setProperty ("performance", performancePayload());
     root->setProperty ("soundcheck", soundcheckPayload());
-    {
-        auto* surfacePages = new juce::DynamicObject();
-        surfacePages->setProperty ("soundcheck", surfaceSoundcheckPage);
-        surfacePages->setProperty ("layers", surfaceLayersPage);
-        surfacePages->setProperty ("discover", surfaceDiscoverPage);
-        surfacePages->setProperty ("cue", surfaceCuePage);
-        surfacePages->setProperty ("changes", surfaceChangesPage);
-        surfacePages->setProperty ("meters", surfaceMetersPage);
-        surfacePages->setProperty ("live", surfaceLivePage);
-        root->setProperty ("surfacePages", juce::var (surfacePages));
-    }
+    root->setProperty ("surfacePages", surfacePagesVar());
     // Which program the page is drawing: the editor, or a player (installed as one, or the
     // editor trying its show as one). The page hides what a player lacks; the refusal above is
     // what makes it true.
@@ -22261,6 +22285,42 @@ juce::var InstrumentHostService::performancePayload() const
     return juce::var (root);
 }
 
+bool InstrumentHostService::rackChangedForClose()
+{
+    if (! openingRackDocument.isObject())
+        return false;
+    juce::String error;
+    const auto live = rack.captureState (&error);
+    return historyPendingLoads > 0 || error.isNotEmpty()
+        || juce::JSON::toString (live.toVar()) != openingRackComparison;
+}
+
+juce::Result InstrumentHostService::finishRackClose (bool keepChanges)
+{
+    if (openingRackDocument.isObject())
+    {
+        auto document = openingRackDocument;
+        if (keepChanges)
+        {
+            if (historyPendingLoads > 0)
+                return juce::Result::fail ("A plug-in is still loading. Close the rack again once it finishes.");
+            juce::String error;
+            document = rack.captureState (&error).toVar();
+            if (error.isNotEmpty())
+                return juce::Result::fail (error);
+        }
+
+        if ((keepChanges || sessionWrittenThisRun) && ! writePerformanceDocument (document))
+            return juce::Result::fail ("Could not write the startup rack. Check the session error in HoSTage.");
+    }
+
+    // An earlier autosave may still be queued on the message thread.
+    ++performanceSaveGeneration;
+    performanceSavePending.store (false);
+    options.persistSession = false;
+    return juce::Result::ok();
+}
+
 void InstrumentHostService::savePerformance()
 {
     noteShowChanged();
@@ -22368,6 +22428,7 @@ bool InstrumentHostService::writePerformanceDocument (const juce::var& document)
         performanceBaselineKnown = true;
         performanceBaselineExisted = true;
         performanceBaselineText = text;
+        sessionWrittenThisRun = true;
         performanceWriteErrorReported = false;
         return true;
     }
