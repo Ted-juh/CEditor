@@ -593,9 +593,13 @@ instrument; the DAW is where its recordings go.
 8. **ASIO.** Enable it on Windows, with Steinberg's SDK and its terms, or rely on WASAPI's
    low-latency mode if the measurement says that is enough?
 9. **Not a mixing desk.** Confirm the second line: HoSTage processes the sound of the people who
-   play through it, and front of house belongs to the desk.
+   play through it, and front of house belongs to the desk. *Worked through in
+   [Decision 9](#decision-9-not-a-mixing-desk); recommendation: confirm it.*
 10. **Solo.** Once there is a monitor output, should Solo become listen-in-the-ears and never touch
     front of house? Today it silences everything else at every output, under Stage Lock too.
+    *Worked through in [Decision 10](#decision-10-solo-as-listen), which found Solo saved into
+    shows and misreported on the Stage screen; recommendation: yes to its six parts, 5 and 6
+    first.*
 11. ~~**Mappings per interface or per computer?**~~ **Decided, 2026-11-16: per interface**, as
     recommended. See [2b](#2b-name-what-the-show-needs-map-it-once-per-interface).
 12. ~~**The VST3's input bus.** Add one, and when?~~ **Decided, 2026-11-16: add it, and early**,
@@ -623,6 +627,10 @@ Revised after decision 2. A recommendation, not a ranking of everything:
    limiter with its gain reduction; Solo as listen (decision 10) once the in-ears exist.
 4. **Foot controllers and stomp mode** (direction 5 and the tools above).
 5. **The audio looper, and input chains in the library** with their reference signal.
+
+Any time, because they need nothing else and guard against a failure that exists today:
+**decision 10's points 5 and 6**, Solo never saved into a show or carried onto stage, and the Stage
+screen no longer calling a soloed-out part LIVE.
 
 Alongside, because they do not depend on any of that: **show control (3)**, cheap and built almost
 entirely on what exists (MIDI clock out and Link first), and **the whole rig (4)**, which only this
@@ -819,6 +827,142 @@ needs. **2e's bus beside it**, now that decision 12 says early: it does not depe
 every week it waits is more projects that saved the old layout. Then 2b (the model and the show),
 2c (outputs), 2d alongside 2c (its silent clock first, since it protects every rig with hardware
 in it, input parts or not), 2e's mapping to connections once 2b exists, and 2f whenever.
+
+## Decisions 9 and 10, worked through
+
+*Worked through on 2026-11-16 at the owner's request, read from the code as step 2 was. Both are
+still the owner's to decide; each ends with a recommendation.*
+
+### Decision 9: not a mixing desk
+
+**The question, in one line.** For each sound on the stage: *does HoSTage change it from song to
+song, or only its level?* If it changes it (a vocal chain per song, an amp per scene, a harmoniser
+following the keys), the sound is played through HoSTage, and HoSTage is right for it. If only its
+level would ever change, it belongs to the desk, and putting it through HoSTage adds latency and a
+point of failure for nothing.
+
+**Inside the line:**
+
+- A singer, a guitarist and a keyboard player through one laptop: each is played through it.
+- An electronic drum kit sending MIDI to a drum instrument in the rack: the drummer plays through
+  HoSTage. A drummer's click and count-in: HoSTage makes them, and there is nothing to mix.
+- **A desk feed.** One input carrying a mix from one of the desk's auxes ("more drums, more bass")
+  into a player's in-ears: an input part with no effects, sent only to the in-ear return (2c). That
+  is how a HoSTage player hears the band without HoSTage taking the band's microphones.
+- **Stems to the desk.** The output pairs as they already behave: a part on a pair of its own
+  leaves past the master chain (`RackModel.h`), which was written for a DAW's stems and is right
+  for an engineer's channels too.
+- **The input list for the engineer.** From the show's named connections (2b), a sheet saying what
+  HoSTage sends to the desk and on which outputs: "1–2 Main, 3–4 Keys, 5 Vocal (processed)". It is
+  preparing to play, so it is inside the line: one page of a tech rider, made from the show
+  instead of typed.
+
+**Outside the line:**
+
+- The drum microphones, the bass DI nobody processes, the other players' mics that HoSTage would
+  only set the level of.
+- A channel strip of its own on every input (gate, EQ and compressor as fixed furniture). An input
+  part has inserts because its chain is an instrument choice; a trim is all it needs of its own
+  (direction 8).
+- Monitor mixes for people who do not play through HoSTage: that is a monitor engineer's job.
+- A console's scene recall beside songs and scenes; talkback; matrix outputs for a venue's zones.
+- Feedback suppression, ringing out the wedges.
+- Recording every input to its own track: the DAW line again.
+
+**Why the line, beyond keeping the scope small:**
+
+1. **The size of a failure.** Every plug-in runs in a process of its own so that one bad plug-in
+   takes only itself down. The same thinking one level up: a laptop that fails should take down
+   only its own players. With the desk mixing front of house, a dead HoSTage silences the keys and
+   the singer's effects, and the drums still reach the PA. With HoSTage as the desk, the whole band
+   goes quiet at once.
+2. **Latency.** A digital desk processes each channel on hardware of its own in a millisecond or
+   two. HoSTage, on a laptop with every plug-in isolated, spends a block per plug-in (the latency
+   section above). A good trade for a player who gets a sound out of it; a poor one for a drum mic
+   that needed nothing but a fader.
+3. **Whose mix it is.** Front of house belongs to the engineer, often the venue's, on the venue's
+   desk. A band that hands over a pair or stems fits every venue; a band that brings its own mixer
+   in a laptop fits only the venues that let it.
+
+**What it changes in what is already written here:**
+
+- Input parts are designed for a handful of inputs, not thirty-two: the dock, the canvas column and
+  the mapping screen are laid out for the people who play through HoSTage, and nothing aims at a
+  console's channel count.
+- Monitor mixes (2c) are for HoSTage's own players; the desk feed is how the rest of the band gets
+  into their ears.
+- Soundcheck measures HoSTage's own inputs and outputs, never the band's.
+
+**If the owner says no**, HoSTage becomes a live mixer as well, and these follow: a channel strip of
+HoSTage's own on every input (built in, so not isolated, because a block per plug-in times thirty
+channels cannot feed anyone's ears), sixteen to thirty-two inputs as the design target, a console's
+scene model beside songs, and the whole band's sound hanging on one laptop. That is a different
+product, and its competition is digital desks rather than live hosts.
+
+**Recommendation: confirm the line**, with the desk feed, stems and the input list as what makes
+HoSTage a good neighbour to the desk rather than a replacement for it.
+
+### Decision 10: Solo as listen
+
+**What Solo does today**, from the code:
+
+- **It is solo-in-place.** When any part is soloed, every other part's gain node is set silent
+  (`InstrumentRackHost::applyMixerState`). That is every output, front of house included, and every
+  send, because sends tap after the gain node: a silenced part's reverb goes too.
+- **Parts only.** Buses and returns have no solo.
+- **It is saved, and nothing clears it.** `solo` is written with the rack and read back
+  (`RackModel.cpp`), and nothing resets it: not opening a show, not entering Stage, not a scene. A
+  scene recalls a part's on/off, mute, volume and pan (`SceneSlot`, `PatternModel.h`), not its solo.
+  A part soloed while building a sound at home is still soloed in the saved show at the gig, from
+  the first note, through every song.
+- **Stage Lock allows it.** `setPartMixer` carries volume, pan, mute and solo in one command, and the
+  whole command is on the allow-list.
+- **The Stage screen misreports it.** The rig labels a part silenced by another part's solo
+  **LIVE**, and counts it among the live ones (`StageRig.svelte`: the label looks at the part's own
+  mute and solo, not at whether anything else is soloed). In Build the rack does say it ("Part audio
+  suppressed by Solo on …", `hostPartIssues.js`); on stage nothing does.
+- **No hardware path.** The Mackie section's buttons go to a control page's button slots, and a
+  control cannot be given a solo. Only a click on the Mixer's **S** does it.
+
+So the danger exists today, on a keyboard-only rig: one **S** clicked while setting up, saved, and
+the rest of the rig silent on stage, with the Stage screen saying LIVE.
+
+**What live desks do.** Solo on a live desk does not touch the main mix. It sends the soloed channel
+to a listen bus (the engineer's headphones or wedge), either before the fader (PFL, pre-fade
+listen: heard even with the fader down) or after it (AFL). Solo-in-place, the studio kind, is the
+one live desks guard against, because it empties the PA.
+
+**The proposal, in six parts:**
+
+1. **Solo becomes Listen once a listen output exists**: the pair marked as the listen output in 2c,
+   normally the in-ears. The soloed strip is heard there; front of house is untouched.
+2. **Pre-fader, after the inserts.** A part can be heard before it is brought in: a pad faded up
+   mid-song can be checked with its fader still down. Returns and buses get Listen too (the reverb
+   on its own), which they never had as solo.
+3. **Dim, not replace, and never the click.** A player in in-ears is also playing with them.
+   Replacing their mix with one soloed part mid-song takes away their own voice and the click. So
+   Listen brings the soloed strip up and dims the rest of the in-ear mix, and the click is never
+   dimmed.
+4. **Without a listen output** (a keyboard player with a stereo out only): solo-in-place as today,
+   in Build, where it is a sound-design tool; under Stage Lock, refused. That means Stage Lock
+   reading `setPartMixer` field by field, solo refused while volume, pan and mute pass. There is a
+   precedent: the player role already refuses `setControlSlotOptions` field by field.
+   `stageSafeParity.test.js` compares command names only, so a field rule needs a sibling test
+   holding the browser preview's copy to it.
+5. **Never saved into a show, never carried onto stage.** Solo-in-place is cleared when Stage is
+   entered and is not written into a show. Listen is a moment, not a setting, and is not saved at
+   all.
+6. **The Stage screen tells the truth.** A part silenced by another part's solo says so (for
+   example SOLOED OUT), not LIVE, and is not counted as live.
+
+**Which of these stand on their own.** Points 5 and 6 need no monitor output and protect every rig
+that exists today: of everything in this record, they are the cheapest change that removes a way to
+go silent on stage. Point 4 needs only the field-by-field check. Points 1 to 3 come with 2c's
+outputs. The manual changes in chapter 6 (the Mixer) and chapter 11, whose Stage Lock list says
+"part levels, mute and solo".
+
+**Recommendation: yes to all six**, with 5 and 6 first, whenever the program is next changed,
+because they guard against a failure that already exists.
 
 ## Where this comes from
 
