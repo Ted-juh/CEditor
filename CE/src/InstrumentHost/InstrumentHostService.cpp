@@ -8244,28 +8244,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         // A hardware part walks the patches captured from the same synth — the front-panel
         // prev/next VIP had for plug-ins, on a box that never had a preset browser at all.
-        const auto target = part->hardware ? hardwarePatchTarget (*part) : part->pluginCeId;
-        juce::Array<const LibraryRecord*> candidates;
-        for (const auto& record : library.allRecords())
-            if (record.type == "preset" && ! record.missing
-                && record.targetCeId == target
-                && (record.sourceType == "hardwarePatch") == part->hardware)
-                candidates.add (&record);
-
-        const auto rankOf = [] (const LibraryRecord& r)
-        { return r.sourceType == "programList" ? 0 : isVendorPresetSource (r.sourceType) ? 1 : 2; };
-        const auto indexOf = [] (const LibraryRecord& r)
-        { return r.sourceLocator.fromLastOccurrenceOf ("/", false, false).getIntValue(); };
-        std::sort (candidates.begin(), candidates.end(),
-                   [&] (const LibraryRecord* a, const LibraryRecord* b)
-                   {
-                       if (rankOf (*a) != rankOf (*b)) return rankOf (*a) < rankOf (*b);
-                       if (rankOf (*a) == 0 && indexOf (*a) != indexOf (*b))
-                           return indexOf (*a) < indexOf (*b);
-                       const auto byName = a->name.compareIgnoreCase (b->name);
-                       if (byName != 0) return byName < 0;
-                       return a->recordId < b->recordId;
-                   });
+        const auto candidates = orderedPartPresets (*part);
 
         if (candidates.isEmpty())
         {
@@ -8296,6 +8275,60 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     }
 
     emitError ("Unknown instrument-host command: " + cmd);
+}
+
+juce::Array<const LibraryRecord*> InstrumentHostService::orderedPartPresets (const RackPart& part)
+{
+    const auto target = part.hardware ? hardwarePatchTarget (part) : part.pluginCeId;
+    juce::Array<const LibraryRecord*> candidates;
+    for (const auto& record : library.allRecords())
+        if (record.type == "preset" && ! record.missing
+            && record.targetCeId == target
+            && (record.sourceType == "hardwarePatch") == part.hardware)
+            candidates.add (&record);
+
+    const auto rankOf = [] (const LibraryRecord& r)
+    { return r.sourceType == "programList" ? 0 : isVendorPresetSource (r.sourceType) ? 1 : 2; };
+    const auto indexOf = [] (const LibraryRecord& r)
+    { return r.sourceLocator.fromLastOccurrenceOf ("/", false, false).getIntValue(); };
+    std::sort (candidates.begin(), candidates.end(),
+               [&] (const LibraryRecord* a, const LibraryRecord* b)
+               {
+                   if (rankOf (*a) != rankOf (*b)) return rankOf (*a) < rankOf (*b);
+                   if (rankOf (*a) == 0 && indexOf (*a) != indexOf (*b))
+                       return indexOf (*a) < indexOf (*b);
+                   const auto byName = a->name.compareIgnoreCase (b->name);
+                   if (byName != 0) return byName < 0;
+                   return a->recordId < b->recordId;
+               });
+    return candidates;
+}
+
+std::vector<InstrumentHostService::SurfacePreset> InstrumentHostService::surfacePartPresets (const juce::String& partId)
+{
+    ensureLibrary();
+    std::vector<SurfacePreset> result;
+    if (const auto* part = rack.getPerformance().findPart (partId))
+        for (const auto* record : orderedPartPresets (*part))
+            if (! record->hidden)
+                result.push_back ({ record->recordId, record->name });
+    return result;
+}
+
+void InstrumentHostService::loadSurfacePartPreset (const juce::String& partId, const juce::String& recordId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    const auto* record = library.find (recordId);
+    if (! part || ! record || record->type != "preset" || record->hidden || record->missing
+        || record->targetCeId != (part->hardware ? hardwarePatchTarget (*part) : part->pluginCeId)
+        || (record->sourceType == "hardwarePatch") != part->hardware)
+        return;
+    auto* cmd = new juce::DynamicObject();
+    cmd->setProperty ("cmd", "loadLibraryRecord");
+    cmd->setProperty ("action", "replace");
+    cmd->setProperty ("partId", partId);
+    cmd->setProperty ("recordId", recordId);
+    handleCommand (juce::var (cmd));
 }
 
 void InstrumentHostService::restoreSession()

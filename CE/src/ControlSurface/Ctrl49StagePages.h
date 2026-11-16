@@ -26,7 +26,7 @@ namespace ceditor::ctrl49
 // --- SOUNDCHECK -----------------------------------------------------------------------------------
 
 Bytes buildRackListPayload (const std::string& name, int cursor, int total, int first,
-                            const std::vector<std::pair<std::string, std::string>>& rows);
+                            const std::vector<std::pair<std::string, std::string>>& rows, bool presets = false);
 
 struct SoundcheckSongView
 {

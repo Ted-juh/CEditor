@@ -464,6 +464,22 @@ Ctrl49SurfaceBroker::Pages Ctrl49SurfaceBroker::pages() const
     return layout;
 }
 
+void Ctrl49SurfaceBroker::openPartPresets()
+{
+    browsingPartPresets = true;
+    const auto& performance = service.getRackHost().getPerformance();
+    presetPartId = performance.focusedPartId;
+    partPresets = service.surfacePartPresets (presetPartId);
+    presetCursor = partPresets.empty() ? -1 : 0;
+    if (const auto* part = performance.findPart (presetPartId))
+        for (int i = 0; i < (int) partPresets.size(); ++i)
+            if (partPresets[i].id == part->lastPresetRecordId)
+            {
+                presetCursor = i;
+                break;
+            }
+}
+
 int Ctrl49SurfaceBroker::rackCursorIndex() const
 {
     const auto& rack = service.getRackHost().getPerformance();
@@ -583,9 +599,28 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         {
             const int cc = data[1], value = data[2];
             const bool inRack = previousPage == layout.rack;
-            const bool choose = inRack && cc == 33 && value == 127;
+            if (cc == 36 && value == 127)
+            {
+                openPartPresets();
+                reducer.setPage (layout.rack);
+                action.emplace();
+            }
+            else if (inRack && browsingPartPresets && cc == 33 && value == 127)
+            {
+                if (juce::isPositiveAndBelow (presetCursor, (int) partPresets.size()))
+                    service.loadSurfacePartPreset (presetPartId, partPresets[presetCursor].id);
+                return;
+            }
+            else if (inRack && browsingPartPresets && cc == 29 && value == 127)
+            {
+                browsingPartPresets = false;
+                rackCursorPart = presetPartId;
+                return;
+            }
+            const bool choose = inRack && ! browsingPartPresets && cc == 33 && value == 127;
             if ((cc == 35 || cc == 37 || choose) && value == 127)
             {
+                browsingPartPresets = false;
                 int target = layout.rack;
                 if (cc == 35)
                     rackCursorPart = performance.focusedPartId;
@@ -609,7 +644,12 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
             else if (inRack && (cc == 34 || ((cc == 30 || cc == 32) && value == 127)))
             {
                 const int delta = cc == 32 ? -1 : cc == 30 ? 1 : value < 64 ? value : value - 128;
-                if (! performance.parts.isEmpty())
+                if (browsingPartPresets)
+                {
+                    if (! partPresets.empty())
+                        presetCursor = juce::jlimit (0, (int) partPresets.size() - 1, presetCursor + delta);
+                }
+                else if (! performance.parts.isEmpty())
                     rackCursorPart = performance.parts.getReference (
                         juce::jlimit (0, performance.parts.size() - 1, rackCursorIndex() + delta)).partId;
                 return;
@@ -643,6 +683,7 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
 
         if (previousPage != reducer.page())
         {
+            if (reducer.page() != layout.rack) browsingPartPresets = false;
             if (reducer.page() == layout.rack)
                 rackCursorPart = performance.focusedPartId;
             if (reducer.page() < controlPages)
@@ -1199,7 +1240,7 @@ void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state,
     obj->setProperty ("payload", toArray (stage));
     obj->setProperty ("pageIndex", reducer.page());
     obj->setProperty ("pageCount", layout.count);
-    obj->setProperty ("pageKind", reducer.page() == layout.rack          ? "rack"
+    obj->setProperty ("pageKind", reducer.page() == layout.rack          ? (browsingPartPresets ? "presets" : "rack")
                                 : reducer.page() == layout.browse        ? "browse"
                                 : reducer.page() == layout.performance   ? "performance"
                                 : reducer.page() == layout.layers        ? "layers"
@@ -1230,7 +1271,27 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     Bytes labels, state, stage;
     std::string stageCall;
 
-    if (reducer.page() == layout.rack)
+    if (reducer.page() == layout.rack && browsingPartPresets)
+    {
+        const auto* part = performance.findPart (presetPartId);
+        const int total = part ? (int) partPresets.size() : 0;
+        int number = 0;
+        for (const auto& candidate : performance.parts)
+        {
+            ++number;
+            if (candidate.partId == presetPartId) break;
+        }
+        const auto title = part ? juce::String (number).paddedLeft ('0', 2) + "  "
+                                  + (part->hardware ? part->midiOutputName : part->pluginName) : "No part";
+        const int first = juce::jlimit (0, juce::jmax (0, total - 5), presetCursor - 2);
+        std::vector<std::pair<std::string, std::string>> rows;
+        for (int i = first; i < juce::jmin (first + 5, total); ++i)
+            rows.emplace_back (partPresets[i].name.toStdString(),
+                               partPresets[i].id == part->lastPresetRecordId ? "Loaded" : "");
+        stage = buildRackListPayload (title.toStdString(), total ? presetCursor : -1, total, first, rows, true);
+        stageCall = "set_presets";
+    }
+    else if (reducer.page() == layout.rack)
     {
         const auto& parts = performance.parts;
         const int cursor = rackCursorIndex();

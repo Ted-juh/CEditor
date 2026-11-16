@@ -31,7 +31,7 @@
   import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload,
            readMetersPayload, readLivePayload, readRackStateExtension, ARP_MODE_NAMES } from '../screen/ctrl49Payloads.js';
 
-  const KIND = { rack: 'Rack', control: 'Controls', performance: 'Performance', browse: 'Sound browser',
+  const KIND = { presets: 'Presets', rack: 'Rack', control: 'Controls', performance: 'Performance', browse: 'Sound browser',
                  layers: 'Layers', soundcheck: 'Soundcheck', discover: 'Discover', cue: 'Cue', changes: 'Changes',
                  meters: 'Meters', live: 'Live' };
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -103,7 +103,7 @@
   // left blank, and its steppers off.
   function stageSlots({ pageKind, payload }) {
     const unused = { label: '', text: '', unused: true };
-    if (pageKind === 'rack') return Array.from({ length: 8 }, () => unused);
+    if (pageKind === 'presets' || pageKind === 'rack') return Array.from({ length: 8 }, () => unused);
     if (pageKind === 'layers') {
       const view = readLayersPayload(payload);
       const part = view.parts.find((p) => p.index === view.focused);
@@ -341,6 +341,7 @@
   const setlists = $derived(($hostState.licence?.features ?? [])
     .find((f) => f.feature === 'scenesAndSetlists')?.allowed !== false);
   const HINT = {
+    presets: 'Scroll with the big dial or Up/Down. Press the dial to load the highlighted preset. Left returns to the rack.',
     rack: 'Use the cursor or big dial to highlight a rack part. Press the dial to select it. Control returns to your last control page.',
     layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
     soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',

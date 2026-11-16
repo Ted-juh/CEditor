@@ -836,6 +836,9 @@ public:
 
         A surface that declares nothing gets a zeroed BrowseSurface, which every function in
         SurfaceBrowse.h handles by refusing rather than by inventing. */
+    struct SurfacePreset { juce::String id, name; };
+    std::vector<SurfacePreset> surfacePartPresets (const juce::String& partId);
+    void loadSurfacePartPreset (const juce::String& partId, const juce::String& recordId);
     surface::BrowseSurface browseSurface() const;
     /** The facets the encoders turn — the library's own values, never invented ones. */
     std::vector<surface::BrowseFacet> browseFacets() const;
@@ -1233,6 +1236,7 @@ private:
                                  bool addNew, std::function<void()> afterLoaded = {});
     /** Availability, computed live against the catalogue (caller holds no locks; this takes
         catalogLock itself): empty = loadable, else the actionable reason. */
+    juce::Array<const LibraryRecord*> orderedPartPresets (const RackPart& part);
     juce::String recordUnavailableReason (const LibraryRecord& record) const;
     /** What `availableOnly` means here: the source is still on disk AND the plug-in the record
         targets is in the catalogue. Only the service knows the second half. */

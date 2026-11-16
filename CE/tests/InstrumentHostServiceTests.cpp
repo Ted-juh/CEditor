@@ -4820,6 +4820,9 @@ void testCtrl49AppScreen()
     using ceditor::ctrl49::Ctrl49SurfaceBroker;
 
     const auto dir = freshDataDir ("surface-app-screen");
+    const auto programsBefore = ceditor::test::StubSynthProcessor::factoryPrograms;
+    const juce::ScopeGuard restorePrograms { [&] { ceditor::test::StubSynthProcessor::factoryPrograms = programsBefore; } };
+    ceditor::test::StubSynthProcessor::factoryPrograms = { { "Init", 0.5f }, { "Bright", 0.9f } };
     seedCatalog (dir);
     Harness h (dir);
     h.cmd ("getState");
@@ -4911,6 +4914,32 @@ void testCtrl49AppScreen()
     check (broker.currentPage() == 4 && rackState.focusedPartId == rackState.parts.getReference (1).partId,
            "Control returns without committing a highlighted part");
 
+    const auto secondId = rackState.parts.getReference (1).partId;
+    h.cmd ("loadInstrument", { { "partId", secondId }, { "ceId", "VST3-good-synth" } });
+    const auto firstPreset = rackState.parts.getReference (0).lastPresetRecordId;
+    const auto secondPreset = rackState.parts.getReference (1).lastPresetRecordId;
+    press (36, 127);
+    tickPast();
+    check (h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("pageKind", {}).toString() == "presets",
+           "Browse opens the focused part's presets");
+    press (34, 1);
+    tickPast();
+    check (rackState.parts.getReference (0).lastPresetRecordId == firstPreset
+           && rackState.parts.getReference (1).lastPresetRecordId == secondPreset, "browsing leaves both sounds intact");
+    press (33, 127);
+    tickPast();
+    check (rackState.parts.getReference (1).lastPresetName == "Bright"
+           && rackState.parts.getReference (0).lastPresetRecordId == firstPreset, "dial loads Bright only on part two");
+    press (36, 127);
+    tickPast();
+    const auto presetPayload = h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("payload", {});
+    check ((int) presetPayload[0] == 1, "reopening highlights the loaded preset");
+    press (29, 127);
+    tickPast();
+    check (h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("pageKind", {}).toString() == "rack",
+           "cursor left returns to the rack without loading");
+    press (37, 127);
+    tickPast();
     press (40, 127);                            // past the last control page
     tickPast();
     screen = h.emits.last ("instrumentHostSurfaceScreen");

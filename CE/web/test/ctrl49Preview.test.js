@@ -358,7 +358,7 @@ test('every function the broker calls is one the page defines', () => {
   // A page beyond the knobs names its call once and sends it through a variable
   // (callLua (stageCall, ...)).
   const stage = [...broker.matchAll(/stageCall = "([a-z_]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(stage.sort(), ['set_changes', 'set_check', 'set_cue', 'set_discover', 'set_layers', 'set_live', 'set_meters', 'set_rack'],
+  assert.deepEqual(stage.sort(), ['set_changes', 'set_check', 'set_cue', 'set_discover', 'set_layers', 'set_live', 'set_meters', 'set_presets', 'set_rack'],
     'each page beyond the knobs names its call');
   for (const name of [...called, ...stage, 'init', 'set_mode', 'draw'])
     assert.match(lua, new RegExp(`^function ${name}\\(`, 'm'), `${name} is defined`);

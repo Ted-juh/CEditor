@@ -1387,19 +1387,25 @@ function set_rack(args)
     end
 end
 
+function set_presets(args)
+    set_rack(args)
+    page_kind = 11
+end
+
 local function draw_rack()
+    local presets = page_kind == 11
     title_bar(rack_screen.title, rack_screen.position)
-    if #rack_screen.rows == 0 then say(ROWTXT, "No parts in rack", GREY, 10, 48, 450, 24) end
+    if #rack_screen.rows == 0 then say(ROWTXT, presets and "No presets for this part" or "No parts in rack", GREY, 10, 48, 450, 24) end
     for r, row in ipairs(rack_screen.rows) do
         local y = 36 + (r - 1) * 38
         if r == rack_screen.cursor then
             draw_rect(4, y, 472, 36, ROW)
             draw_rect(4, y, 3, 36, ORANGE)
         end
-        say(ROWTXT, row.instrument, WHITE, 12, y + 7, 215, 24)
-        say(ROWTXT, row.preset, GREY, 230, y + 7, 240, 24)
+        say(ROWTXT, row.instrument, WHITE, 12, y + 7, presets and 365 or 215, 24)
+        say(ROWTXT, row.preset, GREY, presets and 386 or 230, y + 7, presets and 86 or 240, 24)
     end
-    say(SMALL, "UP/DOWN OR DIAL: BROWSE     PRESS DIAL: SELECT     CONTROL: BACK", GREY, 8, 250, 464, 16)
+    say(SMALL, presets and "TURN: BROWSE     PRESS: LOAD     LEFT: RACK" or "UP/DOWN OR DIAL: BROWSE     PRESS DIAL: SELECT     CONTROL: BACK", GREY, 8, 250, 464, 16)
 end
 
 function draw(args)
@@ -1413,7 +1419,7 @@ function draw(args)
         return
     end
 
-    if page_kind == 10 then draw_rack() return end
+    if page_kind == 10 or page_kind == 11 then draw_rack() return end
     if page_kind == 2 then
         draw_check()
         return
