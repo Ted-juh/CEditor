@@ -6277,9 +6277,20 @@ void testCtrl49Live()
     h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
     h.cmd ("addPart");
 
+    h.cmd ("addControlPage", { { "name", "Controls" } });
     double fakeNow = 0.0;
     Ctrl49SurfaceBroker::Options options;
-    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    FakeSurface fake;
+    std::array<int, 8> blueLights;
+    blueLights.fill (-1);
+    options.discover = [&]
+    {
+        auto ends = fake.makeEndpoints();
+        ends->setBlueButtonLight = [&] (int strip, bool on) { blueLights[(size_t) strip] = on; return true; };
+        return ends;
+    };
+    options.sessionSleep = [] (int) {};
+    options.loadingMilliseconds = 0;
     options.emit = [&h] (const juce::String& name, const juce::var& payload)
     {
         h.emits.entries.push_back ({ name, payload });
@@ -6314,11 +6325,17 @@ void testCtrl49Live()
         return performance.parts.getReference (0).arp;
     };
 
-    tickPast();
+    for (int i = 0; i < 400 && broker.state() != Ctrl49SurfaceBroker::State::connected; ++i)
+    {
+        tickPast();
+        std::this_thread::sleep_for (std::chrono::milliseconds (2));
+    }
+    check (broker.state() == Ctrl49SurfaceBroker::State::connected, "connected for blue step feedback");
     check (broker.pages().live < 0, "LIVE is not on the surface until it is asked for");
     h.cmd ("cueOnSurface", { { "on", true } });
-    h.cmd ("liveOnSurface", { { "on", true } });
     h.cmd ("layersOnSurface", { { "on", true } });
+    h.cmd ("liveOnSurface", { { "on", true } });
+    tickPast();
     const auto layout = broker.pages();
     check (layout.live == layout.cue + 1 && layout.layers == layout.live + 1,
            "asked for, it comes between CUE and LAYERS");
@@ -6337,6 +6354,25 @@ void testCtrl49Live()
            "a fresh part: arp off, no lane drawn, sixteen plain steps, both parts' zones");
     check (at (bytes, 12) == 100 && at (bytes, 13) == 2 && at (bytes, 14) == 1 && at (bytes, 15) == 100,
            "a plain step: velocity 100, no octave, one hit, always");
+
+    auto bluePress = [&] (int strip)
+    {
+        const auto msg = juce::MidiMessage::noteOn (1, 16 + strip, (juce::uint8) 127);
+        h.service->noteMidiActivity ("CTRL49 Mackie/HUI", msg);
+        h.service->noteMidiActivity ("CTRL49 Mackie/HUI", juce::MidiMessage::noteOff (1, 16 + strip));
+        h.service->drainParameterEvents();
+        tickPast();
+    };
+    for (int strip = 0; strip < 8; ++strip)
+    {
+        check (blueLights[(size_t) strip] == 1, "entry paints the enabled step blue");
+        bluePress (strip);
+        check (focusedArp().velocityPattern[strip] == 0 && blueLights[(size_t) strip] == 0,
+               "blue press and release rest one step and extinguish its light");
+        bluePress (strip);
+        check (focusedArp().velocityPattern[strip] == 100 && blueLights[(size_t) strip] == 1,
+               "the next press enables the step and lights it again");
+    }
 
     press (12, 2);                                   // E2: the first step's velocity up two detents
     press (18, 1);                                   // E8: the arp on, up
@@ -6409,6 +6445,10 @@ void testCtrl49Live()
              && arp.octavePattern[11] == 1 && arp.chancePattern[11] == 95,
            "a longer lane goes on as the short one was sounding: its steps round again");
     check (at (payload(), 4) == 12, "and the page shows twelve");
+    bluePress (0);
+    check (focusedArp().velocityPattern[8] == 0 && focusedArp().velocityPattern[0] == 108
+           && blueLights[0] == 0 && blueLights[4] == 0,
+           "in the second half blue B1 toggles step nine and missing steps stay dark");
 
     press (11, 127);                                 // E1 back into the first half
     press (11, 127);

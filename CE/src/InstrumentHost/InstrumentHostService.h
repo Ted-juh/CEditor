@@ -637,6 +637,8 @@ public:
 
     /** Whether HoSTage reads Mackie Control / HUI ports as controls (the default) rather than
         passing them to the instruments as MIDI. Persisted in mackie-section.json. */
+    // Message thread. The connected LIVE page consumes this row; other pages use normal mappings.
+    std::function<bool (int, bool)> onCtrl49BlueButton;
     bool mackieSectionEnabled() const { return mackieSection.load(); }
 
     /** The surface broker reports manual page changes so a captured scene can remember the

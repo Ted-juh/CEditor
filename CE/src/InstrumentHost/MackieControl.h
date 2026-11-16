@@ -23,6 +23,7 @@ struct Event
     int index = -1;       // fader 0..8, button 0..7, transport 0..4 (rewind, forward, stop, play, record)
     int step = 0;         // bank: -1 or +1
     float value = 0.0f;   // fader position 0..1
+    bool ctrl49Blue = false;
     bool down = false;    // button, bank, transport: pressed rather than released
 };
 

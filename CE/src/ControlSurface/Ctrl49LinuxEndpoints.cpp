@@ -137,6 +137,19 @@ std::unique_ptr<Ctrl49SurfaceEndpoints> discoverCtrl49Endpoints()
 
     auto ends = std::make_unique<Ctrl49SurfaceEndpoints>();
     auto* surface = link.get();
+    // The blue Mackie row is MIDI 4, separate from the display cable. A subscribed
+    // ALSA output is required to open the USB destination for direct delivery.
+    if (snd_seq_connect_to (handle, surface->localPort, surface->keyboard, 3) >= 0)
+        ends->setBlueButtonLight = [surface] (int strip, bool on)
+        {
+            snd_seq_event_t event;
+            snd_seq_ev_clear (&event);
+            snd_seq_ev_set_source (&event, surface->localPort);
+            snd_seq_ev_set_subs (&event);
+            snd_seq_ev_set_direct (&event);
+            snd_seq_ev_set_noteon (&event, 0, 16 + strip, on ? 127 : 0);
+            return snd_seq_event_output_direct (surface->seq.get(), &event) >= 0;
+        };
     ends->dequeueInput = [surface] { return surface->dequeue(); };
     ends->inputRunning = [surface] { return surface->failure.empty(); };
     ends->inputFailure = [surface] { return surface->failure; };

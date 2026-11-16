@@ -14767,6 +14767,8 @@ void InstrumentHostService::drainMackieEvents()
                 moved = moveSurfaceFader (pageId, event.index, event.value, queued.minimum, queued.maximum) || moved;
                 break;
             case mackie::Event::Kind::button:
+                if (event.ctrl49Blue && onCtrl49BlueButton && onCtrl49BlueButton (event.index, event.down))
+                    break;
                 pressSurfaceControl (pageId, "button", event.index, event.down);
                 break;
             case mackie::Event::Kind::bank:
@@ -17288,7 +17290,10 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     // else — not the recent-play ring, not MIDI learn, not the activity readout's notes.
     if (mackieSection.load() && mackie::isMackiePort (deviceName))
     {
-        const auto event = mackie::decode (message);
+        auto event = mackie::decode (message);
+        event.ctrl49Blue = event.kind == mackie::Event::Kind::button && message.getChannel() == 1
+                         && juce::isPositiveAndBelow (message.getNoteNumber() - 16, 8)
+                         && deviceName.containsIgnoreCase ("CTRL49");
         if (event.kind == mackie::Event::Kind::none)
             return;
         const std::scoped_lock lock (midiActivityLock);

@@ -13,11 +13,23 @@ Ctrl49SurfaceBroker::Ctrl49SurfaceBroker (host::InstrumentHostService& serviceTo
                                           Options optionsToUse)
     : service (serviceToDrive), options (std::move (optionsToUse))
 {
+    service.onCtrl49BlueButton = [this] (int strip, bool down)
+    {
+        if (currentState != State::connected || ! endpoints || ! endpoints->setBlueButtonLight
+            || reducer.page() != pages().live)
+            return false;
+        // The keyboard also changes its own light. Reassert even an out-of-lane rest.
+        blueLights[(std::size_t) strip] = -1;
+        if (down)
+            applyLiveTurns ({}, (liveCursor < 8 ? 0 : 8) + strip, 0);
+        return true;
+    };
     emitStatus();
 }
 
 Ctrl49SurfaceBroker::~Ctrl49SurfaceBroker()
 {
+    service.onCtrl49BlueButton = {};
     joinWorker();
 
     if (session != nullptr)
@@ -1023,6 +1035,7 @@ void Ctrl49SurfaceBroker::forgetPadState()
     switchDownAt.fill (-1.0);
     switchFired.fill (false);
     paintedPads.fill (-1);
+    blueLights.fill (-1);
 }
 
 void Ctrl49SurfaceBroker::paintPads()
@@ -1045,6 +1058,8 @@ void Ctrl49SurfaceBroker::paintPads()
     std::vector<LiveStep> liveSteps;
     if (page == layout.live && livePart() >= 0)
         liveSteps = liveLaneOf (performance.parts.getReference (livePart()).arp);
+    const bool paintBlue = page == layout.live && service.mackieSectionEnabled() && endpoints->setBlueButtonLight;
+    if (! paintBlue) blueLights.fill (-1);
     for (int pad = 1; pad <= 8; ++pad)
     {
         const auto liveStep = (liveCursor < 8 ? 0 : 8) + pad - 1;
@@ -1057,6 +1072,9 @@ void Ctrl49SurfaceBroker::paintPads()
                        : page == layout.cue ? (pad == 1 && cuePicked >= 0 ? 0xFFA500 : 0)
                        : page == layout.discover ? (pad <= discoverRows ? 0xFFA500 : 0)
                                                  : 0xFFA500;
+        auto& blue = blueLights[(std::size_t) (pad - 1)];
+        if (paintBlue && blue != int (rgb != 0) && endpoints->setBlueButtonLight (pad - 1, rgb != 0))
+            blue = int (rgb != 0);
         auto& painted = paintedPads[(std::size_t) (pad - 1)];
         if (painted == rgb)
             continue;
