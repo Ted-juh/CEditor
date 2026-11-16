@@ -11323,7 +11323,13 @@ void testMackieSection()
         check ((int) faderLayers().getProperty ("count", 0) == 2, "the faders can be given two layers");
         h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 0 }, { "layer", 1 },
                                          { "partId", partId }, { "parameterId", "@pan" } });
+       #if JUCE_LINUX
+        for (const auto* port : { "CTRL49 MIDI 1", "CTRL49 MIDI 2", "CTRL49 MIDI 3", "Other MIDI 4" })
+            check (! mackie::isMackiePort (port), "only the CTRL49 Mackie endpoint is intercepted");
+        send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 127), "CTRL49 MIDI 4");
+       #else
         send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 127));
+       #endif
         send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 0));
         check ((int) faderLayers().getProperty ("active", -1) == 1, "Bank ▶ steps the faders to their next layer");
         const auto panBefore = pan();

@@ -32,6 +32,11 @@ enum Transport { rewind = 0, forward = 1, stop = 2, play = 3, record = 4 };
     CTRL49's is "CTRL49 Mackie/HUI". */
 inline bool isMackiePort (const juce::String& deviceName)
 {
+   #if JUCE_LINUX
+    // ALSA names the CTRL49's Mackie endpoint by port number.
+    if (deviceName.trimEnd() == "CTRL49 MIDI 4")
+        return true;
+   #endif
     return deviceName.containsIgnoreCase ("mackie") || deviceName.containsIgnoreCase ("HUI");
 }
 
