@@ -15,6 +15,7 @@ port of HoSTage was not pushed when this was written, so check that branch befor
   [Decisions](#decisions).
 - **Seven more features**, taken after the decisions: [More features](#more-features).
 - **Eight effect features**, taken after that: [Effects](#effects).
+- **Five more, proposed but not decided**: [Still more](#still-more-proposed-not-decided).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -386,6 +387,28 @@ setting; bypass has no crossfade; a part's inserts run in series only; no MIDI m
    MIDI modules, instrument, inserts, fader, sends. Each block carries its bypass, dry/wet, its few
    most-used knobs (so the plug-in's window is rarely needed on stage), its latency and its state
    (running, restarting, failed). MIDI modules and audio inserts work the same way.
+
+### Still more, proposed (not decided)
+
+Proposed on 2026-11-16, when the owner asked for more features beyond effects. Checked on `main`.
+
+1. **Two keyboards, each with its own parts.** A part filters incoming MIDI by channel, key and
+   velocity, but not by which keyboard it came from (`PartMidiRules.h`). Two keyboards on the same
+   channel, the usual stage set-up with an upper and a lower keyboard, cannot be split. A part
+   should be able to listen to one keyboard only.
+2. **Bluetooth MIDI**, for wireless foot pedals and controllers. On Windows it needs JUCE's WinRT
+   MIDI, which is off (`JUCE_USE_WINRT_MIDI` defaults to 0 and nothing sets it).
+3. **A gig-ready check of the computer.** Most dropouts on stage come from the computer's settings,
+   not the program: on battery, a power plan that slows the processor, sleep, notifications,
+   updates starting mid-set. One screen in Health that checks these and says what to change. The
+   Windows partner of direction 9's Linux checks.
+4. **Stand-in sounds.** A show opened on a computer without one of its plug-ins leaves those parts
+   silent today. Instead, the part could play the nearest sound this computer has, clearly marked
+   as a stand-in. The library already finds similar sounds (the CTRL49's Discover page).
+5. **Back on the same song after a crash.** Recovery brings back a rig that is known to start
+   (`SessionRecovery.h`); it should also land on the song and scene that were playing, ready to
+   play on. Whether it does today needs checking on a real crash. `product-ideas.md` §7 has the
+   idea as "survive a dead laptop".
 
 ## Order of work
 
