@@ -390,33 +390,15 @@
     <span class="status" class:live={$hostSurface.state === 'connected'} data-testid="ctrl49-screen-status">{status}</span>
   </div>
 
-  <div class="body">
-    <!-- The screen is worked like the keyboard's: knobs dragged or scrolled, pages changed with
-         the arrow keys. That is role="application", not "img": an image role lets a screen reader
-         keep the arrow keys for itself. Svelte counts <canvas> as interactive and any role on it
-         as a step down, which is not so here. -->
-    <!-- svelte-ignore a11y_no_interactive_element_to_noninteractive_role -->
-    <canvas bind:this={canvas} width="480" height="272" data-testid="ctrl49-screen-canvas"
-            tabindex="0" role="application" onkeydown={onKeydown}
-            aria-label={`CTRL49 display, ${KIND[$ctrl49Screen.pageKind]} page ${$ctrl49Screen.pageIndex + 1} of ${$ctrl49Screen.pageCount}. Drag or scroll on a knob to turn it; arrow keys change page.`}
-            onpointerdown={knobDown} onpointermove={knobMove} onpointerup={knobUp} onpointercancel={knobUp}
-            onpointerleave={() => { if (!drag) hoverSlot = -1; }}
-            class:over-knob={hoverSlot >= 0}></canvas>
-
-    <div class="controls">
-      <div class="pager">
-        <button type="button" title="Page Left" aria-label="Page Left" data-testid="ctrl49-page-left"
-                onclick={() => surfaceInput(39, 127)}><ChevronLeft size={16} /></button>
-        <span class="page" data-testid="ctrl49-page">
-          {#if activePage}<b>{$ctrl49Screen.pageIndex + 1} / {pages.length}</b> <em>{activePage.name}</em>
-          {:else}{kind === 'presets' ? 'Browse' : KIND[kind]}{/if}
-        </span>
-        <button type="button" title="Page Right" aria-label="Page Right" data-testid="ctrl49-page-right"
-                onclick={() => surfaceInput(40, 127)}><ChevronRight size={16} /></button>
-      </div>
-
+  <nav class="page-bar" aria-label="CTRL49 pages">
       {#if pages.length}
-        <div class="page-tools"><span class="group-label">Control pages</span>
+        <div class="page-tools control-tools"><span class="group-label">Control pages</span>
+        <div class="page-strip" bind:this={strip} role="group" aria-label="Control pages">
+          {#each pages as p (p.pageId)}
+            <button data-page={p.pageId} aria-pressed={activePage?.pageId === p.pageId}
+                    onclick={() => showControlPage(p.pageId)}>{p.name}</button>
+          {/each}
+        </div>
           {#if editingPage}
             <input aria-label="Control page name" bind:value={draft} use:focusAndSelect onblur={finishRename}
                    onkeydown={(e) => { if (e.key === 'Enter') finishRename(); if (e.key === 'Escape') editingPage = ''; }} />
@@ -425,27 +407,22 @@
                     onclick={() => { editingPage = activePage.pageId; draft = activePage.name; }}><Pencil size={14} /></button>
           {/if}
         </div>
-        <div class="page-strip" bind:this={strip} role="group" aria-label="Control pages">
-          {#each pages as p (p.pageId)}
-            <button data-page={p.pageId} aria-pressed={activePage?.pageId === p.pageId}
-                    onclick={() => showControlPage(p.pageId)}>{p.name}</button>
-          {/each}
-        </div>
       {/if}
       <div class="page-tools">
         <button aria-pressed={kind === 'performance'} onclick={() => showSurfaceStagePage('performance')}>Performance</button>
       </div>
       <div class="page-tools"><span class="group-label">After Performance</span>
-        <button title="Manage pages" aria-label="Manage pages" aria-expanded={managing}
-                onclick={() => managing = !managing}><Settings size={14} /></button>
-      </div>
-      <div class="page-tools" role="group" aria-label="After Performance">
+
+
         <button aria-pressed={kind === 'rack'} onclick={() => surfaceInput(35, 127)}>Rack</button>
         <button aria-pressed={kind === 'presets'} onclick={() => surfaceInput(36, 127)}>Browse</button>
         {#each optionalKinds.filter(k => pagesOn[k]) as k}
           <button aria-pressed={kind === k} onclick={() => showSurfaceStagePage(k)}>{KIND[k]}</button>
         {/each}
+        <button title="Manage pages" aria-label="Manage pages" aria-expanded={managing}
+                onclick={() => managing = !managing}><Settings size={14} /></button>
       </div>
+  </nav>
       {#if managing}
       <div class="stage-pages" role="group" aria-label="Manage pages">
         <span class="group-label">Show on keyboard</span>
@@ -476,6 +453,33 @@
 
       {/if}
 
+  <div class="body">
+    <div class="display-column">
+    <!-- The screen is worked like the keyboard's: knobs dragged or scrolled, pages changed with
+         the arrow keys. That is role="application", not "img": an image role lets a screen reader
+         keep the arrow keys for itself. Svelte counts <canvas> as interactive and any role on it
+         as a step down, which is not so here. -->
+    <!-- svelte-ignore a11y_no_interactive_element_to_noninteractive_role -->
+    <canvas bind:this={canvas} width="480" height="272" data-testid="ctrl49-screen-canvas"
+            tabindex="0" role="application" onkeydown={onKeydown}
+            aria-label={`CTRL49 display, ${KIND[$ctrl49Screen.pageKind]} page ${$ctrl49Screen.pageIndex + 1} of ${$ctrl49Screen.pageCount}. Drag or scroll on a knob to turn it; arrow keys change page.`}
+            onpointerdown={knobDown} onpointermove={knobMove} onpointerup={knobUp} onpointercancel={knobUp}
+            onpointerleave={() => { if (!drag) hoverSlot = -1; }}
+            class:over-knob={hoverSlot >= 0}></canvas>
+
+      <div class="pager">
+        <button type="button" title="Page Left" aria-label="Page Left" data-testid="ctrl49-page-left"
+                onclick={() => surfaceInput(39, 127)}><ChevronLeft size={16} /></button>
+        <span class="page" data-testid="ctrl49-page">
+          {#if activePage}<b>{$ctrl49Screen.pageIndex + 1} / {pages.length}</b> <em>{activePage.name}</em>
+          {:else}{kind === 'presets' ? 'Browse' : KIND[kind]}{/if}
+        </span>
+        <button type="button" title="Page Right" aria-label="Page Right" data-testid="ctrl49-page-right"
+                onclick={() => surfaceInput(40, 127)}><ChevronRight size={16} /></button>
+      </div>
+
+    </div>
+    <div class="controls">
       <div class="encoders" role="group" aria-label="Encoders">
         {#each slots as s, slot}
           <div class="encoder" class:active={!splash && !stage && activeSlot === slot} class:hover={hoverSlot === slot}
@@ -573,10 +577,22 @@
   .head strong { font-size: 13px; }
   .status { font-size: 12px; color: var(--host-text-dim, #8791a0); }
   .status.live { color: #8fd0a4; }
-  .body { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .ctrl49-screen { width: 100%; max-width: 1290px; min-width: 0; box-sizing: border-box; container-type: inline-size; }
+  .page-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+    border-block: 1px solid var(--host-line, #34404a); padding: 7px 0; }
+  .body { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .display-column { display: grid; min-width: 0; gap: 5px; }
+  .display-column .pager { justify-content: center; }
+  @container (max-width: 820px) {
+    .body { grid-template-columns: minmax(0, 1fr); }
+    .display-column { width: min(100%, 480px); }
+  }
+  @container (max-width: 480px) {
+    .controls .encoders, .controls .pads { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
   canvas {
     width: 100%; max-width: 480px; aspect-ratio: 480 / 272; height: auto; touch-action: none;
-    border-radius: 6px; border: 6px solid #050608; background: #07090d; box-sizing: content-box;
+    border-radius: 6px; border: 6px solid #050608; background: #07090d; box-sizing: border-box;
   }
   canvas.over-knob { cursor: ns-resize; }
   canvas:focus-visible { outline: 2px solid var(--host-accent, #ff9408); outline-offset: 2px; }
@@ -594,7 +610,7 @@
   button:hover { border-color: var(--host-accent, #ff9408); }
   /* Encoders and pads share one four-column grid, as on the keyboard: pad N sits under
      encoder N's column, and both fill whatever width the card has. */
-  .encoders, .pads { display: grid; grid-template-columns: repeat(4, minmax(104px, 1fr)); gap: 8px 12px; }
+  .encoders, .pads { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 12px; }
   .encoder { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 4px; border-radius: 6px; border: 1px solid transparent; }
   .encoder.hover { background: var(--host-surface-raised, #1d2229); }
   .encoder.active { border-color: var(--host-accent, #ff9408); }
@@ -620,11 +636,17 @@
     background: var(--host-surface-raised); color: var(--host-text); border-color: var(--host-line);
   }
   .page-tools, .page-strip { display: flex; align-items: center; gap: 6px; }
-  .page-tools { flex-wrap: wrap; }
+  .page-tools { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+  .control-tools { flex-wrap: nowrap; }
+  .control-tools input { width: 9em; min-width: 4em; }
+  .page-tools .group-label { white-space: nowrap; }
+  .page-bar .page-tools + .page-tools { padding-left: 12px; border-left: 1px solid var(--host-line, #34404a); }
   .page-tools .group-label { margin: 0; }
-  .page-strip { overflow-x: auto; }
+  .page-strip { min-width: 0; max-width: min(44vw, 520px); overflow-x: auto; }
   .page-strip button { flex: none; white-space: nowrap; }
-  .page-strip button[aria-pressed="true"], .page-tools button[aria-pressed="true"] {
+  .ctrl49-screen .page-bar button[aria-pressed="true"] {
+    --host-surface-raised: #49331c; --host-line: #ed9e4b; --host-text: #ffe2b9;
+    box-shadow: inset 0 -3px #ed9e4b; color: #ffe2b9;
     border-color: var(--host-accent, #ff9408); background: var(--host-accent-surface, #2a2116);
   }
   .stage-pages { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
