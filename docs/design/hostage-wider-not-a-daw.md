@@ -1,10 +1,11 @@
 # HoSTage, wider — and the line before a DAW
 
-*Discussion record, started 2026-11-16. Nothing in it is built. Four decisions are taken, all on
+*Discussion record, started 2026-11-16. Nothing in it is built. Five decisions are taken, all on
 2026-11-16: **HoSTage is for anyone on stage** (decision 2, see
-[Decision 2, taken](#decision-2-taken-anyone-on-stage)), and decisions 11 to 13 on step 2, where the
-owner took the recommendations: mappings per interface, an input bus on the VST3, and waiting for
-the interface on stage (see [Decisions for the owner](#decisions-for-the-owner)). Step 2 of the work, Audio & MIDI, is
+[Decision 2, taken](#decision-2-taken-anyone-on-stage)); **Solo stays, with Listen as a separate
+headphone button** (decision 10); and decisions 11 to 13 on step 2, where the owner took the
+recommendations: mappings per interface, an input bus on the VST3, and waiting for the interface on
+stage (see [Decisions for the owner](#decisions-for-the-owner)). Step 2 of the work, Audio & MIDI, is
 [worked through](#step-2-worked-through-audio--midi), not built. The other decisions at the end are
 the owner's. Written from `main`: the owner's Linux standalone port of
 HoSTage is not pushed yet, so where this says something is Windows-only or missing, that branch may
@@ -410,7 +411,9 @@ output 1–2 only.
 
 **What else changes:**
 
-- **Solo becomes listen.** Today Solo is solo-in-place: any soloed part silences every other part at
+- **Listen beside Solo.** *Decided since (decision 10): Solo stays as described here, and Listen is
+  a separate headphone button; the paragraph below is the first proposal.* Today Solo is
+  solo-in-place: any soloed part silences every other part at
   its gain node (`InstrumentRackHost::applyMixerState`), which is every output, front of house
   included, and Stage Lock allows it (`setPartMixer` is on `stageLock.js`'s allow-list). On a
   keyboard rig that is one stray click from silence; with a singer in the rig, soloing a synth takes
@@ -595,11 +598,12 @@ instrument; the DAW is where its recordings go.
 9. **Not a mixing desk.** Confirm the second line: HoSTage processes the sound of the people who
    play through it, and front of house belongs to the desk. *Worked through in
    [Decision 9](#decision-9-not-a-mixing-desk); recommendation: confirm it.*
-10. **Solo.** Once there is a monitor output, should Solo become listen-in-the-ears and never touch
-    front of house? Today it silences everything else at every output, under Stage Lock too.
-    *Worked through in [Decision 10](#decision-10-solo-as-listen), which found Solo saved into
-    shows and misreported on the Stage screen; recommendation: yes to its six parts, 5 and 6
-    first.*
+10. ~~**Solo.** Should Solo become listen-in-the-ears?~~ **Decided, 2026-11-16: Solo stays as it
+    is (silencing every other part), and Listen is a separate button with a headphone icon.** See
+    [Decision 10](#decision-10-solo-stays-and-listen-beside-it), which also found Solo saved into
+    shows and misreported on the Stage screen, and proposes the details: Listen pre-fader and
+    unaffected by Mute and Solo, dimming rather than replacing, the click never dimmed; Solo not
+    saved, SOLOED OUT on stage, and a banner to clear it.
 11. ~~**Mappings per interface or per computer?**~~ **Decided, 2026-11-16: per interface**, as
     recommended. See [2b](#2b-name-what-the-show-needs-map-it-once-per-interface).
 12. ~~**The VST3's input bus.** Add one, and when?~~ **Decided, 2026-11-16: add it, and early**,
@@ -624,13 +628,13 @@ Revised after decision 2. A recommendation, not a ranking of everything:
    (2b, which fixes the hardware return's channel number and its port id too); output strips and
    monitor mixes (2c); the device watched on stage (2d); the VST3 (2e); JACK and ASIO (2f).
 3. **The input part**, with its input meter, MIDI to inserts, the tuner, mute inputs and the output
-   limiter with its gain reduction; Solo as listen (decision 10) once the in-ears exist.
+   limiter with its gain reduction; the Listen button (decision 10) once the in-ears exist.
 4. **Foot controllers and stomp mode** (direction 5 and the tools above).
 5. **The audio looper, and input chains in the library** with their reference signal.
 
 Any time, because they need nothing else and guard against a failure that exists today:
-**decision 10's points 5 and 6**, Solo never saved into a show or carried onto stage, and the Stage
-screen no longer calling a soloed-out part LIVE.
+**decision 10's safety pieces**: Solo not saved into a show or restored at start, the Stage screen
+saying SOLOED OUT instead of LIVE, and a banner on stage that clears a Solo in one tap.
 
 Alongside, because they do not depend on any of that: **show control (3)**, cheap and built almost
 entirely on what exists (MIDI clock out and Link first), and **the whole rig (4)**, which only this
@@ -747,7 +751,8 @@ What "an interface" is, precisely, because the system does not hand over one nam
   desks it does.
 - **The click** goes to its pair by exclusive routing, as parts are routed today, so it can never
   reach Main.
-- **Solo as listen** (decision 10) needs one pair marked as the listen output: the in-ears.
+- **The Listen button** (decision 10) needs one pair marked as the listen output: the in-ears, or
+  the interface's headphone socket.
 - **The Mixer's new meters** (above) hang off the output strips.
 
 ### 2d. The device on stage
@@ -902,7 +907,7 @@ product, and its competition is digital desks rather than live hosts.
 **Recommendation: confirm the line**, with the desk feed, stems and the input list as what makes
 HoSTage a good neighbour to the desk rather than a replacement for it.
 
-### Decision 10: Solo as listen
+### Decision 10: Solo stays, and Listen beside it
 
 **What Solo does today**, from the code:
 
@@ -932,37 +937,91 @@ to a listen bus (the engineer's headphones or wedge), either before the fader (P
 listen: heard even with the fader down) or after it (AFL). Solo-in-place, the studio kind, is the
 one live desks guard against, because it empties the PA.
 
-**The proposal, in six parts:**
+**Decided, 2026-11-16: Solo stays as it is, and Listen is a button of its own.**
 
-1. **Solo becomes Listen once a listen output exists**: the pair marked as the listen output in 2c,
-   normally the in-ears. The soloed strip is heard there; front of house is untouched.
-2. **Pre-fader, after the inserts.** A part can be heard before it is brought in: a pad faded up
-   mid-song can be checked with its fader still down. Returns and buses get Listen too (the reverb
-   on its own), which they never had as solo.
-3. **Dim, not replace, and never the click.** A player in in-ears is also playing with them.
-   Replacing their mix with one soloed part mid-song takes away their own voice and the click. So
-   Listen brings the soloed strip up and dims the rest of the in-ear mix, and the click is never
-   dimmed.
-4. **Without a listen output** (a keyboard player with a stereo out only): solo-in-place as today,
-   in Build, where it is a sound-design tool; under Stage Lock, refused. That means Stage Lock
-   reading `setPartMixer` field by field, solo refused while volume, pan and mute pass. There is a
-   precedent: the player role already refuses `setControlSlotOptions` field by field.
-   `stageSafeParity.test.js` compares command names only, so a field rule needs a sibling test
-   holding the browser preview's copy to it.
-5. **Never saved into a show, never carried onto stage.** Solo-in-place is cleared when Stage is
-   entered and is not written into a show. Listen is a moment, not a setting, and is not saved at
-   all.
-6. **The Stage screen tells the truth.** A part silenced by another part's solo says so (for
-   example SOLOED OUT), not LIVE, and is not counted as live.
+> Well, I liked the fact you could solo a channel/ instrument that would mute all the others. So,
+> instead of "solo" i would prefer a headphone icon as an extra button.
+>
+> — the owner
 
-**Which of these stand on their own.** Points 5 and 6 need no monitor output and protect every rig
-that exists today: of everything in this record, they are the cheapest change that removes a way to
-go silent on stage. Point 4 needs only the field-by-field check. Points 1 to 3 come with 2c's
-outputs. The manual changes in chapter 6 (the Mixer) and chapter 11, whose Stage Lock list says
-"part levels, mute and solo".
+*The first version of this section proposed turning Solo into Listen, in six parts. The owner kept
+Solo, a tool they use, and asked for Listen as a separate button with a headphone icon. What
+follows is that, worked through. The shape is decided; the details below are proposals.*
 
-**Recommendation: yes to all six**, with 5 and 6 first, whenever the program is next changed,
-because they guard against a failure that already exists.
+**Two buttons, two jobs:**
+
+| | **S** (Solo) | Headphones (Listen) |
+|---|---|---|
+| What it does | Silences every other part | Puts this strip in the listen output |
+| Front of house | Changes it | Never touches it |
+| Who hears the difference | Everyone | Whoever wears the listen output |
+| Where it acts | The part's gain node, as today | After the inserts, before the fader |
+| Which strips have it | Parts, as today | Parts, input parts, buses, returns, the master, the output strips |
+| Under Stage Lock | Allowed, as today | Allowed |
+| Saved | Proposed: no (below) | No |
+
+**Listen, in detail:**
+
+1. **Where it goes**: the pair marked as the listen output in Audio & MIDI (2c). That is usually
+   the in-ears, or the interface's headphone socket, which on many interfaces is a pair of its own.
+   It has to be a pair on the same interface: the laptop's own headphone socket is a second device
+   on a clock of its own, and HoSTage opens one device. Without a listen output, the button is
+   shown dimmed with a hint saying where to set one, not hidden, so that it is clear the feature
+   exists.
+2. **What it hears.** For a part, an input part, a bus or a return: the signal after its inserts
+   and before its fader, so a pad can be checked before it is faded in and a return heard on its
+   own. Built from 2c's machinery: a pre-fader send to a listen bus at full level, switched on while
+   the button is lit. For the master and the output strips: the signal as it leaves, so "what is
+   the PA getting?" can be heard from the stage.
+3. **It ignores Mute and Solo.** A muted part can be listened to before it is unmuted, as on any
+   desk. That is how a microphone that opened muted (decision 2's input part) is checked without
+   the PA hearing it, and how a part silenced by somebody's Solo can still be heard by the one who
+   needs to.
+4. **Dim, not replace; never the click.** The rest of the in-ear mix is dimmed (around −20 dB, set
+   beside the listen output), so a player listening mid-song still hears themselves and the band.
+   The click and the cue voice are never dimmed. In Build, a **Listen alone** switch replaces
+   instead of dimming, for checking a sound in silence.
+5. **One at a time.** Pressing another strip's Listen moves it there; Ctrl-click adds a strip, as a
+   desk's additive solo does. The listen output's own strip says what is being heard ("Listening:
+   Juno"), so a Listen left on is found.
+6. **Never saved.** It is a moment, not a setting.
+7. **On a control.** Listen and Solo both become things a control can be given: a pad that listens
+   to the next part before it comes in, or a pad that solos the lead for a break, which is the use
+   of Solo the owner wants to keep. Today a control can be given neither. These go with stomp
+   mode's new targets (the inventory above).
+
+**The headphone icon is taken.** It already marks a part silenced by another part's Solo
+(`HostPartIssueIcons.svelte`: `solo: Headphones`, for "Part audio suppressed by Solo on …"). One icon
+meaning two things on the same row would mislead, so that issue gets another icon. Proposal: an
+**S** badge in Solo's colour, pointing at the cause.
+
+**Solo, kept, and made hard to be surprised by.** The owner keeps Solo-in-place on purpose, so the
+first version's refusal of Solo under Stage Lock goes: Solo stays allowed on stage, and Stage Lock
+needs no field-by-field check of `setPartMixer`. What stays from the first version is what makes
+Solo safe to keep:
+
+- **Not saved.** Solo is not written into a show, and not restored when HoSTage starts or recovers
+  a rig. Within a session it stays until it is let go. The silent gig is a solo that came back from
+  a file nobody knew held one; a solo pressed on purpose is never in a file.
+- **The Stage screen tells the truth.** A part silenced by another part's Solo reads **SOLOED OUT**,
+  not LIVE, and is not counted among the live ones.
+- **A banner on stage with one tap to clear it**: "SOLO: Juno. Everything else is silent. Clear
+  solo." Beside the existing banners for a stopped plug-in or a stuck note, and as quick to act on.
+  Clearing needs no hold to confirm: it only brings sound back.
+
+**Which pieces stand on their own.** "Not saved", SOLOED OUT and the banner need nothing else and
+protect every rig that exists today: still the cheapest change in this record that removes a way to
+go silent on stage. The Listen button needs a listen output, so it comes with 2c, and the icon swap
+with it. Solo and Listen as control targets come with stomp mode.
+
+**Tests.** The Listen command placed in both lists (`stageSafeParity.test.js`,
+`hostagePlayerRole.test.js`): allowed under Stage Lock and in a player. In `RackHostTests`: a muted
+part heard at the listen output and not at Main; a soloed rig with Listen on a silenced part; the
+click undimmed while Listen is on. In the model's tests: a session written with a part soloed reads
+back with none.
+
+**The manual.** Chapter 6 (the Mixer): Solo as it is, and Listen beside it. Chapter 11: the Stage
+Lock list ("part levels, mute and solo") gains Listen, and the banner is described with the others.
 
 ## Where this comes from
 
