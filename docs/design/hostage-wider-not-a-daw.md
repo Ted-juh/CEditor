@@ -14,7 +14,7 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **What is decided**: all thirteen questions, each with its reason, in
   [Decisions](#decisions).
 - **Seven more features**, taken after the decisions: [More features](#more-features).
-- **Effect features, proposed but not decided**: [Effects](#effects-proposed-not-decided).
+- **Eight effect features**, taken after that: [Effects](#effects).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -356,10 +356,12 @@ a scene and a scene can carry a tempo (`PatternModel.h`), so that was not listed
 8. **Show history.** The show as it was played at each gig, kept, and what changed since: useful
    when a song sounded wrong, and when one band member hands the show to another.
 
-### Effects, proposed (not decided)
+### Effects
 
 Proposed on 2026-11-16, when the owner asked for more on effects and said the dock's effects
-screens could be much better. HoSTage's audio effects are VST3 plug-ins, and decision 3 keeps
+screens could be much better. **Taken, all eight**: the owner answered "Document it.", read here as
+taking the list as it stands (say so if not). All Pro (decision 6), each placed in the order of
+work. HoSTage's audio effects are VST3 plug-ins, and decision 3 keeps
 built-ins to utilities, so most of these are about how effects are *used* live, not new sounds.
 None exists today (checked on `main`: an insert, `EffectSlot` in `RackModel.h`, has no dry/wet
 setting; bypass has no crossfade; a part's inserts run in series only; no MIDI module remaps notes).
@@ -398,14 +400,18 @@ setting; bypass has no crossfade; a part's inserts run in series only; no MIDI m
 5. **The input part**, with its meters, tuner, limiter, Mute inputs and MIDI to inserts, designed
    to grow to a desk's channel count later (decision 9). Then a guitar that plays a synth (more
    features, 7), which needs MIDI out of an insert.
-6. **Foot controllers and stomp mode.**
+6. **Foot controllers and stomp mode**, with click-free bypass and dry/wet (effects 1 and 2), and
+   effect throws (effects 4), which need the new control targets.
 7. **Audio looper, effect chains in the library, backing tracks**, and MIDI backing files with them
    (more features, 4), under the same play-only rules.
 
 **Alongside, independent of all that:** show control (MIDI clock out and Ableton Link first, the
 two everyone asks for), the whole rig, and three of the more features that need nothing else: song
 changes without a gap (1), transposing the whole set (3) and show history (8). Lyrics and chords (2)
-go with the tablet remote. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
+go with the tablet remote. From the effects: tails that ring out (3) beside song changes without a
+gap, the drum map (7), and the new effects screen in the dock (8), which the owner already finds
+lacking. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
+rack. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
 that:** the mixing desk (decision 9).
 
 ## Glossary
