@@ -24,6 +24,8 @@ for lib in libwebkit2gtk-4.1 libjavascriptcoregtk-4.1 libsoup-3.0 libglib-2.0 li
 done
 cat > "$root/usr/bin/hostage" <<'LAUNCH'
 #!/bin/sh
+# WebKitGTK opens native select lists using GTK's menu palette.
+export GTK_THEME="${GTK_THEME:-Adwaita:dark}"
 export LD_LIBRARY_PATH=/usr/lib/hostage/web-libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 exec /usr/lib/hostage/HoSTage "$@"
 LAUNCH
