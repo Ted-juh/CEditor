@@ -22,8 +22,7 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **Seven ease-of-use features**, taken: [Ease of use](#ease-of-use). The kind of feature the owner
   wants most.
 - **Four more ease-of-use features**, taken: [More ease of use](#more-ease-of-use).
-- **Even more ease of use, proposed but not decided**:
-  [Even more ease of use](#even-more-ease-of-use-proposed-not-decided).
+- **Eight more ease-of-use features**, taken: [Even more ease of use](#even-more-ease-of-use).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -527,10 +526,10 @@ with up and down buttons, not by dragging; nothing accepts files dropped from th
 6. **Starred knobs on the part's row.** Parameters pinned with ☆ in the Params tab show as knobs on
    the part's row in the rack, so the few that matter are there without opening the dock.
 
-### Even more ease of use, proposed (not decided)
+### Even more ease of use
 
 Proposed on 2026-11-16, when the owner asked to go the extra mile on the same kind. Each takes away
-a slow or puzzling moment in Build. Checked on `main`: modulation is set up only through the
+a slow or puzzling moment in Build. **The owner took all eight** (all Pro). Checked on `main`: modulation is set up only through the
 Matrix's lists; songs and scenes accept no drops; plug-ins are scanned only when Scan is pressed
 (`hostage-manual.md`, chapter 3); HoSTage never asks a synth who it is, though CEditor's device
 profiles can (`DeviceProfileEngine.cpp`).
@@ -584,7 +583,10 @@ lacking. From still more: two keyboards with their own parts (1) and the gig-rea
 From Build mode: undo that covers everything (1), even levels (3), control pages from what you use
 (6) and the command palette (7). All seven ease-of-use features, and the four taken from "more
 ease of use"; they are mostly screen work and need nothing else. Of those, dropping files from the
-computer (more ease of use, 4) also needs the native side to accept them. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
+computer (more ease of use, 4) also needs the native side to accept them. The eight from "even
+more ease of use", with these exceptions: hold to compare (5) needs the undo that covers everything
+first; plug in a synth (6) needs the device profiles' identity request brought into the host; and
+new plug-ins noticed (7) needs a watch on the plug-in folders on the native side. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
 rack. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
 that:** the mixing desk (decision 9).
 
