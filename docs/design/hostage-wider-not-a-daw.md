@@ -14,6 +14,7 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **What is decided**: all thirteen questions, each with its reason, in
   [Decisions](#decisions).
 - **Seven more features**, taken after the decisions: [More features](#more-features).
+- **Effect features, proposed but not decided**: [Effects](#effects-proposed-not-decided).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
 - **Words used here**: the [Glossary](#glossary) at the end.
@@ -354,6 +355,35 @@ a scene and a scene can carry a tempo (`PatternModel.h`), so that was not listed
    MIDI-to-inserts gap above.
 8. **Show history.** The show as it was played at each gig, kept, and what changed since: useful
    when a song sounded wrong, and when one band member hands the show to another.
+
+### Effects, proposed (not decided)
+
+Proposed on 2026-11-16, when the owner asked for more on effects and said the dock's effects
+screens could be much better. HoSTage's audio effects are VST3 plug-ins, and decision 3 keeps
+built-ins to utilities, so most of these are about how effects are *used* live, not new sounds.
+None exists today (checked on `main`: an insert, `EffectSlot` in `RackModel.h`, has no dry/wet
+setting; bypass has no crossfade; a part's inserts run in series only; no MIDI module remaps notes).
+
+1. **Dry/wet on every insert**, done by HoSTage for plug-ins that have no mix knob. The dry signal
+   must be delayed by the plug-in's latency (at least one block, from isolation), or the two
+   halves phase against each other.
+2. **Click-free bypass**: a few milliseconds of crossfade when an insert is bypassed or brought
+   back. Stomp mode needs it; a footswitch that clicks is not usable on stage.
+3. **Tails that ring out.** Bypassing a reverb or delay, or changing scene, stops feeding it new
+   sound instead of cutting it, so the echoes die away naturally. The effect-level partner of "song
+   changes without a gap".
+4. **Effect throws.** Hold a pad and a part goes to a return (the vocal into the delay); let go and
+   the echoes ring out. Built from what exists: a send, a return and a control target.
+5. **Parallel chains inside a part.** The signal splits into two chains and is mixed back: clean and
+   distorted guitar side by side, or a dry vocal beside a heavily treated one.
+6. **Sidechain ducking.** A pad dips under the vocal or the kick. Needs the sidechain routing found
+   missing above.
+7. **A drum map MIDI module.** Remaps an electronic drum kit's notes to what a drum instrument
+   expects. Small, and it is what a drummer on HoSTage needs first (decision 2).
+8. **A better effects screen in the dock.** The chain shown as one row of blocks, in signal order:
+   MIDI modules, instrument, inserts, fader, sends. Each block carries its bypass, dry/wet, its few
+   most-used knobs (so the plug-in's window is rarely needed on stage), its latency and its state
+   (running, restarting, failed). MIDI modules and audio inserts work the same way.
 
 ## Order of work
 
