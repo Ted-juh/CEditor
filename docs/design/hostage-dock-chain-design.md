@@ -171,6 +171,61 @@ bars, and more than sixteen steps (up to 32).
 A sequence that plays without keys held is a **pattern** in the Performance workspace, which
 already has note, drum, CC and parameter lanes. Neither module repeats it.
 
+## The Chords module: six pages
+
+*Added 2026-11-17, when the owner asked for "the Chords module, same way". Proposed, not yet
+approved. Mockups: `hostage-dock-chords-mockups.html`, pictures `docs/media/hostage-dock-chords-1.png`
+(the dock) and `-2.png` (the pages at the keyboard's size).*
+
+![The Chords module in the dock](../media/hostage-dock-chords-1.png)
+
+**What it is today** (`MidiFxSettings` in `PatternModel.h`, editor `midiModules/ChordsEditor.svelte`):
+one **set** of up to 32 chords, built (root, shape, inversion, voicing, bass) or learned by playing,
+and four **layers** that play them, each with its own on/off:
+
+- **Follow**: every key in a range plays a shape built on itself.
+- **Key map**: chosen keys play chosen set chords exactly, and win over everything.
+- **Pads**: 8 pads × 4 banks, each a set chord. A CTRL49 pad with nothing else to do already plays
+  them (`pressSurfacePad`).
+- **Progression**: keys in a range play the set's chords in order, stepping on each press or on the
+  sustain pedal.
+
+There is no CTRL49 page for it yet, only a mockup: the Chords page of the feature mockups
+(`tools/ctrl49/screen-lab/feature-mockups/hostage-features/preview-5-chords.png`), in the original
+look.
+
+**The pages** follow the module's own shape: one to play from, one for the set, one per layer.
+
+1. **CHORDS**, after the feature mockup: the chord playing, large, with its numeral and its job in
+   the key ("VImaj7, submediant"); the key, with a light per layer; the keyboard with the notes
+   playing and the scale marked; the eight pads of the bank. Knobs: key, scale, bank, then the four
+   layers on and off, then whether the module follows the song's key.
+2. **SET**: eight of the set's chords at a time, the selected one large with its notes on the
+   keyboard. Knobs: chord, root, shape, inversion, voicing, bass, **learn** (play a chord and it is
+   kept), and the top voice's accent.
+3. **FOLLOW**: the shape, the range as a band over the keyboard, and an example of what one key
+   plays. Knobs: shape, inversion, voicing, motion (voice leading), bass, lowest, highest, top.
+4. **KEYS**: the key map, each mapped key labelled with its chord, the selected key outlined. Knobs:
+   the key, and the chord it plays.
+5. **PADS**: the bank's eight pads, each with its chord and its notes. Knob N chooses pad N's chord,
+   as on the pattern pages; Shift and the bank buttons choose the bank, as now.
+6. **PROG**: the progression as a row of chords, the current one lit, and the range the left hand
+   steps it from. Knobs: step, chord, next on (key or pedal), lowest, highest, length.
+
+**Only in the dock**: naming a chord; dragging a chord from SET onto a pad, a key or a progression
+step; removing a chord (it asks first).
+
+**What it needs.** No engine work: every setting shown exists. New are the pages themselves, the
+numeral and job of a chord in the key (worked out from its notes, which `chordNameOf` already
+names), and learning from the keyboard's knob 7. The feature mockup also ringed "the likeliest next
+chord" on the pads; that needs a model of which chord follows which, and is left out.
+
+**Decisions for the owner:**
+
+1. **These six pages**, in this order?
+2. **The layers switched on CHORDS' knobs 4 to 7**, rather than one switch on each layer's page?
+3. **The likeliest next chord** from the feature mockup: leave it out, as here?
+
 ## What changes from today
 
 - **Unchanged**: everything today's arpeggiator can do; the playhead from the engine.
@@ -200,8 +255,8 @@ keyboard down the left.
 
 ## Next
 
-The other thirteen skins on these pages. The same frame for the other MIDI modules (Chords, Echo,
-Strum, Humanize and the rest, in `sections/midiModules/`). Then an audio insert: dry/wet, its main
+The other thirteen skins on these pages. The same frame for the other MIDI modules (Echo, Strum,
+Humanize and the rest, in `sections/midiModules/`); Chords is above. Then an audio insert: dry/wet, its main
 knobs, latency and state in the block, its parameters below, and the plug-in's own window one click
 away.
 
