@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: skins for the program, mockups</title>
+<!--
+  Mockups for "The whole program" in docs/design/hostage-skins-design.md: three choices of skin,
+  each its own. The program's window takes a skin through its --host-* tokens (hostage-theme.css),
+  the Stage screen through its --stage-* tokens (StageView.svelte), and the CTRL49 pages through the
+  sixteen roles. Palettes as in hostage-skins-mockups.html; static, invented data.
+-->
+<style>
+  body { margin: 0; background: #101418; color: #d9e0e6; font: 13px/1.35 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif; }
+  .frame { width: 1440px; padding: 28px 24px 36px; box-sizing: border-box; }
+  .frame + .frame { border-top: 1px solid #2c353e; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif; }
+  .caption p { margin: 0 0 14px; color: #aab5be; max-width: 1200px; }
+  * { box-sizing: border-box; }
+
+  /* the program, drawn only with --host-* tokens */
+  .app { position: relative; border: 1px solid var(--line-soft); background: var(--bg); color: var(--text); overflow: hidden; display: flex; flex-direction: column; font-family: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif; }
+  .hdr { height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+  .logo { font: 700 15px inherit; font-weight: 700; } .logo i { color: var(--accent-strong); font-style: normal; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs span { padding: 5px 12px; border-radius: var(--rc); color: var(--text-soft); font-size: 12.5px; }
+  .tabs span.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .sp { flex: 1; }
+  .stat { font: 11px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; color: var(--text-dim); }
+  .ib { min-width: 30px; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--rc); background: var(--raised); color: var(--text-soft); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+  .cols { display: flex; gap: 12px; padding: 10px 14px; }
+  .rack { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .chead { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+  .chead strong { font-size: 13.5px; }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 4px 9px; border: 1px solid var(--line); border-radius: var(--rc); background: var(--field); color: var(--text-soft); font-size: 11.5px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--rc); background: var(--raised); color: var(--text-soft); font-size: 12px; white-space: nowrap; }
+  .part { display: flex; height: 56px; background: var(--surface); border: 1px solid var(--line-soft); border-left: 4px solid var(--pc); border-radius: var(--rp); }
+  .part.focused { border-color: var(--accent); border-left-color: var(--pc); background: var(--accent-surface); }
+  .art { width: 56px; flex: none; display: flex; align-items: center; justify-content: center; font-weight: 700; color: rgba(255,255,255,.85); }
+  .pbody { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 10px; }
+  .prow { display: flex; align-items: center; gap: 8px; }
+  .pname { font-weight: 600; font-size: 13px; } .pname em { font-style: normal; color: var(--text-dim); margin-right: 5px; }
+  .pvend { color: var(--text-dim); font-size: 11.5px; }
+  .t { padding: 2px 7px; border: 1px solid var(--line); border-radius: var(--rc); background: var(--field); font-size: 11px; color: var(--text-soft); }
+  .t.on { border-color: var(--active); color: var(--active); background: var(--active-surface); }
+  .t.mute { border-color: var(--pending); color: var(--pending); background: var(--pending-surface); }
+  .chip { padding: 1px 7px; border-radius: 9px; font: 600 10.5px/16px inherit; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid var(--line); color: var(--text-soft); background: var(--raised); }
+  .chip.danger { border-color: var(--danger); color: var(--danger); background: var(--danger-surface); }
+  .mini { font: 11px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; color: var(--text-soft); }
+  .browser { width: 360px; flex: none; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--rp); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .search { padding: 5px 9px; background: var(--field); border: 1px solid var(--line); border-radius: var(--rc); color: var(--text-faint); font-size: 12px; }
+  .srow { display: flex; align-items: center; gap: 8px; padding: 5px 4px; font-size: 12.5px; border-bottom: 1px solid var(--line-soft); }
+  .srow .sq { width: 24px; height: 24px; border-radius: var(--rc); flex: none; }
+  .srow small { display: block; color: var(--text-dim); font-size: 11px; }
+  .dock { border-top: 1px solid var(--line); background: var(--surface); }
+  .dtabs { display: flex; align-items: center; gap: 2px; padding: 5px 12px; border-bottom: 1px solid var(--line-soft); }
+  .dtabs span.tb { padding: 4px 11px; font-size: 12px; color: var(--text-soft); border-radius: var(--rc); }
+  .dtabs span.tb.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .dbody { display: flex; gap: 16px; padding: 12px 14px; align-items: flex-start; }
+  .strip { display: flex; flex-direction: column; gap: 6px; width: 250px; }
+  .blk { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--rp); background: var(--raised); font-size: 12.5px; }
+  .blk small { font: 600 9.5px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; letter-spacing: .08em; color: var(--text-dim); text-transform: uppercase; width: 70px; }
+  .blk.sel { border-color: var(--accent); background: var(--accent-surface); }
+  .pagebox svg { display: block; width: 640px; height: 363px; border-radius: 6px; }
+  .note { color: var(--text-faint); font-size: 11.5px; margin-top: 8px; max-width: 420px; }
+
+  /* the Stage screen, drawn only with --stage-* tokens */
+  .stagepair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .stage { border-radius: 6px; overflow: hidden; background: var(--stage-bg); color: var(--stage-text); border: 1px solid var(--stage-line); font-family: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif; }
+  .sstat { display: flex; align-items: center; gap: 14px; padding: 8px 12px; background: var(--stage-panel); border-bottom: 1px solid var(--stage-line); font-size: 12px; color: var(--stage-soft); }
+  .sstat .clock { font: 700 18px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; color: var(--stage-text); }
+  .dotg { width: 8px; height: 8px; border-radius: 50%; background: var(--stage-live); display: inline-block; margin-right: 5px; }
+  .sbody { display: grid; grid-template-columns: 200px 1fr; gap: 10px; padding: 10px; }
+  .rail { background: var(--stage-panel); border: 1px solid var(--stage-line-soft); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .rail .s { display: flex; gap: 8px; padding: 6px 7px; border-radius: 4px; font-size: 12.5px; color: var(--stage-soft); }
+  .rail .s b { width: 16px; color: var(--stage-dim); font-weight: 600; }
+  .rail .s.now { background: var(--stage-now-surface); color: var(--stage-text); box-shadow: inset 3px 0 0 var(--stage-now); }
+  .rail .s.next { background: var(--stage-next-surface); color: var(--stage-text); }
+  .rail .s.done { opacity: .5; }
+  .hero { background: var(--stage-panel); border: 1px solid var(--stage-line-soft); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .eyebrow { font: 700 11px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; letter-spacing: .12em; color: var(--stage-now); }
+  .song { font-size: 40px; font-weight: 700; line-height: 1.05; }
+  .scene { font-size: 15px; color: var(--stage-soft); } .scene b { color: var(--stage-text); }
+  .tempo { display: flex; align-items: baseline; gap: 14px; }
+  .tempo .bpm { font: 700 34px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; }
+  .tempo .pos { font: 700 18px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; color: var(--stage-soft); }
+  .beats { display: flex; gap: 6px; } .beats i { width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--stage-line); background: var(--stage-raised); }
+  .beats i.on { background: var(--stage-now); border-color: var(--stage-now); }
+  .prog { display: flex; align-items: center; gap: 10px; } .prog .bar { flex: 1; height: 10px; border-radius: 5px; background: var(--stage-raised); overflow: hidden; } .prog .bar i { display: block; height: 100%; width: 42%; background: var(--stage-now); }
+  .prog span { font: 700 15px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; color: var(--stage-soft); }
+  .nextline { font-size: 14px; color: var(--stage-soft); } .nextline b { color: var(--stage-next); }
+  .panic { margin-left: auto; padding: 4px 12px; border-radius: 4px; border: 1px solid var(--stage-panic); color: var(--stage-panic); font-weight: 700; font-size: 12px; }
+  .sun { padding: 3px 8px; border: 1px solid var(--stage-line); border-radius: 4px; color: var(--stage-soft); }
+  .label { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12.5px; color: #aab5be; }
+
+  /* the settings */
+  .set { display: flex; flex-direction: column; gap: 14px; padding: 14px; }
+  .choice { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--rp); padding: 12px 14px; }
+  .choice h4 { margin: 0 0 2px; font-size: 14px; } .choice .sub { color: var(--text-dim); font-size: 12px; margin-bottom: 10px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sk { width: 118px; border: 1px solid var(--line); border-radius: var(--rc); overflow: hidden; background: var(--field); }
+  .sk.sel { outline: 2px solid var(--accent-strong); outline-offset: 1px; }
+  .sk .bars { display: flex; height: 26px; } .sk .bars i { flex: 1; }
+  .sk span { display: block; padding: 3px 6px; font-size: 11px; color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sk.same { display: flex; align-items: center; justify-content: center; height: 47px; color: var(--text-soft); font-size: 11.5px; }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--text-soft); }
+  .ok { color: var(--active); font-weight: 600; } .warn { color: var(--pending); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · Three choices of skin, each its own</h2>
+    <p>In the Utilities drawer, one page with three rows. Each row offers the fifteen: the fourteen CTRL49 skins and HoSTage's own look. The
+      contrast check runs on what you pick and names any pair that would be hard to read. The Stage screen's ☀ (high contrast for bright rooms)
+      stays, as a one-tap override over whatever Stage skin is chosen.</p>
+  </div>
+  <div class="app" id="set1" style="width:1392px"></div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · The program in Walnut, the CTRL49 in Midnight</h2>
+    <p>The HoSTage skin is Walnut: the window, the rack, the browser and the dock's frame take Walnut's colours through HoSTage's own tokens. The
+      CTRL49 skin is Midnight: the page in the dock is drawn exactly as the keyboard shows it. Part colours stay HoSTage's six; "Missing" keeps
+      HoSTage's red.</p>
+  </div>
+  <div id="prog2"></div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · The Stage screen: its own skin</h2>
+    <p>Left, the Stage skin left at "same as HoSTage" with HoSTage's own look. Right, Swiss Flat chosen for an outdoor afternoon gig: light,
+      with its blue for what comes next and its orange for what plays now. Panic keeps HoSTage's red in both, and a connected device keeps its green: a status keeps its meaning in every skin.</p>
+  </div>
+  <div class="stagepair" id="stage3"></div>
+</section>
+
+<script>
+  // ---- palettes (as in hostage-skins-mockups.html), plus HoSTage's own look as the fifteenth --------
+  const P = {
+    hostage: { name: 'HoSTage', r: 3, bg: '#1E2226', card: '#171C21', raised: '#20272E', text: '#D9E0E6', label: '#AAB5BE', dim: '#7F8B96', foot: '#65717C', bar: '#526170', grid: '#2C353E', gridS: '#3B4652', primary: '#5B9BD5', on: '#58A879', loud: '#D7A44E', warn: '#D7A44E', keyW: '#E9EDF1', keyB: '#1A1F24' },
+    midnight: { name: 'Midnight 2020', r: 4, bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', label: '#8890B0', dim: '#6B7393', foot: '#565E7E', bar: '#4A5378', grid: '#1F2742', gridS: '#2B3456', primary: '#8B7CFF', on: '#2DD4BF', loud: '#FF5C93', warn: '#FFB547', keyW: '#D9DCE8', keyB: '#1A1F33' },
+    metro: { name: 'Metro Tiles 2012', r: 0, bg: '#111111', card: '#1D1D1D', raised: '#2C2C2C', text: '#FFFFFF', label: '#9A9A9A', dim: '#7A7A7A', foot: '#6A6A6A', bar: '#6A6A6A', grid: '#262626', gridS: '#3A3A3A', primary: '#1BA1E2', on: '#8CBF26', loud: '#D80073', warn: '#F09609' },
+    swiss: { name: 'Swiss Flat 2011', r: 0, bg: '#EEEDE8', card: '#F8F7F3', raised: '#CFCEC8', text: '#151515', label: '#6E6D68', dim: '#8C8B86', foot: '#8C8B86', bar: '#8C8B86', grid: '#E4E3DD', gridS: '#CFCEC8', primary: '#2F5BEA', on: '#FF6A13', loud: '#1A3DB8', warn: '#151515' },
+    blueprint: { name: 'Blueprint 1965', r: 2, bg: '#1E4C8A', card: '#183F74', raised: '#3568A9', text: '#E8F1FF', label: '#9FC1EC', dim: '#7FA5D6', foot: '#9FC1EC', primary: '#9FC1EC', on: '#E8F1FF', warn: '#FFD54A' },
+    neo: { name: 'Neo Brutal 2023', r: 4, bg: '#FFF1D0', card: '#FFFFFF', raised: '#E9DFC6', text: '#111111', label: '#5A503F', dim: '#7A6F5A', foot: '#5A503F', primary: '#3D7BFF', on: '#E8317F', warn: '#FFD23F' },
+    dot: { name: 'Dot Matrix 1983', r: 0, bg: '#B5C57A', card: '#A8B86D', raised: '#9AAA5E', text: '#1E2913', label: '#56653A', dim: '#6E7E48', foot: '#56653A', primary: '#56653A', on: '#0B1205', warn: '#0B1205' },
+    red: { name: 'Red Lead 1997', r: 3, bg: '#C31F26', card: '#1A0D0E', raised: '#7A0D12', text: '#FFFFFF', label: '#FFC9C4', dim: '#F09A94', foot: '#FFC9C4', primary: '#FF6A60', on: '#FFE7E2', warn: '#FFD447' },
+    rhythm: { name: 'Rhythm Box 1980', r: 3, bg: '#2D2D2F', card: '#171718', raised: '#46464A', text: '#EDE6CF', label: '#C9C4B5', dim: '#8E8C86', foot: '#8E8C86', primary: '#F07F1A', on: '#F2C514', warn: '#F2A33A' },
+    walnut: { name: 'Walnut 1971', r: 3, edge: '#734425', bg: '#151515', card: '#0B0B0B', raised: '#2E2E2E', text: '#F2F2F2', label: '#BEBEBE', dim: '#9A9A9A', foot: '#8A8A8A', bar: '#6A6C6E', grid: '#141414', gridS: '#222222', primary: '#C08A50', on: '#FFB347', loud: '#FFC46B', warn: '#F2D27A' },
+    bench: { name: 'Test Bench 1958', r: 2, bg: '#58665C', card: '#040D07', raised: '#3E4840', text: '#EDE4C8', label: '#E3DCC6', dim: '#A8AE9F', foot: '#D2CCB6', primary: '#4FD46E', on: '#9DFFB0', warn: '#FFB04A' },
+    neon: { name: 'Neon Glass', r: 6, bg: '#0C172A', card: '#050E1D', raised: '#153953', text: '#DAFAFF', label: '#7EB5CE', dim: '#3D85AF', foot: '#7EB5CE', primary: '#3D85AF', on: '#4DE8FF', warn: '#FFD24D' },
+    studio: { name: 'Studio 1978', r: 3, bg: '#B4B9B3', card: '#EAD7A4', raised: '#9AA09A', text: '#1C262B', label: '#405053', dim: '#57605E', foot: '#405053', primary: '#1D313E', on: '#2F7A3A', warn: '#C8701E' },
+    bakelite: { name: 'Bakelite 1936', r: 6, bg: '#43281D', card: '#19100A', raised: '#5A3A28', text: '#F5DDB1', label: '#CDB17F', dim: '#B29463', foot: '#CDB17F', primary: '#B29463', on: '#FFD684', warn: '#FFB060' },
+    metal: { name: 'Machined Metal', r: 2, bg: '#2E2E2C', card: '#0C0E0D', raised: '#3A3A37', text: '#F0EEE6', label: '#CDCAB9', dim: '#8A887E', foot: '#8A887E', primary: '#FFB73E', on: '#9CFFD0', warn: '#F0EEE6' },
+  };
+  const ORDER = ['hostage', 'midnight', 'metro', 'swiss', 'blueprint', 'neo', 'dot', 'red', 'rhythm', 'walnut', 'bench', 'neon', 'studio', 'bakelite', 'metal'];
+  const DANGER = '#D98C8C', PANIC = '#FF4D4D';
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, t) => '#' + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, '0')).join('');
+  const lum = (h) => { const [r, g, b] = hex(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
+  const light = (k) => lum(k.bg) > 0.5;
+
+  // the sixteen roles onto HoSTage's --host-* tokens: most directly, the rest as mixes of them
+  function hostVars(k) {
+    if (k === P.hostage) return `--bg:#1e2226;--surface:#171c21;--raised:#20272e;--field:#12171b;--line-soft:#2c353e;--line:#3b4652;--text:#d9e0e6;--text-soft:#aab5be;--text-dim:#7f8b96;--text-faint:#65717c;--accent:#5b9bd5;--accent-strong:#79b9ee;--accent-surface:#243746;--active:#58a879;--active-surface:#20372a;--pending:#d7a44e;--pending-surface:#46371d;--danger:${DANGER};--danger-surface:#452529;--rc:3px;--rp:6px`;
+    const L = light(k);
+    return [`--bg:${k.bg}`, `--surface:${k.card}`, `--raised:${k.raised}`, `--field:${L ? mix(k.card, '#ffffff', .5) : mix(k.card, '#000000', .3)}`,
+      `--line-soft:${mix(k.bg, k.text, .12)}`, `--line:${mix(k.bg, k.text, .22)}`,
+      `--text:${k.text}`, `--text-soft:${k.label}`, `--text-dim:${k.dim}`, `--text-faint:${k.foot}`,
+      `--accent:${k.primary}`, `--accent-strong:${L ? mix(k.primary, '#000000', .15) : mix(k.primary, '#ffffff', .2)}`, `--accent-surface:${mix(k.card, k.primary, .2)}`,
+      `--active:${k.on}`, `--active-surface:${mix(k.card, k.on, .18)}`, `--pending:${k.warn}`, `--pending-surface:${mix(k.card, k.warn, .18)}`,
+      `--danger:${DANGER}`, `--danger-surface:${mix(k.card, DANGER, .2)}`, `--rc:${Math.min(3, k.r)}px`, `--rp:${Math.min(6, k.r + 2)}px`].join(';');
+  }
+  // the same roles onto the Stage screen's --stage-* tokens
+  function stageVars(k) {
+    if (k === P.hostage) return '--stage-bg:#0b0f13;--stage-panel:#121820;--stage-raised:#1a222c;--stage-line:#2a3542;--stage-line-soft:#1e2731;--stage-text:#eef3f7;--stage-soft:#b3bfca;--stage-dim:#7c8997;--stage-now:#ffb347;--stage-now-surface:#2a2216;--stage-next:#79b9ee;--stage-next-surface:#152a3d;--stage-live:#58d68d;--stage-panic:' + PANIC;
+    return [`--stage-bg:${k.bg}`, `--stage-panel:${k.card}`, `--stage-raised:${k.raised}`, `--stage-line:${mix(k.bg, k.text, .22)}`, `--stage-line-soft:${mix(k.bg, k.text, .12)}`,
+      `--stage-text:${k.text}`, `--stage-soft:${k.label}`, `--stage-dim:${k.dim}`, `--stage-now:${k.on}`, `--stage-now-surface:${mix(k.card, k.on, .14)}`,
+      `--stage-next:${k.primary}`, `--stage-next-surface:${mix(k.card, k.primary, .12)}`, `--stage-live:${light(k) ? '#1F8A4C' : '#58D68D'}`, `--stage-panic:${PANIC}`].join(';');
+  }
+
+  // ---- frame 1: the settings -------------------------------------------------------------------------
+  const sw = (key, sel) => { const k = P[key]; return `<div class="sk${sel ? ' sel' : ''}"><div class="bars"><i style="background:${k.bg}"></i><i style="background:${k.card}"></i><i style="background:${k.text}"></i><i style="background:${k.primary}"></i><i style="background:${k.on}"></i><i style="background:${k.warn}"></i></div><span>${k.name}</span></div>`; };
+  document.getElementById('set1').setAttribute('style', document.getElementById('set1').getAttribute('style') + ';' + hostVars(P.walnut));
+  document.getElementById('set1').innerHTML = `
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span><div class="tabs"><span>Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div><span class="sp"></span><span class="ib">Utilities</span></div>
+    <div class="set">
+      <div class="choice"><h4>CTRL49 skin</h4><div class="sub">The CTRL49's pages, on the keyboard and in the dock.</div>
+        <div class="swatches">${ORDER.map((k) => sw(k, k === 'midnight')).join('')}</div>
+        <div class="check"><span class="ok">✓ readable</span> every page's words against Midnight's background and panels</div></div>
+      <div class="choice"><h4>HoSTage skin</h4><div class="sub">The program's own window: the Build screens and the dock's frame around the pages.</div>
+        <div class="swatches">${ORDER.map((k) => sw(k, k === 'walnut')).join('')}</div>
+        <div class="check"><span class="ok">✓ readable</span> danger and the six part colours checked against Walnut too</div></div>
+      <div class="choice"><h4>Stage skin</h4><div class="sub">The Stage screen. ☀ on the Stage screen still switches to high contrast, over this.</div>
+        <div class="swatches"><div class="sk same">Same as HoSTage</div>${ORDER.map((k) => sw(k, k === 'swiss')).join('')}</div>
+        <div class="check"><span class="warn">! one pair</span> Swiss Flat: the footer grey on its background reads at arm's length, not from the back of a stage; shown larger on Stage</div></div>
+    </div>`;
+
+  // ---- the CTRL49 PLAY page (as in hostage-skins-mockups.html) -------------------------------------------
+  let C;
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  function playPage() {
+    const pnl = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${C.r}" fill="${C.card}"/>`;
+    let s = `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${C.on}"/>` + T(18, 22, 'PLAY', C.text, 16, "font-weight='700'") + T(472, 21, 'UP/DN   1/16   120 BPM', C.dim, 11, "text-anchor='end'");
+    s += pnl(8, 32, 338, 44); const names = [0, 2, 4, 5, 7, 9, 11], held = [57, 60, 64, 67], now = 64, ww = 330 / 21;
+    for (let o = 0; o < 3; o++) names.forEach((sm, i) => { const n = 48 + o * 12 + sm, x = 12 + (o * 7 + i) * ww; s += `<rect x="${x + .5}" y="36" width="${ww - 1}" height="36" rx="1.5" fill="${n === now ? C.on : held.includes(n) ? C.primary : C.keyW}"/>`; });
+    for (let o = 0; o < 3; o++) [0, 1, 3, 4, 5].forEach((i) => { const x = 12 + (o * 7 + i + 1) * ww - ww * .32; s += `<rect x="${x}" y="36" width="${ww * .64}" height="22" rx="1" fill="${C.keyB}"/>`; });
+    s += pnl(352, 32, 120, 44) + T(360, 64, 'E4', C.on, 24, "font-weight='700'") + T(466, 47, 'VEL 64', C.dim, 9, "text-anchor='end' font-weight='600'") + T(466, 60, 'NOTE', C.primary, 9, "text-anchor='end' font-weight='700'");
+    s += pnl(8, 82, 464, 120); const cw = 29;
+    for (let i = 1; i < 16; i++) s += `<line x1="${8 + i * cw}" y1="85" x2="${8 + i * cw}" y2="199" stroke="${i % 4 ? C.grid : C.gridS}"/>`;
+    const ys = [150, 138, 138, 120, 108, 0, 0, 96, 150, 138, 126, 120, 108, 0, 132, 150], cols = [C.loud, C.primary, C.primary, C.on, C.loud, C.warn, null, C.text];
+    ys.forEach((y, i) => { if (!y) return; s += `<rect x="${10 + i * cw}" y="${y}" width="${cw * .62}" height="${i % 4 === 0 ? 8 : 5}" rx="1.5" fill="${cols[i % 8] || C.primary}"/>`; });
+    [['MODE', 'UP/DN', .3, 1], ['RATE', '1/16', .55], ['OCTAVES', '2', .33], ['GATE', '60%', .6], ['SWING', '54%', .3], ['TEMPO', '120', .5], ['LATCH', 'OFF'], ['SCALE', 'OFF']].forEach(([l, v, f, foc], i) => {
+      const cx = i * 60 + 30; s += T(cx, 217, l, foc ? C.on : C.label, 9, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, foc ? C.on : C.text, 15, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (f ? `<rect x="${i * 60 + 8}" y="244" width="${44 * f}" height="4" rx="2" fill="${foc ? C.on : C.bar}"/>` : ''); });
+    s += T(8, 265, 'HELD KEYS PLAY THE ARPEGGIO', C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+
+  // ---- frame 2: the program in Walnut, the page in Midnight ----------------------------------------------
+  C = P.midnight;
+  const parts = [['Grand Piano', 'Keyscape · Spectrasonics', '#3d81c4', 'KS', 'C3–C7'], ['Warm Pad', 'Pigments · Arturia', '#4aa88c', 'PG', 'C3–C7'],
+                 ['Juno-106', 'Hardware · ch 2', '#b4854a', 'J6', 'C3–C7'], ['Strings', 'Kontakt · Native Instruments', '#9a6bbf', 'KT', 'C3–C7'], ['Moog Bass', 'Diva · u-he', '#c46a6a', 'DV', 'C1–B2']];
+  const rows = parts.map(([n, v, c, a, r], i) => `<div class="part${i === 4 ? ' focused' : ''}" style="--pc:${c}"><div class="art" style="background:${c}">${a}</div><div class="pbody"><div class="prow"><span class="pname"><em>${i + 1}</em>${n}</span><span class="pvend">${v}</span><span class="sp"></span>${i === 3 ? '<span class="chip danger">Missing</span>' : ''}</div><div class="prow"><span class="t">${r}</span><span class="t on">Active</span><span class="t${i === 1 ? ' mute' : ''}">Mute</span><span class="t">🎧</span><span class="mini">Vol −6.0 dB</span></div></div></div>`).join('');
+  document.getElementById('prog2').innerHTML = `<div class="app" style="${hostVars(P.walnut)};width:1392px;border-left:6px solid ${P.walnut.edge};border-right:6px solid ${P.walnut.edge}">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span><div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div><span class="sp"></span><span class="ib">▶</span><span class="ib">■</span><span class="stat">120 BPM</span><span class="ib">History</span></div>
+    <div class="cols"><div class="rack"><div class="chead"><strong>Rack</strong><span class="seg"><span class="on">List</span><span>Canvas</span></span><span class="sp"></span><span class="ghostb">+ Add part</span></div>${rows}</div>
+      <div class="browser"><div class="seg"><span>Instruments</span><span>Effects</span><span class="on">Sounds</span></div><div class="search">Search sounds…</div>
+        ${[['Moog Bass', 'Diva · Bass', '#c46a6a'], ['Rhodes Mk I', 'Keyscape · Keys', '#3d81c4'], ['Slow Strings Pad', 'Pigments · Pads', '#4aa88c'], ['Sync Lead', 'Diva · Leads', '#b4854a'], ['Celli Spiccato', 'Kontakt · Strings', '#9a6bbf']].map(([n, s, c]) => `<div class="srow"><span class="sq" style="background:${c}"></span><span>${n}<small>${s}</small></span></div>`).join('')}</div></div>
+    <div class="dock"><div class="dtabs"><span class="tb on">Chain</span><span class="tb">Params</span><span class="tb">Zone</span><span class="tb">Sounds</span><span style="margin-left:14px;font-weight:600">5 · Moog Bass</span><span class="sp"></span><span class="stat">CTRL49 skin: Midnight 2020</span></div>
+      <div class="dbody"><div class="strip"><div class="blk sel"><small>MIDI</small>Arpeggiator</div><div class="blk"><small>MIDI</small>Chords</div><div class="blk"><small>Instrument</small>Diva</div><div class="blk"><small>Insert</small>Pro-Q 3</div><div class="blk"><small>Out</small>Main</div>
+        <div class="note">The chain strip and the dock are the program's, in Walnut. The page is the CTRL49's, in Midnight, the same drawing the keyboard shows.</div></div>
+        <div class="pagebox">${playPage()}</div></div></div></div>`;
+
+  // ---- frame 3: the Stage screen, default and Swiss Flat ------------------------------------------------
+  const stage = (k, title) => `<div><div class="stage" style="${stageVars(k)}">
+      <div class="sstat"><span class="clock">21:47</span><span>4:12 in this song</span><span><span class="dotg"></span>Focusrite USB ASIO</span><span><span class="dotg"></span>CTRL49</span><span class="sp"></span><span class="sun">☀</span><span class="panic">PANIC</span></div>
+      <div class="sbody"><div class="rail">${['Opener', 'Northern Lights', 'Evening Song', 'Last Dance', 'Encore'].map((n, i) => `<div class="s${i < 2 ? ' done' : i === 2 ? ' now' : i === 3 ? ' next' : ''}"><b>${i < 2 ? '✓' : i + 1}</b>${n}</div>`).join('')}</div>
+        <div class="hero"><span class="eyebrow">NOW · SONG 3 OF 5</span><span class="song">Evening Song</span><span class="scene">Scene <b>Chorus</b> · page Strings Swell</span>
+          <div class="tempo"><span class="bpm">92</span><span class="pos">24.3</span><span class="beats"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+          <div class="prog"><span class="bar"><i></i></span><span>2:21 left</span></div><span class="nextline">Next: <b>Last Dance</b> · 118 BPM</span></div></div></div>
+    <div class="label"><b>${title}</b><span>Stage skin: ${k === P.hostage ? 'same as HoSTage' : k.name}</span></div></div>`;
+  document.getElementById('stage3').innerHTML = stage(P.hostage, 'A club at night') + stage(P.swiss, 'An outdoor stage in the afternoon');
+</script>
+</body>
+</html>

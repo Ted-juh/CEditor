@@ -102,6 +102,32 @@ Any of the fifteen can be chosen for each: the fourteen and "HoSTage". So a dark
 keyboard, a Walnut program and a light Swiss Flat stage for an outdoor gig are one setting each.
 Danger stays HoSTage's own red in all of them (decision 5).
 
+Mockups: `hostage-skins-program-mockups.html`, pictures `docs/media/hostage-skins-program-1.png` to
+`-3.png`.
+
+![Three choices of skin](../media/hostage-skins-program-1.png)
+
+- **Where**: one page in the Utilities drawer, a row per choice, each offering the fifteen as
+  swatches. The contrast check runs on what is picked and names any pair that would be hard to
+  read (decision 4).
+- **The program** takes its skin through its `--host-*` tokens: each of the sixteen roles fills a
+  token directly, and the rest (hover, field, the tinted surfaces, the lines) are mixes of them.
+
+![The program in Walnut, the CTRL49 in Midnight](../media/hostage-skins-program-2.png)
+
+- **The dock** shows both: its frame and chain strip are the program's (Walnut here), the page
+  inside is the CTRL49's (Midnight here), the same drawing the keyboard shows.
+- **The Stage screen** already has its own 24 `--stage-*` colours in `StageView.svelte`, a dark
+  set and a light one for ☀; the Stage skin fills the dark set. **☀ stays** as it is: one tap to
+  high contrast for a bright room, over whatever Stage skin is chosen.
+
+![The Stage screen: its own skin](../media/hostage-skins-program-3.png)
+
+- **A status keeps its meaning in every skin**: danger and panic keep HoSTage's red (decision 5),
+  and, proposed, a connected device keeps its green. Without that, Swiss Flat would show a working
+  audio interface with an orange dot, which reads as a warning. A status also carries a word or a
+  symbol (✓, !), so a monochrome skin like Dot Matrix still says it.
+
 What it takes, as worked out before the owner chose:
 
 The owner, on whether the skin should stop at the CTRL49 pages: "No, it is not a skin for HoSTage,
@@ -112,11 +138,13 @@ skin the entire program." What that would take, from the code:
   The sixteen roles fill most of them directly (bg, surface, raised, the four text colours, the
   lines, accent, active, pending); the rest are mixes of those (hover, field, the tinted surfaces).
   So a skin can colour the whole window with no more data than it already has.
-- **But many screens do not use the tokens yet.** About 470 colours are written straight into
-  HoSTage's screens against about 220 uses of the tokens: `InstrumentHostView.svelte` 169 against
-  76, `StageView.svelte` 49 against 2, `HostKeyboard.svelte` 29 against none. Each has to become a
-  token first. That is most of the work, and worth doing anyway: it is what lets the dock's frame
-  match the pages inside it.
+- **But many screens do not use the tokens yet.** About 340 colours are written straight into
+  HoSTage's screens, outside any token: 142 in `InstrumentHostView.svelte`, 29 in
+  `HostKeyboard.svelte`, the rest spread over the other `Host*` screens. Each has to become a token
+  first. That is most of the work, and worth doing anyway: it is what lets the dock's frame match
+  the pages inside it. The Stage screen is the exception: it already keeps its colours in 24 tokens
+  of its own, with 5 outside them (corrected 2026-11-17; an earlier count took its token list for
+  written-in colours).
 - **HoSTage has only ever been dark** (`color-scheme: dark`). Four skins are light (Swiss Flat,
   Neo Brutal, Dot Matrix, Studio), so every screen needs checking in a light skin. A plug-in's own
   window is the vendor's and never follows.

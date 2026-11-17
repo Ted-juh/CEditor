@@ -684,9 +684,9 @@ rig). Within a track, a step needs the ones before it only where it says so.*
 1. **Groundwork that the screens below stand on.** Each is small and unblocks several others:
    - **One list of commands**, with each command's words, shortcut, gesture and Stage Lock rule,
      read by the palette, the shortcuts and Stage Lock (Build tools design, section 1).
-   - **HoSTage's colours as tokens.** About 470 colours are written straight into its screens; each
-     becomes one of the `--host-*` tokens. The dock's frame and the program and Stage skins need it
-     (skins design, "The whole program").
+   - **HoSTage's colours as tokens.** About 340 colours are written straight into its screens; each
+     becomes one of the `--host-*` tokens. The dock's frame and the program skin need it (skins
+     design, "The whole program"). The Stage screen already has tokens of its own.
    - **The CTRL49 pages drawn from the sixteen colour roles**, so every page drawn after this takes
      any skin (skins design).
 2. **Undo that covers everything** (Build tools design, section 2): loading a plug-in, a sound or a
@@ -712,8 +712,8 @@ rig). Within a track, a step needs the ones before it only where it says so.*
    plugged in, which needs the device profiles' identity request brought into the host, and new
    plug-ins noticed, which needs a watch on the plug-in folders on the native side.
 8. **Skins** (skins design): the fourteen CTRL49 palettes with their contrast check, after the roles
-   (Build 1); then the HoSTage and Stage skins, after the tokens (Build 1), every screen checked in
-   the four light skins.
+   (Build 1); the Stage skin, whose screen already has its tokens; then the HoSTage skin, after the
+   tokens (Build 1), every screen checked in the four light skins.
 
 **Alongside, independent of both tracks:** show control (MIDI clock out and Ableton Link first, the
 two everyone asks for), the whole rig, and three of the more features that need nothing else: song
