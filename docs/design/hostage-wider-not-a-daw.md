@@ -465,7 +465,9 @@ the common live hosts either. Each passes the line.
 
 ### Build mode
 
-*The command palette (7) and undo (1) are drawn in `hostage-build-tools-design.md` (2026-11-17).*
+*The command palette (7) and undo (1) are drawn in `hostage-build-tools-design.md` (2026-11-17);
+control pages from what you use (6) in `hostage-build-small-design.md`; even levels (3) in
+`hostage-rack-build-design.md`.*
 
 Proposed on 2026-11-16, when the owner asked to move from Stage features to Build mode: making the
 rig, not playing it. Checked on `main`. **The owner took 1, 3, 6 and 7** (all Pro); 2, 4, 5 and 8
@@ -541,7 +543,8 @@ with up and down buttons, not by dragging; nothing accepts files dropped from th
 ### Even more ease of use
 
 *Drag to modulate (2) and hold to compare (5) are drawn in `hostage-build-tools-design.md`
-(2026-11-17); follow the note (1) in `hostage-rack-build-design.md`.*
+(2026-11-17); follow the note (1) in `hostage-rack-build-design.md`; 3, 4, 6, 7 and 8 in
+`hostage-build-small-design.md`.*
 
 Proposed on 2026-11-16, when the owner asked to go the extra mile on the same kind. Each takes away
 a slow or puzzling moment in Build. **The owner took all eight** (all Pro). Checked on `main`: modulation is set up only through the
