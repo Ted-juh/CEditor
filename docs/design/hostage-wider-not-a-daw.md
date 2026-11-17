@@ -608,7 +608,9 @@ sounds, instead of a built-in piano.
   when the note is due; its length is the note's length.
 - **Songs from MIDI files.** Open any `.mid`. Each track can be a hand; a file with one track is
   split at a key the player chooses (middle C to begin with). HoSTage ships no songs: MIDI files of
-  published songs have their own rights.
+  published songs have their own rights. **MusicXML too** (owner, 2026-11-17), whose staves give
+  the hands; sheet music as a PDF or photo is converted elsewhere, not recognised in HoSTage
+  (`hostage-practice-design.md`, Formats).
 - **Tempo** adjustable from slow to full speed. MIDI changes tempo without changing pitch.
 - **Wait mode.** The song waits until the right notes are played, then moves on.
 - **One hand at a time.** The player chooses which hand or track they play; HoSTage plays the

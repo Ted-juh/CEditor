@@ -34,7 +34,8 @@ own rig, with their own sounds. Nothing is edited, so it stays on the right side
 
 ![Opening a song: who plays what](../media/hostage-practice-2.png)
 
-- **Any `.mid` file.** HoSTage ships no songs: MIDI files of published songs have their own rights.
+- **Any `.mid` or MusicXML file** (see Formats below). HoSTage ships no songs: files of published
+  songs have their own rights.
 - **Every track** is listed with its range, its number of notes and a strip showing where on the
   keyboard it lies. Each is played by **you** (as the left or the right hand), by **the rig**, or
   **off**.
@@ -74,8 +75,32 @@ every page:
 - **The card**: the next notes for your hand, the one due first lit (what wait mode waits for);
   where you are in the song and the loop; the last run's result.
 
+## Formats
+
+Taken by the owner on 2026-11-17, after asking how songs get in and whether sheet music could.
+
+| Format | In? | Why |
+| --- | --- | --- |
+| **MIDI** (`.mid`) | Yes | JUCE reads it (`MidiFile`). It does not say which hand plays what, so the hands come from the tracks, or from a split at a key. |
+| **MusicXML** (`.musicxml`, `.mxl`) | Yes | What every notation program exports (MuseScore, Sibelius, Finale, Dorico), and many sheet-music sites offer. Better than MIDI for learning: the two staves *are* the hands, and it carries bar numbers, repeats and fingering. JUCE reads XML and zip (`XmlDocument`, `ZipFile`), so it needs a parser, not a library. |
+| **Sheet music as a PDF or a photo** | No, converted elsewhere | Reading notes from a picture (optical music recognition) is unreliable, more so from a photo, and always needs correcting by hand. Building it in would mean bundling a large program such as Audiveris. Instead: convert it in MuseScore (its PDF import) or Audiveris, correct it there, export MusicXML, open that. The open dialog says so. |
+| **Audio** (an MP3 of a song) | No | Turning a recording into notes is guesswork for piano. |
+
+What MusicXML adds on screen, and only when the file has it:
+
+- **Hands from the staves**: the upper staff is the right hand, the lower the left. Other parts of
+  the score are tracks, as with MIDI.
+- **Fingering**: a finger number in the score is shown on its falling bar.
+- **Repeats** are played out in order, and the bar numbers are the score's own, so "Loop bar 6"
+  means the bar 6 printed on the page.
+
+"Practice what was just played" (turning the last minute played into a song) was offered and is
+**out**.
+
 ## What it needs
 
+- **A MusicXML reader** that turns a score into the same notes, hands, bars and fingering a MIDI
+  file gives, tested on files exported from MuseScore, Sibelius, Finale and Dorico.
 - **A MIDI file reader**, shared with the MIDI backing files (more features, 4): JUCE's
   `MidiFile` reads them.
 - **Playback of the rig's tracks** into the keyboard's input or into one part, with tempo scaled and
