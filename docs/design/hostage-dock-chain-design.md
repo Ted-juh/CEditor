@@ -366,12 +366,41 @@ MIDI modules' when it is built, not the generic EFFECT page.
 - **SECTION** waits on the panel scan.
 - The EFFECT page's groups and pins already exist (Auto pages, the Params tab).
 
-**Decisions for the owner:**
+### Which parameters the EFFECT page's knobs get
 
-1. **These three pages**: EFFECTS, EFFECT, and SECTION where the scan has done the plug-in?
-2. **Measure what each effect does**, at the cost of taps around every slot?
-3. **The EFFECT page's knobs**: the plug-in's own groups, with the pinned parameters a pad away?
-4. **Pad N switches effect N on and off** on EFFECTS?
+*Worked through on 2026-11-17 at the owner's request ("3. Elaborate").* Mostly the rules HoSTage
+already uses for Auto pages (`generateControlPages`, `ParameterModel.h`).
+
+The pages, in this order; the first one there is the one the page opens on:
+
+1. **Your own page for this plug-in**, if you made one: parameters dragged onto the knob cells in
+   the dock. Kept per plug-in, not per rack, so every copy of it you load opens on your page. New.
+2. **Your pinned parameters** (☆ in the Params tab), as one page. The pins exist today.
+3. **The plug-in's own groups**, eight to a page, by the Auto pages rules: only clearly named,
+   automatable parameters; meta parameters and those without a real identity (the "#" cases) left
+   out; each group in the plug-in's own order, split into pages of eight and named after it
+   ("Main", "Sidechain", or "Main 1", "Main 2").
+4. **A plug-in with no groups**: pages of eight in its own order, the same parameters left out.
+
+How it behaves:
+
+- **The pads** ◀ ▶ walk all of these in that order; **pinned** jumps to the pinned page; **‹
+  chain** goes back to EFFECTS.
+- **One group per page.** A group of five leaves three knobs empty rather than borrowing from the
+  next group, so a knob means the same parameter every time that page is shown.
+- **Names and values are the plug-in's.** A name is asked for at eight characters at most, which a
+  plug-in can answer with its own short name (JUCE asks with a maximum length); the dock shows the
+  full name. A value is the plug-in's own text ("−20 dB", "4.6:1").
+- **Not a control page.** Control pages are the show's pages for playing, made in the editor, with
+  parameters from any part. The EFFECT page is generated, for editing one effect, and is not part
+  of the show. A control page can be started from it with one button.
+
+**Decisions** (the owner, 2026-11-17: "1. Yes. 2. yes. 3. Elaborate 4. Yes"):
+
+1. **These three pages**, SECTION where the scan has done the plug-in: yes.
+2. **Measure what each effect does**, at the cost of taps around every slot: yes.
+3. **The EFFECT page's knobs**: worked through above; open until the owner answers.
+4. **Pad N switches effect N on and off** on EFFECTS: yes.
 
 ## What changes from today
 
