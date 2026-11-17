@@ -23,8 +23,7 @@ port of HoSTage was not pushed when this was written, so check that branch befor
   wants most.
 - **Four more ease-of-use features**, taken: [More ease of use](#more-ease-of-use).
 - **Eight more ease-of-use features**, taken: [Even more ease of use](#even-more-ease-of-use).
-- **More Build mode, proposed but not decided**:
-  [Build mode, further](#build-mode-further-proposed-not-decided).
+- **Five more Build-mode features**, taken: [Build mode, further](#build-mode-further).
 - **A practice mode with falling notes**, for learning any song: [Practice mode](#practice-mode).
 - **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
   today.
@@ -557,10 +556,10 @@ profiles can (`DeviceProfileEngine.cpp`).
 8. **Drag to assign in Performance.** Drop a saved rack or sound on a song to make it that song's
    rig; drop a control page on a scene to make it that scene's page.
 
-### Build mode, further, proposed (not decided)
+### Build mode, further
 
 Proposed on 2026-11-16, when the owner asked for more Build-mode features, going the extra mile.
-Checked on `main`: no CPU figure per part (only the whole program's, in the header), controller
+**The owner took 1 to 5** (all Pro, 2026-11-17); 6 is out. Checked on `main`: no CPU figure per part (only the whole program's, in the header), controller
 knobs do not follow the selected part, a part whose plug-in is replaced leaves its control
 assignments unresolved, and there is no search for sounds from an audio file.
 
@@ -577,9 +576,9 @@ assignments unresolved, and there is no search for sounds from an audio file.
 5. **What each part costs.** The processor load of each part shown on its row, so the heavy one is
    found without guessing. Each plug-in already runs in a worker of its own, so its time can be
    measured.
-6. **Tidy the rig.** A list of what is not doing anything: parts no song plays, effects bypassed in
-   every scene, control pages for plug-ins that are gone, the same sound loaded twice. Each with a
-   button to remove it, and undo to bring it back.
+6. ~~**Tidy the rig.**~~ **Out.** A list of what does nothing (parts no song plays, effects bypassed
+   in every scene, pages for plug-ins that are gone, the same sound loaded twice), each with a
+   button to remove it.
 
 ### Practice mode
 
@@ -644,7 +643,10 @@ ease of use"; they are mostly screen work and need nothing else. Of those, dropp
 computer (more ease of use, 4) also needs the native side to accept them. The eight from "even
 more ease of use", with these exceptions: hold to compare (5) needs the undo that covers everything
 first; plug in a synth (6) needs the device profiles' identity request brought into the host; and
-new plug-ins noticed (7) needs a watch on the plug-in folders on the native side. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
+new plug-ins noticed (7) needs a watch on the plug-in folders on the native side. From "Build mode,
+further": knobs follow the selection (1), a macro by moving (2) and keeping the mappings when a
+plug-in is swapped (3) are screen and model work; finding a sound from a recording (4) uses the
+library's sound analysis; what each part costs (5) needs the plug-in workers to report their time. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
 rack. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
 that:** the mixing desk (decision 9).
 
