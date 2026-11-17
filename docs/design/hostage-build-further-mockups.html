@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: Build mode, further, mockups</title>
+<!--
+  Mockups for docs/design/hostage-build-further-design.md: "Build mode, further" 1 to 4 from
+  hostage-wider-not-a-daw.md (knobs follow the selection, a macro by moving, swap a plug-in and
+  keep the mappings, find a sound from a recording). Static, invented data, in HoSTage's own
+  colours; the CTRL49 page is drawn once at 480 x 272 in the original look.
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --hover: #27323b; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --danger: #d98c8c; --danger-surface: #452529;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { position: relative; border: 1px solid var(--line-soft); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+  .hdr { height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+  .logo { font: 700 15px var(--sans); } .logo i { color: var(--accent-strong); font-style: normal; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs span { padding: 5px 12px; border-radius: 3px; color: var(--soft); font-size: 12.5px; }
+  .tabs span.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .sp { flex: 1; }
+  .stat { font: 11px var(--mono); color: var(--dim); }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .chip { padding: 1px 7px; border-radius: 9px; font: 600 10.5px/16px var(--sans); white-space: nowrap; border: 1px solid var(--line); color: var(--soft); background: var(--raised); }
+  .chip.green { border-color: var(--active); color: #8fd1a8; background: var(--active-surface); }
+  .chip.amber { border-color: var(--pending); color: var(--pending); background: var(--pending-surface); }
+  .chip.blue { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-surface); }
+  .chip.red { border-color: var(--danger); color: var(--danger); background: var(--danger-surface); }
+  .tog { width: 30px; height: 16px; border-radius: 8px; background: var(--line); position: relative; flex: none; display: inline-block; vertical-align: middle; }
+  .tog::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--soft); }
+  .tog.on { background: var(--active); } .tog.on::after { left: 16px; background: #fff; }
+
+  /* frame 1 */
+  .duo { display: grid; grid-template-columns: 520px 1fr; gap: 24px; align-items: start; }
+  .rackbox { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .rh { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+  .rh strong { font-size: 13.5px; }
+  .part { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; background: var(--surface); border: 1px solid var(--line-soft); border-left: 4px solid var(--pc); border-radius: 4px; }
+  .part.focused { border-color: var(--accent); border-left-color: var(--pc); background: #1a2229; }
+  .part b { font-size: 13px; } .part small { color: var(--dim); font-size: 11.5px; }
+  .ctl49 svg { display: block; width: 864px; height: 490px; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  .notes { color: var(--soft); margin-top: 12px; } .notes li { margin-bottom: 4px; }
+
+  /* frame 2 and 3: dock */
+  .dock { background: var(--surface); display: flex; flex-direction: column; }
+  .dtabs { display: flex; align-items: center; gap: 2px; padding: 5px 12px; border-bottom: 1px solid var(--line-soft); min-height: 40px; }
+  .dtabs span.tb { padding: 4px 11px; font-size: 12px; color: var(--soft); border-radius: 3px; }
+  .dtabs span.tb.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .dtabs .subj { margin-left: 14px; font-weight: 600; }
+  .banner { display: flex; align-items: center; gap: 12px; margin: 10px 14px 0; padding: 9px 12px; border: 1px solid #e05c5c; border-radius: 5px; background: #3a2020; color: #f2c4c4; font-size: 13px; }
+  .banner .rec { width: 10px; height: 10px; border-radius: 50%; background: #e05c5c; box-shadow: 0 0 8px #e05c5c; }
+  .banner b { color: #fff; }
+  .dbody { display: flex; gap: 14px; padding: 12px 14px; }
+  .knobs { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px 6px; align-content: start; }
+  .kn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 6px; border: 1px solid transparent; border-radius: 6px; }
+  .kn.caught { border-color: #e05c5c; background: rgba(224,92,92,.08); }
+  .kn .nm { font-size: 12px; color: var(--soft); } .kn .vl { font: 600 12px var(--mono); }
+  .side { width: 360px; flex: none; display: flex; flex-direction: column; gap: 6px; }
+  .side h5 { margin: 0 0 2px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .crow { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid var(--line-soft); border-radius: 4px; font-size: 12.5px; background: var(--bg); }
+  .crow .amt { margin-left: auto; font: 600 11.5px var(--mono); }
+  .crow small { color: var(--dim); }
+  .macro { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); }
+  .macro b { font-size: 14px; } .macro small { display: block; color: var(--dim); font-size: 11.5px; }
+
+  /* frame 3: swap */
+  .veil { position: absolute; inset: 0; background: rgba(8,11,14,.6); z-index: 10; }
+  .modal { position: absolute; z-index: 11; left: 50%; top: 60px; transform: translateX(-50%); width: 1040px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 7px; box-shadow: 0 22px 60px rgba(0,0,0,.65); }
+  .mh { display: flex; align-items: baseline; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
+  .mh strong { font-size: 15px; } .mh span { color: var(--dim); font-size: 12px; }
+  .mb { padding: 8px 16px 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 7px 8px; border-bottom: 1px solid var(--line-soft); }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  td small { color: var(--dim); }
+  .dd { display: inline-flex; justify-content: space-between; gap: 10px; min-width: 210px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); font-size: 12px; }
+  .dd.ask { border-color: var(--pending); color: var(--pending); }
+  .dd.none { color: var(--faint); }
+  .mf { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--dim); }
+
+  /* frame 4: find from a recording */
+  .find { display: grid; grid-template-columns: 1fr 470px; gap: 14px; padding: 12px 14px; }
+  .card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 10px 12px; }
+  .card h5 { margin: 0 0 8px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; }
+  .wave { position: relative; height: 120px; background: var(--field); border: 1px solid var(--line-soft); border-radius: 4px; overflow: hidden; }
+  .wave .selr { position: absolute; top: 0; bottom: 0; background: rgba(91,155,213,.16); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+  .wave .selr span { position: absolute; top: 4px; left: 6px; font: 10px var(--mono); color: var(--accent-strong); white-space: nowrap; }
+  .res { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
+  .res.sel { background: var(--accent-surface); box-shadow: inset 3px 0 0 var(--accent); }
+  .res .sq { width: 26px; height: 26px; border-radius: 3px; flex: none; }
+  .res .nm { flex: 1; min-width: 0; } .res .nm small { display: block; color: var(--dim); font-size: 11px; }
+  .res .pct { font: 600 14px var(--mono); width: 54px; text-align: right; }
+  .why { color: var(--soft); font-size: 11.5px; width: 250px; }
+  .axes { display: grid; grid-template-columns: 90px 1fr 70px; gap: 6px 10px; align-items: center; font-size: 12px; }
+  .axes .bar { position: relative; height: 10px; background: var(--field); border: 1px solid var(--line-soft); border-radius: 2px; }
+  .axes .bar i { position: absolute; top: -3px; width: 3px; height: 14px; border-radius: 1px; }
+  .axes .d { font: 11px var(--mono); color: var(--dim); text-align: right; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · Knobs follow the selection</h2>
+    <p>In Build, select a part and the CTRL49 goes to that part's INSTRUMENT page (PARAMS for a hardware synth): the eight knobs play its main
+      parameters at once, chosen by the page's own rules. No page to make. Pages stay for the show: on the Stage screen, and in Performance,
+      the knobs do what the song's page says.</p>
+  </div>
+  <div class="duo">
+    <div>
+      <div class="app" style="height:auto">
+        <div class="rackbox">
+          <div class="rh"><strong>Rack</strong><span class="sp"></span><span class="stat">Knobs follow</span><span class="tog on"></span></div>
+          <div class="part" style="--pc:#3d81c4"><b>1 · Grand Piano</b><small>Keyscape</small></div>
+          <div class="part" style="--pc:#4aa88c"><b>2 · Warm Pad</b><small>Pigments</small></div>
+          <div class="part" style="--pc:#b4854a"><b>3 · Juno-106</b><small>Hardware</small></div>
+          <div class="part" style="--pc:#9a6bbf"><b>4 · Strings</b><small>Kontakt</small></div>
+          <div class="part focused" style="--pc:#c46a6a"><b>5 · Moog Bass</b><small>Diva</small><span class="sp"></span><span class="chip blue">CTRL49 knobs</span></div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li><b>Which eight:</b> as the INSTRUMENT page chooses them: your page for the plug-in, your pins (☆), then its own groups.</li>
+        <li><b>A knob that does not turn endlessly</b> uses the pickup that exists: it takes over when it passes the value.</li>
+        <li><b>The dock following what you play</b> (Rack design) moves the knobs with it.</li>
+        <li><b>Off</b> with the switch, or pin the dock.</li>
+      </ul>
+    </div>
+    <div class="ctl49" id="ctl1"></div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · A macro by moving</h2>
+    <p>Press Learn macro, then turn the knobs to where the macro's far end should take them, here, in the plug-in's own window or on the
+      controller, on any part. Each one caught is listed from where it was to where it went. Press Done: one macro now moves all of them
+      together, from there to there, and can be put on a knob like any other.</p>
+  </div>
+  <div class="app">
+    <div class="dock">
+      <div class="dtabs"><span class="tb">Chain</span><span class="tb on">Params</span><span class="tb">Zone</span><span class="tb">Sounds</span><span class="subj">5 · Moog Bass · Diva</span><span class="sp"></span><span class="ghostb">Learn macro</span></div>
+      <div class="banner"><span class="rec"></span><span>Learning <b>Brightness</b>: turn the knobs to where the macro's far end should take them. 4 caught.</span><span class="sp"></span><span class="ghostb">Cancel</span><span class="btn">Done</span></div>
+      <div class="dbody">
+        <div class="knobs" id="knobs2"></div>
+        <div class="side"><h5>Caught · from → to</h5>
+          <div class="crow">Cutoff<small>Moog Bass</small><span class="amt">48 % → 74 %</span></div>
+          <div class="crow">Resonance<small>Moog Bass</small><span class="amt">20 % → 32 %</span></div>
+          <div class="crow">Env amount<small>Moog Bass</small><span class="amt">55 % → 40 %</span></div>
+          <div class="crow">Brightness<small>Warm Pad · Pigments</small><span class="amt">30 % → 65 %</span></div>
+          <h5 style="margin-top:8px">After Done</h5>
+          <div class="macro"><span id="mk2"></span><span><b>Brightness</b><small>4 parameters on 2 parts · 0 % is where they were, 100 % where you took them</small></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · Swap a plug-in, keep the mappings</h2>
+    <p>Moog Bass moves from Diva to Mini V. Everything that pointed at Diva's parameters (knob pages, macros, modulation, the INSTRUMENT page's
+      pins) is offered Mini V's parameter of the same or a similar name. Sure matches are ticked; a guess asks; one with nothing near it says
+      so. Today all of them would become unresolved.</p>
+  </div>
+  <div class="app" style="height:650px">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span><div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div></div>
+    <div class="veil"></div>
+    <div class="modal">
+      <div class="mh"><strong>Moog Bass: Diva → Mini V</strong><span>7 things pointed at Diva · 4 sure · 2 to check · 1 with no match</span></div>
+      <div class="mb">
+        <table>
+          <tr><th>Used by</th><th>Was (Diva)</th><th>Now (Mini V)</th><th></th></tr>
+          <tr><td>Page “Bass” · knob 1<br><small>and macro Brightness</small></td><td>Cutoff</td><td><span class="dd">Cutoff<small>▾</small></span></td><td><span class="chip green">same name</span></td></tr>
+          <tr><td>Page “Bass” · knob 2</td><td>Resonance</td><td><span class="dd">Emphasis<small>▾</small></span></td><td><span class="chip green">known: resonance</span></td></tr>
+          <tr><td>Page “Bass” · knob 3</td><td>Glide</td><td><span class="dd">Glide<small>▾</small></span></td><td><span class="chip green">same name</span></td></tr>
+          <tr><td>Pinned ☆</td><td>Volume</td><td><span class="dd">Master Volume<small>▾</small></span></td><td><span class="chip green">close</span></td></tr>
+          <tr><td>Velocity → (modulation)</td><td>Env amount</td><td><span class="dd ask">Amount of Contour?<small>▾</small></span></td><td><span class="chip amber">check: a guess</span></td></tr>
+          <tr><td>Mod wheel → (modulation)</td><td>Vibrato</td><td><span class="dd ask">Mod Mix?<small>▾</small></span></td><td><span class="chip amber">check: a guess</span></td></tr>
+          <tr><td>Page “Bass” · knob 6</td><td>Drive</td><td><span class="dd none">nothing near it<small>▾ pick</small></span></td><td><span class="chip red">left unresolved</span></td></tr>
+        </table>
+      </div>
+      <div class="mf"><span>Each "Now" can be changed. A row left as it is stays unresolved, as today, and says so on its page.</span><span class="sp"></span><span class="ghostb">Leave them all unresolved</span><span class="btn">Keep these</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f4">
+  <div class="caption">
+    <h2>4 · Find a sound from a recording</h2>
+    <p>Drop a few seconds of audio on the Sounds tab: a demo, a song, a voice memo of a synth. Mark the stretch where the sound plays on its own;
+      HoSTage measures it the way the library measures every sound and lists the ones you own that are nearest, with what agrees and what
+      does not. Play the recording and a sound one after the other, then load it.</p>
+  </div>
+  <div class="app">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span><div class="tabs"><span>Rack</span><span class="on">Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div></div>
+    <div class="find">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card"><h5><span>The recording · demo-chorus.wav · 0:42</span><span>▶ play the marked stretch</span></h5>
+          <div class="wave" id="wave4"><div class="selr" style="left:41%;width:9%"><span>3.1 s · the pad alone</span></div></div>
+          <div style="margin-top:8px;color:var(--faint);font-size:11.5px">Drag to mark where the sound plays on its own. Best: a held note or chord near middle C, the note the library measures every sound with.</div>
+        </div>
+        <div class="card"><h5><span>Nearest sounds you own</span><span>of 3,612 measured</span></h5>
+          <div class="res sel"><span class="sq" style="background:#4aa88c"></span><span class="nm">Slow Strings Pad<small>Pigments · Arturia · Pads</small></span><span class="why">same attack and width, a little darker</span><span class="pct" style="color:#8fd1a8">91 %</span><span class="ghostb">▶</span><span class="btn">Load</span></div>
+          <div class="res"><span class="sq" style="background:#6a94c4"></span><span class="nm">Glass Choir<small>Pigments · Arturia · Pads</small></span><span class="why">same brightness, longer tail</span><span class="pct">86 %</span><span class="ghostb">▶</span><span class="ghostb">Load</span></div>
+          <div class="res"><span class="sq" style="background:#9a6bbf"></span><span class="nm">Analog Strings<small>Diva · u-he · Pads</small></span><span class="why">same tail, narrower</span><span class="pct">82 %</span><span class="ghostb">▶</span><span class="ghostb">Load</span></div>
+          <div class="res"><span class="sq" style="background:#3d81c4"></span><span class="nm">Warm Strings<small>Omnisphere · Spectrasonics · Strings</small></span><span class="why">slower attack, brighter</span><span class="pct">77 %</span><span class="ghostb">▶</span><span class="ghostb">Load</span></div>
+          <div class="res"><span class="sq" style="background:#b4854a"></span><span class="nm">Velvet Choir<small>Omnisphere · Spectrasonics · Choir</small></span><span class="why">noisier, shorter tail</span><span class="pct">71 %</span><span class="ghostb">▶</span><span class="ghostb">Load</span></div>
+        </div>
+      </div>
+      <div class="card"><h5><span>The recording against Slow Strings Pad</span></h5>
+        <div class="axes" id="axes4"></div>
+        <div style="margin-top:14px;display:flex;gap:8px"><span class="ghostb">▶ Recording</span><span class="ghostb">▶ Slow Strings Pad</span><span class="sp"></span><span class="btn">Load into 2 · Warm Pad</span></div>
+        <div style="margin-top:14px;color:var(--faint);font-size:11.5px">The measure is the library's own: brightness, attack, tail, width, noisiness. It finds a sound like the one you hear, not the same patch; in a full mix, mark a stretch where it is alone.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ---- the CTRL49 INSTRUMENT page, following the selection ----
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378',
+              violet: '#8B7CFF', teal: '#2DD4BF', pink: '#FF5C93', amber: '#FFB547' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const colX = (i) => i * 60 + 6;
+  function instrumentFollow() {
+    let s = `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${C.violet}"/>` + T(18, 22, 'DIVA', C.text, 16, "font-weight='700'");
+    s += `<rect x="70" y="9" width="76" height="14" rx="7" fill="#123a36"/>` + T(108, 19.5, 'FOLLOWING', C.teal, 7.5, "text-anchor='middle' font-weight='700'");
+    s += T(472, 21, '5 · MOOG BASS', C.dim, 10.5, "text-anchor='end'");
+    ['FILTER', 'AMP ENV', 'OSC', 'FX'].forEach((g, k) => { const x = 8 + k * 80; s += `<rect x="${x}" y="32" width="76" height="16" rx="3" fill="${k === 0 ? C.violet : C.raised}"/>` + T(x + 38, 43.5, g, k === 0 ? C.bg : C.label, 8, "text-anchor='middle' font-weight='700'"); });
+    s += T(472, 44, 'YOUR PINS FIRST', C.dim, 7.5, "text-anchor='end' font-weight='700'");
+    s += `<rect x="8" y="54" width="464" height="122" rx="4" fill="${C.card}"/><rect x="16" y="62" width="300" height="106" rx="3" fill="${C.bg}"/>`;
+    s += `<polyline fill="none" stroke="${C.violet}" stroke-width="2" points="${Array.from({ length: 60 }, (_, i) => { const f = i / 59; const y = f < .45 ? 0 : (f < .53 ? -22 * Math.sin((f - .45) / .08 * Math.PI) : (f - .53) * 300); return `${16 + f * 300},${96 + Math.min(y, 68)}`; }).join(' ')}"/>`;
+    s += T(326, 78, 'LADDER 24', C.text, 11, "font-weight='700'") + T(326, 94, 'cutoff 62 %', C.label, 9, "font-weight='600'");
+    s += T(326, 126, 'SELECT A PART', C.label, 7.5, "font-weight='700'") + T(326, 140, 'AND THE KNOBS FOLLOW', C.label, 7.5, "font-weight='700'");
+    s += T(326, 160, '● BUILD', C.teal, 9, "font-weight='700'");
+    const pads = [{ l: 'ON', on: true }, { l: '◀ GROUP' }, { l: 'GROUP ▶' }, { l: 'PINNED' }, null, null, { l: 'FOLLOW', on: true }, { l: '‹ CHAIN', on: true, col: C.violet }];
+    pads.forEach((p, i) => { const x = colX(i); if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; return; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'"); });
+    [['CUTOFF', '62%', .62], ['RESO', '35%', .35], ['ENV AMT', '70%', .7], ['ATTACK', '4ms', .05], ['DECAY', '420', .4], ['SUSTAIN', '60%', .6], ['GLIDE', '40ms', .25], ['VIBRATO', '0%', 0]].forEach(([l, v, f], i) => {
+      const cx = i * 60 + 30; s += T(cx, 217, l, C.label, 9, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, C.text, 13, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/><rect x="${i * 60 + 8}" y="244" width="${Math.max(2, 44 * f)}" height="4" rx="2" fill="${C.bar}"/>`; });
+    s += T(8, 265, 'IN BUILD THE KNOBS FOLLOW THE SELECTED PART · PAD 7 TURNS IT OFF', C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+  document.getElementById('ctl1').innerHTML = instrumentFollow();
+
+  // ---- knobs ----
+  function knob(v, from, col = '#79b9ee') {
+    const R = 24, cx = 30, cy = 30, a0 = -225, span = 270;
+    const pt = (deg, r = R) => { const t = deg * Math.PI / 180; return [cx + r * Math.cos(t), cy + r * Math.sin(t)]; };
+    const arc = (f0, f1, r, c, w) => { const d0 = a0 + span * f0, d1 = a0 + span * f1; const [x0, y0] = pt(d0, r), [x1, y1] = pt(d1, r);
+      const large = Math.abs(d1 - d0) > 180 ? 1 : 0, sweep = d1 > d0 ? 1 : 0; return `<path d="M${x0} ${y0} A${r} ${r} 0 ${large} ${sweep} ${x1} ${y1}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`; };
+    let s = arc(0, 1, R, '#2c353e', 4) + arc(0, Math.max(v, .001), R, col, 4);
+    if (from !== undefined) { s += arc(Math.min(from, v), Math.max(from, v), R + 6, '#e05c5c', 3.5); const [gx, gy] = pt(a0 + span * from, R); s += `<circle cx="${gx}" cy="${gy}" r="3.5" fill="none" stroke="#f2c4c4" stroke-width="1.5"/>`; }
+    const [px, py] = pt(a0 + span * v, R - 9);
+    s += `<circle cx="${cx}" cy="${cy}" r="17" fill="#20272e" stroke="#3b4652"/><line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" stroke="#d9e0e6" stroke-width="2.5" stroke-linecap="round"/>`;
+    return `<svg width="60" height="60" viewBox="0 0 60 60">${s}</svg>`;
+  }
+  const K = [['Cutoff', .74, '74 %', .48], ['Resonance', .32, '32 %', .20], ['Env amount', .40, '40 %', .55], ['Attack', .05, '4 ms'], ['Decay', .40, '420 ms'], ['Sustain', .60, '60 %'],
+             ['Release', .30, '280 ms'], ['Drive', .18, '18 %'], ['Vibrato', 0, '0 %'], ['Glide', .25, '40 ms'], ['Volume', .72, '−4 dB'], ['Pan', .5, 'C']];
+  document.getElementById('knobs2').innerHTML = K.map(([n, v, t, from]) => `<div class="kn${from !== undefined ? ' caught' : ''}">${knob(v, from)}<span class="nm">${n}</span><span class="vl">${t}</span></div>`).join('');
+  document.getElementById('mk2').innerHTML = knob(1, undefined, '#f0a070');
+
+  // ---- the recording's waveform ----
+  { const w = document.getElementById('wave4'); const W = w.clientWidth, H = 120; let seed = 3; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    let p = ''; for (let i = 0; i < 300; i++) { const x = i / 299 * W; const env = (i > 123 && i < 150) ? .35 : (.45 + .45 * Math.abs(Math.sin(i / 9)) * rnd()); const h = env * H / 2; p += `<line x1="${x}" y1="${H / 2 - h}" x2="${x}" y2="${H / 2 + h}" stroke="#4f6a82" stroke-width="2"/>`; }
+    w.insertAdjacentHTML('afterbegin', `<svg width="${W}" height="${H}" style="position:absolute;inset:0">${p}</svg>`); }
+
+  // ---- the axes: the recording (blue) against the sound (green) ----
+  document.getElementById('axes4').innerHTML = [['Brightness', .52, .46, 'darker'], ['Attack', .61, .60, 'same'], ['Tail', .70, .66, 'same'], ['Width', .82, .80, 'same'], ['Noisiness', .20, .14, 'cleaner']]
+    .map(([n, a, b, d]) => `<span>${n}</span><span class="bar"><i style="left:${a * 100}%;background:#79b9ee"></i><i style="left:${b * 100}%;background:#8fd1a8"></i></span><span class="d">${d}</span>`).join('')
+    + `<span></span><span style="font-size:11px;color:var(--dim)"><span style="color:#79b9ee">■</span> recording &nbsp; <span style="color:#8fd1a8">■</span> Slow Strings Pad</span><span></span>`;
+</script>
+</body>
+</html>

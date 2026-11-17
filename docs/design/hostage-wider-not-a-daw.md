@@ -571,6 +571,8 @@ profiles can (`DeviceProfileEngine.cpp`).
 
 ### Build mode, further
 
+*1 to 4 are drawn in `hostage-build-further-design.md` (2026-11-17); 5 in `hostage-rack-build-design.md`.*
+
 Proposed on 2026-11-16, when the owner asked for more Build-mode features, going the extra mile.
 **The owner took 1 to 5** (all Pro, 2026-11-17); 6 is out. Checked on `main`: no CPU figure per part (only the whole program's, in the header), controller
 knobs do not follow the selected part, a part whose plug-in is replaced leaves its control
