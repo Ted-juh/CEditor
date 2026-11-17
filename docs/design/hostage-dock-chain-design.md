@@ -404,8 +404,8 @@ How it behaves:
 
 ## The instrument and Out: the last blocks
 
-*Added 2026-11-17, when the owner said "Go ahead, next". Proposed, not yet approved. Mockups:
-`hostage-dock-instrument-mockups.html`, pictures `docs/media/hostage-dock-instrument-1.png` (a
+*Added 2026-11-17, when the owner said "Go ahead, next". **Approved by the owner the same day.**
+Mockups: `hostage-dock-instrument-mockups.html`, pictures `docs/media/hostage-dock-instrument-1.png` (a
 plug-in instrument), `-2.png` (a hardware synth), `-3.png` (Out) and `-4.png` (the pages at the
 keyboard's size).*
 
@@ -457,11 +457,11 @@ SECTION as for effects; PATCH and PARAMS, which need the device profile's groups
 host and the read-back (`ce-verify-module.md`'s design); the CEditor panel as a part's window
 (direction 4); STRIP.
 
-**Decisions for the owner:**
+**Decisions** (the owner, 2026-11-17: "All three, yes"):
 
-1. **A plug-in instrument's four pages**: SOUND, CHANGES, INSTRUMENT, SECTION?
-2. **A hardware synth's two pages**, PATCH and PARAMS, with its CEditor panel in the dock?
-3. **Out as STRIP**, with the existing METERS beside it in the dock?
+1. **A plug-in instrument's four pages**, SOUND, CHANGES, INSTRUMENT, SECTION: yes.
+2. **A hardware synth's two pages**, PATCH and PARAMS, with its CEditor panel in the dock: yes.
+3. **Out as STRIP**, with the existing METERS beside it in the dock: yes.
 
 ## What changes from today
 
