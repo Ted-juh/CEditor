@@ -22,6 +22,7 @@ decisions, all 2026-11-17, shaped the rest:
    it also applies to the arpeggiater and step sequencer.. but that could be just a "color"
    change." Proven here on the original CTRL49 look only: "there are fourteen skin sets, they can be
    done later. Just a proof of concept on the original ctrl49 set."
+   The other thirteen skins are worked out in `hostage-skins-design.md` (2026-11-17).
 
 ## What is there today
 

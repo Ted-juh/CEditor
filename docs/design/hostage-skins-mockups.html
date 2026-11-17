@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: CTRL49 skins as colour, mockups</title>
+<!--
+  Mockups for docs/design/hostage-skins-design.md: the fourteen CTRL49 skin sets
+  (tools/ctrl49/screen-lab: ten era presets, three design presets, Machined Metal) applied to the
+  HoSTage pages as a change of colour. One page, the arpeggiator's PLAY page from
+  hostage-dock-chain-mockups.html, drawn with each skin's palette. The palettes are read from each
+  skin's own colour table (era-presets/*/Skin.lua, design-presets/make_designs.py,
+  machined-metal/make_assets.py) and sampled from its panels.png where a skin paints its surfaces.
+-->
+<style>
+  body { margin: 0; background: #101418; color: #d9e0e6; font: 13px/1.35 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif; }
+  .frame { width: 1440px; padding: 28px 24px 36px; box-sizing: border-box; }
+  .frame + .frame { border-top: 1px solid #2c353e; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif; }
+  .caption p { margin: 0 0 14px; color: #aab5be; max-width: 1200px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px 16px; }
+  figure { margin: 0; }
+  figure svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  figcaption { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12.5px; }
+  figcaption b { font-weight: 600; } figcaption span { color: #7f8b96; }
+  table { border-collapse: collapse; font-size: 12px; width: 100%; }
+  th { text-align: left; font: 600 10px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; letter-spacing: .06em; text-transform: uppercase; color: #7f8b96; padding: 6px 4px; border-bottom: 1px solid #2c353e; }
+  td { padding: 4px; border-bottom: 1px solid #222a31; }
+  td.n { white-space: nowrap; padding-right: 10px; }
+  .sw { width: 52px; height: 22px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+  .sw small { display: block; font: 9px/22px 'JetBrains Mono', 'DejaVu Sans Mono', monospace; text-align: center; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · One page, fourteen skins</h2>
+    <p>The arpeggiator's PLAY page, drawn once, coloured fourteen ways. Nothing moves between skins: the same layout, the same words, the same
+      knob under the same cell. What changes is a palette of sixteen colours, a corner radius, and for two skins one extra touch (Walnut's
+      cheeks, Neo Brutal's outlines). The dock draws the same page with the same palette.</p>
+  </div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · What a skin is: sixteen colours</h2>
+    <p>Each role is used the same way on every page: <b>bg</b> the page, <b>card</b> the panels, <b>raised</b> empty tracks and off pads,
+      <b>text</b>, <b>label</b>, <b>dim</b> and <b>foot</b> the four kinds of words, <b>bar</b> a value's fill, <b>grid</b> and <b>grid+</b> the
+      pattern lines, <b>primary</b> held keys, notes and the selected tab, <b>on</b> what sounds now, the focused cell and lit pads,
+      <b>loud</b> accents, <b>warn</b> the cursor and warnings, and the two <b>key</b> colours of a keyboard drawn on the page. Words on a filled
+      colour take the bg or the text colour, whichever reads.</p>
+  </div>
+  <table id="tbl"></table>
+</section>
+
+<script>
+  // ---- the fourteen palettes ---------------------------------------------------------------------
+  // Read from each skin's own table (Skin.lua T: title, label, head, foot, dot_off, bar, playhead,
+  // note_loud, accent/cursor; THEMES in make_designs.py; AMBER and MINT in machined-metal) and, for
+  // bg and card, sampled from its panels.png. Roles a skin's table has no word for are chosen to
+  // read in it: Swiss Flat's black primary, Dot Matrix's two greens, Red Lead's lit LED white.
+  const SKINS = [
+    { name: 'Metro Tiles', year: 2012, kind: 'era', r: 0,
+      bg: '#111111', card: '#1D1D1D', raised: '#2C2C2C', text: '#FFFFFF', label: '#9A9A9A', dim: '#7A7A7A', foot: '#6A6A6A', bar: '#6A6A6A',
+      grid: '#262626', gridS: '#3A3A3A', primary: '#1BA1E2', on: '#8CBF26', loud: '#D80073', warn: '#F09609', keyW: '#E6E6E6', keyB: '#111111' },
+    { name: 'Midnight', year: 2020, kind: 'era · the original', r: 4,
+      bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', label: '#8890B0', dim: '#6B7393', foot: '#565E7E', bar: '#4A5378',
+      grid: '#1F2742', gridS: '#2B3456', primary: '#8B7CFF', on: '#2DD4BF', loud: '#FF5C93', warn: '#FFB547', keyW: '#D9DCE8', keyB: '#1A1F33' },
+    { name: 'Swiss Flat', year: 2011, kind: 'era', r: 0,
+      bg: '#EEEDE8', card: '#F8F7F3', raised: '#CFCEC8', text: '#151515', label: '#6E6D68', dim: '#8C8B86', foot: '#8C8B86', bar: '#8C8B86',
+      grid: '#E4E3DD', gridS: '#CFCEC8', primary: '#2F5BEA', on: '#FF6A13', loud: '#1A3DB8', warn: '#151515', keyW: '#D2D1CB', keyB: '#151515' },
+    { name: 'Blueprint', year: 1965, kind: 'era', r: 2,
+      bg: '#1E4C8A', card: '#183F74', raised: '#3568A9', text: '#E8F1FF', label: '#9FC1EC', dim: '#7FA5D6', foot: '#9FC1EC', bar: '#9FC1EC',
+      grid: '#22508C', gridS: '#3568A9', primary: '#9FC1EC', on: '#E8F1FF', loud: '#FF6B6B', warn: '#FFD54A', keyW: '#D6E6FA', keyB: '#183F74' },
+    { name: 'Neo Brutal', year: 2023, kind: 'era', r: 4, outline: '#111111',
+      bg: '#FFF1D0', card: '#FFFFFF', raised: '#E9DFC6', text: '#111111', label: '#5A503F', dim: '#7A6F5A', foot: '#5A503F', bar: '#111111',
+      grid: '#EFE7D2', gridS: '#D6CAA8', primary: '#3D7BFF', on: '#E8317F', loud: '#111111', warn: '#FFD23F', keyW: '#EFE3C2', keyB: '#111111' },
+    { name: 'Dot Matrix', year: 1983, kind: 'era', r: 0,
+      bg: '#B5C57A', card: '#A8B86D', raised: '#9AAA5E', text: '#1E2913', label: '#56653A', dim: '#6E7E48', foot: '#56653A', bar: '#1E2913',
+      grid: '#A0B065', gridS: '#93A358', primary: '#56653A', on: '#0B1205', loud: '#1E2913', warn: '#0B1205', keyW: '#C5D48A', keyB: '#1E2913' },
+    { name: 'Red Lead', year: 1997, kind: 'era', r: 3,
+      bg: '#C31F26', card: '#1A0D0E', raised: '#7A0D12', text: '#FFFFFF', label: '#FFC9C4', dim: '#F09A94', foot: '#FFC9C4', bar: '#FF6A60',
+      grid: '#2A1012', gridS: '#3A1416', primary: '#FF6A60', on: '#FFE7E2', loud: '#FF6A5A', warn: '#FFD447', keyW: '#F2E6E4', keyB: '#2A0A0C' },
+    { name: 'Rhythm Box', year: 1980, kind: 'era', r: 3,
+      bg: '#2D2D2F', card: '#171718', raised: '#46464A', text: '#EDE6CF', label: '#C9C4B5', dim: '#8E8C86', foot: '#8E8C86', bar: '#77746E',
+      grid: '#222224', gridS: '#333336', primary: '#F07F1A', on: '#F2C514', loud: '#D7262A', warn: '#F2A33A', keyW: '#EDE6CF', keyB: '#151516' },
+    { name: 'Walnut', year: 1971, kind: 'era', r: 3, edge: '#734425',
+      bg: '#151515', card: '#060606', raised: '#2E2E2E', text: '#F2F2F2', label: '#BEBEBE', dim: '#9A9A9A', foot: '#9A9A9A', bar: '#6A6C6E',
+      grid: '#141414', gridS: '#222222', primary: '#C08A50', on: '#FFB347', loud: '#FFC46B', warn: '#F2F2F2', keyW: '#E8E4DA', keyB: '#0A0A0A' },
+    { name: 'Test Bench', year: 1958, kind: 'era', r: 2,
+      bg: '#58665C', card: '#040D07', raised: '#3E4840', text: '#EDE4C8', label: '#E3DCC6', dim: '#A8AE9F', foot: '#D2CCB6', bar: '#87958A',
+      grid: '#0C1A10', gridS: '#163A20', primary: '#4FD46E', on: '#9DFFB0', loud: '#F2FFF4', warn: '#FFB04A', keyW: '#EDE4C8', keyB: '#1E2620' },
+    { name: 'Neon Glass', year: null, kind: 'design preset', r: 6,
+      bg: '#0C172A', card: '#050E1D', raised: '#153953', text: '#DAFAFF', label: '#7EB5CE', dim: '#3D85AF', foot: '#7EB5CE', bar: '#3D85AF',
+      grid: '#0E2238', gridS: '#153953', primary: '#3D85AF', on: '#4DE8FF', loud: '#FF5CD6', warn: '#FFD24D', keyW: '#CFEFFF', keyB: '#050E1D' },
+    { name: 'Studio', year: 1978, kind: 'design preset', r: 3,
+      bg: '#B4B9B3', card: '#EAD7A4', raised: '#9AA09A', text: '#1C262B', label: '#405053', dim: '#57605E', foot: '#405053', bar: '#57605E',
+      grid: '#DCC994', gridS: '#C9B57E', primary: '#1D313E', on: '#2F7A3A', loud: '#7B2B13', warn: '#C8701E', keyW: '#FFFDF4', keyB: '#1C262B' },
+    { name: 'Bakelite', year: 1936, kind: 'design preset', r: 6,
+      bg: '#43281D', card: '#19100A', raised: '#5A3A28', text: '#F5DDB1', label: '#CDB17F', dim: '#B29463', foot: '#CDB17F', bar: '#99743B',
+      grid: '#24170F', gridS: '#3A2617', primary: '#B29463', on: '#FFD684', loud: '#E07A3A', warn: '#FFB060', keyW: '#F5DDB1', keyB: '#19100A' },
+    { name: 'Machined Metal', year: null, kind: 'the first skin', r: 2,
+      bg: '#2E2E2C', card: '#0C0E0D', raised: '#3A3A37', text: '#F0EEE6', label: '#CDCAB9', dim: '#8A887E', foot: '#8A887E', bar: '#6A6A64',
+      grid: '#151816', gridS: '#232624', primary: '#FFB73E', on: '#9CFFD0', loud: '#FF7A5A', warn: '#F0EEE6', keyW: '#E4E2DA', keyB: '#0C0E0D' },
+  ];
+
+  // ---- drawing: the PLAY page of hostage-dock-chain-mockups.html, every colour from C ------------
+  let C;
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const lum = (h) => { const n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+  const ink = (fill) => (lum(fill) > 0.55 ? (lum(C.bg) < 0.5 ? C.bg : C.text) : (lum(C.bg) > 0.5 ? C.bg : C.text));
+  const panel = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${C.r}" fill="${C.card}"${C.outline ? ` stroke="${C.outline}" stroke-width="2"` : ''}/>`;
+
+  function chrome(title, right, cells, footer, idx, count, inner) {
+    let s = `<rect width="480" height="272" fill="${C.bg}"/>`;
+    if (C.edge) s += `<rect x="0" y="0" width="5" height="272" fill="${C.edge}"/><rect x="475" y="0" width="5" height="272" fill="${C.edge}"/>`;
+    s += `<rect x="8" y="7" width="4" height="17" rx="${Math.min(1, C.r)}" fill="${C.on}"/>` + T(18, 22, title, C.text, 16, "font-weight='700'");
+    s += T(472, 21, right, C.dim, 11, "text-anchor='end'");
+    s += inner;
+    cells.forEach((c, i) => {
+      if (!c.l) return;
+      const cx = i * 60 + 30, focus = c.focus;
+      s += T(cx, 217, c.l, focus ? C.on : C.label, 9, "text-anchor='middle' font-weight='700'");
+      s += T(cx, 236, c.v, focus ? C.on : C.text, c.vs || 16, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="${Math.min(2, C.r)}" fill="${C.raised}"/>`;
+      if (c.f) s += `<rect x="${i * 60 + 8}" y="244" width="${44 * c.f}" height="4" rx="${Math.min(2, C.r)}" fill="${focus ? C.on : C.bar}"/>`;
+    });
+    s += T(8, 265, footer, C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    for (let k = 0; k < count; k++) s += `<rect x="${472 - (count - k) * 13 + 3}" y="259" width="10" height="4" rx="${Math.min(1, C.r)}" fill="${k === idx ? C.on : C.raised}"/>`;
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+  function keys(x0, y0, w, h, firstOct, octaves, held, sounding) {
+    const names = ['C', 'D', 'E', 'F', 'G', 'A', 'B'], semis = [0, 2, 4, 5, 7, 9, 11];
+    const whites = []; for (let o = 0; o < octaves; o++) names.forEach((n, i) => whites.push({ n: 12 * (firstOct + 1 + o) + semis[i], name: n }));
+    const ww = w / whites.length; let s = '';
+    whites.forEach((k, i) => {
+      const c = k.n === sounding ? C.on : held.includes(k.n) ? C.primary : C.keyW;
+      s += `<rect x="${x0 + i * ww + .5}" y="${y0}" width="${ww - 1}" height="${h}" rx="${Math.min(1.5, C.r)}" fill="${c}"/>`;
+      if (k.n === sounding) s += `<circle cx="${x0 + i * ww + ww / 2}" cy="${y0 + h - 6}" r="2.6" fill="${ink(C.on)}"/>`;
+    });
+    whites.forEach((k, i) => {
+      if (!['C', 'D', 'F', 'G', 'A'].includes(k.name)) return;
+      const n = k.n + 1, c = n === sounding ? C.on : held.includes(n) ? C.primary : C.keyB;
+      s += `<rect x="${x0 + (i + 1) * ww - ww * .32}" y="${y0}" width="${ww * .64}" height="${h * .6}" rx="${Math.min(1, C.r)}" fill="${c}"/>`;
+    });
+    return s;
+  }
+  const NN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nn = (n) => NN[n % 12] + (Math.floor(n / 12) - 1);
+  const types = ['accent', 'note', 'tie', 'note', 'accent', 'x2', 'rest', 'chord'];
+  const vels = [97, 72, 90, 64, 97, 84, 50, 96], octs = [0, 0, 0, 1, 0, 0, 0, -1];
+  const cur = 3, pool = [57, 60, 64, 67, 69, 72, 76, 79], walk = [...pool, 76, 72, 69, 67, 64, 60];
+  function playPage() {
+    const tcol = { accent: C.loud, note: C.primary, tie: C.primary, x2: C.warn, rest: C.dim, chord: C.text };
+    const now = 64;
+    let s = panel(8, 32, 338, 44) + keys(12, 36, 330, 36, 3, 3, [57, 60, 64, 67], now);
+    s += panel(352, 32, 120, 44) + T(360, 64, nn(now), C.on, 24, "font-weight='700'")
+       + T(466, 47, 'VEL 64', C.dim, 9, "text-anchor='end' font-weight='600'") + T(466, 60, 'NOTE', C.primary, 9, "text-anchor='end' font-weight='700'");
+    for (let k = 0; k < 8; k++) s += `<rect x="${404 + k * 8}" y="67" width="6" height="3" rx="${Math.min(1, C.r)}" fill="${k === cur ? C.warn : C.raised}"/>`;
+    const X = 8, Y = 82, W = 464, H = 120, cw = W / 16;
+    s += panel(X, Y, W, H);
+    for (let i = 1; i < 16; i++) s += `<line x1="${X + i * cw}" y1="${Y + 3}" x2="${X + i * cw}" y2="${Y + H - 3}" stroke="${i % 4 ? C.grid : C.gridS}"/>`;
+    s += `<rect x="${X + cur * cw}" y="${Y}" width="${cw}" height="${H}" fill="${C.on}" opacity=".10"/>`;
+    const lo = 42, hi = 94, y = (n) => Y + 8 + (1 - (n - lo) / (hi - lo)) * (H - 16);
+    let w = 0, prev = null; const rr = Math.min(1.5, C.r);
+    for (let i = 0; i < 16; i++) {
+      const t = types[i % 8], v = vels[i % 8], o = octs[i % 8] * 12, gate = .62, x = X + i * cw + 2, th = 2.5 + (v / 127) * 4.5;
+      if (t === 'rest') { prev = null; continue; }
+      if (t === 'tie' && prev) { s += `<rect x="${prev.x}" y="${prev.y - prev.th / 2}" width="${x + cw * gate - prev.x}" height="${prev.th}" rx="${rr}" fill="${C.primary}"/>`; continue; }
+      if (t === 'chord') { [57, 60, 64, 67].forEach((n) => { s += `<rect x="${x}" y="${y(n + o) - 2.5}" width="${cw * gate}" height="5" rx="${rr}" fill="${C.text}"/>`; }); prev = null; continue; }
+      const n = walk[w % walk.length] + o; w++;
+      const thick = t === 'accent' ? th + 2 : th;
+      if (i === 12) { s += `<rect x="${x}" y="${y(n) - thick / 2}" width="${cw * gate}" height="${thick}" rx="${rr}" fill="none" stroke="${C.dim}" stroke-dasharray="2 2"/>`; prev = null; continue; }
+      const col = i === cur ? C.on : tcol[t];
+      if (t === 'x2') { const hw = (cw - 4) / 2; s += `<rect x="${x}" y="${y(n) - th / 2}" width="${hw * gate}" height="${th}" rx="${rr}" fill="${col}"/><rect x="${x + hw}" y="${y(n) - th / 2}" width="${hw * gate}" height="${th}" rx="${rr}" fill="${col}"/>`; }
+      else s += `<rect x="${x}" y="${y(n) - thick / 2}" width="${cw * gate}" height="${thick}" rx="${rr}" fill="${col}"/>`;
+      prev = { x, y: y(n), th: thick };
+    }
+    return chrome('PLAY', 'UP/DN   1/16   120 BPM', [
+      { l: 'MODE', v: 'UP/DN', f: .3, vs: 14, focus: true }, { l: 'RATE', v: '1/16', f: .55 }, { l: 'OCTAVES', v: '2', f: .33 }, { l: 'GATE', v: '60%', f: .6 },
+      { l: 'SWING', v: '54%', f: .3 }, { l: 'TEMPO', v: '120', f: .5 }, { l: 'LATCH', v: 'OFF' }, { l: 'SCALE', v: 'OFF' },
+    ], 'HELD KEYS PLAY THE ARPEGGIO', 0, 6, s);
+  }
+
+  document.getElementById('grid').innerHTML = SKINS.map((k) => { C = k;
+    return `<figure>${playPage()}<figcaption><b>${k.name}${k.year ? ' ' + k.year : ''}</b><span>${k.kind}</span></figcaption></figure>`; }).join('');
+
+  const ROLES = ['bg', 'card', 'raised', 'text', 'label', 'dim', 'foot', 'bar', 'grid', 'gridS', 'primary', 'on', 'loud', 'warn', 'keyW', 'keyB'];
+  const HEAD = { gridS: 'grid+', keyW: 'key w', keyB: 'key b' };
+  document.getElementById('tbl').innerHTML = `<tr><th>Skin</th>${ROLES.map((r) => `<th>${HEAD[r] || r}</th>`).join('')}</tr>` +
+    SKINS.map((k) => { C = k; return `<tr><td class="n">${k.name}${k.year ? ' ' + k.year : ''}</td>${ROLES.map((r) => `<td><div class="sw" style="background:${k[r]}"><small style="color:${ink(k[r])}">${k[r].slice(1)}</small></div></td>`).join('')}</tr>`; }).join('');
+</script>
+</body>
+</html>
