@@ -1,6 +1,6 @@
 # HoSTage dock: the Chain tab, the arpeggiator and the step sequencer
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. It works out "a better
+*Design with mockups, **approved by the owner on 2026-11-17** ("Approved.."). Nothing built. It works out "a better
 effects screen in the dock" (`hostage-wider-not-a-daw.md`, Effects, 8), taken on 2026-11-16,
 starting with the arpeggiator, as the owner asked. Mockups: `hostage-dock-chain-mockups.html`, and
 the same four frames as pictures in `docs/media/hostage-dock-chain-1.png` to `-4.png`. When this
@@ -182,18 +182,21 @@ already has note, drum, CC and parameter lanes. Neither module repeats it.
   step types and NOTES mode needing engine work (above); the step sequencer's NOTES page, on the
   same piano roll; both modules' editors in the dock drawn from the keyboard's pages.
 
-## Decisions for the owner
+## Decisions
 
-1. **One Chain tab** in place of the MIDI and Inserts tabs?
-2. **The arpeggiator's PLAY knobs 7 and 8** as latch and scale lock?
-3. **The arpeggiator's pattern up to 32 steps** in the dock, eight at a time on the keyboard, or
-   eight only, as designed?
+All settled on 2026-11-17. The owner approved the design as drawn, which settles the five that were
+still open the way the mockups show them:
+
+1. **One Chain tab** in place of the MIDI and Inserts tabs.
+2. **The arpeggiator's PLAY knobs 7 and 8** are latch and scale lock.
+3. **The arpeggiator's pattern** is up to 32 steps in the dock, eight at a time on the keyboard.
 4. **The step sequencer's two pages**: SEQ with tie, gate and rate on knobs 6 to 8, and NOTES with
-   the melody and the sequence's settings?
-5. **Patterns as a menu** in place of a row of chips?
+   the melody and the sequence's settings.
+5. **Patterns as a menu** in place of a row of chips.
 
-Decided, 2026-11-17: two modules; almost identical on the dock and the CTRL49; the skin applies to
-both (the other skins later); the arpeggiator's NOTES mode, with the whole keyboard down the left.
+Decided before that, also 2026-11-17: two modules; almost identical on the dock and the CTRL49; the
+skin applies to both (the other thirteen skins later); the arpeggiator's NOTES mode, with the whole
+keyboard down the left.
 
 ## Next
 

@@ -396,7 +396,8 @@ setting; bypass has no crossfade; a part's inserts run in series only; no MIDI m
    MIDI modules, instrument, inserts, fader, sends. Each block carries its bypass, dry/wet, its few
    most-used knobs (so the plug-in's window is rarely needed on stage), its latency and its state
    (running, restarting, failed). MIDI modules and audio inserts work the same way. **Worked out,
-   starting with the arpeggiator, with mockups for approval:** `hostage-dock-chain-design.md`.
+   starting with the arpeggiator and step sequencer, and approved on 2026-11-17:**
+   `hostage-dock-chain-design.md`.
 
 ### Still more
 
