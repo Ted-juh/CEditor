@@ -1,6 +1,6 @@
 # HoSTage: Practice mode
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. It draws "Practice mode"
+*Design with mockups, approved by the owner on 2026-11-17 as drawn ("this is terrific"). Nothing built. It draws "Practice mode"
 from `hostage-wider-not-a-daw.md`, which is taken; this record decides only how it looks and
 behaves. Mockups: `hostage-practice-mockups.html`, pictures `docs/media/hostage-practice-1.png` to
 `-4.png`. When this and the code disagree, the code is right.*
@@ -86,10 +86,11 @@ every page:
 - **Kept per song**: who plays what, tempo, loop and the runs, in the data folder.
 - **The CTRL49 page**, in the page list beside the others.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-17)
 
-1. **Practice as a tab of its own**, the whole window, with the rig loaded now sounding both hands?
+1. **Practice as a tab of its own**, the whole window, with the rig loaded now sounding both hands.
+   **Yes.**
 2. **The rig's tracks go through your keyboard** (your splits) by default, with one part per track
-   as the option, and drums off?
-3. **Results kept per song**, and the next tempo offered after two runs over 90 %?
-4. **The PRACTICE page on the CTRL49**?
+   as the option, and drums off. **Yes.**
+3. **Results kept per song**, and the next tempo offered after two runs over 90 %. **Yes.**
+4. **The PRACTICE page on the CTRL49.** **Yes.**
