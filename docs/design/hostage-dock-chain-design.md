@@ -106,6 +106,28 @@ The Rhythm Box design's six pages, in the original look (frame 1, and frame 3 at
 **Only in the dock**: a pattern longer than eight steps (up to 32, the engine's limit; the keyboard
 shows eight at a time), patterns, and dragging across several steps at once.
 
+### NOTES mode: the notes you place yourself
+
+**Decided, 2026-11-17.** The owner: "the arpeggiater should also be assignable instead of just the
+up/down etc modes.. all the keys to the left to see the range of the keyboard." So besides the
+twelve walks there is a thirteenth mode, **NOTES** (frame 2):
+
+- **Each step's note is set by hand** on a piano roll, with the whole keyboard on its side down the
+  left, as on the era designs' Arp Edit page. Knob 2 sets the selected step's note; knob 3 scrolls
+  the roll through the keyboard's whole range. A note outside the view is marked at the top or
+  bottom edge of its step.
+- **It still plays like an arpeggiator.** The key you hold moves the pattern from its **root**
+  (knob 5), so one finger transposes it (**follow: key**). The pattern pages still apply: a step's
+  type (accent, tie, ratchet, chord, rest), velocity, octave and chance.
+- **The NOTES page takes MOTION's place as page 2** in this mode, because octave order, repeat,
+  inversion and random shape a walk, and NOTES mode has none. So the arpeggiator has six pages in
+  every mode.
+- **PLAY** says NOTES as its mode, and its roll and NOW show the placed notes.
+- **The sounding note is lit** on the side keyboard as well as on PLAY's.
+
+The engine needs, for this: per-step notes over the whole MIDI range rather than today's free rows
+(one octave either side of the lowest key held, `ArpEngine.h`, Drawn mode), a root, and follow.
+
 ### What the engine needs for it
 
 What the six pages ask for and `ArpSettings` does not have yet:
@@ -136,10 +158,12 @@ size).
   sounding. Knobs: step, velocity, octave, ratchet, chance, **tie**, gate, rate. On today's Live
   page knob 6 is gate, 7 rate and 8 the arpeggiator's mode; tie takes knob 6 so a step's settings
   are all on knobs 1 to 6, and the mode leaves with the arpeggiator.
-- **NOTES**: the melody, after the era designs' Arp Edit roll. Thirteen rows around the key you
-  hold (the shaded row), sixteen steps, the selected step outlined. **Free** rows are semitones
-  around the lowest key held, so one finger transposes the line; **chord** rows are the notes of
-  the chord held. Both exist today. Knobs: step, note, rows, scroll, swing, feel, steps, scale lock.
+- **NOTES**: the melody, on **the same piano roll as the arpeggiator's NOTES page**: the whole
+  keyboard on its side down the left, sixteen steps, the selected step outlined, scrolled through
+  the keyboard's range by knob 3. **Follow** says what the key you hold does: **key** moves the line
+  from its root (today's free rows, widened from one octave either side to the whole range),
+  **chord** fits its notes to the chord held (today's chord rows), **off** plays it as written.
+  Knobs: step, note, scroll, follow, swing, feel, steps, scale lock.
 
 So every setting has a knob on the keyboard. **Only in the dock**: painting across the grid or the
 bars, and more than sixteen steps (up to 32).

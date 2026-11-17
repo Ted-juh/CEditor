@@ -141,8 +141,30 @@
 
 <section class="frame" id="f2">
   <div class="caption">
-    <h2>2 · The step sequencer in the dock: its two CTRL49 pages, larger</h2>
-    <p>SEQ is the Live page's layout: the steps, the zones and the keys, and the selected step's knobs. NOTES carries the melody, after the era designs' Arp Edit roll. Same drawings as on the keyboard, at about one and a half times its size.</p>
+    <h2>2 · The arpeggiator in NOTES mode: the notes you place yourself</h2>
+    <p>Besides the twelve walks, a thirteenth mode where you set each step's note on a piano roll, the whole keyboard on its side down the left, scrolled by knob 3. A note outside the view is marked at the edge. The key you hold moves the pattern from its root, so it still plays like an arpeggiator. In this mode the NOTES page takes MOTION's place as page 2; pages 3 to 6 are as in frame 1.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker"><i></i>Part 3 · Bell Pluck ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Zone</span><span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Unfold the chain ▾</span>
+    </div>
+    <div class="compact"><span class="lbl" style="margin-right:6px">Chain</span>
+      <span class="crumb">Key</span>›<span class="crumb sel"><b>Arpeggiator</b></span>›<span class="crumb" style="opacity:.55">Humanize</span>›<span class="crumb">Diva</span>›<span class="crumb">ValhallaDelay</span>›<span class="crumb">Pro-Q 3 <span style="color:var(--pending)">●</span></span>›<span class="crumb">Fader</span>›<span class="crumb">Sends</span></div>
+    <div class="detail">
+      <div class="dhead"><h3>Arpeggiator</h3><span class="toggle">● ON</span><span style="flex:1"></span><span class="chip">Patterns ▾</span><span class="hw"><i></i>CTRL49 · ON PAGE 2 OF 6</span></div>
+      <div class="pages two" id="arpnotes"></div>
+      <div class="extras"><span class="lbl">Only in the dock</span><span>Click a row to place a step's note; drag to move it</span><span>Scroll the roll with the wheel</span><span>Pages 3 to 6 below, as in frame 1</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · The step sequencer in the dock: its two CTRL49 pages, larger</h2>
+    <p>SEQ is the Live page's layout: the steps, the zones and the keys, and the selected step's knobs. NOTES carries the melody on the same piano roll as the arpeggiator's, the whole keyboard down the left. Same drawings as on the keyboard, at about one and a half times its size.</p>
   </div>
   <div class="dock">
     <div class="tabs">
@@ -161,10 +183,10 @@
   </div>
 </section>
 
-<section class="frame wide" id="f3">
+<section class="frame wide" id="f4">
   <div class="caption">
-    <h2>3 · The eight pages at the keyboard's own size</h2>
-    <p>480 × 272, as the CTRL49 shows them: knob N under cell N, the pads on the steps. These are the drawings frames 1 and 2 scale; the CTRL49 would draw them from rectangles and tinted sprites, as its other pages do, so a skin recolours them for free.</p>
+    <h2>4 · The nine pages at the keyboard's own size</h2>
+    <p>480 × 272, as the CTRL49 shows them: knob N under cell N, the pads on the steps. These are the drawings frames 1 to 3 scale; the CTRL49 would draw them from rectangles and tinted sprites, as its other pages do, so a skin recolours them for free.</p>
   </div>
   <div class="ref" id="ref"></div>
 </section>
@@ -184,6 +206,7 @@
     s += T(472, 21, right, C.dim, 11, "text-anchor='end'");
     s += inner;
     cells.forEach((c, i) => {
+      if (!c.l) return;
       const cx = i * 60 + 30, focus = c.focus;
       s += T(cx, 217, c.l, focus ? C.teal : C.label, c.small ? 8.5 : 9, "text-anchor='middle' font-weight='700'");
       s += T(cx, 236, c.v, focus ? C.teal : (c.vc || C.text), c.vs || 16, "text-anchor='middle' font-weight='600'");
@@ -204,6 +227,43 @@
   const pool = [57, 60, 64, 67, 69, 72, 76, 79], walk = [...pool, 76, 72, 69, 67, 64, 60];
   const colX = (i) => i * 60 + 6;   // pattern columns sit over the cells: column N over knob N
 
+  // ---- the piano roll with the keyboard on its side, used by both NOTES pages --------------------
+  const NN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nn = (n) => NN[n % 12] + (Math.floor(n / 12) - 1);
+  const arpNotes = [57, 64, 64, 69, 72, 76, -1, [57, 60, 64]];   // per step: a note, a rest, or a chord
+  function pianoRoll({ steps, notes, colour, sel, sounding, low, rows }) {
+    const X = 50, Y = 32, W = 422, H = 170, rh = H / rows, cw = W / steps; let s = '';
+    s += `<rect x="8" y="${Y}" width="38" height="${H}" rx="3" fill="#D9DCE8"/><rect x="${X}" y="${Y}" width="${W}" height="${H}" rx="3" fill="${C.card}"/>`;
+    const lit = [], blacks = [];
+    for (let r = 0; r < rows; r++) {
+      const n = low + rows - 1 - r, yy = Y + r * rh, black = [1, 3, 6, 8, 10].includes(n % 12);
+      if (black) s += `<rect x="${X}" y="${yy}" width="${W}" height="${rh}" fill="#121830"/>`;
+      s += `<line x1="${X}" y1="${yy}" x2="${X + W}" y2="${yy}" stroke="${n % 12 === 11 ? C.gridS : C.grid}"/>`;
+      // the keyboard on its side: white keys behind, black keys over them, a line where two whites meet
+      if (n === sounding) (black ? blacks : lit).push(yy);
+      if (black) blacks.push({ yy, on: n === sounding });
+      if (n % 12 === 5 || n % 12 === 0) s += `<line x1="8" y1="${yy + rh}" x2="46" y2="${yy + rh}" stroke="#8D93A8"/>`;
+      if (n % 12 === 0) s += T(43, yy + rh - 1.6, nn(n), C.bg, 6.5, "text-anchor='end' font-weight='700'");
+    }
+    lit.forEach((yy) => { s += `<rect x="8" y="${yy}" width="38" height="${rh}" fill="${C.teal}"/>`; });
+    blacks.filter((b) => typeof b === 'object').forEach((b) => { s += `<rect x="8" y="${b.yy}" width="23" height="${rh}" rx="1" fill="${b.on ? C.teal : '#1a1f33'}"/>`; });
+    for (let i = 1; i < steps; i++) s += `<line x1="${X + i * cw}" y1="${Y}" x2="${X + i * cw}" y2="${Y + H}" stroke="${i % 4 ? C.grid : C.gridS}"/>`;
+    const rowY = (n) => Y + (low + rows - 1 - n) * rh;
+    let prev = null;
+    notes.forEach((v, i) => {
+      const list = Array.isArray(v) ? v : [v], col = colour(i);
+      if (v === -1) { prev = null; return; }
+      if (v === 'tie' && prev) { s += `<rect x="${prev.x}" y="${prev.y}" width="${X + (i + 1) * cw - 2 - prev.x}" height="${rh - 2}" rx="1.5" fill="${prev.c}"/>`; return; }
+      list.forEach((n) => {
+        if (n >= low + rows) s += `<path d="M${X + i * cw + cw / 2 - 5} ${Y + 7} l5 -5 l5 5 z" fill="${col}"/>`;
+        else if (n < low) s += `<path d="M${X + i * cw + cw / 2 - 5} ${Y + H - 7} l5 5 l5 -5 z" fill="${col}"/>`;
+        else { s += `<rect x="${X + i * cw + 2}" y="${rowY(n) + 1}" width="${cw - 4}" height="${rh - 2}" rx="1.5" fill="${col}"/>`; prev = { x: X + i * cw + 2, y: rowY(n) + 1, c: col }; }
+      });
+    });
+    s += `<rect x="${X + sel * cw}" y="${Y}" width="${cw}" height="${H}" fill="none" stroke="${C.teal}" stroke-width="1.5"/>`;
+    return s;
+  }
+
   // ---- keyboard drawing, used by PLAY and SEQ ----------------------------------------------------
   function keys(x0, y0, w, h, firstOct, octaves, held, sounding, extra = {}) {
     const names = ['C', 'D', 'E', 'F', 'G', 'A', 'B'], semis = [0, 2, 4, 5, 7, 9, 11];
@@ -223,9 +283,10 @@
   }
 
   // ---- the arpeggiator's six pages ---------------------------------------------------------------
-  function playPage() {
-    let s = `<rect x="8" y="32" width="338" height="44" rx="4" fill="${C.card}"/>` + keys(12, 36, 330, 36, 3, 3, [57, 60, 64, 67], 64);
-    s += `<rect x="352" y="32" width="120" height="44" rx="4" fill="${C.card}"/>` + T(360, 64, 'E4', C.teal, 24, "font-weight='700'")
+  function playPage(mode = 'walk') {
+    const now = mode === 'notes' ? 69 : 64;
+    let s = `<rect x="8" y="32" width="338" height="44" rx="4" fill="${C.card}"/>` + keys(12, 36, 330, 36, 3, 3, [57, 60, 64, 67], now);
+    s += `<rect x="352" y="32" width="120" height="44" rx="4" fill="${C.card}"/>` + T(360, 64, nn(now), C.teal, 24, "font-weight='700'")
        + T(466, 47, 'VEL 64', C.dim, 9, "text-anchor='end' font-weight='600'") + T(466, 60, 'NOTE', C.violet, 9, "text-anchor='end' font-weight='700'");
     for (let k = 0; k < 8; k++) s += `<rect x="${404 + k * 8}" y="67" width="6" height="3" rx="1" fill="${k === cur ? C.amber : C.raised}"/>`;
     // the roll of the next sixteen steps
@@ -240,7 +301,8 @@
       if (t === 'rest') { prev = null; continue; }
       if (t === 'tie' && prev) { s += `<rect x="${prev.x}" y="${prev.y - prev.th / 2}" width="${x + cw * gate - prev.x}" height="${prev.th}" rx="1.5" fill="${C.violet}"/>`; continue; }
       if (t === 'chord') { [57, 60, 64, 67].forEach((n) => { s += `<rect x="${x}" y="${y(n + o) - 2.5}" width="${cw * gate}" height="5" rx="1.5" fill="${C.cream}"/>`; }); prev = null; continue; }
-      const n = walk[w % walk.length] + o; w++;
+      let n = walk[w % walk.length] + o; w++;
+      if (mode === 'notes') { const a = arpNotes[i % 8]; if (Array.isArray(a)) continue; n = a + o; }
       const thick = t === 'accent' ? th + 2 : th;
       if (i === 12) { s += `<rect x="${x}" y="${y(n) - thick / 2}" width="${cw * gate}" height="${thick}" rx="1.5" fill="none" stroke="${C.dim}" stroke-dasharray="2 2"/>`; prev = null; continue; }
       const col = i === cur ? C.teal : tcol[t];
@@ -248,8 +310,8 @@
       else s += `<rect x="${x}" y="${y(n) - thick / 2}" width="${cw * gate}" height="${thick}" rx="1.5" fill="${col}"/>`;
       prev = { x, y: y(n), th: thick };
     }
-    return chrome('PLAY', 'UP/DN   1/16   120 BPM', [
-      { l: 'MODE', v: 'UP/DN', f: .3, vs: 14 }, { l: 'RATE', v: '1/16', f: .55 }, { l: 'OCTAVES', v: '2', f: .33 }, { l: 'GATE', v: '60%', f: .6 },
+    return chrome('PLAY', `${mode === 'notes' ? 'NOTES' : 'UP/DN'}   1/16   120 BPM`, [
+      { l: 'MODE', v: mode === 'notes' ? 'NOTES' : 'UP/DN', f: mode === 'notes' ? 1 : .3, vs: 14 }, { l: 'RATE', v: '1/16', f: .55 }, { l: 'OCTAVES', v: '2', f: .33 }, { l: 'GATE', v: '60%', f: .6 },
       { l: 'SWING', v: '54%', f: .3 }, { l: 'TEMPO', v: '120', f: .5 }, { l: 'LATCH', v: 'OFF' }, { l: 'SCALE', v: 'OFF' },
     ], 'HELD KEYS PLAY THE ARPEGGIO', 0, 6, s);
   }
@@ -363,7 +425,25 @@
     ], 'PADS TURN STEPS ON AND OFF   E1 STEP', 0, 2, s);
   }
 
+  function arpNotesPage() {
+    const roll = pianoRoll({ steps: 8, notes: arpNotes.map((v, i) => types[i] === 'tie' ? 'tie' : v), colour: (i) => i === cur ? C.teal : tcol[types[i]],
+                             sel: cur, sounding: 69, low: 55, rows: 18 });
+    return chrome('NOTES', 'THE KEY YOU HOLD MOVES IT', [
+      { l: 'STEP', v: '4 / 8', f: .5, focus: true }, { l: 'NOTE', v: 'A4', f: .6 }, { l: 'SCROLL', v: 'G3', f: .45 }, { l: 'FOLLOW', v: 'KEY', vs: 14 },
+      { l: 'ROOT', v: 'A3', vs: 15 }, {}, {}, {},
+    ], 'E2 SETS THE STEP’S NOTE   E3 SCROLLS THE WHOLE KEYBOARD', 1, 6, roll);
+  }
+
   function notesPage() {
+    const notes = melody.map((m) => (m < 0 ? -1 : 57 + (m - 6)));
+    const roll = pianoRoll({ steps: 16, notes, colour: (i) => (i === play ? C.teal : i === sel ? '#B3A9FF' : C.violet), sel, sounding: notes[play], low: 52, rows: 18 });
+    return chrome('NOTES', 'THE KEY YOU HOLD MOVES IT', [
+      { l: 'STEP', v: '5 / 16', f: 5 / 16, focus: true }, { l: 'NOTE', v: nn(notes[sel]), f: .6, vs: 15 }, { l: 'SCROLL', v: 'E3', f: .4 }, { l: 'FOLLOW', v: 'KEY', vs: 14 },
+      { l: 'SWING', v: '12%', f: .16 }, { l: 'FEEL', v: 'STR', vs: 14 }, { l: 'STEPS', v: '16', f: .5 }, { l: 'SCALE', v: 'OFF' },
+    ], 'E2 SETS THE STEP’S NOTE   E3 SCROLLS THE WHOLE KEYBOARD', 1, 2, roll);
+  }
+
+  function oldNotesPage() {
     const X = 34, Y = 32, W = 438, H = 170, cw = W / 16, rh = H / 13;
     let s = `<rect x="${X}" y="${Y}" width="${W}" height="${H}" rx="3" fill="${C.card}"/>`;
     for (let r = 0; r < 13; r++) {
@@ -386,12 +466,16 @@
 
   // ---- place them ---------------------------------------------------------------------------------
   const arp = [playPage(), motionPage(), stepsPage(), velocityPage(), octavePage(), chancePage()];
+  const arpN = [playPage('notes'), arpNotesPage()];
   const seq = [seqPage(), notesPage()];
   document.getElementById('arpdock').innerHTML = arp.join('');
+  document.getElementById('arpnotes').innerHTML = arpN.join('');
   document.getElementById('seqdock').innerHTML = seq.join('');
-  const names = [['PLAY', 'arpeggiator, page 1'], ['MOTION', 'arpeggiator, page 2'], ['STEPS', 'arpeggiator, page 3'], ['VELOCITY', 'arpeggiator, page 4'],
-                 ['OCTAVE', 'arpeggiator, page 5'], ['CHANCE', 'arpeggiator, page 6'], ['SEQ', 'step sequencer, page 1'], ['NOTES', 'step sequencer, page 2']];
-  document.getElementById('ref').innerHTML = [...arp, ...seq].map((svg, i) => `<figure>${svg}<figcaption><b>${names[i][0]}</b>${names[i][1]}</figcaption></figure>`).join('');
+  const ref = [[arp[0], 'PLAY', 'arpeggiator, page 1'], [arp[1], 'MOTION', 'arpeggiator, page 2 in the walk modes'],
+               [arpN[1], 'NOTES', 'arpeggiator, page 2 in NOTES mode'], [arp[2], 'STEPS', 'arpeggiator, page 3'],
+               [arp[3], 'VELOCITY', 'arpeggiator, page 4'], [arp[4], 'OCTAVE', 'arpeggiator, page 5'], [arp[5], 'CHANCE', 'arpeggiator, page 6'],
+               [seq[0], 'SEQ', 'step sequencer, page 1'], [seq[1], 'NOTES', 'step sequencer, page 2']];
+  document.getElementById('ref').innerHTML = ref.map(([svg, n, d]) => `<figure>${svg}<figcaption><b>${n}</b>${d}</figcaption></figure>`).join('');
 </script>
 </body>
 </html>
