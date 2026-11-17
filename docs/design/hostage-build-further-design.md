@@ -1,6 +1,7 @@
 # HoSTage: Build mode, further
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. It draws "Build mode,
+*Design with mockups, approved by the owner on 2026-11-17 as recommended ("Do what you
+recommend"). Nothing built. It draws "Build mode,
 further" 1 to 4 from `hostage-wider-not-a-daw.md`, which are taken (5, what each part costs, is in
 `hostage-rack-build-design.md`); this record decides only how they look and behave. Mockups:
 `hostage-build-further-mockups.html`, pictures `docs/media/hostage-build-further-1.png` to `-4.png`.
@@ -81,9 +82,10 @@ pointed at the old one becomes unresolved.
 - **Find from a recording**: the library's measures run on a marked stretch of an audio file
   instead of a render; the comparison exists.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-17: "Do what you recommend")
 
-1. **Knobs follow the selection in Build only**, on the INSTRUMENT page, on by default?
-2. **A macro by moving** on any part, from anywhere (dock, plug-in window, controller)?
-3. **On a swap**, sure matches applied, guesses asked, the rest left unresolved and said so?
-4. **Find a sound** among the sounds you own only, on a stretch you mark?
+1. **Knobs follow the selection in Build only**, on the INSTRUMENT page, on by default. **Yes.**
+2. **A macro by moving** on any part, from anywhere (dock, plug-in window, controller). **Yes.**
+3. **On a swap**, sure matches applied, guesses asked, the rest left unresolved and said so.
+   **Yes.**
+4. **Find a sound** among the sounds you own only, on a stretch you mark. **Yes.**
