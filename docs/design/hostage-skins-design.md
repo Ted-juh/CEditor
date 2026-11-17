@@ -124,7 +124,7 @@ Mockups: `hostage-skins-program-mockups.html`, pictures `docs/media/hostage-skin
 ![The Stage screen: its own skin](../media/hostage-skins-program-3.png)
 
 - **A status keeps its meaning in every skin**: danger and panic keep HoSTage's red (decision 5),
-  and, proposed, a connected device keeps its green. Without that, Swiss Flat would show a working
+  and a connected device keeps its green (decision 6). Without that, Swiss Flat would show a working
   audio interface with an orange dot, which reads as a warning. A status also carries a word or a
   symbol (✓, !), so a monochrome skin like Dot Matrix still says it.
 
@@ -171,3 +171,4 @@ skin the entire program." What that would take, from the code:
    the Stage skin. See "The whole program".
 4. **A contrast check** over every palette. **Yes.**
 5. **Danger stays HoSTage's red** in every skin. **Yes.**
+6. **Connected stays green** in every skin, as danger stays red. **Yes.**
