@@ -173,8 +173,8 @@ already has note, drum, CC and parameter lanes. Neither module repeats it.
 
 ## The Chords module: six pages
 
-*Added 2026-11-17, when the owner asked for "the Chords module, same way". Proposed, not yet
-approved. Mockups: `hostage-dock-chords-mockups.html`, pictures `docs/media/hostage-dock-chords-1.png`
+*Added 2026-11-17, when the owner asked for "the Chords module, same way". **Approved by the owner
+the same day.** Mockups: `hostage-dock-chords-mockups.html`, pictures `docs/media/hostage-dock-chords-1.png`
 (the dock) and `-2.png` (the pages at the keyboard's size).*
 
 ![The Chords module in the dock](../media/hostage-dock-chords-1.png)
@@ -198,8 +198,9 @@ look.
 
 1. **CHORDS**, after the feature mockup: the chord playing, large, with its numeral and its job in
    the key ("VImaj7, submediant"); the key, with a light per layer; the keyboard with the notes
-   playing and the scale marked; the eight pads of the bank. Knobs: key, scale, bank, then the four
-   layers on and off, then whether the module follows the song's key.
+   playing and the scale marked; the eight pads of the bank, with a dashed ring around the pad whose chord most
+   likely comes next. Knobs: key, scale, bank, then the four layers on and off, then whether the
+   module follows the song's key.
 2. **SET**: eight of the set's chords at a time, the selected one large with its notes on the
    keyboard. Knobs: chord, root, shape, inversion, voicing, bass, **learn** (play a chord and it is
    kept), and the top voice's accent.
@@ -215,16 +216,28 @@ look.
 **Only in the dock**: naming a chord; dragging a chord from SET onto a pad, a key or a progression
 step; removing a chord (it asks first).
 
-**What it needs.** No engine work: every setting shown exists. New are the pages themselves, the
-numeral and job of a chord in the key (worked out from its notes, which `chordNameOf` already
-names), and learning from the keyboard's knob 7. The feature mockup also ringed "the likeliest next
-chord" on the pads; that needs a model of which chord follows which, and is left out.
+**What it needs.** No engine work for the module's playing: every setting shown exists. New are the
+pages themselves, the numeral and job of a chord in the key (worked out from its notes, which
+`chordNameOf` already names), learning from the keyboard's knob 7, and the likeliest next chord
+(below).
 
-**Decisions for the owner:**
+**The likeliest next chord.** A hint, not a change: the ring marks a pad, and every pad still plays
+the chord it is set to. Two sources, in this order:
 
-1. **These six pages**, in this order?
-2. **The layers switched on CHORDS' knobs 4 to 7**, rather than one switch on each layer's page?
-3. **The likeliest next chord** from the feature mockup: leave it out, as here?
+- **The player's own habit**: which chord they played after this one before, counted per part from
+  what was played (the MIDI journal, `MidiCaptureJournal.h`, already records it). Once a few
+  changes are counted, this decides.
+- **The key, until then**: a short table of the usual moves by a chord's job in the key (tonic to
+  subdominant or dominant, subdominant to dominant, dominant home), so a set with no history still
+  gets a sensible ring. In A minor after Fmaj7 (VI), that is G (VII), as drawn.
+
+Only chords on the bank's pads can be ringed; when the likeliest is elsewhere, nothing is.
+
+**Decisions** (the owner, 2026-11-17: "Approved. 1 yes. 2. Yes. 3. No"):
+
+1. **These six pages, in this order**: yes.
+2. **The layers switched on CHORDS' knobs 4 to 7**: yes.
+3. **The likeliest next chord**: in, not left out (the question was whether to leave it out).
 
 ## What changes from today
 

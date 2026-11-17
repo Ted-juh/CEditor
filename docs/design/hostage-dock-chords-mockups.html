@@ -202,13 +202,15 @@
     for (let i = 0; i < 8; i++) {
       const [n, , num] = SET[i], x = i * 60 + 6, on = i === SOUNDING;
       s += `<rect x="${x}" y="152" width="48" height="46" rx="4" fill="${on ? '#2a2550' : C.card}" ${on ? `stroke="${C.violet}" stroke-width="1.5"` : ''}/>`;
+      if (i === 5) s += `<rect x="${x - 2}" y="150" width="52" height="50" rx="5" fill="none" stroke="${C.teal}" stroke-width="1.5" stroke-dasharray="3 2"/>`
+                     + `<rect x="${x + 12}" y="146" width="24" height="9" rx="2" fill="${C.teal}"/>` + T(x + 24, 153, 'NEXT', C.bg, 6.5, "text-anchor='middle' font-weight='700'");
       s += T(x + 24, 170, n, on ? C.violet : C.text, 10.5, "text-anchor='middle' font-weight='700'") + T(x + 24, 182, num, C.dim, 8, "text-anchor='middle' font-weight='600'")
          + T(x + 24, 194, `PAD ${i + 1}`, C.foot, 7, "text-anchor='middle' font-weight='700'");
     }
     return chrome('CHORDS', 'PLAYING   4 NOTES   BANK A', [
       { l: 'KEY', v: 'A', f: .75 }, { l: 'SCALE', v: 'MINOR', vs: 12 }, { l: 'BANK', v: 'A', f: .25 }, { l: 'FOLLOW', v: 'ON', fc: C.teal, f: 1 },
       { l: 'KEY MAP', v: 'ON', f: 1, fc: C.teal }, { l: 'PADS', v: 'ON', f: 1, fc: C.teal }, { l: 'PROG', v: 'OFF' }, { l: 'SONG KEY', v: 'ON', f: 1, fc: C.teal },
-    ], 'PADS PLAY THE CHORDS   KNOBS 4–7 SWITCH THE LAYERS', 0, 6, s);
+    ], 'PADS PLAY THE CHORDS   THE RING IS THE LIKELIEST NEXT', 0, 6, s);
   }
 
   // ---- SET: the chords themselves ---------------------------------------------------------------------
