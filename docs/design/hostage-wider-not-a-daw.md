@@ -295,7 +295,8 @@ manual change.
 
 ### Step 2: Audio & MIDI
 
-*Worked out with mockups on 2026-11-17: `hostage-audio-setup-design.md` (2a, 2b and the line check).*
+*Worked out with mockups and approved on 2026-11-17: `hostage-audio-setup-design.md` (2a, 2b and
+the line check). The mapping screen opens only when asked, never by itself.*
 
 The set-up everything above needs, in six parts:
 

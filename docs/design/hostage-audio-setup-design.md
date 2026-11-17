@@ -1,6 +1,7 @@
 # HoSTage: Audio & MIDI set-up, the show's connections, and the line check
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. It works out steps 2a and
+*Design with mockups, approved by the owner on 2026-11-17 with one change: the mapping screen does
+not open by itself (decision 3). Nothing built. It works out steps 2a and
 2b of `hostage-wider-not-a-daw.md` ("Step 2: Audio & MIDI") and the line check ("More features",
 5), all already decided there; this record decides only how they look and behave. Mockups:
 `hostage-audio-setup-mockups.html`, pictures `docs/media/hostage-audio-setup-1.png` to `-3.png`.
@@ -55,10 +56,12 @@ on this interface, once (frame 2).
 - **Kept per interface** (decision 11), under the name the device type reports; under Windows Audio
   an interface's inputs and outputs are two devices and are kept apart. A spare of the same model
   needs nothing; another device type maps once more, and the screen says so.
-- **When it opens.** By itself when a show is opened and something is not settled, as the
-  missing-plug-in message does now; from **Map connections…** in Audio & MIDI; and from **Map
-  inputs…** on an input part. In a player too (a stick player on a new computer must map); not under
-  Stage Lock.
+- **When it opens.** Only when asked: from **Map connections…** in Audio & MIDI, from **Map
+  inputs…** on an input part, and from a line check that fails. **Never by itself** (decision 3): a
+  show opens as it is, and what is not settled stays silent, its part saying "not mapped". Main
+  falls back to the interface's first pair, as today, so a show still sounds. Audio & MIDI counts
+  what is not settled, and the line check lists it. In a player too (a stick player on a new
+  computer must map); not under Stage Lock.
 - **Old shows** convert as step 2b says: a hardware part's port and return become connections named
   after the part, already mapped to what they held.
 
@@ -88,10 +91,12 @@ and the same list in the dock.
 - The commands placed in both lists: mapping allowed in a player, refused under Stage Lock
   (`stageSafeParity.test.js`, `hostagePlayerRole.test.js`).
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-17)
 
 1. **The device types in plain words** (Shared, Low latency, This program only, ASIO), with the
-   buffer in milliseconds beside the samples?
-2. **Mapping by playing**, outputs by a quiet ident, Main never without asking?
-3. **The mapping screen opening by itself** when a show is opened with something unsettled?
-4. **The line check** as drawn: inputs and MIDI ticking themselves, outputs ticked by hand?
+   buffer in milliseconds beside the samples. **Yes.**
+2. **Mapping by playing**, outputs by a quiet ident, Main never without asking. **Yes.**
+3. **The mapping screen opening by itself** when a show is opened with something unsettled. **No.**
+   It opens only when asked; what is not settled is silent and says so, and Main falls back to the
+   first pair (section 2, "When it opens").
+4. **The line check** as drawn: inputs and MIDI ticking themselves, outputs ticked by hand. **Yes.**
