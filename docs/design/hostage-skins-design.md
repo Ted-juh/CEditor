@@ -1,7 +1,7 @@
 # HoSTage: the CTRL49 skins as colour
 
-*Design with mockups, approved by the owner on 2026-11-17 (decisions 1, 2 and 4); decision 3, whether
-the skin may colour the whole program, is open and worked out below. Nothing built. It does what the Chain
+*Design with mockups, approved by the owner on 2026-11-17. Decision 3 became three choices of skin:
+the CTRL49's, the program's and the Stage screen's ("The whole program" below). Nothing built. It does what the Chain
 tab design left for later: the other thirteen skins on HoSTage's CTRL49 pages, "just a colour
 change" (`hostage-dock-chain-design.md`, decision 3). Mockups: `hostage-skins-mockups.html`,
 pictures `docs/media/hostage-skins-1.png` and `-2.png`. When this and the code disagree, the code
@@ -72,8 +72,8 @@ The skin's own pages keep everything they have: knob images, materials, glow. On
 pages take a skin as colour. They draw no knob images (a cell is a word and a bar), so nothing on
 them needs a material.
 
-Whether the rest of HoSTage's window follows the skin too is decision 3, open: see "The whole
-program" below.
+The rest of HoSTage's window takes a skin of its own, chosen separately: see "The whole program"
+below.
 
 ## What it needs
 
@@ -86,7 +86,23 @@ program" below.
 - **The recolouring the owner's Linux branch does** for the Meters, Cue and Browse pages, used for
   these pages too. It is not on `main`, so it is not described here.
 
-## The whole program (decision 3, open)
+## The whole program (decision 3)
+
+**Taken, 2026-11-17: three choices of skin, each its own.** "It is its own choice. So, for the
+CTRL49 (and the pages/dock) should apply. The HoSTage skin could be a different one." And for the
+Stage screen: "Same as 1."
+
+| Choice | What it colours | Default |
+| --- | --- | --- |
+| **CTRL49 skin** | the CTRL49's pages, on the keyboard and in the dock | Midnight 2020 |
+| **HoSTage skin** | the program's own window: the Build screens and the dock's frame around the pages | HoSTage (today's look) |
+| **Stage skin** | the Stage screen | the same as the HoSTage skin |
+
+Any of the fifteen can be chosen for each: the fourteen and "HoSTage". So a dark Midnight
+keyboard, a Walnut program and a light Swiss Flat stage for an outdoor gig are one setting each.
+Danger stays HoSTage's own red in all of them (decision 5).
+
+What it takes, as worked out before the owner chose:
 
 The owner, on whether the skin should stop at the CTRL49 pages: "No, it is not a skin for HoSTage,
 but as you mentioned, it could be applied to the dock, so it raises the question whether it could
@@ -122,6 +138,8 @@ skin the entire program." What that would take, from the code:
 1. **A skin on HoSTage's pages is sixteen colours and a radius**, with Walnut's cheeks and Neo
    Brutal's outlines as the only extras, on the keyboard and in the dock. **Yes.**
 2. **The palettes as drawn**, taken from each skin's own colours. **Yes.**
-3. **The skin colours only the CTRL49 pages.** **No: open.** The owner asks whether it could skin
-   the whole program; worked out in "The whole program" above, waiting for the owner.
+3. **The skin colours only the CTRL49 pages.** **No.** Three choices, each its own: the CTRL49
+   skin (its pages, on the keyboard and in the dock), the HoSTage skin (the program's window) and
+   the Stage skin. See "The whole program".
 4. **A contrast check** over every palette. **Yes.**
+5. **Danger stays HoSTage's red** in every skin. **Yes.**
