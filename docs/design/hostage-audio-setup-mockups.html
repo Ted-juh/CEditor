@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: Audio & MIDI setup mockups</title>
+<!--
+  Mockups for step 2 of hostage-wider-not-a-daw.md (2a: the set-up remembered; 2b: the show's
+  connections, mapped once per interface), worked out in docs/design/hostage-audio-setup-design.md.
+  Static, invented data. The utility and the mapping screen are HoSTage's own UI (--host-* colours);
+  the LINE CHECK page is a CTRL49 page, drawn once at 480 x 272 in the original look.
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --danger: #d98c8c; --danger-surface: #452529;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1160px; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .app { display: flex; height: 760px; border: 1px solid var(--line-soft); background: var(--bg); }
+  .ws { flex: 1; position: relative; background: var(--surface); }
+  .ws::after { content: 'the workspace, behind the drawer'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 12px; background: repeating-linear-gradient(45deg, #171c21 0 12px, #181e23 12px 24px); }
+  .drawer { width: 560px; border-left: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; }
+  .dhead { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); }
+  .dhead strong { font-size: 14px; }
+  .dbody { padding: 12px 14px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+  .sec { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 10px 12px; }
+  .sec h4 { margin: 0 0 8px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .row:last-child { margin-bottom: 0; }
+  .row > .k { width: 120px; color: var(--soft); font-size: 12px; }
+  .sel { flex: 1; padding: 5px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--text); display: flex; justify-content: space-between; }
+  .sel small { color: var(--faint); }
+  .seg { display: flex; gap: 2px; flex: 1; }
+  .seg span { flex: 1; text-align: center; padding: 5px 4px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 11.5px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .note { color: var(--faint); font-size: 11.5px; }
+  .big { font: 600 18px var(--mono); }
+  .ok { color: var(--active); } .warn { color: var(--pending); } .bad { color: var(--danger); }
+  .btn { padding: 5px 11px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .ghost { padding: 5px 11px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .tog { width: 30px; height: 16px; border-radius: 8px; background: var(--line); position: relative; flex: none; }
+  .tog::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--soft); }
+  .tog.on { background: var(--active); } .tog.on::after { left: 16px; background: #fff; }
+  .midi { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 12.5px; }
+  .midi .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--active); }
+
+  /* the mapping screen */
+  .modal { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
+  .mhead { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line-soft); }
+  .mhead h3 { margin: 0; font-size: 16px; }
+  .mhead .sub { color: var(--soft); font-size: 12.5px; }
+  .mbody { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; padding: 16px 18px; }
+  .col h4 { margin: 0 0 10px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .conn { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--surface); }
+  .conn.need { border-color: var(--pending); background: #241f16; }
+  .conn.ask { border-color: var(--accent); background: #1c2732; }
+  .conn .n { font-weight: 600; }
+  .conn .to { font: 600 11px var(--mono); color: var(--soft); text-align: right; }
+  .conn .how { grid-column: 1 / -1; color: var(--faint); font-size: 11.5px; display: flex; align-items: center; gap: 8px; }
+  .lamp { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; }
+  .lamp.sig { background: var(--active); box-shadow: 0 0 8px var(--active); }
+  .lvl { width: 90px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .lvl i { display: block; height: 100%; background: var(--active); }
+  .chans { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .chans span { padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px; font: 600 10px var(--mono); color: var(--soft); background: var(--field); }
+  .chans span.lit { border-color: var(--active); color: #fff; background: var(--active-surface); box-shadow: 0 0 6px #58a87955; }
+  .chans span.taken { opacity: .45; }
+  .mfoot { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--line-soft); color: var(--soft); font-size: 12px; }
+  .mfoot .grow { flex: 1; }
+
+  .ref { display: grid; grid-template-columns: 960px 1fr; gap: 24px; align-items: start; }
+  .ref svg { display: block; width: 960px; height: 544px; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  .refnotes { color: var(--soft); } .refnotes h4 { margin: 0 0 6px; color: var(--text); } .refnotes ul { margin: 0 0 14px; padding-left: 18px; } .refnotes li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · Audio &amp; MIDI, remembered (step 2a)</h2>
+    <p>Everything the audio set-up is made of, chosen once and restored at every start: the type of device, the device, the rate, and the buffer, shown in milliseconds as well as samples, because milliseconds are what a player feels. The MIDI input switches are kept too, which today they are not.</p>
+  </div>
+  <div class="app">
+    <div class="ws"></div>
+    <div class="drawer">
+      <div class="dhead"><strong>Audio &amp; MIDI</strong><span class="ghost">×</span></div>
+      <div class="dbody">
+        <div class="sec"><h4>Audio <span class="ok">● running · remembered</span></h4>
+          <div class="row"><span class="k">Type</span><div class="seg"><span>Shared</span><span>Low latency</span><span>This program only</span><span class="on">ASIO</span></div></div>
+          <div class="row"><span class="k"></span><span class="note">ASIO: the interface's own low-latency driver. "Shared" plays alongside other programs and is the slowest.</span></div>
+          <div class="row"><span class="k">Device</span><span class="sel">Focusrite USB ASIO <small>Scarlett 18i8 · 8 in, 8 out</small></span></div>
+          <div class="row"><span class="k">Sample rate</span><div class="seg"><span>44.1 kHz</span><span class="on">48 kHz</span><span>96 kHz</span></div></div>
+          <div class="row"><span class="k">Buffer</span><div class="seg"><span>64 · 1.3 ms</span><span class="on">128 · 2.7 ms</span><span>256 · 5.3 ms</span><span>512 · 10.7 ms</span></div></div>
+        </div>
+        <div class="sec"><h4>How late it is <span>measured</span></h4>
+          <div class="row"><span class="k">Round trip</span><span class="big ok">6.1 ms</span><span class="note" style="flex:1">in at input 1, out at output 1, through HoSTage with nothing on the path</span><span class="btn">Measure again</span></div>
+          <div class="row"><span class="k"></span><span class="note">Needs a cable from an output to an input for a moment. Each part's own figure adds its plug-ins.</span></div>
+          <div class="row"><span class="k">Dropouts</span><span>0 this song · 2 last night in <b>Song 7</b></span></div>
+        </div>
+        <div class="sec"><h4>MIDI inputs <span>switches kept between starts</span></h4>
+          <div class="midi"><span class="tog on"></span>CTRL49 USB<span class="dot" style="margin-left:auto"></span><span class="note">note 64 · just now</span></div>
+          <div class="midi"><span class="tog on"></span>Juno-DS</div>
+          <div class="midi"><span class="tog"></span>FCB1010 foot controller<span class="note" style="margin-left:auto">off: switched off on 12 May</span></div>
+          <div class="midi"><span class="tog on"></span>Bluetooth: AirTurn BT-200<span class="note" style="margin-left:auto">wireless</span></div>
+        </div>
+        <div class="sec"><h4>This show <span class="warn">2 connections to settle</span></h4>
+          <div class="row"><span class="note" style="flex:1">The show needs 10 connections; 8 are mapped here. The desk feed is not, and the Juno's port needs choosing.</span><span class="btn">Map connections…</span><span class="ghost">Line check</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · Map the show to this interface (step 2b)</h2>
+    <p>The show names what it needs; this screen says where each one is on this interface, once. Inputs are mapped by playing: sing, play or speak into it and the channel that lights is chosen. Outputs get a short, quiet ident. MIDI ports are found by name, and asked about only when two share a name. The mapping is kept for this interface, so the same model on any computer needs nothing.</p>
+  </div>
+  <div class="modal">
+    <div class="mhead"><h3>Map "Friday Set" to this interface</h3><span class="sub">Scarlett 18i8 · ASIO · inputs and outputs</span><span style="flex:1"></span><span class="ghost">Kept for every Scarlett 18i8</span></div>
+    <div class="mbody">
+      <div class="col"><h4>Inputs · play into each</h4>
+        <div class="conn"><span class="n">Vocal mic</span><span class="to">IN 1</span><div class="how"><span class="lamp sig"></span><span class="lvl"><i style="width:62%"></i></span>mono · signal now</div></div>
+        <div class="conn"><span class="n">Guitar DI</span><span class="to">IN 3</span><div class="how"><span class="lamp"></span><span class="lvl"><i style="width:0"></i></span>mono · quiet</div></div>
+        <div class="conn"><span class="n">Juno return</span><span class="to">IN 5–6</span><div class="how"><span class="lamp sig"></span><span class="lvl"><i style="width:44%"></i></span>stereo · signal now</div></div>
+        <div class="conn need"><span class="n">Desk feed</span><span class="to warn">NOT MAPPED</span>
+          <div class="how" style="display:block">Listening: play something into it. The first channel that lights is chosen.
+            <div class="chans"><span class="taken">1</span><span>2</span><span class="taken">3</span><span>4</span><span class="taken">5</span><span class="taken">6</span><span class="lit">7</span><span class="lit">8</span></div></div></div>
+      </div>
+      <div class="col"><h4>Outputs · listen to each</h4>
+        <div class="conn"><span class="n">Main</span><span class="to">OUT 1–2</span><div class="how"><span class="ghost" style="padding:2px 8px">Ident</span>front of house · limiter on</div></div>
+        <div class="conn"><span class="n">In-ears</span><span class="to">OUT 3–4</span><div class="how"><span class="ghost" style="padding:2px 8px">Ident</span>headphones 1 · limiter on · listen output</div></div>
+        <div class="conn"><span class="n">Click</span><span class="to">OUT 5–6</span><div class="how"><span class="ghost" style="padding:2px 8px">Ident</span>the drummer's in-ears only</div></div>
+        <p class="note">An ident is a short, quiet tone on the pair being mapped. Main never gets one without asking.</p>
+      </div>
+      <div class="col"><h4>MIDI ports · by name</h4>
+        <div class="conn"><span class="n">Keys</span><span class="to">CTRL49 USB</span><div class="how">found by name</div></div>
+        <div class="conn ask"><span class="n">Juno</span><span class="to" style="color:var(--accent-strong)">WHICH ONE?</span>
+          <div class="how" style="display:block">Two ports are called "USB MIDI Interface". Press a key on the Juno to pick the one it is on.
+            <div class="chans"><span>USB MIDI Interface (1)</span><span class="lit">USB MIDI Interface (2)</span></div></div></div>
+        <div class="conn"><span class="n">Pedals</span><span class="to">AirTurn BT-200</span><div class="how">Bluetooth · found by name</div></div>
+      </div>
+    </div>
+    <div class="mfoot"><span class="warn">● 2 to settle</span><span class="ok">● 8 mapped</span><span class="grow"></span><span>Inputs and outputs are kept under this interface's name; under Windows Audio an interface is two devices, so they are kept apart.</span><span class="btn">Done</span></div>
+  </div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · The line check, on the CTRL49</h2>
+    <p>Before the doors open, one walk through every connection of the show: speak into each mic, play each instrument, hear each output's ident. Each one lights as it is heard and is ticked. Knob 1 walks the list; the pads confirm, ident, skip or go back. The same list is in the dock under the utility's Line check.</p>
+  </div>
+  <div class="ref">
+    <div id="lc"></div>
+    <div class="refnotes">
+      <h4>What it checks</h4>
+      <ul><li>Every input arrives: a signal on its mapped channel, and no clip.</li><li>Every output is heard: its ident played, ticked by hand.</li><li>Every MIDI port answers: a key or a knob from it.</li></ul>
+      <h4>What it does not</h4>
+      <ul><li>Set levels: that is Soundcheck's Measure, song by song.</li><li>Change any mapping: a connection that fails opens the mapping screen in the dock.</li></ul>
+    </div>
+  </div>
+</section>
+
+<script>
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378',
+              violet: '#8B7CFF', teal: '#2DD4BF', pink: '#FF5C93', amber: '#FFB547' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const colX = (i) => i * 60 + 6;
+  function lineCheck() {
+    const rows = [['Vocal mic', 'IN 1', 'ok'], ['Guitar DI', 'IN 3', 'ok'], ['Juno return', 'IN 5–6', 'ok'], ['Desk feed', 'IN 7–8', 'now'],
+                  ['Main', 'OUT 1–2', 'todo'], ['In-ears', 'OUT 3–4', 'todo'], ['Click', 'OUT 5–6', 'todo']];
+    let s = `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${C.teal}"/>` + T(18, 22, 'LINE CHECK', C.text, 16, "font-weight='700'") + T(472, 21, '3 OF 10 HEARD', C.dim, 10.5, "text-anchor='end'");
+    s += `<rect x="8" y="30" width="464" height="148" rx="4" fill="${C.card}"/>`;
+    rows.forEach(([n, ch, st], k) => {
+      const y = 33 + k * 20.5, now = st === 'now';
+      if (now) s += `<rect x="10" y="${y}" width="460" height="19" rx="3" fill="#163a3a" stroke="${C.teal}" stroke-width="1.3"/>`;
+      s += `<circle cx="22" cy="${y + 9.5}" r="5" fill="${st === 'ok' ? C.teal : now ? C.amber : C.raised}"/>` + (st === 'ok' ? T(22, y + 12.5, '✓', C.bg, 8, "text-anchor='middle' font-weight='700'") : '');
+      s += T(36, y + 13.5, n, now ? C.teal : st === 'ok' ? C.text : C.label, 10, "font-weight='700'") + T(170, y + 13.5, ch, C.dim, 9, "font-weight='700'");
+      s += T(462, y + 13.5, st === 'ok' ? 'HEARD' : now ? 'PLAY INTO IT…' : (ch.startsWith('OUT') ? 'IDENT, THEN TICK' : ''), st === 'ok' ? C.teal : now ? C.amber : C.label, 8, "text-anchor='end' font-weight='700'");
+    });
+    const pads = [{ l: 'OK', on: true }, { l: 'IDENT', on: false }, { l: 'SKIP', on: false }, { l: 'AGAIN', on: false }, null, null, null, { l: '‹ BACK', on: true, col: C.violet }];
+    pads.forEach((p, i) => { const x = colX(i); if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; return; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'"); });
+    [['CONNECT', '4 / 10', true], ['LEVEL', '−24 dB'], ['CLIP', 'NONE']].forEach(([l, v, f], i) => {
+      const cx = i * 60 + 30; s += T(cx, 217, l, f ? C.teal : C.label, 9, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, f ? C.teal : C.text, 13, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>`; });
+    s += T(8, 265, 'SPEAK, PLAY OR LISTEN: EACH CONNECTION LIGHTS WHEN IT WORKS', C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+  document.getElementById('lc').innerHTML = lineCheck();
+</script>
+</body>
+</html>

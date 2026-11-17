@@ -295,6 +295,8 @@ manual change.
 
 ### Step 2: Audio & MIDI
 
+*Worked out with mockups on 2026-11-17: `hostage-audio-setup-design.md` (2a, 2b and the line check).*
+
 The set-up everything above needs, in six parts:
 
 - **2a. Remember the set-up.** Device type (ASIO included), devices, sample rate, buffer (shown in
