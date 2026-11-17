@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: Practice mode, mockups</title>
+<!--
+  Mockups for docs/design/hostage-practice-design.md: Practice mode from hostage-wider-not-a-daw.md
+  (falling notes onto the keyboard, songs from MIDI files). Static, invented data; the song is
+  Beethoven's Für Elise, a public-domain piece, from a MIDI file the player opened. HoSTage's own
+  colours (--host-*); the PRACTICE page is a CTRL49 page drawn once at 480 x 272 in the original look.
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --danger: #d98c8c; --danger-surface: #452529;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { position: relative; height: 790px; border: 1px solid var(--line-soft); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+  .hdr { height: 42px; display: flex; align-items: center; gap: 14px; padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+  .logo { font: 700 15px var(--sans); } .logo i { color: var(--accent-strong); font-style: normal; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs span { padding: 5px 12px; border-radius: 3px; color: var(--soft); font-size: 12.5px; }
+  .tabs span.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .sp { flex: 1; }
+  .stat { font: 11px var(--mono); color: var(--dim); }
+
+  .tr { display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--line-soft); flex: none; }
+  .tr.a { height: 44px; background: var(--surface); }
+  .tr.b { height: 40px; }
+  .ib { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
+  .ib.play { border-color: var(--active); background: var(--active-surface); color: #8fd1a8; }
+  .song { font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .song small { color: var(--dim); font-weight: 400; font-size: 11.5px; margin-left: 6px; }
+  .pos { flex: 1; position: relative; height: 22px; }
+  .pos .trk { position: absolute; left: 0; right: 0; top: 9px; height: 4px; background: var(--line-soft); border-radius: 2px; }
+  .pos .loop { position: absolute; top: 3px; height: 16px; background: rgba(91,155,213,.18); border: 1px solid var(--accent); border-radius: 3px; }
+  .pos .head { position: absolute; top: 1px; width: 2px; height: 20px; background: #8fd1a8; }
+  .pos .lbl { position: absolute; top: -12px; font: 9.5px var(--mono); color: var(--accent-strong); white-space: nowrap; }
+  .barno { font: 11.5px var(--mono); color: var(--soft); white-space: nowrap; }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .k { color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .slider { width: 150px; height: 4px; background: var(--line); border-radius: 2px; position: relative; }
+  .slider i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 2px; }
+  .slider b { position: absolute; top: -5px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent-strong); }
+  .v { font: 600 12px var(--mono); }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 11.5px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .tog { width: 30px; height: 16px; border-radius: 8px; background: var(--line); position: relative; flex: none; }
+  .tog::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--soft); }
+  .tog.on { background: var(--active); } .tog.on::after { left: 16px; background: #fff; }
+  .div { width: 1px; height: 22px; background: var(--line-soft); }
+
+  .stage { flex: 1; position: relative; padding: 0 14px; background: var(--field); min-height: 0; }
+  .fall { position: absolute; left: 14px; right: 14px; top: 0; bottom: 0; overflow: hidden; }
+  .lane { position: absolute; top: 0; bottom: 0; background: rgba(0,0,0,.18); }
+  .oct { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.04); }
+  .bar { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,.09); }
+  .bar span { position: absolute; left: 4px; top: -14px; font: 10px var(--mono); color: var(--faint); }
+  .nt { position: absolute; border-radius: 4px; font: 700 10px var(--mono); color: #0d1a26; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 3px; }
+  .nt.you { background: linear-gradient(#79b9ee, #5b9bd5); border: 1px solid #a6d2f5; }
+  .nt.rig { background: rgba(127,139,150,.45); border: 1px solid rgba(170,181,190,.5); color: transparent; }
+  .now { position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; background: #8fd1a8; box-shadow: 0 0 10px #58a879; z-index: 3; }
+  .tag { position: absolute; z-index: 4; padding: 2px 7px; border-radius: 3px; font: 600 10.5px var(--mono); white-space: nowrap; }
+  .tag.ok { background: var(--active-surface); border: 1px solid var(--active); color: #bfe6cd; }
+  .tag.bad { background: var(--danger-surface); border: 1px solid var(--danger); color: #f0c2c2; }
+  .kbwrap { padding: 0 14px 10px; background: var(--field); flex: none; }
+  .kb { position: relative; height: 104px; }
+  .wk { position: absolute; top: 0; height: 104px; background: #e9edf1; border: 1px solid #9aa4ad; border-radius: 0 0 4px 4px; }
+  .bk { position: absolute; top: 0; height: 64px; background: #1a1f24; border: 1px solid #000; border-radius: 0 0 3px 3px; z-index: 2; }
+  .wk.c::after { content: attr(data-n); position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; font: 10px var(--mono); color: #6b7680; }
+  .wk.good, .bk.good { background: #58a879; } .wk.wrong, .bk.wrong { background: #d98c8c; } .wk.rig, .bk.rig { background: #9aa6b2; }
+  .foot { height: 30px; display: flex; align-items: center; gap: 14px; padding: 0 14px; border-top: 1px solid var(--line-soft); background: var(--surface); font-size: 11.5px; color: var(--dim); flex: none; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+  .veil { position: absolute; inset: 0; background: rgba(8,11,14,.62); z-index: 10; }
+  .modal { position: absolute; z-index: 11; left: 50%; top: 70px; transform: translateX(-50%); width: 980px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 20px 50px rgba(0,0,0,.6); }
+  .mh { display: flex; align-items: baseline; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
+  .mh strong { font-size: 15px; } .mh span { color: var(--dim); font-size: 12px; }
+  .mb { padding: 12px 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 6px 8px; border-bottom: 1px solid var(--line-soft); }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  td small { color: var(--dim); }
+  .dd { display: inline-flex; justify-content: space-between; min-width: 170px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); font-size: 12px; }
+  .dd.off { color: var(--faint); }
+  .mini { display: inline-block; width: 160px; height: 10px; background: var(--field); border: 1px solid var(--line-soft); border-radius: 2px; position: relative; vertical-align: middle; }
+  .mini i { position: absolute; top: 1px; bottom: 1px; border-radius: 1px; }
+  .mf { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--dim); }
+  .note { color: var(--faint); font-size: 11.5px; margin-top: 10px; }
+
+  .res { position: absolute; z-index: 11; left: 50%; top: 110px; transform: translateX(-50%); width: 760px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 20px 50px rgba(0,0,0,.6); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 14px 16px 6px; }
+  .st { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 5px; padding: 9px 11px; }
+  .st small { display: block; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .st b { display: block; font: 600 24px var(--mono); margin-top: 3px; }
+  .st span { font-size: 11.5px; color: var(--soft); }
+  .tl { margin: 8px 16px 4px; position: relative; height: 54px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 5px; }
+  .tl .mid { position: absolute; left: 0; right: 0; top: 26px; height: 1px; background: var(--line); }
+  .tl .bl { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line-soft); }
+  .tl .bl span { position: absolute; bottom: 1px; left: 3px; font: 9px var(--mono); color: var(--faint); }
+  .tl .d { position: absolute; width: 6px; height: 6px; border-radius: 50%; }
+  .row2 { display: flex; gap: 10px; padding: 8px 16px; }
+  .box { flex: 1; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 5px; padding: 9px 11px; font-size: 12.5px; }
+  .box h4 { margin: 0 0 6px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .box .li { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .runs { display: flex; align-items: flex-end; gap: 6px; height: 54px; }
+  .runs div { width: 34px; background: var(--accent-surface); border: 1px solid var(--accent); border-radius: 2px 2px 0 0; position: relative; }
+  .runs div span { position: absolute; bottom: -15px; left: 0; right: 0; text-align: center; font: 9px var(--mono); color: var(--dim); }
+  .runs div.last { background: var(--active-surface); border-color: var(--active); }
+
+  .ref { display: grid; grid-template-columns: 960px 1fr; gap: 24px; align-items: start; }
+  .ref svg { display: block; width: 960px; height: 544px; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  .refnotes { color: var(--soft); } .refnotes h4 { margin: 0 0 6px; color: var(--text); } .refnotes ul { margin: 0 0 14px; padding-left: 18px; } .refnotes li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · Practice: the notes fall onto your keyboard</h2>
+    <p>A MIDI file opened in the Practice tab. Your hand's notes fall in blue onto the keys they belong to, each as long as the note; the other hand
+      falls in grey and is played by HoSTage through your own rig. Keys light green when right and red when wrong, with how early or late.
+      Slower tempo, wait mode, which hand, and a loop with count-in sit in the bar above.</p>
+  </div>
+  <div class="app" id="app1"></div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · Opening a song: who plays what</h2>
+    <p>Every track of the file is listed with its range and a picture of where its notes are. Each is played by you (as the left or the right hand),
+      by the rig, or not at all. What the rig plays goes in as if played on your keyboard, through your splits and layers, unless a track is sent
+      to one part. A file with one track is split into hands at a key. All of this is kept for the song.</p>
+  </div>
+  <div class="app" id="app2">
+    <div class="veil"></div>
+    <div class="modal">
+      <div class="mh"><strong>Evening Song.mid</strong><span>5 tracks · 4/4 · ♩ = 92 · 3:48 · 84 bars</span><span class="sp"></span><span class="ghostb">Open another…</span></div>
+      <div class="mb">
+        <table>
+          <tr><th>Track in the file</th><th>Notes</th><th>Where</th><th>Played by</th><th>Into</th></tr>
+          <tr><td><b>Piano RH</b></td><td><small>F3–C6 · 1,204</small></td><td><span class="mini"><i style="left:46%;width:44%;background:#5b9bd5"></i></span></td><td><span class="seg"><span class="on">You · right</span><span>You · left</span><span>Rig</span><span>Off</span></span></td><td><span class="dd off">—<small>you play it</small></span></td></tr>
+          <tr><td><b>Piano LH</b></td><td><small>C2–G3 · 862</small></td><td><span class="mini"><i style="left:8%;width:30%;background:#9aa6b2"></i></span></td><td><span class="seg"><span>You · right</span><span>You · left</span><span class="on">Rig</span><span>Off</span></span></td><td><span class="dd">Your keyboard<small>splits ▾</small></span></td></tr>
+          <tr><td><b>Bass</b></td><td><small>E1–D3 · 640</small></td><td><span class="mini"><i style="left:0%;width:28%;background:#9aa6b2"></i></span></td><td><span class="seg"><span>You · right</span><span>You · left</span><span class="on">Rig</span><span>Off</span></span></td><td><span class="dd">Part 5 · Moog Bass<small>▾</small></span></td></tr>
+          <tr><td><b>Strings</b></td><td><small>G3–E5 · 310</small></td><td><span class="mini"><i style="left:40%;width:30%;background:#9aa6b2"></i></span></td><td><span class="seg"><span>You · right</span><span>You · left</span><span class="on">Rig</span><span>Off</span></span></td><td><span class="dd">Part 4 · Strings<small>▾</small></span></td></tr>
+          <tr><td><b>Drums</b><br><small>channel 10</small></td><td><small>36–51 · 2,016</small></td><td><span class="mini"><i style="left:5%;width:8%;background:#65717c"></i></span></td><td><span class="seg"><span>You · right</span><span>You · left</span><span>Rig</span><span class="on">Off</span></span></td><td><span class="dd off">—<small>off</small></span></td></tr>
+        </table>
+        <div class="note">A file with one track: split into hands at <span class="dd" style="min-width:70px">C4<small>▾</small></span>, below is the left hand. Drums (channel 10) start off; a keyboard rig rarely has a kit on it.
+          HoSTage ships no songs: MIDI files of published songs have rights of their own.</div>
+      </div>
+      <div class="mf"><span>Kept with this song: who plays what, tempo, loop.</span><span class="sp"></span><span class="ghostb">Cancel</span><span class="btn">Practice</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · After a run</h2>
+    <p>When the loop comes round or the song ends: how many notes were right, how many on time, a dot per note across the bars (early above,
+      late below, wrong in red), the bars that went worst with a button to loop just those, and the runs so far. When two runs in a row are over
+      90 %, it offers the next tempo. Kept per song on this computer; nothing is sent anywhere.</p>
+  </div>
+  <div class="app" id="app3">
+    <div class="veil"></div>
+    <div class="res">
+      <div class="mh"><strong>Run 6 · bars 1–8 · 70 %</strong><span>Für Elise · right hand</span><span class="sp"></span><span class="ghostb">✕</span></div>
+      <div class="stats">
+        <div class="st"><small>Right notes</small><b class="ok" style="color:#8fd1a8">92 %</b><span>46 of 50</span></div>
+        <div class="st"><small>On time</small><b>81 %</b><span>within 40 ms</span></div>
+        <div class="st"><small>Early · late</small><b style="font-size:20px">9 % · 10 %</b><span>you rush a little</span></div>
+        <div class="st"><small>Wrong · missed</small><b style="color:var(--danger)">2 · 2</b><span>both in bar 6</span></div>
+      </div>
+      <div class="tl" id="tl3"><div class="mid"></div></div>
+      <div class="row2">
+        <div class="box"><h4>Worst bars</h4>
+          <div class="li"><b>Bar 6</b><span style="color:var(--soft)">F5 for E5, twice; one missed</span><span class="sp"></span><span class="ghostb">Loop bar 6</span></div>
+          <div class="li"><b>Bar 3</b><span style="color:var(--soft)">G♯4 late by 90 ms</span><span class="sp"></span><span class="ghostb">Loop bar 3</span></div></div>
+        <div class="box"><h4>Runs so far</h4>
+          <div class="runs"><div style="height:58%"><span>60 %</span></div><div style="height:74%"><span>60 %</span></div><div style="height:66%"><span>70 %</span></div><div style="height:80%"><span>70 %</span></div><div style="height:90%"><span>70 %</span></div><div class="last" style="height:92%"><span>70 %</span></div></div></div>
+      </div>
+      <div class="mf"><span>Over 90 % twice in a row.</span><span class="sp"></span><span class="ghostb">Again</span><span class="btn">Again at 80 %</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f4">
+  <div class="caption">
+    <h2>4 · PRACTICE on the CTRL49</h2>
+    <p>Both hands stay on the keys: the controller starts, stops, loops and slows the song, and shows the next notes for wait mode. The same
+      rules as every page: knobs set values, pads switch options, pad 8 goes back.</p>
+  </div>
+  <div class="ref">
+    <div id="pr"></div>
+    <div class="refnotes">
+      <h4>Knobs</h4>
+      <ul><li>1 Tempo, 2 and 3 the loop's first and last bar, 4 the count-in, 5 the rig's level against your hand.</li></ul>
+      <h4>Pads</h4>
+      <ul><li>Play, restart (from the loop's start, with the count-in), wait, loop.</li><li>Left, right, both: which hand you play.</li><li>Back to the page before.</li></ul>
+      <h4>The card</h4>
+      <ul><li>The next notes for your hand, the one due first lit; where you are in the song and the loop; the last run's result.</li></ul>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ---------- the practice screen ----------
+  const LO = 36, HI = 96, PX = 26, NOW = 8;
+  const isBlack = (n) => [1,3,6,8,10].includes(n % 12);
+  const NAMES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+  const nm = (n) => NAMES[n % 12] + (Math.floor(n / 12) - 1);
+  const whites = []; for (let n = LO; n <= HI; n++) if (!isBlack(n)) whites.push(n);
+  // Für Elise, first bars, in sixteenths (3/8: six to a bar, two pick-up notes)
+  const RH = [[0,76],[1,75],[2,76],[3,75],[4,76],[5,71],[6,74],[7,72],[8,69,2],[10,60],[11,64],[12,69],[13,71,2],[15,64],[16,68],[17,71],[18,72,2],[20,64],[21,76],[22,75],[23,76],[24,75],[25,76]];
+  const LH = [[8,45],[9,52],[10,57],[13,40],[14,52],[15,56],[18,45],[19,52],[20,57],[24,52]];
+  const BARS = [[2,1],[8,2],[14,3],[20,4],[26,5]];
+
+  function screen(app, { keys = {}, tags = [], dim = false } = {}) {
+    app.insertAdjacentHTML('afterbegin', `
+      <div class="hdr"><span class="logo">Ho<i>ST</i>age</span>
+        <div class="tabs"><span>Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span><span class="on">Practice</span></div>
+        <span class="sp"></span><span class="stat">Friday Set · 48 kHz · 128</span></div>
+      <div class="tr a"><span class="ib">⟲</span><span class="ib play">❚❚</span><span class="song">Für Elise<small>Für Elise.mid · 3/8</small></span>
+        <span class="barno">bar 2 / 104</span>
+        <div class="pos"><div class="trk"></div><div class="loop" style="left:0%;width:7.7%"></div><span class="lbl" style="left:0">LOOP 1–8</span><div class="head" style="left:1.2%"></div></div>
+        <span class="ghostb">Open…</span></div>
+      <div class="tr b"><span class="k">Tempo</span><div class="slider"><i style="width:56%"></i><b style="left:52%"></b></div><span class="v">70 %</span>
+        <span class="div"></span><span class="k">Wait for me</span><span class="tog"></span>
+        <span class="div"></span><span class="k">You play</span><span class="seg"><span>Left</span><span class="on">Right</span><span>Both</span></span>
+        <span class="div"></span><span class="k">Loop</span><span class="tog on"></span><span class="v">1–8</span>
+        <span class="div"></span><span class="k">Count-in</span><span class="seg"><span>Off</span><span class="on">1 bar</span><span>2</span></span>
+        <span class="sp"></span><span class="k">The rest plays through <b style="color:var(--text)">Friday Set</b>, your splits</span></div>
+      <div class="stage"><div class="fall"></div></div><div class="now"></div>
+      <div class="kbwrap"><div class="kb"></div></div>
+      <div class="foot"><span><span class="sw" style="background:#5b9bd5"></span>you · right hand</span><span><span class="sw" style="background:#9aa6b2"></span>the rig · left hand</span>
+        <span><span class="sw" style="background:#58a879"></span>right</span><span><span class="sw" style="background:#d98c8c"></span>wrong</span><span class="sp"></span><span>Space plays · ← → a bar · L loops</span></div>`);
+    const kb = app.querySelector('.kb'), fall = app.querySelector('.fall');
+    const W = kb.clientWidth / whites.length;
+    const x = (n) => isBlack(n) ? whites.indexOf(n + 1) * W - W * 0.3 : whites.indexOf(n) * W;
+    const w = (n) => isBlack(n) ? W * 0.6 : W;
+    for (let n = LO; n <= HI; n++) {
+      const k = document.createElement('div');
+      k.className = (isBlack(n) ? 'bk' : 'wk' + (n % 12 === 0 ? ' c' : '')) + (keys[n] ? ' ' + keys[n] : '');
+      k.dataset.n = 'C' + (Math.floor(n / 12) - 1); k.style.left = x(n) + 'px'; k.style.width = w(n) + 'px'; kb.appendChild(k);
+      if (isBlack(n)) { const l = document.createElement('div'); l.className = 'lane'; l.style.left = x(n) + 'px'; l.style.width = w(n) + 'px'; fall.appendChild(l); }
+      if (n % 12 === 0) { const o = document.createElement('div'); o.className = 'oct'; o.style.left = x(n) + 'px'; fall.appendChild(o); }
+    }
+    const H = fall.clientHeight;
+    BARS.forEach(([t, b]) => { const y = H - (t - NOW) * PX; if (y < 0 || y > H) return;
+      const d = document.createElement('div'); d.className = 'bar'; d.style.top = y + 'px'; d.innerHTML = `<span>bar ${b}</span>`; fall.appendChild(d); });
+    const draw = (list, cls) => list.forEach(([t, n, len = 1]) => {
+      const end = t + len; if (end <= NOW) return;
+      const bottom = H - Math.max(0, t - NOW) * PX, top = H - (end - NOW) * PX + 2; if (bottom < 0) return;
+      const d = document.createElement('div'); d.className = 'nt ' + cls; const ww = w(n) * (cls === 'rig' ? 0.55 : 0.82);
+      d.style.left = (x(n) + (w(n) - ww) / 2) + 'px'; d.style.width = ww + 'px'; d.style.top = top + 'px'; d.style.height = (bottom - top) + 'px';
+      if (cls === 'you' && bottom - top > 18) d.textContent = NAMES[n % 12]; fall.appendChild(d); });
+    draw(LH, 'rig'); draw(RH, 'you');
+    const stage = app.querySelector('.stage').getBoundingClientRect(), a = app.getBoundingClientRect();
+    tags.forEach(([n, cls, text, dy = 0]) => { const t = document.createElement('div'); t.className = 'tag ' + cls; t.textContent = text;
+      t.style.left = (14 + x(n) + w(n) / 2) + 'px'; t.style.top = (stage.bottom - a.top - 26 + dy) + 'px'; t.style.transform = 'translateX(-50%)'; app.appendChild(t); });
+    const now = app.querySelector('.now'); now.style.top = (stage.bottom - a.top - 1) + 'px'; now.style.bottom = 'auto';
+  }
+  screen(document.getElementById('app1'), { keys: { 69: 'good', 45: 'rig', 68: 'wrong' }, tags: [[69, 'ok', 'A4 · 12 ms late', 0], [68, 'bad', 'G♯4 · wrong', -26]] });
+  screen(document.getElementById('app2'));
+  screen(document.getElementById('app3'));
+
+  // the run's timeline: a dot per note, bars 1-8
+  { const tl = document.getElementById('tl3'); const Wd = tl.clientWidth;
+    for (let b = 0; b < 8; b++) { const l = document.createElement('div'); l.className = 'bl'; l.style.left = (b / 8 * Wd) + 'px'; l.innerHTML = `<span>${b + 1}</span>`; tl.appendChild(l); }
+    let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    for (let i = 0; i < 50; i++) { const xx = (i + 0.5) / 50 * Wd; let off = (rnd() - 0.55) * 16; let col = Math.abs(off) < 5 ? '#58a879' : '#d7a44e';
+      const bar = Math.floor(i / 50 * 8); if (bar === 5 && (i % 3 === 0)) { col = '#d98c8c'; off = 0; }
+      if (bar === 2 && i === 15) { off = 14; col = '#d7a44e'; }
+      const d = document.createElement('div'); d.className = 'd'; d.style.left = (xx - 3) + 'px'; d.style.top = (23 + off) + 'px'; d.style.background = col; tl.appendChild(d); } }
+
+  // ---------- the CTRL49 page ----------
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378',
+              violet: '#8B7CFF', teal: '#2DD4BF', pink: '#FF5C93', amber: '#FFB547' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const colX = (i) => i * 60 + 6;
+  function practicePage() {
+    let s = `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${C.teal}"/>` + T(18, 22, 'PRACTICE', C.text, 16, "font-weight='700'") + T(472, 21, 'BAR 2 / 104', C.dim, 10.5, "text-anchor='end'");
+    s += `<rect x="8" y="30" width="464" height="148" rx="4" fill="${C.card}"/>`;
+    s += T(18, 50, 'FÜR ELISE', C.text, 13, "font-weight='700'") + T(462, 50, 'YOU: RIGHT · RIG: LEFT', C.label, 9, "text-anchor='end' font-weight='700'");
+    // the next notes
+    s += T(18, 78, 'NEXT', C.label, 9, "font-weight='700'");
+    ['A4', 'C4', 'E4', 'A4', 'B4', 'E4', 'G♯4', 'B4', 'C5'].forEach((n, i) => { const x = 58 + i * 45, on = i === 0;
+      s += `<rect x="${x}" y="62" width="40" height="24" rx="3" fill="${on ? C.teal : C.raised}"/>` + T(x + 20, 79, n, on ? C.bg : C.text, 11, "text-anchor='middle' font-weight='700'"); });
+    // where in the song
+    s += T(18, 112, 'SONG', C.label, 9, "font-weight='700'") + `<rect x="58" y="104" width="404" height="6" rx="3" fill="${C.raised}"/>`;
+    s += `<rect x="58" y="101" width="31" height="12" rx="2" fill="none" stroke="${C.violet}" stroke-width="1.4"/><rect x="62" y="100" width="2" height="14" fill="${C.teal}"/>` + T(94, 112, 'LOOP 1–8', C.violet, 8.5, "font-weight='700'");
+    // last run
+    s += T(18, 144, 'LAST RUN', C.label, 9, "font-weight='700'") + T(80, 145, '92 % RIGHT', C.teal, 12, "font-weight='700'") + T(178, 145, '81 % ON TIME', C.text, 12, "font-weight='700'") + T(290, 145, 'WORST: BAR 6', C.amber, 12, "font-weight='700'");
+    s += T(18, 166, 'TWICE OVER 90 %: TRY 80 %', C.dim, 9, "font-weight='700'");
+    const pads = [{ l: 'PLAY', on: true }, { l: 'RESTART' }, { l: 'WAIT' }, { l: 'LOOP', on: true }, { l: 'LEFT' }, { l: 'RIGHT', on: true }, { l: 'BOTH' }, { l: '‹ BACK', on: true, col: C.violet }];
+    pads.forEach((p, i) => { const x = colX(i);
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'"); });
+    [['TEMPO', '70 %', 0.56, true], ['FROM', 'BAR 1', 0.0], ['TO', 'BAR 8', 0.08], ['COUNT-IN', '1 BAR', 0.33], ['RIG', '−6 dB', 0.7]].forEach(([l, v, f, hi], i) => {
+      const cx = i * 60 + 30; s += T(cx, 217, l, hi ? C.teal : C.label, 9, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, hi ? C.teal : C.text, 12, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/><rect x="${i * 60 + 8}" y="244" width="${Math.max(3, 44 * f)}" height="4" rx="2" fill="${hi ? C.teal : C.bar}"/>`; });
+    [5, 6, 7].forEach((i) => { s += `<rect x="${i * 60 + 24}" y="226" width="12" height="8" rx="2" fill="${C.raised}" opacity=".5"/>`; });
+    s += T(8, 265, 'KNOBS SET TEMPO AND LOOP · PADS PLAY, WAIT AND PICK THE HAND', C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+  document.getElementById('pr').innerHTML = practicePage();
+</script>
+</body>
+</html>

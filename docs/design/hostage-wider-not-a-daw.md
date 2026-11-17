@@ -590,6 +590,9 @@ assignments unresolved, and there is no search for sounds from an audio file.
 
 ### Practice mode
 
+*Drawn with mockups in `hostage-practice-design.md` (2026-11-17): the tab, opening a song, the
+result after a run and a PRACTICE page on the CTRL49.*
+
 **Taken, 2026-11-16** (Pro): "General practice mode to learn songs in general." Not tied to the
 set: for learning any song, the way piano-learning apps (Synthesia, Flowkey, Simply Piano) teach
 with coloured bars falling onto a keyboard. The shape is decided; the details below are the
