@@ -1,6 +1,7 @@
 # HoSTage: the CTRL49 skins as colour
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. It does what the Chain
+*Design with mockups, approved by the owner on 2026-11-17 (decisions 1, 2 and 4); decision 3, whether
+the skin may colour the whole program, is open and worked out below. Nothing built. It does what the Chain
 tab design left for later: the other thirteen skins on HoSTage's CTRL49 pages, "just a colour
 change" (`hostage-dock-chain-design.md`, decision 3). Mockups: `hostage-skins-mockups.html`,
 pictures `docs/media/hostage-skins-1.png` and `-2.png`. When this and the code disagree, the code
@@ -71,8 +72,8 @@ The skin's own pages keep everything they have: knob images, materials, glow. On
 pages take a skin as colour. They draw no knob images (a cell is a word and a bar), so nothing on
 them needs a material.
 
-The rest of HoSTage's window keeps its own colours. The skin is the CTRL49's, wherever its pages
-are shown: on the keyboard, and in the dock.
+Whether the rest of HoSTage's window follows the skin too is decision 3, open: see "The whole
+program" below.
 
 ## What it needs
 
@@ -85,12 +86,42 @@ are shown: on the keyboard, and in the dock.
 - **The recolouring the owner's Linux branch does** for the Meters, Cue and Browse pages, used for
   these pages too. It is not on `main`, so it is not described here.
 
-## Decisions for the owner
+## The whole program (decision 3, open)
+
+The owner, on whether the skin should stop at the CTRL49 pages: "No, it is not a skin for HoSTage,
+but as you mentioned, it could be applied to the dock, so it raises the question whether it could
+skin the entire program." What that would take, from the code:
+
+- **HoSTage already has one place for its colours**: 32 `--host-*` tokens in `hostage-theme.css`.
+  The sixteen roles fill most of them directly (bg, surface, raised, the four text colours, the
+  lines, accent, active, pending); the rest are mixes of those (hover, field, the tinted surfaces).
+  So a skin can colour the whole window with no more data than it already has.
+- **But many screens do not use the tokens yet.** About 470 colours are written straight into
+  HoSTage's screens against about 220 uses of the tokens: `InstrumentHostView.svelte` 169 against
+  76, `StageView.svelte` 49 against 2, `HostKeyboard.svelte` 29 against none. Each has to become a
+  token first. That is most of the work, and worth doing anyway: it is what lets the dock's frame
+  match the pages inside it.
+- **HoSTage has only ever been dark** (`color-scheme: dark`). Four skins are light (Swiss Flat,
+  Neo Brutal, Dot Matrix, Studio), so every screen needs checking in a light skin. A plug-in's own
+  window is the vendor's and never follows.
+- **The Stage screen** is read from metres away. A light skin can dazzle in a dark venue, and is
+  the better one on an outdoor stage in daylight. So the Stage screen could have a skin of its
+  own.
+- **Colours that mean something** must keep their meaning: on (green-ish), warn (amber) and
+  danger. Danger (remove, missing, clip) has no role in the sixteen; it would stay HoSTage's own
+  red in every skin, so it always stands out. Dot Matrix cannot tell green from amber, so a status
+  must also be a word or an icon, as most already are. The part colours stay HoSTage's six, checked
+  against each skin's background.
+- **HoSTage's current look becomes a fifteenth entry**, "HoSTage", and the default: nothing
+  changes for anyone who does not choose a skin.
+- Only HoSTage: the tokens are scoped to `.host-workspace`, so CEditor's panel editor is not
+  touched.
+
+## Decisions (owner, 2026-11-17)
 
 1. **A skin on HoSTage's pages is sixteen colours and a radius**, with Walnut's cheeks and Neo
-   Brutal's outlines as the only extras, on the keyboard and in the dock?
-2. **The palettes as drawn**, taken from each skin's own colours? Name any skin that should look
-   different.
-3. **The skin colours only the CTRL49 pages**, wherever they are shown; the rest of HoSTage keeps
-   its own colours?
-4. **A contrast check** over every palette?
+   Brutal's outlines as the only extras, on the keyboard and in the dock. **Yes.**
+2. **The palettes as drawn**, taken from each skin's own colours. **Yes.**
+3. **The skin colours only the CTRL49 pages.** **No: open.** The owner asks whether it could skin
+   the whole program; worked out in "The whole program" above, waiting for the owner.
+4. **A contrast check** over every palette. **Yes.**
