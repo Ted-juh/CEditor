@@ -303,6 +303,76 @@ interconnected pages. 3. Yes, 4. Yes"):
    Velocity when it is opened: yes.
 4. **The Articulation Manager's pads** switch articulations, as the trigger keys do: yes.
 
+## The audio effects: three pages
+
+*Added 2026-11-17, when the owner asked for "the audio effects, same way". Proposed, not yet
+approved. Mockups: `hostage-dock-effects-mockups.html`, pictures `docs/media/hostage-dock-effects-1.png`
+(the dock) and `-2.png` (the pages at the keyboard's size).*
+
+![An audio effect in the dock](../media/hostage-dock-effects-1.png)
+
+**What is there today.** A part's audio effects are VST3 plug-ins in its insert chain (`EffectSlot`,
+`effects` on parts, buses, returns and the master, `RackModel.h`); HoSTage has no built-in effects
+yet. The Inserts tab lists them with reorder, Byp, Editor (the plug-in's window), P (its
+parameters) and remove. Every one runs isolated, at a block of latency each (the latency finding
+in `hostage-wider-not-a-daw.md`). Two CTRL49 designs exist, in the original look: the Rig mockups'
+**Effects** page, which measures each effect by what it does to the sound
+(`feature-mockups/hostage-rig/preview-2-effects.png`), and the Live mockups' **Section** page, a
+section of a plug-in's own window found by the panel scan (`ctrl49-panel-scan.md`: a spec, its
+first tool built, waiting on a test with real plug-ins).
+
+**In the chain strip**, each audio block shows what the effects decisions already asked for: its
+on/off, its **dry/wet** (Effects, 1), **what it is doing** to the sound in one line ("SQUASH
+9.6 dB"), its latency and its state.
+
+**The pages.** Click a block and three pages open underneath, the keyboard's pages:
+
+1. **EFFECTS**, after the Rig mockup: the part's whole chain as cards, each with five measures of
+   what it does (**gain**: louder or quieter; **tone**: brighter or darker; **squash**: how far the
+   loudest moments come down; **width**; **tail**: how long it rings on) and the one that matters
+   named. Under the cards, the selected effect's spectrum in and out, its level over the last four
+   seconds, and its five measures. An effect that changes nothing says so. Knobs: slot, the
+   selected effect's first four parameters, its mix. **Pad N switches effect N on and off**,
+   without a click (Effects, 2).
+2. **EFFECT**: one plug-in's own parameters on the eight knobs, named and written the way the
+   plug-in does ("−20 dB", "4.6:1"), a group at a time, the groups the plug-in itself declares
+   (as Auto pages already uses them). Beside them, what it does, its level in and out, its latency,
+   its processor load and its state. Pads: on/off, the previous and next group, the parameters you
+   pinned (☆ in the Params tab), and back to EFFECTS.
+3. **SECTION**: a section of the plug-in's own window, as the panel scan cuts it, with the number
+   of each control the knob that turns it. Its pointers are painted over at the live value, as the
+   Section mockup shows. Controls that are not on the section are reached by name on the knobs left
+   over. Pads: on/off, the previous and next section, back to EFFECTS. **Only where the scan has
+   done the plug-in**; until the panel scan is proven on real plug-ins, EFFECT is the page.
+
+**Only in the dock**: the plug-in's own window, one click away; all its parameters (the Params
+tab); dragging a parameter onto a knob cell to put it on the EFFECT page; presets.
+
+**The same pages elsewhere.** Buses, returns and the master have chains too; selecting one in the
+Rack tab or on its Mixer strip opens the same three pages for its effects.
+
+**Built-in effects** (decision 3: limiter, tuner, click and count-in, file player, input trim;
+later the channel strip for the desk) are HoSTage's own, so each gets a designed page like the
+MIDI modules' when it is built, not the generic EFFECT page.
+
+**What it needs:**
+
+- **Measuring each effect**: taps before and after every slot for the five measures, the spectrum
+  and the level. New, and it costs processing; the measures can be worked out off the audio thread
+  at a low rate.
+- **Dry/wet and click-free bypass**, already taken (Effects, 1 and 2).
+- **The processor load per effect**, already taken ("what each part costs", Build mode, further 5),
+  from each plug-in's worker.
+- **SECTION** waits on the panel scan.
+- The EFFECT page's groups and pins already exist (Auto pages, the Params tab).
+
+**Decisions for the owner:**
+
+1. **These three pages**: EFFECTS, EFFECT, and SECTION where the scan has done the plug-in?
+2. **Measure what each effect does**, at the cost of taps around every slot?
+3. **The EFFECT page's knobs**: the plug-in's own groups, with the pinned parameters a pad away?
+4. **Pad N switches effect N on and off** on EFFECTS?
+
 ## What changes from today
 
 - **Unchanged**: everything today's arpeggiator can do; the playhead from the engine.
@@ -332,7 +402,8 @@ keyboard down the left.
 
 ## Next
 
-The other thirteen skins on these pages. The MIDI modules are all above. Then an audio insert: dry/wet, its main
+The other thirteen skins on these pages. The MIDI modules and the audio effects are all above; the
+built-in effects get their pages when they are built. Then an audio insert: dry/wet, its main
 knobs, latency and state in the block, its parameters below, and the plug-in's own window one click
 away.
 

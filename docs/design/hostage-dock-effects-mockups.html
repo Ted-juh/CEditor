@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage dock: audio effect pages</title>
+<!--
+  Mockups for the audio effects in docs/design/hostage-dock-chain-design.md. Static, invented data.
+  As with the MIDI modules, each CTRL49 page is drawn ONCE at 480 x 272 in the original look
+  (Midnight 2020) and the dock shows that drawing. EFFECTS follows the Rig mockup
+  (feature-mockups/hostage-rig/preview-2-effects.png); SECTION follows the Live mockup's Section page
+  (feature-mockups/hostage-live/preview-2-section.png) and the panel scan (ctrl49-panel-scan.md).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --part: #9a7ad6;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame.wide { width: 1520px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1160px; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .dock { background: var(--surface); border: 1px solid var(--line-soft); border-top: 2px solid var(--line); }
+  .tabs { display: flex; align-items: center; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); background: var(--bg); }
+  .picker { display: flex; align-items: center; gap: 8px; padding: 4px 10px; margin-right: 14px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); }
+  .picker i { width: 4px; height: 16px; background: var(--part); border-radius: 2px; }
+  .tab { padding: 6px 14px; border-radius: 3px; color: var(--soft); font-weight: 600; }
+  .tab.on { background: var(--accent-surface); color: var(--accent-strong); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tabs .spacer { flex: 1; }
+  .ghostbtn { padding: 5px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--soft); background: var(--raised); font-size: 12px; }
+  .chain { display: flex; align-items: stretch; padding: 12px 12px 10px; border-bottom: 1px solid var(--line-soft); overflow: hidden; }
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group .row { display: flex; align-items: center; }
+  .sep { width: 14px; display: flex; align-items: center; justify-content: center; color: var(--faint); padding-top: 18px; }
+  .block { width: 122px; height: 98px; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
+  .block.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 18px #5b9bd533; background: #1f2b36; }
+  .block.byp { opacity: .55; } .block.byp .name { text-decoration: line-through; }
+  .block .head { display: flex; align-items: center; gap: 6px; }
+  .block .name { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .pw { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--active); display: flex; align-items: center; justify-content: center; flex: none; }
+  .pw::after { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--active); }
+  .pw.off { border-color: var(--line-strong); } .pw.off::after { background: transparent; }
+  .block .sub { color: var(--soft); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .block .what { font: 600 10px var(--mono); color: var(--accent-strong); }
+  .block .foot { margin-top: auto; display: flex; align-items: center; gap: 6px; font: 10px var(--mono); color: var(--dim); }
+  .mix { display: flex; align-items: center; gap: 6px; font: 10px var(--mono); color: var(--soft); }
+  .mk { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--accent) 0 var(--v), var(--line) var(--v) 75%, transparent 75%); transform: rotate(-135deg); position: relative; flex: none; }
+  .mk::after { content: ''; position: absolute; inset: 4px; background: var(--raised); border-radius: 50%; }
+  .state { margin-left: auto; padding: 1px 6px; border-radius: 9px; font: 600 9px var(--mono); }
+  .state.ok { color: var(--active); } .state.warn { background: var(--pending-surface); color: var(--pending); }
+  .add { width: 26px; height: 98px; border: 1px dashed var(--line); border-radius: 6px; color: var(--dim); display: flex; align-items: center; justify-content: center; font-size: 16px; margin-left: 6px; }
+  .inst { background: #241f30; border-color: #5c4b80; }
+  .detail { padding: 12px 14px 14px; }
+  .dhead { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .dhead h3 { margin: 0; font: 600 14px var(--sans); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 3px; border: 1px solid var(--active); background: var(--active-surface); color: var(--active); font: 600 11px var(--mono); }
+  .hw { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); font: 600 10px var(--mono); color: var(--soft); }
+  .hw i { width: 7px; height: 7px; border-radius: 50%; background: var(--active); box-shadow: 0 0 6px var(--active); }
+  .chip { padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; }
+  .pages { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); }
+  .pages svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  .extras { display: flex; gap: 18px; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-soft); color: var(--faint); font-size: 11.5px; flex-wrap: wrap; }
+  .ref { display: grid; grid-template-columns: repeat(3, 480px); gap: 18px 16px; }
+  .ref figure { margin: 0; }
+  .ref svg { display: block; width: 480px; height: 272px; border-radius: 4px; box-shadow: 0 0 0 1px #2b3456; }
+  .ref figcaption { margin-top: 6px; color: var(--soft); font-size: 12px; }
+  .ref figcaption b { color: var(--text); font: 600 11px var(--mono); margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · An audio effect in the dock: its three CTRL49 pages</h2>
+    <p>Each audio block in the chain now shows its dry/wet, what it is doing to the sound, its latency and its state. Click one and its pages open underneath: EFFECTS, the whole chain measured; EFFECT, this plug-in's own parameters on the eight knobs; SECTION, a section of its own window, where the panel scan has done it. The same three drawings are the keyboard's pages.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker"><i></i>Part 2 · String Pad ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Zone</span><span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Fold the chain ▴</span>
+    </div>
+    <div class="chain">
+      <div class="group"><span class="lbl">MIDI</span><div class="row">
+        <div class="block" style="width:104px"><div class="head"><span class="name">Chords</span><span class="pw"></span></div><span class="sub">› Strum</span><div class="foot">2 modules</div></div></div></div>
+      <div class="sep" style="width:22px">›</div>
+      <div class="group"><span class="lbl">Instrument</span><div class="row">
+        <div class="block inst" style="width:118px"><div class="head"><span class="name">Omnisphere</span><span class="pw"></span></div><span class="sub">Warm Strings</span><div class="foot">2.7 ms <span class="state ok">●</span></div></div></div></div>
+      <div class="sep" style="width:22px">›</div>
+      <div class="group"><span class="lbl">Audio</span><div class="row">
+        <div class="block"><div class="head"><span class="name">Channel EQ</span><span class="pw"></span></div><div class="mix"><span class="mk" style="--v:75%"></span>mix 100%</div><span class="what">TONE +1.9 dB</span><div class="foot">0.0 ms <span class="state ok">●</span></div></div>
+        <div class="sep">›</div>
+        <div class="block sel"><div class="head"><span class="name">Bus Comp</span><span class="pw"></span></div><div class="mix"><span class="mk" style="--v:75%"></span>mix 100%</div><span class="what">SQUASH 9.6 dB</span><div class="foot">2.7 ms <span class="state ok">●</span></div></div>
+        <div class="sep">›</div>
+        <div class="block"><div class="head"><span class="name">Ensemble</span><span class="pw"></span></div><div class="mix"><span class="mk" style="--v:37%"></span>mix 50%</div><span class="what">WIDTH 46%</span><div class="foot">2.7 ms <span class="state ok">●</span></div></div>
+        <div class="sep">›</div>
+        <div class="block byp"><div class="head"><span class="name">Tape Echo</span><span class="pw off"></span></div><div class="mix"><span class="mk" style="--v:22%"></span>mix 30%</div><span class="what" style="color:var(--dim)">OFF</span><div class="foot">2.7 ms</div></div>
+        <div class="sep">›</div>
+        <div class="block"><div class="head"><span class="name">Plate</span><span class="pw"></span></div><div class="mix"><span class="mk" style="--v:30%"></span>mix 40%</div><span class="what">TAIL 2.0 s</span><div class="foot">2.7 ms <span class="state warn">RESTART</span></div></div>
+        <div class="add">+</div></div></div>
+      <div class="sep" style="width:22px">›</div>
+      <div class="group"><span class="lbl">Out</span><div class="row">
+        <div class="block" style="width:104px"><div class="head"><span class="name">Fader</span></div><span class="sub">−6.0 dB</span><div class="foot">13.5 ms</div></div></div></div>
+    </div>
+    <div class="detail">
+      <div class="dhead"><h3>Bus Comp</h3><span class="toggle">● ON</span><span class="chip">slot 2 of 5</span><span style="flex:1"></span><span class="btn">Open its window ↗</span><span class="chip">Presets ▾</span><span class="hw"><i></i>CTRL49 · ON EFFECT</span></div>
+      <div class="pages" id="dock"></div>
+      <div class="extras"><span class="lbl">Only in the dock</span><span>Its own window, one click away</span><span>All its parameters (the Params tab)</span><span>Drag a parameter onto a knob cell to put it on the EFFECT page</span><span>Presets</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame wide" id="f2">
+  <div class="caption">
+    <h2>2 · The three pages at the keyboard's own size</h2>
+    <p>480 × 272, in the original look. On EFFECTS pad N switches effect N on and off; on EFFECT and SECTION the pads switch the effect and step through its groups or sections, and pad 8 goes back to EFFECTS.</p>
+  </div>
+  <div class="ref" id="ref"></div>
+</section>
+
+<script>
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393',
+              label: '#8890B0', foot: '#565E7E', bar: '#4A5378', grid: '#1F2742', gridS: '#2B3456',
+              violet: '#8B7CFF', teal: '#2DD4BF', pink: '#FF5C93', amber: '#FFB547' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const colX = (i) => i * 60 + 6;
+
+  function page(title, right, cells, pads, footer, inner) {
+    let s = `<rect width="480" height="272" fill="${C.bg}"/>`;
+    s += `<rect x="8" y="7" width="4" height="17" rx="1" fill="${C.violet}"/>` + T(18, 22, title, C.text, 16, "font-weight='700'");
+    s += T(472, 21, right, C.dim, 10.5, "text-anchor='end'");
+    s += inner;
+    for (let i = 0; i < 8; i++) {
+      const p = pads[i], x = colX(i);
+      if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; continue; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>`;
+      s += T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'");
+    }
+    cells.forEach((c, i) => {
+      if (!c || !c.l) return;
+      const cx = i * 60 + 30;
+      s += T(cx, 217, c.l, c.focus ? C.teal : C.label, 9, "text-anchor='middle' font-weight='700'");
+      s += T(cx, 236, c.v, c.focus ? C.teal : C.text, c.vs || 14, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>`;
+      if (c.f) s += `<rect x="${i * 60 + 8}" y="244" width="${44 * c.f}" height="4" rx="2" fill="${C.bar}"/>`;
+    });
+    s += T(8, 265, footer, C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+
+  // what each slot does to the sound, measured in and out of it
+  const SLOTS = [
+    { n: 'CHANNEL EQ', short: 'EQ', what: 'TONE +1.9 dB', m: [0, .4, 0, 0, 0], on: true },
+    { n: 'BUS COMP', short: 'COMP', what: 'SQUASH 9.6 dB', m: [.34, 0, .8, 0, 0], on: true },
+    { n: 'ENSEMBLE', short: 'ENS', what: 'WIDTH 46%', m: [0, 0, 0, .46, .1], on: true },
+    { n: 'TAPE ECHO', short: 'ECHO', what: 'OFF', m: [0, 0, 0, 0, 0], on: false },
+    { n: 'PLATE', short: 'PLATE', what: 'TAIL 2.0 s', m: [0, -.1, 0, .2, .8], on: true },
+  ];
+  const SEL = 1;
+  const METRICS = [['GAIN', '+3.4 dB', .34], ['TONE', '0.0 dB', 0], ['SQUASH', '9.6 dB', .8], ['WIDTH', '0%', 0], ['TAIL', '0.0 s', 0]];
+  function metricBars(x, y, w) {
+    let s = '';
+    METRICS.forEach(([n, v, f], k) => {
+      const yy = y + k * 15;
+      s += T(x, yy + 8, n, C.label, 8, "font-weight='700'") + `<rect x="${x + 50}" y="${yy + 3}" width="${w - 100}" height="5" rx="2" fill="${C.raised}"/>`;
+      s += `<rect x="${x + 50}" y="${yy + 3}" width="${(w - 100) * f}" height="5" rx="2" fill="${C.violet}"/>` + T(x + w, yy + 8.5, v, C.text, 8.5, "text-anchor='end' font-weight='700'");
+    });
+    return s;
+  }
+
+  // ---- EFFECTS: the part's chain, measured --------------------------------------------------------------
+  function effectsPage() {
+    let s = '';
+    const cw = 88, gap = 6;
+    SLOTS.forEach((sl, k) => {
+      const x = 8 + k * (cw + gap), sel = k === SEL;
+      s += `<rect x="${x}" y="32" width="${cw}" height="52" rx="4" fill="${C.card}" ${sel ? `stroke="${C.violet}" stroke-width="1.5"` : ''} opacity="${sl.on ? 1 : .5}"/>`;
+      s += T(x + 6, 44, `${k + 1}  ${sl.n}`, sel ? C.text : C.label, 7.5, "font-weight='700'");
+      sl.m.forEach((v, b) => { s += `<rect x="${x + 8 + b * 15}" y="${62 - Math.abs(v) * 12}" width="11" height="${Math.max(2, Math.abs(v) * 12)}" rx="1" fill="${v ? (sel ? C.violet : C.bar) : C.raised}"/>`; });
+      s += T(x + cw / 2, 78, sl.what, sl.on ? C.text : C.dim, 8, "text-anchor='middle' font-weight='700'");
+      if (k < SLOTS.length - 1) s += T(x + cw + 3, 62, '›', C.dim, 9, "text-anchor='middle'");
+    });
+    // tone in and out, level over four seconds, the five measures
+    s += `<rect x="8" y="90" width="150" height="86" rx="4" fill="${C.card}"/>` + T(14, 101, 'TONE  IN (GREY), OUT', C.label, 7.5, "font-weight='700'");
+    for (let b = 0; b < 26; b++) { const hin = 50 * Math.exp(-b / 14) + 6 + 4 * Math.sin(b), hout = hin * .82 + 3; s += `<rect x="${14 + b * 5.4}" y="${172 - hin}" width="4" height="${hin}" fill="${C.bar}"/><rect x="${14 + b * 5.4 + 1}" y="${172 - hout}" width="2" height="${hout}" fill="${C.violet}"/>`; }
+    s += `<rect x="162" y="90" width="150" height="86" rx="4" fill="${C.card}"/>` + T(168, 101, 'LEVEL  LAST 4 SECONDS', C.label, 7.5, "font-weight='700'");
+    s += `<polyline fill="none" stroke="${C.bar}" stroke-width="1" points="${Array.from({ length: 60 }, (_, i) => `${168 + i * 2.35},${160 - (i % 10 < 2 ? 50 : 30 - (i % 10) * 2)}`).join(' ')}"/>`;
+    s += `<polyline fill="none" stroke="${C.violet}" stroke-width="1.5" points="${Array.from({ length: 60 }, (_, i) => `${168 + i * 2.35},${160 - (i % 10 < 2 ? 34 : 28 - (i % 10) * 1.2)}`).join(' ')}"/>`;
+    s += `<rect x="316" y="90" width="156" height="86" rx="4" fill="${C.card}"/>` + metricBars(322, 96, 144);
+    return page('EFFECTS', 'STRING PAD   5 EFFECTS', [
+      { l: 'SLOT', v: '2 / 5', f: .4, focus: true }, { l: 'THRESH', v: '−20 dB', vs: 12 }, { l: 'RATIO', v: '4.6:1', vs: 13 }, { l: 'ATTACK', v: '10 ms', vs: 13 },
+      { l: 'RELEASE', v: '251 ms', vs: 12 }, { l: 'MIX', v: '100%', f: 1 }, {}, {},
+    ], SLOTS.map((sl, k) => ({ l: `${k + 1} ${sl.short}`, on: sl.on })), 'EVERY EFFECT MEASURED BY WHAT IT DOES   PAD N: EFFECT N ON OR OFF', s);
+  }
+
+  // ---- EFFECT: one plug-in's own parameters ----------------------------------------------------------
+  function effectPage() {
+    let s = '';
+    ['MAIN', 'SIDECHAIN', 'OUTPUT'].forEach((g, k) => {
+      const x = 8 + k * 80, on = k === 0;
+      s += `<rect x="${x}" y="32" width="76" height="16" rx="3" fill="${on ? C.violet : C.raised}"/>` + T(x + 38, 43.5, g, on ? C.bg : C.label, 8, "text-anchor='middle' font-weight='700'");
+    });
+    s += T(472, 44, 'GROUP 1 OF 3, AS THE PLUG-IN GROUPS THEM', C.dim, 7.5, "text-anchor='end' font-weight='700'");
+    s += `<rect x="8" y="54" width="300" height="122" rx="4" fill="${C.card}"/>` + T(16, 68, 'WHAT IT DOES', C.label, 8, "font-weight='700'") + metricBars(16, 74, 284);
+    s += `<rect x="314" y="54" width="158" height="122" rx="4" fill="${C.card}"/>` + T(322, 68, 'IN', C.label, 8, "font-weight='700'") + T(352, 68, 'OUT', C.label, 8, "font-weight='700'");
+    [[322, 104, '#4A5378'], [352, 86, C.violet]].forEach(([x, h, c]) => { s += `<rect x="${x}" y="74" width="18" height="96" rx="2" fill="${C.raised}"/><rect x="${x}" y="${170 - h * .9}" width="18" height="${h * .9}" rx="2" fill="${c}"/>`; });
+    s += T(388, 86, 'LATENCY', C.label, 7.5, "font-weight='700'") + T(388, 100, '2.7 ms', C.text, 11, "font-weight='700'");
+    s += T(388, 120, 'PROCESSOR', C.label, 7.5, "font-weight='700'") + T(388, 134, '3%', C.text, 11, "font-weight='700'");
+    s += T(388, 154, 'STATE', C.label, 7.5, "font-weight='700'") + T(388, 168, '● RUNNING', C.teal, 9, "font-weight='700'");
+    return page('BUS COMP', 'SLOT 2 OF 5', [
+      { l: 'THRESH', v: '−20 dB', vs: 12, f: .4 }, { l: 'RATIO', v: '4.6:1', vs: 13, f: .35 }, { l: 'ATTACK', v: '10 ms', vs: 13, f: .2 }, { l: 'RELEASE', v: '251 ms', vs: 12, f: .5 },
+      { l: 'KNEE', v: '6 dB', vs: 13, f: .3 }, { l: 'MAKEUP', v: '+3.4', vs: 13, f: .55 }, { l: 'MIX', v: '100%', vs: 13, f: 1 }, { l: 'SC HPF', v: '60 Hz', vs: 12, f: .2 },
+    ], [{ l: 'ON', on: true }, { l: '◀ GROUP', on: false }, { l: 'GROUP ▶', on: false }, { l: 'PINNED', on: false }, null, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    'THE PLUG-IN’S OWN PARAMETERS, NAMED AND WRITTEN AS IT DOES', s);
+  }
+
+  // ---- SECTION: a section of the plug-in's own window (panel scan) --------------------------------------
+  function sectionPage() {
+    let s = `<rect x="8" y="32" width="464" height="144" rx="4" fill="#2B2D31"/><rect x="8" y="32" width="464" height="20" rx="4" fill="#232427"/>`;
+    s += `<text x="18" y="46" font-family="Liberation Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#E9DFC7" letter-spacing="1.5">BUS COMPRESSOR</text>`;
+    s += `<text x="462" y="46" font-family="Liberation Sans, Arial, sans-serif" font-size="8" fill="#9A9488" text-anchor="end">model 2 · stereo</text>`;
+    const knobs = [['THRESHOLD', .4], ['RATIO', .35], ['ATTACK', .2], ['RELEASE', .5], ['MAKE-UP', .55]];
+    knobs.forEach(([n, v], k) => {
+      const cx = 52 + k * 72, cy = 104, a = (-135 + v * 270) * Math.PI / 180;
+      s += `<circle cx="${cx}" cy="${cy}" r="21" fill="#18191C" stroke="#4A4C52" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="15" fill="#3A3C42"/>`;
+      s += `<line x1="${cx}" y1="${cy}" x2="${cx + Math.sin(a) * 14}" y2="${cy - Math.cos(a) * 14}" stroke="${C.violet}" stroke-width="2.5" stroke-linecap="round"/>`;
+      s += `<text x="${cx}" y="${cy + 36}" font-family="Liberation Sans, Arial, sans-serif" font-size="8.5" fill="#E9DFC7" text-anchor="middle" letter-spacing=".5">${n}</text>`;
+      s += `<circle cx="${cx - 22}" cy="${cy - 22}" r="7" fill="${C.violet}"/>` + T(cx - 22, cy - 19, k + 1, C.bg, 8, "text-anchor='middle' font-weight='700'");
+      if (k === 0) s += `<circle cx="${cx}" cy="${cy}" r="25" fill="none" stroke="${C.teal}" stroke-width="1.5"/>`;
+    });
+    // the gain reduction meter, as the plug-in draws it
+    s += `<rect x="404" y="62" width="58" height="66" rx="3" fill="#E9DFC7"/><text x="433" y="76" font-family="Liberation Sans, Arial, sans-serif" font-size="7" fill="#3A3C42" text-anchor="middle">GAIN REDUCTION</text>`;
+    s += `<path d="M412 120 A28 28 0 0 1 454 120" fill="none" stroke="#8A8478" stroke-width="1"/><line x1="433" y1="122" x2="446" y2="98" stroke="#B03A2E" stroke-width="1.5"/>`;
+    s += T(14, 172, 'KNOBS 6 TO 8: MIX, SC HPF AND KNEE ARE NOT ON THIS SECTION; REACHED BY NAME', C.dim, 7, "font-weight='700'");
+    return page('BUS COMP', 'SECTION 1 OF 2   PANEL SCAN', [
+      { l: 'THRESH', v: '−20 dB', vs: 12, focus: true }, { l: 'RATIO', v: '4.6:1', vs: 13 }, { l: 'ATTACK', v: '10 ms', vs: 13 }, { l: 'RELEASE', v: '251 ms', vs: 12 },
+      { l: 'MAKEUP', v: '+3.4', vs: 13 }, { l: 'MIX', v: '100%', vs: 13 }, { l: 'SC HPF', v: '60 Hz', vs: 12 }, { l: 'KNEE', v: '6 dB', vs: 13 },
+    ], [{ l: 'ON', on: true }, { l: '◀ SECTION', on: false }, { l: 'SECTION ▶', on: false }, null, null, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    'ITS OWN WINDOW, A SECTION AT A TIME   NUMBER N IS KNOB N', s);
+  }
+
+  const pages = [effectsPage(), effectPage(), sectionPage()];
+  document.getElementById('dock').innerHTML = pages.join('');
+  const names = [['EFFECTS', 'the part’s chain, every effect measured'], ['EFFECT', 'one plug-in’s parameters, a group at a time'], ['SECTION', 'its own window, a section at a time']];
+  document.getElementById('ref').innerHTML = pages.map((svg, i) => `<figure>${svg}<figcaption><b>${names[i][0]}</b>${names[i][1]}</figcaption></figure>`).join('');
+</script>
+</body>
+</html>
