@@ -492,7 +492,7 @@ are out. "More like this" in Sounds already exists
 
 ### Ease of use
 
-*The ones that live on the Rack tab are drawn in `hostage-rack-build-design.md` (2026-11-17), with
+*The ones that live on the Rack tab are drawn and approved in `hostage-rack-build-design.md` (2026-11-17), with
 "More ease of use" 1, 2 and 4, "Even more" 1, even levels and what each part costs.*
 
 Proposed on 2026-11-16, when the owner asked about dragging instruments and effects onto the rack

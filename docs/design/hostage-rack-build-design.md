@@ -1,6 +1,6 @@
 # HoSTage: the Rack in Build mode
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. It draws the ease-of-use
+*Design with mockups, approved by the owner on 2026-11-17 as drawn. Nothing built. It draws the ease-of-use
 features the owner took in `hostage-wider-not-a-daw.md` that live on the Rack tab: "Ease of use" 1
 to 7, "More ease of use" 1, 2 and 4, "Even more ease of use" 1, "Build mode" 3 (even levels) and
 "Build mode, further" 5 (what each part costs). Those are decided; this record decides only how
@@ -99,10 +99,10 @@ comes. "Try a MIDI module before adding it" belongs to the Chain tab's "+ Add mo
 - **What it costs**: each plug-in worker reporting its processing time.
 - **Even level**: the library's measured level, which exists, and the part's gain.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-17)
 
 1. **A drop on a key makes a real split** (the parts there give up those keys), and a drop on a band
-   layers?
-2. **The up and down buttons go**, replaced by the grip?
-3. **Replacing by dropping asks first** until undo covers loading?
-4. **"Why is this not sounding?" on the Rack tab only**, not on the Stage screen?
+   layers. **Yes.**
+2. **The up and down buttons go**, replaced by the grip. **Yes.**
+3. **Replacing by dropping asks first** until undo covers loading. **Yes.**
+4. **"Why is this not sounding?" on the Rack tab only**, not on the Stage screen. **Yes.**
