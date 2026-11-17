@@ -25,8 +25,11 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **Eight more ease-of-use features**, taken: [Even more ease of use](#even-more-ease-of-use).
 - **Five more Build-mode features**, taken: [Build mode, further](#build-mode-further).
 - **A practice mode with falling notes**, for learning any song: [Practice mode](#practice-mode).
-- **What to do next**: [Order of work](#order-of-work). The first items fix things that are wrong
-  today.
+- **The designs with mockups**, approved 2026-11-17, one record each: listed in
+  [Where each design is](#where-each-design-is), with where each sits in the order.
+- **What to do next**: [Order of work](#order-of-work), in two tracks, Stage and Build. The first
+  Stage items fix things that are wrong today; the first Build items are groundwork the screens
+  stand on.
 - **Words used here**: the [Glossary](#glossary) at the end.
 
 ## HoSTage today, in one paragraph
@@ -635,43 +638,92 @@ the time (`MidiCaptureJournal.h`), which is what right and wrong are measured ag
 
 ## Order of work
 
+*Rewritten 2026-11-17, after the designs below were approved, so the order fits them. Two tracks
+that can run side by side: **Stage** (playing the rig, with live inputs) and **Build** (making the
+rig). Within a track, a step needs the ones before it only where it says so.*
+
+### Where each design is
+
+| Design record | What it settles | In the order |
+| --- | --- | --- |
+| `hostage-audio-setup-design.md` | Audio & MIDI remembered, a show's connections mapped per interface, the line check | Stage 2 and 4 |
+| `hostage-dock-chain-design.md` | the dock's Chain tab and the CTRL49 pages for every block: arpeggiator, step sequencer, chords, the other modules, effects, instrument, Out, live inputs | Build 4; the input pages with Stage 5 |
+| `hostage-rack-build-design.md` | the Rack: drag and drop, splits by dropping on a key, several parts, why a key is silent, what each part costs, even levels | Build 3 |
+| `hostage-build-tools-design.md` | the command palette, undo that covers everything, drag to modulate, hold to compare | Build 1, 2 and 5 |
+| `hostage-build-further-design.md` | knobs that follow the selection, a macro by moving, swap a plug-in and keep the mappings, find a sound from a recording | Build 6 |
+| `hostage-build-small-design.md` | ranges by showing, layers by playing, a synth plugged in, new plug-ins noticed, drag to assign in Performance, a page from what you touched | Build 7 |
+| `hostage-skins-design.md` | the fourteen CTRL49 skins as colour; three skin choices (CTRL49, program, Stage) | Build 1 and 8 |
+| `hostage-practice-design.md` | Practice mode, from MIDI and MusicXML | Stage 7 |
+| `ctrl49-panel-scan.md` | the SECTION pages: a plug-in's own window on the CTRL49 | when the scan is tested on real plug-ins |
+
+### Stage
+
 1. **Fixes, any time, every edition**: Solo not saved, SOLOED OUT and the banner; the MIDI input
    switches remembered. They need nothing else, and fix things that are wrong today. Also check
    that a restart after a crash lands on the song that was playing (still more, 5).
-2. **2a, then the latency measurement.** The measurement needs a chosen buffer and device type, and
-   the owner's interfaces.
+2. **2a, then the latency measurement** (Audio & MIDI design, section 1). The measurement needs a
+   chosen buffer and device type, and the owner's interfaces.
 3. **2e**, early, before more projects save the old plug-in shape.
 4. **2b, 2c with Listen, 2d.** 2d's silent clock first: it protects every rig with a hardware synth,
-   live inputs or not. With 2b, the list for the sound engineer (decision 9), and the line check
-   (more features, 5), which needs the named connections.
+   live inputs or not. With 2b, its mapping screen and the line check (Audio & MIDI design,
+   sections 2 and 3), which need the named connections, and the list for the sound engineer
+   (decision 9).
 5. **The input part**, with its meters, tuner, limiter, Mute inputs and MIDI to inserts, designed
-   to grow to a desk's channel count later (decision 9). Then a guitar that plays a synth (more
-   features, 7), which needs MIDI out of an insert.
+   to grow to a desk's channel count later (decision 9), and its pages in the dock (Chain design,
+   live inputs). Then a guitar that plays a synth (more features, 7), which needs MIDI out of an
+   insert.
 6. **Foot controllers and stomp mode**, with click-free bypass and dry/wet (effects 1 and 2),
    effect throws (effects 4), which need the new control targets, and Bluetooth MIDI (still more,
    2), since wireless pedals are the usual reason for it.
 7. **Audio looper, effect chains in the library, backing tracks**, and MIDI backing files with them
    (more features, 4), under the same play-only rules. **Practice mode** after the MIDI backing
-   files, since it uses the same MIDI file reader.
+   files, since it uses the same MIDI file reader; its MusicXML reader is its own.
 
-**Alongside, independent of all that:** show control (MIDI clock out and Ableton Link first, the
+### Build
+
+1. **Groundwork that the screens below stand on.** Each is small and unblocks several others:
+   - **One list of commands**, with each command's words, shortcut, gesture and Stage Lock rule,
+     read by the palette, the shortcuts and Stage Lock (Build tools design, section 1).
+   - **HoSTage's colours as tokens.** About 470 colours are written straight into its screens; each
+     becomes one of the `--host-*` tokens. The dock's frame and the program and Stage skins need it
+     (skins design, "The whole program").
+   - **The CTRL49 pages drawn from the sixteen colour roles**, so every page drawn after this takes
+     any skin (skins design).
+2. **Undo that covers everything** (Build tools design, section 2): loading a plug-in, a sound or a
+   preset, and a visit to a plug-in's own window, as steps; a hundred of them; the History list.
+   Early, because the Rack's replace-by-drop asks first until it exists, and the swap screen and
+   the drops in Performance are each one undo step.
+3. **The Rack** (Rack design): drops everywhere, splits by dropping on a key, several parts at once,
+   the grip, duplicate, effects dragged between parts, and "why is this not sounding?". What each
+   part costs needs the plug-in workers to report their time; even levels uses the level the
+   library measured. Dropping files from the computer (more ease of use, 4) also needs the native
+   side to accept them.
+4. **The Chain tab** (Chain design): the arpeggiator and the step sequencer as two modules, chords,
+   the other modules, effects, the instrument and Out, each with its CTRL49 pages in the original
+   look. The SECTION pages wait for the panel scan.
+5. **The rest of the Build tools** (Build tools design): the command palette (after the command
+   list, Build 1), drag to modulate, and hold to compare, which swaps in a snapshot taken at the
+   Mark and does not need the undo history.
+6. **Build mode, further** (its design): knobs follow the selection, which needs the INSTRUMENT page
+   (Build 4); a macro by moving; keeping the mappings when a plug-in is swapped; finding a sound from
+   a recording, which runs the library's measures on an audio file.
+7. **The smaller ones** (their design): ranges by showing, layers by playing, drag to assign in
+   Performance and a page from what you touched are screen work on fields that exist. Then a synth
+   plugged in, which needs the device profiles' identity request brought into the host, and new
+   plug-ins noticed, which needs a watch on the plug-in folders on the native side.
+8. **Skins** (skins design): the fourteen CTRL49 palettes with their contrast check, after the roles
+   (Build 1); then the HoSTage and Stage skins, after the tokens (Build 1), every screen checked in
+   the four light skins.
+
+**Alongside, independent of both tracks:** show control (MIDI clock out and Ableton Link first, the
 two everyone asks for), the whole rig, and three of the more features that need nothing else: song
 changes without a gap (1), transposing the whole set (3) and show history (8). Lyrics and chords (2)
 go with the tablet remote. From the effects: tails that ring out (3) beside song changes without a
-gap, the drum map (7), and the new effects screen in the dock (8), which the owner already finds
-lacking. From still more: two keyboards with their own parts (1) and the gig-ready check (3).
-From Build mode: undo that covers everything (1), even levels (3), control pages from what you use
-(6) and the command palette (7). All seven ease-of-use features, and the four taken from "more
-ease of use"; they are mostly screen work and need nothing else. Of those, dropping files from the
-computer (more ease of use, 4) also needs the native side to accept them. The eight from "even
-more ease of use", with these exceptions: hold to compare (5) needs the undo that covers everything
-first; plug in a synth (6) needs the device profiles' identity request brought into the host; and
-new plug-ins noticed (7) needs a watch on the plug-in folders on the native side. From "Build mode,
-further": knobs follow the selection (1), a macro by moving (2) and keeping the mappings when a
-plug-in is swapped (3) are screen and model work; finding a sound from a recording (4) uses the
-library's sound analysis; what each part costs (5) needs the plug-in workers to report their time. **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the
-rack. **Later:** the tablet remote, LV2 and CLAP, JACK. **After
-that:** the mixing desk (decision 9).
+gap, and the drum map (7). From still more: two keyboards with their own parts (1) and the
+gig-ready check (3).
+
+**Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the rack; the
+tablet remote, LV2 and CLAP, JACK. **After that:** the mixing desk (decision 9).
 
 ## Glossary
 
