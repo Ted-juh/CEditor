@@ -239,6 +239,66 @@ Only chords on the bank's pads can be ringed; when the likeliest is elsewhere, n
 2. **The layers switched on CHORDS' knobs 4 to 7**: yes.
 3. **The likeliest next chord**: in, not left out (the question was whether to leave it out).
 
+## The other MIDI modules: one page each, or two
+
+*Added 2026-11-17, when the owner asked to go on with the remaining modules "same way". Proposed,
+not yet approved. Mockups: `hostage-dock-modules-mockups.html`, pictures
+`docs/media/hostage-dock-modules-1.png` (one in the dock) and `-2.png` (all the pages at the
+keyboard's size).*
+
+![The eleven module pages at the keyboard's size](../media/hostage-dock-modules-2.png)
+
+The eleven modules after the arpeggiator and Chords are small: most have a handful of settings
+(`NoteModuleSettings` and `MidiFxSettings` in `PatternModel.h`; editors in `sections/midiModules/`).
+So **one page each**, and two for Velocity / Expression, which has two curves.
+
+**One rule for these pages: the knobs set the values, the pads switch the options.** A strip of
+labelled pads sits above the knob row, pad N under column N, lit when its option is on. On the
+arpeggiator's pattern pages the pads turn steps on and off, on Chords they play chords; here they
+are the page's switches, so they are never idle. Pad labels are eight characters at most, because
+the CTRL49's pads are small.
+
+A module with one page shows it **large in the dock**, the same drawing as on the keyboard, with
+what only the mouse can do beside it (frame 1: Humanize, with its presets, its frozen roll's seed,
+and a test bar to hear it on).
+
+| Page | What the picture shows | Knobs | Pads |
+|---|---|---|---|
+| **KEY** | The scale on the keyboard, the transpose, a note out of the scale and where it goes | transpose, mode (chromatic or diatonic), root, scale, fold (snap or drop) | scale lock, follow the song key |
+| **VELOCITY** (1 of 2) | The response curve, the input and output windows, one played velocity and what it sounds as | curve, in min, in max, out min, out max, scale, fixed | — |
+| **EXPRESSION** (2 of 2) | The expression curve for its source | source, controller, curve, in min, in max, out min, out max | expression on |
+| **ECHO** | The played note and its repeats: quieter, climbing, shorter, down to the floor | repeats, step, feedback, transpose, feel, floor, amount | climb in the scale, each repeat shorter |
+| **STRUM** | A chord spread string by string, lowest first | spread, pattern, curve, velocity ramp, repeat, amount | guitar voicing, a harder hit strums tighter |
+| **HUMANIZE** | Where you played (dashed) and where and how hard it sounds | timing, velocity, gate, lay back, swing, grid, accent, amount | chords together, beats kept, freeze the roll, new roll |
+| **CHANCE** | A bar of notes, those left out dashed, the beats kept | chance, amount | keep the beats, soft notes first |
+| **NOTE LENGTH** | Each note as played and as it sounds | mode (as played, fixed, at most, at least, legato), length | — |
+| **LATCH** | The notes held, on the keyboard | mode (replace, add, toggle) | latch on, the pedal lets go |
+| **MPE** | Several notes' expression coming in, one stream going out | in, in axis, in controller, out, out axis, out controller, collapse, channel | MPE on |
+| **ARTICULATIONS** | The articulation map as a list: name, trigger key, what it sends; the current one lit | articulation, trigger, sends, value, channel | pad N switches to articulation N |
+
+Times are shown in milliseconds at the song's tempo but kept in beats, as now, so they stay right
+when the tempo changes.
+
+**Only in the dock**: presets (Humanize's tight, loose, human and drunk, and every module's saved
+presets); the frozen roll's seed; naming articulations and the map; MPE's member channels; **hear
+it**, a test bar played through the module and the part.
+
+**Note shaping** gets no page. It is the old combined block (transpose, scale, chorder and
+velocity in one), which a part from before the MIDI chain turns into (`migrateLegacyEventChain`).
+Its parts are the Key, Chords and Velocity modules, each with its pages.
+
+**What it needs.** No engine work for the settings: every one shown exists. New are the pages,
+the pad switches, **hear it**, and the Articulation Manager's pads, which send what a trigger key
+would.
+
+**Decisions for the owner:**
+
+1. **Knobs for values, pads for switches**, on these pages?
+2. **Velocity / Expression on two pages**, one per curve?
+3. **Note shaping**: take it out of "+ Add module…", and offer to split an old one into Key, Chords
+   and Velocity when it is opened?
+4. **The Articulation Manager's pads** switching articulations, as the trigger keys do?
+
 ## What changes from today
 
 - **Unchanged**: everything today's arpeggiator can do; the playhead from the engine.
@@ -268,8 +328,7 @@ keyboard down the left.
 
 ## Next
 
-The other thirteen skins on these pages. The same frame for the other MIDI modules (Echo, Strum,
-Humanize and the rest, in `sections/midiModules/`); Chords is above. Then an audio insert: dry/wet, its main
+The other thirteen skins on these pages. The MIDI modules are all above. Then an audio insert: dry/wet, its main
 knobs, latency and state in the block, its parameters below, and the plug-in's own window one click
 away.
 
