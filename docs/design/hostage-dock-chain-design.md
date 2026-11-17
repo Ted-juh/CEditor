@@ -138,6 +138,28 @@ already has note, drum, CC and parameter lanes. Neither module repeats it.
 - Only the dock has painting, the step sequencer's melody grid, the arpeggiator's roll and walk
   together, patterns, and the rest of the chain.
 
+## The same picture on both screens
+
+**Decided, 2026-11-17**: the owner, "They should have almost identical Gui's." The dock and the
+CTRL49 show these two modules almost the same way.
+
+The mockups above do not yet: the arpeggiator's six CTRL49 pages are in the Rhythm Box 1980 look,
+the step sequencer's Live page in HoSTage's own navy look, and the dock in the app's colours with a
+layout of its own. The rule from here:
+
+- **The CTRL49 page is the master.** Its screen is the stricter one (480 × 272, eight knobs, text
+  the tightest budget: `tools/ctrl49/screen-lab/feature-mockups/README.md` measured it), so a
+  layout that works there is drawn larger in the dock, not the other way round.
+- **One look for both: HoSTage's own CTRL49 look**, the one the Live page and the other stage pages
+  already use. The arpeggiator's six pages are redrawn in it, from the Rhythm Box design's layout.
+  The era skins stay what they are: experiments in style.
+- **The dock is the pages, side by side, plus what only a mouse can do**: the same step cards,
+  knob cells and step colours, larger; around them, painting, more steps at once, the settings the
+  keyboard has no page for, and the chain strip.
+- **Labels short enough for the keyboard**, so the two screens say the same words.
+
+The mockups are to be redrawn this way before this design is approved.
+
 ## What changes from today
 
 - **Unchanged**: everything today's arpeggiator can do; the playhead from the engine.
