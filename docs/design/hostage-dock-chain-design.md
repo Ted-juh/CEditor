@@ -241,8 +241,8 @@ Only chords on the bank's pads can be ringed; when the likeliest is elsewhere, n
 
 ## The other MIDI modules: one page each, or two
 
-*Added 2026-11-17, when the owner asked to go on with the remaining modules "same way". Proposed,
-not yet approved. Mockups: `hostage-dock-modules-mockups.html`, pictures
+*Added 2026-11-17, when the owner asked to go on with the remaining modules "same way". **Approved by
+the owner the same day.** Mockups: `hostage-dock-modules-mockups.html`, pictures
 `docs/media/hostage-dock-modules-1.png` (one in the dock) and `-2.png` (all the pages at the
 keyboard's size).*
 
@@ -250,7 +250,9 @@ keyboard's size).*
 
 The eleven modules after the arpeggiator and Chords are small: most have a handful of settings
 (`NoteModuleSettings` and `MidiFxSettings` in `PatternModel.h`; editors in `sections/midiModules/`).
-So **one page each**, and two for Velocity / Expression, which has two curves.
+So **one page each**, and two for Velocity / Expression, which has two curves. Those two are one
+module's two connected pages: pad 8 on each jumps to the other, as Page ◀ ▶ does on the keyboard,
+and the dock shows them side by side.
 
 **One rule for these pages: the knobs set the values, the pads switch the options.** A strip of
 labelled pads sits above the knob row, pad N under column N, lit when its option is on. On the
@@ -291,13 +293,15 @@ Its parts are the Key, Chords and Velocity modules, each with its pages.
 the pad switches, **hear it**, and the Articulation Manager's pads, which send what a trigger key
 would.
 
-**Decisions for the owner:**
+**Decisions** (the owner, 2026-11-17: "Approved. 1. Yes. 2. If it is switchable, it is two
+interconnected pages. 3. Yes, 4. Yes"):
 
-1. **Knobs for values, pads for switches**, on these pages?
-2. **Velocity / Expression on two pages**, one per curve?
-3. **Note shaping**: take it out of "+ Add module…", and offer to split an old one into Key, Chords
-   and Velocity when it is opened?
-4. **The Articulation Manager's pads** switching articulations, as the trigger keys do?
+1. **Knobs for values, pads for switches**, on these pages: yes.
+2. **Velocity / Expression on two pages**: yes, as two connected pages one switch apart (pad 8 on
+   each, and Page ◀ ▶), shown side by side in the dock.
+3. **Note shaping** leaves "+ Add module…"; an old one is offered to be split into Key, Chords and
+   Velocity when it is opened: yes.
+4. **The Articulation Manager's pads** switch articulations, as the trigger keys do: yes.
 
 ## What changes from today
 

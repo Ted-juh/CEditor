@@ -191,7 +191,7 @@
     return page('VELOCITY', 'PAGE 1 OF 2', [
       { l: 'CURVE', v: 'SOFT', vs: 14 }, { l: 'IN MIN', v: '20', f: .16 }, { l: 'IN MAX', v: '118', f: .93 }, { l: 'OUT MIN', v: '30', f: .24 },
       { l: 'OUT MAX', v: '127', f: 1 }, { l: 'SCALE', v: '1.0', f: .5 }, { l: 'FIXED', v: 'OFF' }, {},
-    ], [], 'HOW HARD YOU PLAY, MAPPED TO HOW HARD IT SOUNDS', s);
+    ], [null, null, null, null, null, null, null, { l: 'EXPR ›', on: true, col: C.violet }], 'HOW HARD YOU PLAY, MAPPED TO HOW HARD IT SOUNDS   PAD 8: EXPRESSION', s);
   }
   function expressionPage() {
     let s = panel();
@@ -201,7 +201,7 @@
     return page('EXPRESSION', 'PAGE 2 OF 2', [
       { l: 'SOURCE', v: 'CC', vs: 14 }, { l: 'CC', v: '11', f: .09 }, { l: 'CURVE', v: 'S', vs: 14 }, { l: 'IN MIN', v: '0' },
       { l: 'IN MAX', v: '127', f: 1 }, { l: 'OUT MIN', v: '20', f: .16 }, { l: 'OUT MAX', v: '127', f: 1 }, {},
-    ], [{ l: 'EXPR ON', on: true }], 'A PEDAL OR CONTROLLER, MAPPED TO WHAT THE SOUND RESPONDS TO', s);
+    ], [{ l: 'EXPR ON', on: true }, null, null, null, null, null, null, { l: '‹ VELOC', on: true, col: C.violet }], 'A PEDAL OR CONTROLLER, MAPPED   PAD 8: VELOCITY', s);
   }
 
   // ---- ECHO ------------------------------------------------------------------------------------------
