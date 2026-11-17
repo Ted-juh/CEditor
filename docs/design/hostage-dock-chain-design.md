@@ -465,7 +465,8 @@ host and the read-back (`ce-verify-module.md`'s design); the CEditor panel as a 
 
 ## Live inputs: the INPUT block, the tuner and the limiter
 
-*Added 2026-11-17, when the owner chose live inputs as the next design. Proposed, not yet approved.
+*Added 2026-11-17, when the owner chose live inputs as the next design. **Approved by the owner the
+same day.**
 Mockups: `hostage-dock-input-mockups.html`, pictures `docs/media/hostage-dock-input-1.png` (a vocal
 input), `-2.png` (a guitar input with the tuner) and `-3.png` (the pages at the keyboard's size).*
 
@@ -520,15 +521,13 @@ on the Stage screen and on a footswitch. The audio looper, input chains in the l
 reference phrase to audition them come later in the order of work. Mapping the show's inputs to an
 interface is step 2b's screen; the dock's **Map inputs…** opens it.
 
-**Decisions for the owner:**
+**Decisions** (the owner, 2026-11-17: "All 4 yes"):
 
-1. **The INPUT block and page** as drawn: the meter before everything with its CLIP light, muted
-   on opening with the signal still shown, and the latency in milliseconds against the 5 and 10 ms
-   marks?
+1. **The INPUT block and page** as drawn: yes.
 2. **The tuner** silencing the part while open, from the INPUT page, the Stage screen or a
-   footswitch?
-3. **The limiter** on every output pair, on by default, with only a ceiling and a release to set?
-4. **Whose notes an effect hears** set on the EFFECTS page's knob 5?
+   footswitch: yes.
+3. **The limiter** on every output pair, on by default, ceiling and release only: yes.
+4. **Whose notes an effect hears** on the EFFECTS page's knob 5: yes.
 
 ## What changes from today
 
