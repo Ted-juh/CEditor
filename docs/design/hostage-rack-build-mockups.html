@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: the Rack in Build mode, mockups</title>
+<!--
+  Mockups for docs/design/hostage-rack-build-design.md: the Rack tab's List view with the
+  ease-of-use features the owner took in hostage-wider-not-a-daw.md (drag and drop, splits by
+  dropping on the keyboard, several parts at once, follow the note). Static, invented data, in
+  HoSTage's own colours (--host-* in hostage-theme.css) and its six part colours (partColor()).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --hover: #27323b; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --danger: #d98c8c; --danger-surface: #452529;
+    --p0: #3d81c4; --p1: #4aa88c; --p2: #b4854a; --p3: #9a6bbf; --p4: #c46a6a;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; color: var(--soft); font-size: 12.5px; }
+  .legend b { color: var(--text); }
+  .n { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; background: var(--pending); color: #1b1408; font: 700 11px var(--mono); align-items: center; justify-content: center; margin-right: 5px; flex: none; }
+
+  .app { position: relative; height: 790px; border: 1px solid var(--line-soft); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+  .hdr { height: 42px; display: flex; align-items: center; gap: 14px; padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+  .logo { font: 700 15px var(--sans); letter-spacing: .02em; }
+  .logo i { color: var(--accent-strong); font-style: normal; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs span { padding: 5px 12px; border-radius: 3px; color: var(--soft); font-size: 12.5px; }
+  .tabs span.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .hdr .sp { flex: 1; }
+  .hdr .stat { font: 11px var(--mono); color: var(--dim); }
+
+  .kbwrap { position: relative; padding: 8px 14px 6px; background: var(--bg); border-bottom: 1px solid var(--line-soft); flex: none; }
+  .kb { position: relative; height: 62px; }
+  .wk { position: absolute; top: 0; height: 62px; background: #e9edf1; border: 1px solid #9aa4ad; border-radius: 0 0 3px 3px; }
+  .bk { position: absolute; top: 0; height: 38px; background: #1a1f24; border: 1px solid #000; border-radius: 0 0 2px 2px; z-index: 2; }
+  .wk.c::after { content: attr(data-n); position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font: 9px var(--mono); color: #6b7680; }
+  .wk.hit { background: #ffd58a; } .wk.held { background: #8fd1a8; }
+  .lanes { position: relative; margin-top: 4px; }
+  .band { position: absolute; height: 14px; border-radius: 2px; font: 600 9.5px/14px var(--mono); color: #fff; padding: 0 6px; white-space: nowrap; overflow: hidden; }
+  .band.ghost { background: transparent !important; border: 1.5px dashed; color: var(--text); line-height: 11px; }
+  .band.gone { background: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,.18) 4px 7px) !important; border: 1px dashed rgba(255,255,255,.35); color: var(--soft); }
+  .kbtip { position: absolute; z-index: 5; background: var(--raised); border: 1px solid var(--pending); border-radius: 4px; padding: 5px 9px; font-size: 12px; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+  .kbtip .sw { display: inline-block; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--soft); font-size: 11px; }
+
+  .cols { flex: 1; display: flex; gap: 12px; padding: 10px 14px; min-height: 0; }
+  .rack { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; position: relative; }
+  .chead { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+  .chead strong { font-size: 13.5px; }
+  .chead .sp { flex: 1; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 4px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 11.5px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); }
+
+  .part { position: relative; display: flex; height: 62px; background: var(--surface); border: 1px solid var(--line-soft); border-left: 4px solid var(--pc); border-radius: 4px; }
+  .part.focused { border-color: var(--accent); border-left-color: var(--pc); background: #1a2229; }
+  .part.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .part.target { outline: 2px dashed var(--pending); outline-offset: -1px; }
+  .part.hot { outline: 2px solid var(--pending); background: var(--pending-surface); }
+  .part.dimmed { opacity: .55; }
+  .grip { width: 16px; display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 13px; letter-spacing: -2px; flex: none; }
+  .tick { width: 15px; height: 15px; border: 1px solid var(--line-strong); border-radius: 3px; margin: 0 6px 0 2px; align-self: center; flex: none; font: 700 11px/13px var(--sans); text-align: center; color: #fff; }
+  .tick.on { background: var(--accent); border-color: var(--accent); }
+  .art { width: 64px; flex: none; border-right: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: center; font: 700 15px var(--sans); color: rgba(255,255,255,.85); }
+  .pbody { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 10px; min-width: 0; }
+  .prow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pname { font-weight: 600; font-size: 13px; white-space: nowrap; }
+  .pname em { font-style: normal; color: var(--dim); font-weight: 500; margin-right: 5px; }
+  .pvend { color: var(--dim); font-size: 11.5px; white-space: nowrap; }
+  .chip { padding: 1px 7px; border-radius: 9px; font: 600 10.5px/16px var(--sans); white-space: nowrap; border: 1px solid var(--line); color: var(--soft); background: var(--raised); }
+  .chip.amber { border-color: var(--pending); color: var(--pending); background: var(--pending-surface); }
+  .chip.green { border-color: var(--active); color: #8fd1a8; background: var(--active-surface); }
+  .chip.red { border-color: var(--danger); color: var(--danger); background: var(--danger-surface); }
+  .chip.blue { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-surface); }
+  .prow .sp { flex: 1; }
+  .walk { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: var(--field); border: 1px solid var(--line-soft); border-radius: 3px; font-size: 11.5px; color: var(--soft); width: 160px; justify-content: space-between; }
+  .t { padding: 2px 7px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); font-size: 11px; color: var(--soft); }
+  .t.on { border-color: var(--active); color: #8fd1a8; background: var(--active-surface); }
+  .t.mute { border-color: var(--pending); color: var(--pending); background: var(--pending-surface); }
+  .t.rng { border-color: var(--pc); color: var(--text); }
+  .mini { font: 11px var(--mono); color: var(--soft); }
+  .acts { display: flex; gap: 3px; color: var(--dim); font-size: 13px; }
+  .acts span { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 3px; }
+  .acts span.new { color: var(--accent-strong); background: var(--accent-surface); }
+  .cpu { font: 10.5px var(--mono); color: var(--dim); width: 64px; text-align: right; }
+  .cpu b { font-weight: 600; color: var(--soft); }
+  .cpu.heavy b { color: var(--pending); }
+  .why { font-size: 12px; white-space: nowrap; }
+  .why.ok { color: #8fd1a8; } .why.no { color: var(--soft); }
+  .why b { font-weight: 600; }
+
+  .gap { position: relative; height: 0; }
+  .gap .ins { position: absolute; left: 0; right: 0; top: -4px; height: 2px; background: var(--pending); }
+  .gap .ins::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--pending); }
+  .gap .ins.faint { background: transparent; border-top: 2px dashed rgba(215,164,78,.45); height: 0; }
+  .gap .ins.faint::before { background: rgba(215,164,78,.45); }
+  .empty { height: 46px; border: 1.5px dashed rgba(215,164,78,.5); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--pending); font-size: 12px; }
+
+  .selbar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--accent-surface); border: 1px solid var(--accent); border-radius: 4px; font-size: 12px; }
+  .selbar b { color: var(--accent-strong); }
+  .selbar .f { display: inline-flex; align-items: center; gap: 5px; color: var(--soft); }
+  .selbar .v { padding: 2px 8px; background: var(--field); border: 1px solid var(--line); border-radius: 3px; color: var(--text); font: 11.5px var(--mono); }
+  .selbar .sp { flex: 1; }
+
+  .browser { width: 430px; flex: none; display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 8px 10px; }
+  .search { padding: 5px 9px; background: var(--field); border: 1px solid var(--line); border-radius: 3px; color: var(--faint); font-size: 12px; }
+  .kinds { display: flex; gap: 4px; flex-wrap: wrap; }
+  .srow { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 3px; font-size: 12.5px; }
+  .srow:nth-child(odd) { background: rgba(255,255,255,.015); }
+  .srow .sq { width: 26px; height: 26px; border-radius: 3px; flex: none; }
+  .srow .nm { flex: 1; min-width: 0; }
+  .srow .nm small { display: block; color: var(--dim); font-size: 11px; }
+  .srow .lv { font: 10.5px var(--mono); color: var(--dim); }
+  .srow.src { opacity: .4; outline: 1px dashed var(--line-strong); }
+
+  .dock { height: 168px; flex: none; border-top: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; }
+  .dtabs { display: flex; align-items: center; gap: 2px; padding: 5px 12px; border-bottom: 1px solid var(--line-soft); }
+  .dtabs span { padding: 4px 11px; font-size: 12px; color: var(--soft); border-radius: 3px; }
+  .dtabs span.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .dtabs .subj { margin-left: 14px; font-weight: 600; color: var(--text); padding: 0; }
+  .dtabs .sp { flex: 1; }
+  .chain { flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+  .blk { min-width: 110px; height: 70px; border: 1px solid var(--line); border-radius: 5px; background: var(--raised); padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; }
+  .blk small { font: 600 9.5px var(--mono); letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+  .blk b { font-size: 12.5px; }
+  .blk.inst { border-color: var(--pc); min-width: 150px; }
+  .blk.lifted { opacity: .35; border-style: dashed; }
+  .blk.add { border-style: dashed; color: var(--faint); align-items: center; justify-content: center; min-width: 60px; }
+  .arrow { color: var(--faint); }
+
+  .drag { position: absolute; z-index: 20; display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 6px; background: var(--raised); border: 1px solid var(--pending); border-radius: 4px; box-shadow: 0 10px 26px rgba(0,0,0,.55); font-size: 12.5px; transform: rotate(-1.5deg); }
+  .drag .sq { width: 24px; height: 24px; border-radius: 3px; }
+  .drag small { display: block; color: var(--dim); font-size: 11px; }
+  .cursor { position: absolute; z-index: 21; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 16px solid #fff; transform: rotate(-28deg); filter: drop-shadow(0 1px 2px #000); }
+  .call { position: absolute; z-index: 22; }
+  .toast { position: absolute; z-index: 15; background: var(--raised); border: 1px solid var(--accent); border-radius: 4px; padding: 7px 11px; font-size: 12px; box-shadow: 0 8px 20px rgba(0,0,0,.5); }
+  .toast small { display: block; color: var(--dim); font-size: 11px; }
+  .heldtip { position: absolute; z-index: 6; background: var(--active-surface); border: 1px solid var(--active); color: #bfe6cd; border-radius: 4px; padding: 3px 8px; font: 11.5px var(--mono); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<!-- ============================== frame 1 ============================== -->
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1. Drop it where it goes</h2>
+    <p>A sound, an instrument or an effect is dragged from the browser. While it is held, every place that takes it is outlined; the one under
+      the pointer is filled and says what will happen. The keyboard shows every part's band while something is held, as Range shows it now.
+      Here a bass from Sounds is held over C3: it will become a new part, and because the library knows it is a bass, it takes the keys below.</p>
+    <div class="legend">
+      <span><span class="n">1</span><b>On a key:</b> a new part split there (a bass takes the keys below, anything else the keys above; ⇄ flips it)</span>
+      <span><span class="n">2</span><b>On a part's band:</b> a new part layered with it</span>
+      <span><span class="n">3</span><b>On a part's row:</b> loads into that part, replacing what is there (undoable)</span>
+      <span><span class="n">4</span><b>Between rows or below them:</b> a new part there</span>
+      <span><span class="n">5</span><b>An effect:</b> onto the Chain, a row or a mixer strip</span>
+    </div>
+  </div>
+  <div class="app">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span>
+      <div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div>
+      <span class="sp"></span><span class="stat">Friday Set · 48 kHz · 128</span></div>
+
+    <div class="kbwrap"><div class="kb" id="kb1"></div><div class="lanes" id="ln1"></div></div>
+
+    <div class="cols">
+      <div class="rack">
+        <div class="chead"><strong>Rack</strong><span class="seg"><span class="on">List</span><span>Canvas</span></span><span class="sp"></span><span class="ghostb">+ Add part</span></div>
+        <div class="part target" style="--pc:var(--p0)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#2c5a8a,#183049)">KS</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>1</em>Grand Piano</span><span class="pvend">Keyscape · Spectrasonics</span><span class="sp"></span><span class="acts"><span>⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>Concert D Stage</span> ›</span><span class="t rng">C1–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −4.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="gap"><div class="ins faint"></div></div>
+        <div class="part target" style="--pc:var(--p1)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#2a7a63,#163d33)">PG</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>2</em>Warm Pad</span><span class="pvend">Pigments · Arturia</span><span class="sp"></span><span class="acts"><span>⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>Glass Choir</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −9.5 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="gap"><div class="ins faint"></div></div>
+        <div class="part target" style="--pc:var(--p2)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#7a5a2c,#3a2b16)">J6</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>3</em>Juno-106</span><span class="pvend">Hardware · USB MIDI Interface · ch 2</span><span class="sp"></span><span class="acts"><span>⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>A14 Brass</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −6.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="gap"><div class="ins faint"></div></div>
+        <div class="part target" style="--pc:var(--p3)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#6a4a8a,#2f2140)">KT</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>4</em>Strings</span><span class="pvend">Kontakt · Native Instruments</span><span class="sp"></span><span class="acts"><span>⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>Chamber Legato</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −8.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="empty">New part here</div>
+      </div>
+
+      <div class="browser">
+        <div class="seg"><span>Instruments</span><span>Effects</span><span class="on">Sounds</span></div>
+        <div class="search">Search sounds…</div>
+        <div class="kinds"><span class="chip blue">All</span><span class="chip">Bass</span><span class="chip">Keys</span><span class="chip">Pads</span><span class="chip">Leads</span><span class="chip">Strings</span><span class="chip">Brass</span></div>
+        <div class="srow src"><span class="sq" style="background:#c46a6a"></span><span class="nm">Moog Bass<small>Diva · u-he</small></span><span class="chip">Bass</span><span class="lv">−14 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#3d81c4"></span><span class="nm">Rhodes Mk I<small>Keyscape · Spectrasonics</small></span><span class="chip">Keys</span><span class="lv">−18 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#4aa88c"></span><span class="nm">Slow Strings Pad<small>Pigments · Arturia</small></span><span class="chip">Pads</span><span class="lv">−21 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#b4854a"></span><span class="nm">Sync Lead<small>Diva · u-he</small></span><span class="chip">Leads</span><span class="lv">−13 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#9a6bbf"></span><span class="nm">Celli Spiccato<small>Kontakt · Native Instruments</small></span><span class="chip">Strings</span><span class="lv">−19 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#6a94c4"></span><span class="nm">B3 Full Drawbars<small>Keyscape · Spectrasonics</small></span><span class="chip">Keys</span><span class="lv">−16 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#c46a6a"></span><span class="nm">Sub Wobble<small>Pigments · Arturia</small></span><span class="chip">Bass</span><span class="lv">−12 LU</span></div>
+      </div>
+    </div>
+
+    <div class="dock" style="--pc:var(--p0)">
+      <div class="dtabs"><span class="on">Chain</span><span>Params</span><span>Zone</span><span>Sounds</span><span class="subj">1 · Grand Piano</span><span class="sp"></span></div>
+      <div class="chain"><div class="blk"><small>MIDI</small><b>Notes in</b></div><span class="arrow">▸</span>
+        <div class="blk inst"><small>Instrument</small><b>Keyscape</b></div><span class="arrow">▸</span>
+        <div class="blk"><small>Insert</small><b>Pro-Q 3</b></div><span class="arrow">▸</span>
+        <div class="blk"><small>Insert</small><b>Comp</b></div><span class="arrow">▸</span>
+        <div class="blk add">+</div><span class="arrow">▸</span>
+        <div class="blk"><small>Out</small><b>Main</b></div></div>
+    </div>
+
+    <!-- the held sound, over C3 -->
+    <div class="drag" id="drag1"><span class="sq" style="background:#c46a6a"></span><span>Moog Bass<small>Diva · Bass</small></span></div>
+    <div class="cursor" id="cur1"></div>
+    <div class="kbtip" id="tip1">Split at C3: new part <b>Moog Bass</b>, C1–B2 <span class="sw">⇄ keys above</span><br><small style="color:var(--dim)">Grand Piano gives up C1–B2 · drop on a band to layer instead</small></div>
+    <span class="call n" id="c1a">1</span><span class="call n" id="c1b">2</span><span class="call n" id="c1c">3</span><span class="call n" id="c1d">4</span><span class="call n" id="c1e">5</span>
+  </div>
+</section>
+
+<!-- ============================== frame 2 ============================== -->
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2. Work on parts, not one control at a time</h2>
+    <p>Ctrl-click or Shift-click selects several parts; a bar above them changes what they share. Parts move by their grip. An effect or a MIDI
+      module is dragged from the Chain onto another part's row to move it there, Ctrl to copy. Each row says what it costs, and offers to even its
+      level when its sound is far louder or softer than the rest.</p>
+    <div class="legend">
+      <span><span class="n">1</span><b>Several parts:</b> channel, transpose, output, an effect, duplicate, remove</span>
+      <span><span class="n">2</span><b>Grip:</b> drag to reorder (the up and down buttons go)</span>
+      <span><span class="n">3</span><b>Duplicate</b> a part, with its chain and zone</span>
+      <span><span class="n">4</span><b>Drag between parts:</b> move, Ctrl copies</span>
+      <span><span class="n">5</span><b>What it costs</b>, from its own worker</span>
+      <span><span class="n">6</span><b>Even level</b>, offered, never automatic</span>
+    </div>
+  </div>
+  <div class="app">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span>
+      <div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div>
+      <span class="sp"></span><span class="stat">Friday Set · 48 kHz · 128 · CPU 34 %</span></div>
+
+    <div class="kbwrap"><div class="kb" id="kb2"></div></div>
+
+    <div class="cols">
+      <div class="rack">
+        <div class="chead"><strong>Rack</strong><span class="seg"><span class="on">List</span><span>Canvas</span></span><span class="sp"></span><span class="ghostb">+ Add part</span></div>
+        <div class="selbar" id="sel2"><b>2 parts</b><span class="f">Channel <span class="v">1 ▾</span></span><span class="f">Transpose <span class="v">0 st</span></span><span class="f">Output <span class="v">Main ▾</span></span><span class="ghostb">+ Effect…</span><span class="ghostb">Duplicate</span><span class="ghostb">Remove</span><span class="sp"></span><span style="color:var(--dim)">Esc clears</span></div>
+        <div class="part sel focused" style="--pc:var(--p0)"><div class="grip">⋮⋮</div><div class="tick on">✓</div><div class="art" style="background:linear-gradient(135deg,#2c5a8a,#183049)">KS</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>1</em>Grand Piano</span><span class="pvend">Keyscape · Spectrasonics</span><span class="sp"></span><span class="cpu">CPU <b>6 %</b></span><span class="acts"><span class="new" id="dup2">⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>Concert D Stage</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −4.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="part sel" style="--pc:var(--p1)"><div class="grip">⋮⋮</div><div class="tick on">✓</div><div class="art" style="background:linear-gradient(135deg,#2a7a63,#163d33)">PG</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>2</em>Warm Pad</span><span class="pvend">Pigments · Arturia</span><span class="sp"></span><span class="cpu heavy">CPU <b>19 %</b></span><span class="acts"><span>⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>Glass Choir</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −9.5 dB</span><span class="mini">Pan C</span><span class="chip amber" id="even2">7 dB softer than the rest · Even it</span></div></div></div>
+        <div class="part" style="--pc:var(--p2)"><div class="grip" id="grip2">⋮⋮</div><div class="tick"></div><div class="art" style="background:linear-gradient(135deg,#7a5a2c,#3a2b16)">J6</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>3</em>Juno-106</span><span class="pvend">Hardware · USB MIDI Interface · ch 2</span><span class="sp"></span><span class="cpu">CPU <b>—</b></span><span class="acts"><span>⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>A14 Brass</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −6.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="part hot" style="--pc:var(--p3)" id="hot2"><div class="grip">⋮⋮</div><div class="tick"></div><div class="art" style="background:linear-gradient(135deg,#6a4a8a,#2f2140)">KT</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>4</em>Strings</span><span class="pvend">Kontakt · Native Instruments</span><span class="sp"></span><span class="chip amber">Move Valhalla Plate here · Ctrl copies</span><span class="cpu">CPU <b>8 %</b></span><span class="acts"><span>⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>Chamber Legato</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −8.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="part" style="--pc:var(--p4)"><div class="grip">⋮⋮</div><div class="tick"></div><div class="art" style="background:linear-gradient(135deg,#8a3c3c,#401d1d)">DV</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>5</em>Moog Bass</span><span class="pvend">Diva · u-he</span><span class="sp"></span><span class="cpu">CPU <b>4 %</b></span><span class="acts"><span>⧉</span><span>▢</span><span>⇱</span><span>⏏</span><span>🗑</span></span></div>
+            <div class="prow"><span class="walk">‹ <span>Moog Bass</span> ›</span><span class="t rng">C1–B2</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −6.0 dB</span><span class="mini">Pan C</span></div></div></div>
+      </div>
+
+      <div class="browser">
+        <div class="seg"><span>Instruments</span><span class="on">Effects</span><span>Sounds</span></div>
+        <div class="search">Search effects…</div>
+        <div class="kinds"><span class="chip blue">All</span><span class="chip">Reverb</span><span class="chip">Delay</span><span class="chip">EQ</span><span class="chip">Dynamics</span><span class="chip">Modulation</span></div>
+        <div class="srow"><span class="sq" style="background:#4b5a68"></span><span class="nm">Pro-Q 3<small>FabFilter · EQ</small></span></div>
+        <div class="srow"><span class="sq" style="background:#4b5a68"></span><span class="nm">Valhalla Room<small>Valhalla DSP · Reverb</small></span></div>
+        <div class="srow"><span class="sq" style="background:#4b5a68"></span><span class="nm">EchoBoy<small>Soundtoys · Delay</small></span></div>
+        <div class="srow"><span class="sq" style="background:#4b5a68"></span><span class="nm">Pro-C 2<small>FabFilter · Dynamics</small></span></div>
+        <div class="srow"><span class="sq" style="background:#4b5a68"></span><span class="nm">Phase Mistress<small>Soundtoys · Modulation</small></span></div>
+        <div class="srow"><span class="sq" style="background:#4b5a68"></span><span class="nm">Valhalla Plate<small>Valhalla DSP · Reverb</small></span></div>
+      </div>
+    </div>
+
+    <div class="dock" style="--pc:var(--p0)">
+      <div class="dtabs"><span class="on">Chain</span><span>Params</span><span>Zone</span><span>Sounds</span><span class="subj">1 · Grand Piano</span><span class="sp"></span></div>
+      <div class="chain"><div class="blk"><small>MIDI</small><b>Notes in</b></div><span class="arrow">▸</span>
+        <div class="blk inst"><small>Instrument</small><b>Keyscape</b></div><span class="arrow">▸</span>
+        <div class="blk"><small>Insert</small><b>Pro-Q 3</b></div><span class="arrow">▸</span>
+        <div class="blk lifted" id="lift2"><small>Insert</small><b>Valhalla Plate</b></div><span class="arrow">▸</span>
+        <div class="blk add">+</div><span class="arrow">▸</span>
+        <div class="blk"><small>Out</small><b>Main</b></div></div>
+    </div>
+
+    <div class="drag" id="drag2"><span class="sq" style="background:#4b5a68"></span><span>Valhalla Plate<small>from Grand Piano</small></span></div>
+    <div class="cursor" id="cur2"></div>
+    <span class="call n" id="c2a">1</span><span class="call n" id="c2b">2</span><span class="call n" id="c2c">3</span><span class="call n" id="c2d">4</span><span class="call n" id="c2e">5</span><span class="call n" id="c2f">6</span>
+  </div>
+</section>
+
+<!-- ============================== frame 3 ============================== -->
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3. Why is this not sounding?</h2>
+    <p>Play a key: each row says whether the note reached it, and if not, why, in plain words. The dock follows what you play and shows the part
+      that sounded (the top one when several did); the pin stops it following. Move a knob on the controller and the screen shows what it
+      controls. Nothing here changes the rig; each reason is a link to the setting that caused it.</p>
+    <div class="legend">
+      <span><span class="n">1</span><b>Follow the note:</b> the key held, its velocity and channel</span>
+      <span><span class="n">2</span><b>Each row:</b> sounding, or the reason it stayed silent</span>
+      <span><span class="n">3</span><b>The dock follows</b> what you play; pin to stop</span>
+      <span><span class="n">4</span><b>Touch to find:</b> a knob moved names what it controls</span>
+    </div>
+  </div>
+  <div class="app">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span>
+      <div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div>
+      <span class="sp"></span><span class="stat">Friday Set · 48 kHz · 128 · CPU 34 %</span></div>
+
+    <div class="kbwrap"><div class="kb" id="kb3"></div><div class="lanes" id="ln3"></div></div>
+
+    <div class="cols">
+      <div class="rack">
+        <div class="chead"><strong>Rack</strong><span class="seg"><span class="on">List</span><span>Canvas</span></span><span class="sp"></span><span class="ghostb">+ Add part</span></div>
+        <div class="part focused" style="--pc:var(--p0)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#2c5a8a,#183049)">KS</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>1</em>Grand Piano</span><span class="pvend">Keyscape · Spectrasonics</span><span class="sp"></span><span class="why ok" id="why3">▶ <b>Sounding</b></span></div>
+            <div class="prow"><span class="walk">‹ <span>Concert D Stage</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −4.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="part" style="--pc:var(--p1)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#2a7a63,#163d33)">PG</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>2</em>Warm Pad</span><span class="pvend">Pigments · Arturia</span><span class="sp"></span><span class="why no">— <b>Too soft:</b> played at 64, it starts at <u>90</u></span></div>
+            <div class="prow"><span class="walk">‹ <span>Glass Choir</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −9.5 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="part" style="--pc:var(--p2)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#7a5a2c,#3a2b16)">J6</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>3</em>Juno-106</span><span class="pvend">Hardware · USB MIDI Interface · ch 2</span><span class="sp"></span><span class="why no">— <b>Other channel:</b> it listens on <u>2</u>, the CTRL49 sends 1</span></div>
+            <div class="prow"><span class="walk">‹ <span>A14 Brass</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −6.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="part" style="--pc:var(--p3)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#6a4a8a,#2f2140)">KT</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>4</em>Strings</span><span class="pvend">Kontakt · Native Instruments</span><span class="sp"></span><span class="why no">— <b>Muted:</b> the note arrived, the sound is <u>off</u></span></div>
+            <div class="prow"><span class="walk">‹ <span>Chamber Legato</span> ›</span><span class="t rng">C3–C7</span><span class="t on">Active</span><span class="t mute">Mute</span><span class="t">🎧</span><span class="mini">Vol −8.0 dB</span><span class="mini">Pan C</span></div></div></div>
+        <div class="part" style="--pc:var(--p4)"><div class="grip">⋮⋮</div><div class="art" style="background:linear-gradient(135deg,#8a3c3c,#401d1d)">DV</div>
+          <div class="pbody"><div class="prow"><span class="pname"><em>5</em>Moog Bass</span><span class="pvend">Diva · u-he</span><span class="sp"></span><span class="why no">— <b>Outside its keys:</b> E4, it plays <u>C1–B2</u></span></div>
+            <div class="prow"><span class="walk">‹ <span>Moog Bass</span> ›</span><span class="t rng">C1–B2</span><span class="t on">Active</span><span class="t">Mute</span><span class="t">🎧</span><span class="mini">Vol −6.0 dB</span><span class="mini">Pan C</span></div></div></div>
+      </div>
+
+      <div class="browser">
+        <div class="seg"><span>Instruments</span><span>Effects</span><span class="on">Sounds</span></div>
+        <div class="search">Search sounds…</div>
+        <div class="kinds"><span class="chip blue">All</span><span class="chip">Bass</span><span class="chip">Keys</span><span class="chip">Pads</span><span class="chip">Leads</span><span class="chip">Strings</span><span class="chip">Brass</span></div>
+        <div class="srow"><span class="sq" style="background:#c46a6a"></span><span class="nm">Moog Bass<small>Diva · u-he</small></span><span class="chip">Bass</span><span class="lv">−14 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#3d81c4"></span><span class="nm">Rhodes Mk I<small>Keyscape · Spectrasonics</small></span><span class="chip">Keys</span><span class="lv">−18 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#4aa88c"></span><span class="nm">Slow Strings Pad<small>Pigments · Arturia</small></span><span class="chip">Pads</span><span class="lv">−21 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#b4854a"></span><span class="nm">Sync Lead<small>Diva · u-he</small></span><span class="chip">Leads</span><span class="lv">−13 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#9a6bbf"></span><span class="nm">Celli Spiccato<small>Kontakt · Native Instruments</small></span><span class="chip">Strings</span><span class="lv">−19 LU</span></div>
+        <div class="srow"><span class="sq" style="background:#6a94c4"></span><span class="nm">B3 Full Drawbars<small>Keyscape · Spectrasonics</small></span><span class="chip">Keys</span><span class="lv">−16 LU</span></div>
+      </div>
+    </div>
+
+    <div class="dock" style="--pc:var(--p0)">
+      <div class="dtabs"><span class="on">Chain</span><span>Params</span><span>Zone</span><span>Sounds</span><span class="subj">1 · Grand Piano</span><span class="chip green" style="margin-left:10px" id="fol3">following the keys</span><span class="chip" style="margin-left:6px">📌 Pin</span><span class="sp"></span></div>
+      <div class="chain"><div class="blk"><small>MIDI</small><b>Notes in</b></div><span class="arrow">▸</span>
+        <div class="blk inst" style="outline:2px solid var(--accent)"><small>Instrument · Reverb</small><b>Keyscape</b></div><span class="arrow">▸</span>
+        <div class="blk"><small>Insert</small><b>Pro-Q 3</b></div><span class="arrow">▸</span>
+        <div class="blk"><small>Insert</small><b>Comp</b></div><span class="arrow">▸</span>
+        <div class="blk add">+</div><span class="arrow">▸</span>
+        <div class="blk"><small>Out</small><b>Main</b></div></div>
+    </div>
+
+    <div class="heldtip" id="held3">E4 · velocity 64 · channel 1 · CTRL49</div>
+    <div class="toast" id="toast3">Knob 3 · CTRL49 → <b>Grand Piano · Reverb</b> 38 %<small>shown in the dock; the page it is on: Keys</small></div>
+    <span class="call n" id="c3a">1</span><span class="call n" id="c3b">2</span><span class="call n" id="c3c">3</span><span class="call n" id="c3d">4</span>
+  </div>
+</section>
+
+<script>
+  // The keyboard: C1 (24) to C7 (96), drawn into the strip's width; bands under it by note.
+  const LO = 24, HI = 96, NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const isBlack = (n) => [1,3,6,8,10].includes(n % 12);
+  const whites = []; for (let n = LO; n <= HI; n++) if (!isBlack(n)) whites.push(n);
+  function geom(el) { const W = el.clientWidth / whites.length; return { W,
+    x(n) { if (!isBlack(n)) return whites.indexOf(n) * W; return whites.indexOf(n + 1) * W - W * 0.3; },
+    right(n) { return isBlack(n) ? this.x(n) + W * 0.6 : this.x(n) + W; } }; }
+  function keyboard(id, { hit = [], held = [] } = {}) {
+    const el = document.getElementById(id), g = geom(el);
+    for (let n = LO; n <= HI; n++) {
+      const k = document.createElement('div');
+      if (isBlack(n)) { k.className = 'bk'; k.style.left = g.x(n) + 'px'; k.style.width = g.W * 0.6 + 'px'; }
+      else { k.className = 'wk' + (n % 12 === 0 ? ' c' : ''); k.dataset.n = 'C' + (Math.floor(n / 12) - 1); k.style.left = g.x(n) + 'px'; k.style.width = g.W + 'px'; }
+      if (hit.includes(n)) k.classList.add('hit'); if (held.includes(n)) k.classList.add('held');
+      el.appendChild(k);
+    }
+    return g;
+  }
+  function lanes(id, g, bands) {
+    const el = document.getElementById(id); el.style.height = (Math.max(...bands.map((b, i) => b.lane ?? i)) + 1) * 17 + 'px';
+    bands.forEach((b, i) => { const d = document.createElement('div'); d.className = 'band ' + (b.cls || '');
+      d.style.left = g.x(b.lo) + 'px'; d.style.width = (g.right(b.hi) - g.x(b.lo)) + 'px'; d.style.top = (b.lane ?? i) * 17 + 'px';
+      d.style.background = b.c; d.style.borderColor = b.c; d.textContent = b.t; el.appendChild(d); });
+  }
+  const at = (id, x, y) => { const e = document.getElementById(id); e.style.left = x + 'px'; e.style.top = y + 'px'; };
+  const box = (id, app) => { const r = document.getElementById(id).getBoundingClientRect(), a = app.getBoundingClientRect(); return { x: r.left - a.left, y: r.top - a.top, w: r.width, h: r.height }; };
+
+  // frame 1: the bass held over C3 (48)
+  const g1 = keyboard('kb1', { hit: [48] });
+  lanes('ln1', g1, [
+    { lo: 24, hi: 47, c: '#3d81c4', t: 'Grand Piano gives up C1–B2', cls: 'gone', lane: 0 },
+    { lo: 48, hi: 96, c: '#3d81c4', t: '1 · Grand Piano', lane: 0 },
+    { lo: 48, hi: 96, c: '#4aa88c', t: '2 · Warm Pad', lane: 1 },
+    { lo: 48, hi: 96, c: '#b4854a', t: '3 · Juno-106', lane: 2 },
+    { lo: 48, hi: 96, c: '#9a6bbf', t: '4 · Strings', lane: 3 },
+    { lo: 24, hi: 47, c: '#c46a6a', t: 'new · Moog Bass  C1–B2', cls: 'ghost', lane: 4 },
+  ]);
+  { const app = document.querySelector('#f1 .app'); const kx = 14 + g1.x(48) + g1.W / 2;
+    at('cur1', kx - 4, 40); at('drag1', kx + 12, 30); at('tip1', kx + 160, 6);
+    const r = (s) => app.querySelector(s).getBoundingClientRect(), a = app.getBoundingClientRect();
+    at('c1a', kx - 26, 52);
+    at('c1b', 14 + g1.x(70), 44 + 8 + 62 + 4 + 17 + 1);
+    const p = app.querySelectorAll('#f1 .part'); const p2 = p[1].getBoundingClientRect(); at('c1c', p2.right - a.left - 24, p2.top - a.top + 34);
+    const gp = app.querySelectorAll('#f1 .gap')[2].getBoundingClientRect(); at('c1d', gp.left - a.left + 300, gp.top - a.top - 12);
+    const ad = app.querySelector('#f1 .blk.add').getBoundingClientRect(); at('c1e', ad.left - a.left + 20, ad.top - a.top - 22);
+  }
+
+  // frame 2
+  const g2 = keyboard('kb2');
+  { const app = document.querySelector('#f2 .app'), a = app.getBoundingClientRect();
+    const hot = document.getElementById('hot2').getBoundingClientRect();
+    at('cur2', hot.left - a.left + 610, hot.top - a.top + 30); at('drag2', hot.left - a.left + 624, hot.top - a.top + 36);
+    const sb = document.getElementById('sel2').getBoundingClientRect(); at('c2a', sb.left - a.left - 10, sb.top - a.top - 10);
+    const gr = document.getElementById('grip2').getBoundingClientRect(); at('c2b', gr.left - a.left - 12, gr.top - a.top + 6);
+    const du = document.getElementById('dup2').getBoundingClientRect(); at('c2c', du.left - a.left + 2, du.top - a.top - 20);
+    at('c2d', hot.left - a.left + 300, hot.top - a.top - 10);
+    const cp = document.querySelectorAll('#f2 .cpu')[1].getBoundingClientRect(); at('c2e', cp.left - a.left - 2, cp.top - a.top - 18);
+    const ev = document.getElementById('even2').getBoundingClientRect(); at('c2f', ev.right - a.left + 4, ev.top - a.top - 4);
+  }
+
+  // frame 3: E4 (64) held
+  const g3 = keyboard('kb3', { held: [64] });
+  lanes('ln3', g3, [
+    { lo: 48, hi: 96, c: '#3d81c4', t: '1 · Grand Piano', lane: 0 },
+    { lo: 48, hi: 96, c: '#4aa88c', t: '2 · Warm Pad  vel 90–127', lane: 1 },
+    { lo: 48, hi: 96, c: '#b4854a', t: '3 · Juno-106  ch 2', lane: 2 },
+    { lo: 48, hi: 96, c: '#9a6bbf', t: '4 · Strings  muted', lane: 3 },
+    { lo: 24, hi: 47, c: '#c46a6a', t: '5 · Moog Bass', lane: 4 },
+  ]);
+  { const app = document.querySelector('#f3 .app'), a = app.getBoundingClientRect(); const kx = 14 + g3.x(64) + g3.W / 2;
+    at('held3', kx + 18, 56); at('c3a', kx - 9, 30);
+    const w = document.getElementById('why3').getBoundingClientRect(); at('c3b', w.left - a.left - 26, w.top - a.top - 2);
+    const f = document.getElementById('fol3').getBoundingClientRect(); at('c3c', f.right - a.left + 64, f.top - a.top + 1);
+    const ln = document.createElement('div'); ln.style.cssText = `position:absolute;z-index:4;left:${kx - 1}px;top:${44 + 8}px;width:2px;height:${62 + 4 + 5 * 17}px;background:#8fd1a8;opacity:.8`; app.appendChild(ln);
+    at('toast3', 940, 650); at('c3d', 930, 640);
+  }
+</script>
+</body>
+</html>
