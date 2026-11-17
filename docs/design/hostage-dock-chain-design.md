@@ -150,15 +150,25 @@ layout of its own. The rule from here:
 - **The CTRL49 page is the master.** Its screen is the stricter one (480 × 272, eight knobs, text
   the tightest budget: `tools/ctrl49/screen-lab/feature-mockups/README.md` measured it), so a
   layout that works there is drawn larger in the dock, not the other way round.
-- **One look for both: HoSTage's own CTRL49 look**, the one the Live page and the other stage pages
-  already use. The arpeggiator's six pages are redrawn in it, from the Rhythm Box design's layout.
-  The era skins stay what they are: experiments in style.
+- **One layout, coloured by the skin.** The owner: "the whole idea of a skin is that it also
+  applies to the arpeggiater and step sequencer.. but that could be just a "color" change". So the
+  arpeggiator's six pages and the step sequencer's page have one layout each, and the chosen skin
+  gives them their colours, as it does every other page. The Rhythm Box design and the Live page
+  are then the same layouts in two skins, not two designs.
+- **Colour is cheap on the keyboard.** The CTRL49 pages draw colour as rectangles and as grey
+  sprites the keyboard tints as it draws them (`tint.png`, `feature-mockups/README.md`, "The
+  sound's colour"), so a skin's colours cost no second set of images. The owner's Linux branch
+  already recolours the Meters, Cue and Browse pages; the arpeggiator and step sequencer should use
+  the same mechanism. It is not on `main`, so it is not described here.
+- **The dock follows the same skin** for these two editors, so the keyboard and the dock match in
+  colour as well as layout.
 - **The dock is the pages, side by side, plus what only a mouse can do**: the same step cards,
   knob cells and step colours, larger; around them, painting, more steps at once, the settings the
   keyboard has no page for, and the chain strip.
 - **Labels short enough for the keyboard**, so the two screens say the same words.
 
-The mockups are to be redrawn this way before this design is approved.
+The mockups are to be redrawn this way before this design is approved: one layout for each module,
+shown in two skins.
 
 ## What changes from today
 
