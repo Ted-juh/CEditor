@@ -463,6 +463,73 @@ host and the read-back (`ce-verify-module.md`'s design); the CEditor panel as a 
 2. **A hardware synth's two pages**, PATCH and PARAMS, with its CEditor panel in the dock: yes.
 3. **Out as STRIP**, with the existing METERS beside it in the dock: yes.
 
+## Live inputs: the INPUT block, the tuner and the limiter
+
+*Added 2026-11-17, when the owner chose live inputs as the next design. Proposed, not yet approved.
+Mockups: `hostage-dock-input-mockups.html`, pictures `docs/media/hostage-dock-input-1.png` (a vocal
+input), `-2.png` (a guitar input with the tuner) and `-3.png` (the pages at the keyboard's size).*
+
+![A vocal input in the dock](../media/hostage-dock-input-1.png)
+
+This draws what decision 2 already settled for the input part (`hostage-wider-not-a-daw.md`, "Live
+inputs"), in the frame of the Chain tab. Nothing here is new as a decision except where it says so.
+
+**In the chain strip** an input part has an **INPUT** block where an instrument part has its
+instrument: the connection's name ("Vocal mic"), where it comes in (input 1 on this interface,
+mono), a meter with a CLIP light, the trim, **MUTED** while it is (every input part opens muted),
+and how late its player hears themselves. The dock's tabs follow: an **Input** tab in place of Zone,
+and no MIDI chain of its own.
+
+**INPUT**, its page:
+
+- **The meter reads before the effects and the mute.** It sets the preamp's gain, and it shows a
+  muted microphone is arriving ("signal arriving"), so the singer can check it without the PA
+  hearing it. Its CLIP light is a real clip: 0 dBFS at an input is the converter's ceiling.
+- **Muted or live**, large, and "opened so" when the mute came from opening the show.
+- **"You hear yourself 12.1 ms late"**: the round trip, measured by loopback, against two marks,
+  5 ms (a singer on in-ears) and 10 ms (a guitarist three metres from an amp). Teal under 5, amber
+  under 10, pink above. Under it, what makes it long ("three plug-ins in a row add 8.1 ms of it"),
+  which is the latency choices' job to shorten: same-block processing, one worker for a chain, or
+  built-ins (the latency section of `hostage-wider-not-a-daw.md`). Inputs never wait for the rest
+  of the rig (decision 7).
+- Knobs: trim (the built-in input trim, decision 3), source (which named connection), channels
+  (mono or stereo), the in-ear send, level. Pads: mute, **listen** (decision 10), tuner, back to
+  the chain.
+
+**Its effects** are a part's effects, with the EFFECTS, EFFECT and SECTION pages as for any part.
+Two things matter more for inputs:
+
+- **Whose notes an effect hears**: knob 5 on EFFECTS, for the selected effect ("NOTES ← KEYS": the
+  harmoniser follows the keys part). That is the "MIDI to inserts" an input part needs.
+- **What a failed effect does**: pass the signal dry, or go quiet (an amp simulator's dry signal is
+  harsh in a PA). A pad on the EFFECT page.
+
+**TUNER**, a built-in (decision 3): the note, the cents off, a needle, the strings of the chosen
+tuning with the one being tuned lit. **The part is silent while it is open**, as with a pedal tuner.
+It opens from the INPUT page's pad, the Stage screen, or a footswitch. Knobs: the reference pitch,
+the strings (guitar, bass, or your own in the dock), needle or strobe.
+
+**LIMITER**, a built-in on **every output pair, on by default** (decision 3): the pair's meters, the
+gain reduction over the last thirty seconds, and **how often it worked this song**, so a limiter
+working all the time shows up as a soundcheck note rather than hiding a gain problem. Knobs: ceiling
+and release. It opens from an output strip. Being built in, it costs no isolation block; a
+look-ahead of about a millisecond is its own latency, shown with the rest.
+
+**Not on these pages, and where they are:** **Mute inputs** (every input at once) sits beside Panic
+on the Stage screen and on a footswitch. The audio looper, input chains in the library and the
+reference phrase to audition them come later in the order of work. Mapping the show's inputs to an
+interface is step 2b's screen; the dock's **Map inputs…** opens it.
+
+**Decisions for the owner:**
+
+1. **The INPUT block and page** as drawn: the meter before everything with its CLIP light, muted
+   on opening with the signal still shown, and the latency in milliseconds against the 5 and 10 ms
+   marks?
+2. **The tuner** silencing the part while open, from the INPUT page, the Stage screen or a
+   footswitch?
+3. **The limiter** on every output pair, on by default, with only a ceiling and a release to set?
+4. **Whose notes an effect hears** set on the EFFECTS page's knob 5?
+
 ## What changes from today
 
 - **Unchanged**: everything today's arpeggiator can do; the playhead from the engine.
