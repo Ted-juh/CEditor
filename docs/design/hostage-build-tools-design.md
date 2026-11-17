@@ -1,6 +1,7 @@
 # HoSTage: Build-mode tools
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. It draws four features
+*Design with mockups, approved by the owner on 2026-11-17 with one change: "before" in hold to
+compare is only ever the Mark you set (decision 4). Nothing built. It draws four features
 the owner took in `hostage-wider-not-a-daw.md`: the command palette ("Build mode", 7), undo that
 covers everything ("Build mode", 1), drag to modulate and hold to compare ("Even more ease of use",
 2 and 5). They are decided; this record decides only how they look and behave. Mockups:
@@ -67,9 +68,12 @@ history, so it cannot be undone; changes made in a plug-in's own window are neve
 
 ![Hold to compare](../media/hostage-build-tools-4.png)
 
-- **Hold** the "◐ Hold to compare" button in the dock, or the ` key, and you hear the part as it was
-  before this round of editing. **Let go** to come back.
-- **Before** is the part as it was when you selected it, or when you last pressed **Mark**.
+- **Mark first.** Press **Mark** in the dock when the part sounds the way you want to keep for
+  reference. "Before" is only ever that Mark (decision 4): selecting a part sets nothing. Each part
+  keeps its own Mark until you press **Mark again**, for as long as the show is open. Until a part
+  has one, the compare button says "Mark first".
+- **Hold** the "◐ Hold to compare" button, or the ` key, and you hear the part as it was at the
+  Mark. **Let go** to come back.
 - **While held**, the dock turns amber; every knob shows its value then, with today's struck
   through; "Changed since" lists what differs. Only this part changes; the rest of the rig plays as
   it is now.
@@ -85,12 +89,15 @@ history, so it cannot be undone; changes made in a plug-in's own window are neve
 - **Undo**: the plug-in's state kept with a loading step; a state comparison when a plug-in's
   window closes; the step limit by memory; the History list.
 - **Drag to modulate**: the sources as drag sources, every knob as a drop target, and the ring.
-- **Hold to compare**: a snapshot of the part when it is selected or marked, swapped in and out
-  without a history step.
+- **Hold to compare**: a snapshot of the part when it is marked, swapped in and out without a
+  history step.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-17)
 
-1. **The palette**: Ctrl+K, a fixed list of words (no AI), acting on the part you are on?
-2. **A plug-in's own window as one undo step** per visit, and a hundred steps?
-3. **Modulation depth by dragging the ring**, double-click to remove, new connections at 25 %?
-4. **"Before" is when you selected the part, or Mark**, held with the button or the ` key?
+1. **The palette**: Ctrl+K, a fixed list of words (no AI), acting on the part you are on. **Yes.**
+2. **A plug-in's own window as one undo step** per visit, and a hundred steps. **Yes.**
+3. **Modulation depth by dragging the ring**, double-click to remove, new connections at 25 %.
+   **Yes.**
+4. **What "before" is.** Proposed: when you selected the part, or Mark. **Taken: the Mark only**
+   ("when you selected the mark"). Selecting a part sets nothing; until a part is marked, there is
+   nothing to compare with. Held with the button or the ` key, as proposed.
