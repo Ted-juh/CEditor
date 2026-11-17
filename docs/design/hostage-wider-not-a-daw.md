@@ -653,6 +653,7 @@ rig). Within a track, a step needs the ones before it only where it says so.*
 | `hostage-build-further-design.md` | knobs that follow the selection, a macro by moving, swap a plug-in and keep the mappings, find a sound from a recording | Build 6 |
 | `hostage-build-small-design.md` | ranges by showing, layers by playing, a synth plugged in, new plug-ins noticed, drag to assign in Performance, a page from what you touched | Build 7 |
 | `hostage-skins-design.md` | the fourteen CTRL49 skins as colour; three skin choices (CTRL49, program, Stage) | Build 1 and 8 |
+| `hostage-controller-design.md` | the Controller tab: pages as a list, the keyboard's screen beside the controller, short labels, commands on pads, copying a page | Build 7, beside the smaller ones |
 | `hostage-practice-design.md` | Practice mode, from MIDI and MusicXML | Stage 7 |
 | `ctrl49-panel-scan.md` | the SECTION pages: a plug-in's own window on the CTRL49 | when the scan is tested on real plug-ins |
 
@@ -708,7 +709,9 @@ rig). Within a track, a step needs the ones before it only where it says so.*
    (Build 4); a macro by moving; keeping the mappings when a plug-in is swapped; finding a sound from
    a recording, which runs the library's measures on an audio file.
 7. **The smaller ones** (their design): ranges by showing, layers by playing, drag to assign in
-   Performance and a page from what you touched are screen work on fields that exist. Then a synth
+   Performance and a page from what you touched are screen work on fields that exist. With them,
+   **the Controller tab** (its design): commands on pads need the command list (Build 1), copying a
+   page needs the swap's matching (Build 6). Then a synth
    plugged in, which needs the device profiles' identity request brought into the host, and new
    plug-ins noticed, which needs a watch on the plug-in folders on the native side.
 8. **Skins** (skins design): the fourteen CTRL49 palettes with their contrast check, after the roles
