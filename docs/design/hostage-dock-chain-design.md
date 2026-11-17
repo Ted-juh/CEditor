@@ -58,12 +58,13 @@ Audio and Out (fader and sends). Each block shows:
 
 - its name and an on/off switch (bypass);
 - a line saying what it is set to (the arpeggiator's mode, rate and octaves);
-- for audio blocks, dry/wet and one or two main knobs (Effects, 1);
+- for audio blocks, dry/wet and what the effect is doing ("SQUASH 9.6 dB"), as the audio effects
+  section below settles;
 - its latency, and its state: running, restarting (amber), failed.
 
 Click a block and its editor opens underneath. A **+** at the end of the MIDI and Audio groups adds
-one. Dragging to reorder and between parts, and trying a module before adding it, work here (More
-ease of use, 1, 2 and 5). **Fold the chain** shrinks the strip to one line of names when an editor
+one. Dragging to reorder (as today), dragging between parts, and trying a module before adding it
+work here (More ease of use, 2 and 5). **Fold the chain** shrinks the strip to one line of names when an editor
 needs the room (frames 2 and 3).
 
 ## The same picture on both screens
@@ -306,8 +307,8 @@ interconnected pages. 3. Yes, 4. Yes"):
 
 ## The audio effects: three pages
 
-*Added 2026-11-17, when the owner asked for "the audio effects, same way". Proposed, not yet
-approved. Mockups: `hostage-dock-effects-mockups.html`, pictures `docs/media/hostage-dock-effects-1.png`
+*Added 2026-11-17, when the owner asked for "the audio effects, same way". **Approved by the
+owner the same day** (Decisions below). Mockups: `hostage-dock-effects-mockups.html`, pictures `docs/media/hostage-dock-effects-1.png`
 (the dock) and `-2.png` (the pages at the keyboard's size).*
 
 ![An audio effect in the dock](../media/hostage-dock-effects-1.png)
@@ -332,8 +333,9 @@ on/off, its **dry/wet** (Effects, 1), **what it is doing** to the sound in one l
    what it does (**gain**: louder or quieter; **tone**: brighter or darker; **squash**: how far the
    loudest moments come down; **width**; **tail**: how long it rings on) and the one that matters
    named. Under the cards, the selected effect's spectrum in and out, its level over the last four
-   seconds, and its five measures. An effect that changes nothing says so. Knobs: slot, the
-   selected effect's first four parameters, its mix. **Pad N switches effect N on and off**,
+   seconds, and its five measures. An effect that changes nothing says so. Knobs: 1 the slot,
+   2 to 4 the selected effect's first three parameters, 5 whose notes it hears for an effect that
+   takes notes (live inputs section) and its fourth parameter otherwise, 6 its mix. **Pad N switches effect N on and off**,
    without a click (Effects, 2).
 2. **EFFECT**: one plug-in's own parameters on the eight knobs, named and written the way the
    plug-in does ("−20 dB", "4.6:1"), a group at a time, the groups the plug-in itself declares
@@ -354,7 +356,8 @@ Rack tab or on its Mixer strip opens the same three pages for its effects.
 
 **Built-in effects** (decision 3: limiter, tuner, click and count-in, file player, input trim;
 later the channel strip for the desk) are HoSTage's own, so each gets a designed page like the
-MIDI modules' when it is built, not the generic EFFECT page.
+MIDI modules', not the generic EFFECT page: TUNER and LIMITER are designed in the live inputs
+section below; the others when they are built.
 
 **What it needs:**
 
@@ -554,15 +557,16 @@ still open the way the mockups show them:
 5. **Patterns as a menu** in place of a row of chips.
 
 Decided before that, also 2026-11-17: two modules; almost identical on the dock and the CTRL49; the
-skin applies to both (the other thirteen skins later); the arpeggiator's NOTES mode, with the whole
+skin applies to both (the other thirteen skins later, since done in `hostage-skins-design.md`);
+the arpeggiator's NOTES mode, with the whole
 keyboard down the left.
 
 ## Next
 
-The other thirteen skins on these pages. The MIDI modules and the audio effects are all above; the
-built-in effects get their pages when they are built. Then an audio insert: dry/wet, its main
-knobs, latency and state in the block, its parameters below, and the plug-in's own window one click
-away.
+All of this record is approved. What was listed here as next is done: the other thirteen skins
+(`hostage-skins-design.md`), the audio insert (the audio effects section above), and the TUNER and
+LIMITER pages (live inputs). Still to come: the pages of the other built-ins (click, file player,
+input trim) when they are built, and the SECTION pages once the panel scan is tested.
 
 ## Mockups
 

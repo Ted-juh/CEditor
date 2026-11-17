@@ -27,7 +27,7 @@ own rig, with their own sounds. Nothing is edited, so it stays on the right side
     Timing is not scored while waiting; right and wrong still are.
   - **You play**: left, right or both. The rest is the rig's.
   - **Loop** a range of bars, set by dragging on the song's position bar, with a **count-in** of
-    one or two bars on the click (decision 3).
+    one or two bars on the click (the HoSTage record's decision 3).
 - Keys: Space plays and stops, the arrows move a bar, L loops.
 
 ## 2. Opening a song

@@ -96,8 +96,9 @@ stood.
    plays through it too. This brings live audio inputs, and most of this record follows from it.
 3. **Built-ins: yes, utilities only**: an output limiter, a tuner, a click and count-in, a file
    player, an input trim. HoSTage had no built-in processing at all. A stage needs these whatever
-   plug-ins someone owns; they add no latency, because only third-party plug-ins are isolated (see
-   the latency finding); and on Linux the choice of plug-ins is small. No synths or reverbs: those
+   plug-ins someone owns; they need no isolation block, because only third-party plug-ins are
+   isolated (see the latency finding), though a look-ahead limiter has about a millisecond of its
+   own (Chain design, live inputs); and on Linux the choice of plug-ins is small. No synths or reverbs: those
    would turn HoSTage into a plug-in collection. Decision 9 later adds a channel strip (gate, EQ,
    compressor) for the mixing desk.
 4. **The network: nothing opens a port until the user agrees once.** A tablet remote, band follow
@@ -259,7 +260,7 @@ The wider HoSTage, in nine directions. None needs a timeline, edits a recording 
 Decision 7 removes the waiting for other parts. The plug-ins' own cost remains, with three ways out
 to choose between once measured: (a) process an input's plug-ins in the same block, waiting behind
 a deadline instead of returning the previous block; (b) run a whole chain in one worker process, one
-block instead of one per plug-in; (c) use built-ins, which add nothing. **The measurement**:
+block instead of one per plug-in; (c) use built-ins, which need no isolation block. **The measurement**:
 round-trip latency on two or three common interfaces, at 64, 128 and 256 samples, through 0, 1 and
 3 effects. It needs step 2a first.
 
@@ -304,13 +305,14 @@ the line check). The mapping screen opens only when asked, never by itself.*
 The set-up everything above needs, in six parts:
 
 - **2a. Remember the set-up.** Device type (ASIO included), devices, sample rate, buffer (shown in
-  milliseconds as well as samples) and the MIDI input switches, saved in the data folder and
-  restored at start. The default device is used only on a first start. Small, and no change to the
+  milliseconds as well as samples) and the MIDI input switches (already done if the Stage 1 fix
+  came first), saved in the data folder and restored at start. The default device is used only on a first start. Small, and no change to the
   rack model.
 - **2b. Name the connections.** A show stops storing channel numbers and port ids. It names what it
   needs ("Vocal mic", "In-ears", "Juno"), and each interface maps those names to its channels once
-  (decision 11), so shows move between computers. MIDI ports are found by id, then by name, and
-  otherwise the user is asked. Old shows convert: a hardware part's port and return become
+  (decision 11), so shows move between computers. MIDI ports are found by id, then by name; when
+  two share a name, the mapping screen asks, and it opens only when asked, never by itself (Audio &
+  MIDI design, decision 3). Old shows convert: a hardware part's port and return become
   connections named after the part.
 - **2c. Outputs a stage can use.** The standalone opens as many outputs as the show's pairs need,
   and every pair ends in a level, the limiter and a meter. A monitor mix reuses what exists: a
@@ -401,7 +403,8 @@ setting; bypass has no crossfade; a part's inserts run in series only; no MIDI m
 8. **A better effects screen in the dock.** The chain shown as one row of blocks, in signal order:
    MIDI modules, instrument, inserts, fader, sends. Each block carries its bypass, dry/wet, its few
    most-used knobs (so the plug-in's window is rarely needed on stage), its latency and its state
-   (running, restarting, failed). MIDI modules and audio inserts work the same way. **Worked out,
+   (running, restarting, failed). (The design shows what an effect is doing, measured, in the block
+   instead of knobs; the knobs are on its pages.) MIDI modules and audio inserts work the same way. **Worked out,
    starting with the arpeggiator and step sequencer, and approved on 2026-11-17:**
    `hostage-dock-chain-design.md`.
 
@@ -511,13 +514,16 @@ Load button, and the only drag reorders effects. Nothing duplicates a part, sele
 follows what is played.
 
 1. **Drag and drop everywhere.** From the Instruments, Effects and Sounds lists onto a part's row
-   in the List view, onto the dock's Inserts, onto a mixer strip, or onto empty space for a new
-   part, as the Canvas already allows.
+   in the List view, onto the dock's Chain (the Inserts tab became part of the Chain tab), onto a
+   mixer strip, or onto empty space for a new part, as the Canvas already allows.
 2. **Drop on the keyboard to split or layer.** Drop a sound on a key of the keyboard strip and it
-   becomes a new part from that key up; drop it on another part's coloured band and it layers with
-   that part. Splits and layers made the way a player thinks of them.
-3. **Smart placement.** The library knows what kind of sound it is; a bass offers the left hand, a
-   pad offers a layer over what is there. Offered, never forced.
+   becomes a new part split at that key, the parts there giving those keys up; drop it on another
+   part's coloured band and it layers with that part. Splits and layers made the way a player
+   thinks of them. (As settled in the Rack design.)
+3. **Smart placement.** The library knows what kind of sound it is: a bass takes the keys below the
+   key it is dropped on, anything else the keys above, and ⇄ flips it before letting go. Offered,
+   never forced. (The Rack design settled this; an earlier idea, a pad offering a layer, was left
+   out.)
 4. **Duplicate a part**, with its effects and zone, to start a variation from it.
 5. **Select several parts and change them together**: the channel, the transpose, an effect, the
    output.
@@ -556,7 +562,8 @@ Matrix's lists; songs and scenes accept no drops; plug-ins are scanned only when
 profiles can (`DeviceProfileEngine.cpp`).
 
 1. **Follow the note.** Play a key and see which parts received it and, for each part that stayed
-   silent, why: outside its zone, wrong channel, outside its velocity range, muted, layered away.
+   silent, the first reason, in this order: off, other channel, outside its keys, too soft or too
+   hard for its velocity range, muted (as settled in the Rack design).
    The most common question while building is "why is this not sounding?"
 2. **Drag to modulate.** Drag an LFO, an envelope, a macro or the mod wheel onto any knob to
    modulate it, then drag on the knob to set the depth. The Matrix stays, as the list of what is
@@ -565,8 +572,8 @@ profiles can (`DeviceProfileEngine.cpp`).
    to each end, instead of typing numbers.
 4. **Layers set by playing.** Play the softest note that should bring in the second sound, or the
    key where it should start, and the layer's switch point is set there.
-5. **Hold to compare.** Hold a key to hear the part as it was before this round of editing; let go
-   to come back. Uses the undo history (Build mode, 1).
+5. **Hold to compare.** Hold a key to hear the part as it was at the Mark you set; let go to come
+   back. A snapshot of its own, not the undo history (Build tools design, decision 4).
 6. **Plug in a synth, get a part.** When a synth is connected, HoSTage asks it who it is and offers
    a hardware part for it with the right port, channel and CEditor panel. Builds on the device
    profiles' identity request.
@@ -608,8 +615,8 @@ result after a run and a PRACTICE page on the CTRL49.*
 
 **Taken, 2026-11-16** (Pro): "General practice mode to learn songs in general." Not tied to the
 set: for learning any song, the way piano-learning apps (Synthesia, Flowkey, Simply Piano) teach
-with coloured bars falling onto a keyboard. The shape is decided; the details below are the
-proposal.
+with coloured bars falling onto a keyboard. The shape is decided; the details below were the
+proposal, and the approved design is `hostage-practice-design.md`.
 
 **Why it fits.** It is playing and practising, and nothing is edited, so it passes the line. And
 HoSTage has what those apps lack: the notes sound through the player's own rig, with their own
@@ -669,7 +676,8 @@ rig). Within a track, a step needs the ones before it only where it says so.*
    live inputs or not. With 2b, its mapping screen and the line check (Audio & MIDI design,
    sections 2 and 3), which need the named connections, and the list for the sound engineer
    (decision 9).
-5. **The input part**, with its meters, tuner, limiter, Mute inputs and MIDI to inserts, designed
+5. **The input part**, with its meters, tuner, Mute inputs and MIDI to inserts (the limiter is on
+   the output pairs, with 2c), designed
    to grow to a desk's channel count later (decision 9), and its pages in the dock (Chain design,
    live inputs). Then a guitar that plays a synth (more features, 7), which needs MIDI out of an
    insert.

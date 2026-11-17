@@ -3,7 +3,7 @@
 *Design with mockups, approved by the owner on 2026-11-17. Decision 3 became three choices of skin:
 the CTRL49's, the program's and the Stage screen's ("The whole program" below). Nothing built. It does what the Chain
 tab design left for later: the other thirteen skins on HoSTage's CTRL49 pages, "just a colour
-change" (`hostage-dock-chain-design.md`, decision 3). Mockups: `hostage-skins-mockups.html`,
+change" (`hostage-dock-chain-design.md`, the third of the three decisions that shaped it). Mockups: `hostage-skins-mockups.html`,
 pictures `docs/media/hostage-skins-1.png` and `-2.png`. When this and the code disagree, the code
 is right.*
 

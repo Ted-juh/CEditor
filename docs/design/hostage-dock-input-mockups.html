@@ -285,8 +285,8 @@
     s += T(18, 116, 'HARMONY TAKES ITS NOTES FROM', C.label, 8, "font-weight='700'") + T(18, 136, 'PART 1 · KEYS', C.amber, 15, "font-weight='700'");
     s += T(18, 156, 'THE KEYS PLAY AM7: THE VOICE GETS A THIRD AND A FIFTH ABOVE', C.dim, 8, "font-weight='700'");
     return page('EFFECTS', 'VOCALS   3 EFFECTS', [
-      { l: 'SLOT', v: '3 / 3', f: 1, focus: true }, { l: 'VOICES', v: '2', vs: 14 }, { l: 'KEY', v: 'FOLLOW', vs: 12 }, { l: 'MIX', v: '40%', f: .4 },
-      { l: 'NOTES', v: 'KEYS', vs: 13, vc: C.amber }, {}, {}, {},
+      { l: 'SLOT', v: '3 / 3', f: 1, focus: true }, { l: 'VOICES', v: '2', vs: 14 }, { l: 'KEY', v: 'FOLLOW', vs: 12 }, { l: 'SPREAD', v: '30%', f: .3 },
+      { l: 'NOTES', v: 'KEYS', vs: 13, vc: C.amber }, { l: 'MIX', v: '40%', f: .4 }, {}, {},
     ], [{ l: '1 EQ', on: true }, { l: '2 DESS', on: true }, { l: '3 HARM', on: true }, null, null, null, null, null],
     'PAD N: EFFECT N ON OR OFF   KNOB 5: WHOSE NOTES AN EFFECT HEARS', s, C.violet);
   }

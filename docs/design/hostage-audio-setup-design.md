@@ -31,7 +31,7 @@ on a first start, so HoSTage still makes sound out of the box.
   2.7 ms"), because milliseconds are what a player feels.
 - **How late it is.** The **round trip**, measured: a cable from an output to an input for a moment,
   a click sent and timed coming back, through HoSTage with nothing on the path. Each input part's
-  own figure (the INPUT page) adds its plug-ins. Under it, the **dropouts**, per song (step 2d).
+  own figure (the INPUT page) adds its plug-ins. Under it, the **dropouts**, per song (the Stage screen already counts them).
 - **MIDI inputs.** Each with its switch, **kept between starts**, and when it was switched off.
   Bluetooth MIDI devices are listed with the rest (decided under "Still more", 2). The last message
   received stays, as now.
@@ -49,7 +49,7 @@ on this interface, once (frame 2).
 - **Inputs are mapped by playing.** Sing, play or speak into the one being mapped: its level shows,
   and the first channel that lights is chosen. Channels other connections already use are greyed.
 - **Outputs are listened to.** An **ident** is a short, quiet tone on the pair being mapped. Main
-  never gets one without asking. Each says what is on it: the limiter (decision 3), and which pair
+  never gets one without asking. Each says what is on it: the limiter (the HoSTage record's decision 3), and which pair
   is the listen output (decision 10).
 - **MIDI ports are found by id, then by name**; when two share a name, the screen asks, and a key
   pressed on the synth picks the port it is on.
