@@ -399,8 +399,69 @@ How it behaves:
 
 1. **These three pages**, SECTION where the scan has done the plug-in: yes.
 2. **Measure what each effect does**, at the cost of taps around every slot: yes.
-3. **The EFFECT page's knobs**: worked through above; open until the owner answers.
+3. **The EFFECT page's knobs**: as worked through above: yes (the owner: "Go ahead").
 4. **Pad N switches effect N on and off** on EFFECTS: yes.
+
+## The instrument and Out: the last blocks
+
+*Added 2026-11-17, when the owner said "Go ahead, next". Proposed, not yet approved. Mockups:
+`hostage-dock-instrument-mockups.html`, pictures `docs/media/hostage-dock-instrument-1.png` (a
+plug-in instrument), `-2.png` (a hardware synth), `-3.png` (Out) and `-4.png` (the pages at the
+keyboard's size).*
+
+![A plug-in instrument in the dock](../media/hostage-dock-instrument-1.png)
+
+With these, every block in the chain strip has pages. Three already exist on the CTRL49 and are
+reused, not redrawn: the **browser** (page kind 7, `Hostage_MultiKnob.lua`), **Changes** and
+**Meters** (stage pages, `tools/ctrl49/README.md`).
+
+**A plug-in instrument: four pages.**
+
+1. **SOUND**: the CTRL49's browser over this instrument's sounds in the library: name, kind,
+   rating, favourite, the loaded one marked. Knobs: the sound, then filters for kind, rating and
+   favourites. Pads: load (as the data dial already does), previous and next (the rack's preset
+   walker), favourite, **hear** (its recorded preview), back to the chain.
+2. **CHANGES**: the existing page: the sound against its save, A and B, each change listed, one
+   put back at a time, the history walked.
+3. **INSTRUMENT**: its parameters on the eight knobs, chosen exactly as the EFFECT page chooses
+   them (your page for the plug-in, your pins, its own groups, then pages of eight), with a picture
+   of what the group does where HoSTage can draw it, its latency, load and state.
+4. **SECTION**: its own window a section at a time, as for an effect, once the panel scan is
+   proven.
+
+**A hardware synth: two pages, and its panel.**
+
+1. **PATCH**: what the synth is playing: its name, the captured patch, bank and program, and three
+   lights: **sent** (when the song started), **read back** (the synth holds it, where its profile
+   lets HoSTage ask: the "whole rig" direction's recall that checks), and **return** (audio coming
+   back on its input). Knobs: bank, program, channel, return level, what happens on opening the
+   show (ask, send, nothing). Pads: send program, send patch, capture, compare, read back.
+2. **PARAMS**: its parameters from its **CEditor device profile**, a group at a time, named and
+   formatted the way the profile writes them; the same choosing rules as INSTRUMENT, with the
+   profile's groups in place of a plug-in's.
+3. **Its CEditor panel** opens from the dock like a plug-in's window (the "whole rig" direction).
+
+**Out: one page, beside the existing one.**
+
+- **STRIP**: the part's mixer strip: level with its meter, pan, each send with pre or post, and the
+  output pair. Knobs: level, pan, the sends, the output. Pads: **on, mute, solo, listen** (decision
+  10: Solo and the headphone Listen are separate pads).
+- **METERS**, the existing page, beside it in the dock, so the strip is seen with every other part.
+
+**Only in the dock**: the plug-in's window or the synth's CEditor panel; the whole library; saving
+the sound, the chain or the rack; choosing the synth's MIDI port and audio return; naming and
+colouring the part; adding a send; routing to buses (the Routing tab).
+
+**What it needs.** SOUND, CHANGES and METERS exist. New: the SOUND page's pads; INSTRUMENT and
+SECTION as for effects; PATCH and PARAMS, which need the device profile's groups brought into the
+host and the read-back (`ce-verify-module.md`'s design); the CEditor panel as a part's window
+(direction 4); STRIP.
+
+**Decisions for the owner:**
+
+1. **A plug-in instrument's four pages**: SOUND, CHANGES, INSTRUMENT, SECTION?
+2. **A hardware synth's two pages**, PATCH and PARAMS, with its CEditor panel in the dock?
+3. **Out as STRIP**, with the existing METERS beside it in the dock?
 
 ## What changes from today
 
