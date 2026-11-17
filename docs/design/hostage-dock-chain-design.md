@@ -3,7 +3,7 @@
 *Design with mockups for the owner to approve, 2026-11-17. Nothing built. It works out "a better
 effects screen in the dock" (`hostage-wider-not-a-daw.md`, Effects, 8), taken on 2026-11-16,
 starting with the arpeggiator, as the owner asked. Mockups: `hostage-dock-chain-mockups.html`, and
-the same three frames as pictures in `docs/media/hostage-dock-chain-1.png` to `-3.png`. When this
+the same four frames as pictures in `docs/media/hostage-dock-chain-1.png` to `-4.png`. When this
 and the code disagree, the code is right.*
 
 ![The arpeggiator in the dock: its six CTRL49 pages](../media/hostage-dock-chain-1.png)
@@ -63,12 +63,12 @@ Audio and Out (fader and sends). Each block shows:
 Click a block and its editor opens underneath. A **+** at the end of the MIDI and Audio groups adds
 one. Dragging to reorder and between parts, and trying a module before adding it, work here (More
 ease of use, 1, 2 and 5). **Fold the chain** shrinks the strip to one line of names when an editor
-needs the room (frame 2).
+needs the room (frames 2 and 3).
 
 ## The same picture on both screens
 
 The proof of concept is in how the mockups are made: **each CTRL49 page is drawn once, at the
-keyboard's 480 × 272, and the dock shows that same drawing scaled.** Frame 3 is the pages at the
+keyboard's 480 × 272, and the dock shows that same drawing scaled.** Frame 4 is the pages at the
 keyboard's own size; frames 1 and 2 are the same pages in the dock.
 
 - **The CTRL49 page is the master.** Its screen is the stricter one: eight knobs, and text the
@@ -87,7 +87,7 @@ keyboard's own size; frames 1 and 2 are the same pages in the dock.
 
 ## The arpeggiator: six pages
 
-The Rhythm Box design's six pages, in the original look (frame 1, and frame 3 at size):
+The Rhythm Box design's six pages, in the original look (frame 1, and frame 4 at size):
 
 - **PLAY**: the keyboard with the held chord lit and the sounding note in teal; NOW (the note, its
   velocity, its step type, the place in the pattern); and a roll of the next sixteen steps,
@@ -150,7 +150,7 @@ ratchet rows. Only accent and chord are new kinds of step.
 
 ## The step sequencer: two pages
 
-Today's Drawn mode as a module of its own: every step carries a note (frame 2, and frame 3 at
+Today's Drawn mode as a module of its own: every step carries a note (frame 3, and frame 4 at
 size).
 
 - **SEQ**: the Live page's layout. Sixteen steps (velocity as the bar, repeat dots above, the
@@ -178,9 +178,9 @@ already has note, drum, CC and parameter lanes. Neither module repeats it.
   sequencer; one in any other mode opens as an arpeggiator, its lane kept.
 - **Moved**: the MIDI and Inserts tabs into one Chain tab; the pattern chips into a menu; tie, gate
   and rate on the Live page's knobs 6 to 8.
-- **New**: the chain strip; the arpeggiator's six pages, with its motion settings, five modes and
-  two step types needing engine work (above); the step sequencer's NOTES page; both modules'
-  editors in the dock drawn from the keyboard's pages.
+- **New**: the chain strip; the arpeggiator's six pages, with its motion settings, five modes, two
+  step types and NOTES mode needing engine work (above); the step sequencer's NOTES page, on the
+  same piano roll; both modules' editors in the dock drawn from the keyboard's pages.
 
 ## Decisions for the owner
 
@@ -193,7 +193,7 @@ already has note, drum, CC and parameter lanes. Neither module repeats it.
 5. **Patterns as a menu** in place of a row of chips?
 
 Decided, 2026-11-17: two modules; almost identical on the dock and the CTRL49; the skin applies to
-both. The other skins come later.
+both (the other skins later); the arpeggiator's NOTES mode, with the whole keyboard down the left.
 
 ## Next
 
@@ -209,8 +209,9 @@ function each at 480 × 272, in the original look; the dock around them is in Ho
 
 1. **The arpeggiator in the dock**: the chain strip, then its six pages side by side
    (`docs/media/hostage-dock-chain-1.png`).
-2. **The step sequencer in the dock**: the chain folded, then its two pages, larger (`-2.png`).
-3. **The eight pages at the keyboard's own size** (`-3.png`).
+2. **The arpeggiator in NOTES mode**: PLAY and the NOTES page, larger (`-2.png`).
+3. **The step sequencer in the dock**: the chain folded, then its two pages, larger (`-3.png`).
+4. **The nine pages at the keyboard's own size** (`-4.png`).
 
 The Rhythm Box pictures of the arpeggiator's design are `docs/media/hostage-arp-ctrl49-1-play.png`
 to `-6-chance.png`.
