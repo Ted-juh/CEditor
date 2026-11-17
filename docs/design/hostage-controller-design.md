@@ -1,9 +1,18 @@
 # HoSTage: the Controller tab
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. The owner chose the
-Controller tab, where control pages are made, as the next Build screen. Mockups:
+*Design with mockups, approved by the owner on 2026-11-17 ("Yes, all 4 of them"). Nothing built. The
+owner chose the Controller tab, where control pages are made, as the next Build screen. Mockups:
 `hostage-controller-mockups.html`, pictures `docs/media/hostage-controller-1.png` to `-3.png`. When
 this and the code disagree, the code is right.*
+
+## What it is for, in short
+
+A **control page** says what each knob, fader and pad on the controller does: "Bass" might put the
+bass synth's cutoff on knob 1 and "mute the strings" on pad 3. The CTRL49 holds several pages,
+stepped through with Page ◀ ▶, and a song or scene can call up its own. The Controller tab is where
+pages are made and changed. It exists; this design fixes four things that are awkward in it today:
+you cannot see your pages or where they are used, you cannot see what the keyboard's screen will
+show, a pad cannot do an action, and giving another synth the same layout means starting over.
 
 ## What is there today
 
@@ -91,10 +100,10 @@ is yours to change (`ControlBinding.label`, which exists).
   Stage Lock rule checked when it runs.
 - **Copy**: the swap's matching (Build mode, further) run over a page instead of a part.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-17: "Yes, all 4 of them")
 
 1. **The pages as an ordered list**, each saying what it is and where it is used, with the
-   keyboard's screen shown beside the controller?
-2. **Short labels made for you**, up to eight letters, yours to change?
-3. **A pad can run a command** from the command list, obeying Stage Lock?
-4. **Copy a page to another part**, matched by the swap rules?
+   keyboard's screen shown beside the controller. **Yes.**
+2. **Short labels made for you**, up to eight letters, yours to change. **Yes.**
+3. **A pad can run a command** from the command list, obeying Stage Lock. **Yes.**
+4. **Copy a page to another part**, matched by the swap rules. **Yes.**
