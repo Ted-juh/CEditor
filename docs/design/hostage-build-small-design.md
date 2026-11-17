@@ -1,6 +1,7 @@
 # HoSTage: the smaller Build features
 
-*Design with mockups for the owner to approve, 2026-11-17. Nothing built. It draws the six
+*Design with mockups, approved by the owner on 2026-11-17 as recommended ("Do what is
+recommended"). Nothing built. It draws the six
 smaller Build-mode features the owner took in `hostage-wider-not-a-daw.md`: "Even more ease of use"
 3 (ranges by showing), 4 (layers set by playing), 6 (plug in a synth, get a part), 7 (new plug-ins
 noticed) and 8 (drag to assign in Performance), and "Build mode" 6 (control pages from what you
@@ -92,11 +93,11 @@ Today a song's rig and a song's or a scene's control page are chosen from lists.
 - **A page from what you touched**: a count kept with "Recently touched", and a page made from
   the ticked list.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-17: "Do what is recommended")
 
 1. **Range by showing** (bottom, then top; a lower top inverts) and **layer switch by playing**
-   (the last note counts), as drawn?
+   (the last note counts), as drawn. **Yes.**
 2. **A synth plugged in is asked who it is**, in Build only, on new ports only, and offered as a
-   part?
-3. **New plug-ins noticed** and offered for a scan, in Build only?
-4. **Drag to assign in Performance**, and **a page from what you touched**, as drawn?
+   part. **Yes.**
+3. **New plug-ins noticed** and offered for a scan, in Build only. **Yes.**
+4. **Drag to assign in Performance**, and **a page from what you touched**, as drawn. **Yes.**
