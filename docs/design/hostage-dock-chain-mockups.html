@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage dock: Chain tab mockups</title>
+<!--
+  Mockups for docs/design/hostage-dock-chain-design.md. Static: the data is invented, nothing
+  here talks to HoSTage. Colours and type are HoSTage's own (--host-* in InstrumentHostView.svelte).
+  Frame 3 shows the CTRL49's Live page from tools/ctrl49/screen-lab/feature-mockups/hostage-live.
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --hover: #27323b;
+    --field: #12171b; --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --danger: #d98c8c;
+    --part: #9a7ad6;            /* this part's colour: third in the rack */
+    --arp-note: #4fc1c9;        /* the note the arp is playing, as on the CTRL49 */
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1100px; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+
+  /* --- the keyboard strip above the workspaces, a slice of it -------------------------------- */
+  .kbd { position: relative; height: 54px; background: var(--bg); border: 1px solid var(--line-soft);
+         border-radius: 6px 6px 0 0; padding: 6px 10px 0; display: flex; gap: 10px; align-items: flex-end; }
+  .kbd .keys { position: relative; flex: 1; height: 44px; display: flex; }
+  .kbd .w { flex: 1; background: #e8ecef; border: 1px solid #9aa4ad; border-top: 0; border-radius: 0 0 3px 3px; position: relative; }
+  .kbd .w.held { background: var(--part); }
+  .kbd .b { position: absolute; top: 0; width: 1.4%; height: 26px; background: #20262c; border-radius: 0 0 2px 2px; }
+  .kbd .dot { position: absolute; bottom: 5px; left: 50%; width: 9px; height: 9px; margin-left: -4.5px; border-radius: 50%;
+              background: var(--arp-note); box-shadow: 0 0 0 2px #0b0f12; }
+  .kbd .side { width: 150px; padding-bottom: 8px; color: var(--soft); font-size: 11px; }
+
+  /* --- the dock ------------------------------------------------------------------------------ */
+  .dock { background: var(--surface); border: 1px solid var(--line-soft); border-top: 2px solid var(--line); }
+  .tabs { display: flex; align-items: center; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); background: var(--bg); }
+  .picker { display: flex; align-items: center; gap: 8px; padding: 4px 10px; margin-right: 14px; border: 1px solid var(--line);
+            border-radius: 3px; background: var(--field); color: var(--text); }
+  .picker i { width: 4px; height: 16px; background: var(--part); border-radius: 2px; }
+  .tab { padding: 6px 14px; border-radius: 3px; color: var(--soft); font-weight: 600; }
+  .tab.on { background: var(--accent-surface); color: var(--accent-strong); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tab small { color: var(--faint); font-weight: 400; margin-left: 4px; }
+  .tabs .spacer { flex: 1; }
+  .ghostbtn { padding: 5px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--soft); background: var(--raised); font-size: 12px; }
+
+  /* the chain strip */
+  .chain { display: flex; align-items: stretch; gap: 0; padding: 12px 12px 10px; border-bottom: 1px solid var(--line-soft); overflow: hidden; }
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group > .lbl { padding-left: 2px; }
+  .group .row { display: flex; align-items: center; }
+  .sep { width: 18px; display: flex; align-items: center; justify-content: center; color: var(--faint); padding-top: 18px; }
+  .block { width: 150px; height: 98px; background: var(--raised); border: 1px solid var(--line); border-radius: 6px;
+           padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; position: relative; }
+  .block.wide { width: 176px; }
+  .block.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 18px #5b9bd533; background: #1f2b36; }
+  .block.byp { opacity: .55; }
+  .block.byp .name { text-decoration: line-through; text-decoration-color: var(--faint); }
+  .block .head { display: flex; align-items: center; gap: 6px; }
+  .block .name { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .pw { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--active); display: flex; align-items: center; justify-content: center; }
+  .pw::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--active); }
+  .pw.off { border-color: var(--line-strong); } .pw.off::after { background: transparent; }
+  .block .sub { color: var(--soft); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .block .foot { margin-top: auto; display: flex; align-items: center; gap: 6px; font: 10px var(--mono); color: var(--dim); }
+  .knobs { display: flex; gap: 8px; align-items: center; }
+  .mk { width: 22px; height: 22px; border-radius: 50%; background: conic-gradient(var(--accent) 0 var(--v), var(--line) var(--v) 75%, transparent 75%);
+        transform: rotate(-135deg); position: relative; }
+  .mk::after { content: ''; position: absolute; inset: 4px; background: var(--raised); border-radius: 50%; }
+  .mkl { font: 10px var(--mono); color: var(--soft); }
+  .state { margin-left: auto; padding: 1px 6px; border-radius: 9px; font: 600 9px var(--mono); letter-spacing: .05em; }
+  .state.ok { color: var(--active); } .state.warn { background: var(--pending-surface); color: var(--pending); }
+  .add { width: 30px; height: 98px; border: 1px dashed var(--line); border-radius: 6px; color: var(--dim); display: flex; align-items: center; justify-content: center; font-size: 18px; margin-left: 6px; }
+  .inst { background: #241f30; border-color: #5c4b80; }
+  .meter { flex: 1; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--active) 0 58%, var(--line) 58%); }
+
+  /* the detail area */
+  .detail { padding: 12px 14px 14px; }
+  .dhead { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .dhead h3 { margin: 0; font: 600 14px var(--sans); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 3px; border: 1px solid var(--active);
+            background: var(--active-surface); color: var(--active); font: 600 11px var(--mono); }
+  .toggle.off { border-color: var(--line); background: var(--field); color: var(--dim); }
+  .modes { display: flex; gap: 3px; }
+  .mode { width: 66px; height: 44px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); display: flex;
+          flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--soft); font-size: 10px; }
+  .mode.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); }
+  .mode svg { width: 34px; height: 16px; fill: currentColor; }
+  .hw { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; background: var(--field);
+        border: 1px solid var(--line); font: 600 10px var(--mono); color: var(--soft); letter-spacing: .05em; }
+  .hw i { width: 7px; height: 7px; border-radius: 50%; background: var(--active); box-shadow: 0 0 6px var(--active); }
+
+  /* the lane */
+  .lanewrap { display: flex; gap: 12px; }
+  .gutter { width: 112px; display: flex; flex-direction: column; gap: 6px; }
+  .seg { display: flex; flex-direction: column; gap: 2px; }
+  .seg span { padding: 5px 8px; border-radius: 3px; border: 1px solid transparent; color: var(--soft); font-size: 12px; }
+  .seg span.on { background: var(--accent-surface); border-color: var(--accent); color: var(--accent-strong); font-weight: 600; }
+  .seg span em { float: right; font-style: normal; color: var(--faint); font: 10px var(--mono); padding-top: 2px; }
+  .lane { flex: 1; display: grid; grid-template-columns: repeat(16, 1fr); gap: 5px; }
+  .step { position: relative; height: 168px; background: var(--field); border: 1px solid var(--line-soft); border-radius: 5px;
+          display: flex; flex-direction: column; padding: 5px 4px 4px; }
+  .step.beat { border-left: 2px solid var(--line-strong); }
+  .step.play { background: #16252a; border-color: #2f5d63; }
+  .step.play::before { content: ''; position: absolute; left: -1px; right: -1px; top: -1px; height: 3px; background: var(--arp-note); border-radius: 5px 5px 0 0; }
+  .step.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .marks { height: 16px; display: flex; align-items: center; justify-content: space-between; font: 600 10px var(--mono); color: var(--soft); }
+  .rdots { display: flex; gap: 2px; } .rdots i { width: 4px; height: 4px; border-radius: 50%; background: var(--soft); }
+  .oct { color: var(--accent-strong); } .ch { color: var(--pending); }
+  .tie { position: absolute; right: -8px; top: 78px; width: 12px; height: 6px; border: 2px solid var(--soft); border-left: 0; border-right: 0; border-radius: 3px; z-index: 2; }
+  .barbox { flex: 1; position: relative; margin: 4px 2px; }
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 3px 3px 1px 1px; background: linear-gradient(180deg, #8fc2ef, var(--accent)); }
+  .step.sel .bar { background: linear-gradient(180deg, #a6d3fb, var(--accent-strong)); }
+  .step.rest .barbox { border: 1px dashed var(--line); border-radius: 3px; }
+  .step.rest .barbox::after { content: 'rest'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 10px var(--mono); color: var(--faint); }
+  .bipolar { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line-strong); }
+  .obar { position: absolute; left: 0; right: 0; background: var(--accent); border-radius: 2px; }
+  .sfoot { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; }
+  .snum { font: 600 10px var(--mono); color: var(--dim); }
+  .step.sel .snum { color: var(--accent-strong); }
+  .pad { width: 16px; height: 12px; border-radius: 3px; background: var(--part); box-shadow: 0 0 6px #9a7ad677; }
+  .pad.off { background: var(--line-soft); box-shadow: none; }
+
+  /* the eight cells: the CTRL49's encoders */
+  .cells { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin: 12px 0 0 124px; }
+  .cell { background: var(--raised); border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px 8px; position: relative; }
+  .cell .lbl { display: block; color: var(--dim); }
+  .cell .v { font: 600 20px var(--mono); margin: 2px 0 5px; color: var(--text); }
+  .cell .track { height: 4px; background: var(--line); border-radius: 2px; } .cell .track i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+  .cell .e { position: absolute; right: 8px; top: 6px; font: 9px var(--mono); color: var(--faint); }
+  .cell.step1 { border-color: var(--accent); background: #1f2b36; }
+  .cellgroups { display: grid; grid-template-columns: 5fr 3fr; gap: 6px; margin: 6px 0 0 124px; }
+  .cellgroups div { border-top: 1px solid var(--line-strong); padding-top: 3px; text-align: center; }
+  .more { display: flex; gap: 22px; align-items: center; margin: 14px 0 0 124px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+  .more .f { display: flex; align-items: center; gap: 8px; }
+  .chip { padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .chip.on { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-surface); }
+  .hint { margin: 10px 0 0 124px; color: var(--faint); font-size: 11.5px; }
+
+  /* drawn mode: the melody grid */
+  .melody { display: flex; gap: 12px; margin-bottom: 8px; }
+  .mgrid { flex: 1; display: grid; grid-template-columns: repeat(16, 1fr); gap: 5px; }
+  .mcol { display: grid; grid-template-rows: repeat(13, minmax(0, 1fr)); gap: 2px; height: 156px; }
+  .mcol i { background: var(--field); border-radius: 2px; }
+  .mcol i.ground { background: #1d2a34; }
+  .mcol i.on { background: var(--accent); }
+  .mcol.play i.on { background: var(--arp-note); }
+  .mcol.sel i.on { background: var(--accent-strong); box-shadow: 0 0 0 1px #cfe6fb; }
+  .rowlbls { display: grid; grid-template-rows: repeat(13, minmax(0, 1fr)); gap: 2px; height: 156px; font: 9px/1 var(--mono); color: var(--faint); text-align: right; }
+  .rowlbls span { display: flex; align-items: center; justify-content: flex-end; overflow: hidden; }
+  .compact { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12px; color: var(--soft); }
+  .compact b { color: var(--accent-strong); font-weight: 600; }
+  .compact .crumb { padding: 2px 8px; border-radius: 3px; background: var(--raised); border: 1px solid var(--line-soft); }
+  .compact .crumb.sel { border-color: var(--accent); background: var(--accent-surface); }
+
+  /* frame 3 */
+  .pair { display: grid; grid-template-columns: 1fr 962px; gap: 28px; align-items: start; }
+  .pair .ctrl { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #000; }
+  .pair .ctrl img { display: block; width: 960px; image-rendering: auto; }
+  .notes { color: var(--soft); }
+  .notes h4 { margin: 0 0 6px; color: var(--text); font-size: 13px; }
+  .notes ul { margin: 0 0 16px; padding-left: 18px; } .notes li { margin-bottom: 5px; }
+  .mapcells { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 10px; width: 960px; }
+  .mapcells div { background: var(--raised); border: 1px solid var(--line); border-radius: 4px; padding: 5px 6px; text-align: center; }
+  .mapcells div b { display: block; font: 600 13px var(--mono); }
+  .mapcells div.s { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ============================================================================================ -->
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · The Chain tab, with the arpeggiator open</h2>
+    <p>One tab for the whole part, in signal order: MIDI modules, the instrument, audio effects, the fader and the sends. Click a block and its editor opens underneath. The arpeggiator's editor is laid out like the CTRL49's Live page: the steps, then the same eight controls in the same order as the keyboard's eight knobs.</p>
+  </div>
+
+  <div class="kbd">
+    <div class="side"><span class="lbl">Keyboard</span><br>held: A3 C4 E4 · arp: <span style="color:var(--arp-note)">E4</span></div>
+    <div class="keys" id="kbd1"></div>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker"><i></i>Part 3 · Bell Pluck ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Zone</span>
+      <span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Fold the chain ▴</span>
+    </div>
+
+    <div class="chain">
+      <div class="group"><span class="lbl">MIDI</span>
+        <div class="row">
+          <div class="block"><div class="head"><span class="name">Key</span><span class="pw"></span></div>
+            <span class="sub">C minor · snap</span><div class="foot">MIDI</div></div>
+          <div class="sep">›</div>
+          <div class="block sel"><div class="head"><span class="name">Arpeggiator</span><span class="pw"></span></div>
+            <span class="sub">Up · 1/16 · 16 steps</span>
+            <div class="foot">MIDI <span class="state ok">● step 9</span></div></div>
+          <div class="sep">›</div>
+          <div class="block byp"><div class="head"><span class="name">Humanize</span><span class="pw off"></span></div>
+            <span class="sub">timing 8 ms</span><div class="foot">MIDI · bypassed</div></div>
+          <div class="add">+</div>
+        </div>
+      </div>
+      <div class="sep" style="width:30px">›</div>
+      <div class="group"><span class="lbl">Instrument</span>
+        <div class="row">
+          <div class="block wide inst"><div class="head"><span class="name">Diva</span><span class="pw"></span></div>
+            <span class="sub">Bell Pluck</span>
+            <div class="knobs"><span class="mk" style="--v:48%"></span><span class="mkl">Cutoff</span><span class="mk" style="--v:30%"></span><span class="mkl">Res</span></div>
+            <div class="foot">2.7 ms <span class="state ok">● running</span></div></div>
+        </div>
+      </div>
+      <div class="sep" style="width:30px">›</div>
+      <div class="group"><span class="lbl">Audio</span>
+        <div class="row">
+          <div class="block"><div class="head"><span class="name">ValhallaDelay</span><span class="pw"></span></div>
+            <div class="knobs"><span class="mk" style="--v:22%"></span><span class="mkl">Mix 30%</span></div>
+            <div class="foot">2.7 ms <span class="state ok">● ok</span></div></div>
+          <div class="sep">›</div>
+          <div class="block"><div class="head"><span class="name">Pro-Q 3</span><span class="pw"></span></div>
+            <div class="knobs"><span class="mk" style="--v:52%"></span><span class="mkl">Mix 100%</span></div>
+            <div class="foot">2.7 ms <span class="state warn">RESTARTING</span></div></div>
+          <div class="add">+</div>
+        </div>
+      </div>
+      <div class="sep" style="width:30px">›</div>
+      <div class="group"><span class="lbl">Out</span>
+        <div class="row">
+          <div class="block" style="width:132px"><div class="head"><span class="name">Fader</span></div>
+            <span class="sub">−3.2 dB · pan C</span><div class="meter"></div><div class="foot">5.4 ms in all</div></div>
+          <div class="sep">›</div>
+          <div class="block" style="width:120px"><div class="head"><span class="name">Sends</span></div>
+            <span class="sub">Reverb A 25%</span><span class="sub">In-ears 80%</span><div class="foot">post / pre</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail">
+      <div class="dhead">
+        <h3>Arpeggiator</h3><span class="toggle">● ON</span>
+        <div class="modes" id="modes1"></div>
+        <span class="spacer" style="flex:1"></span>
+        <span class="chip">Patterns ▾</span><span class="chip">Latch</span>
+        <span class="hw"><i></i>CTRL49 · LIVE PAGE</span>
+      </div>
+
+      <div class="lanewrap">
+        <div class="gutter">
+          <span class="lbl">Bars show</span>
+          <div class="seg">
+            <span class="on">Velocity <em>V</em></span><span>Octave <em>O</em></span><span>Repeats <em>R</em></span><span>Chance <em>C</em></span><span>Tie <em>T</em></span>
+          </div>
+        </div>
+        <div class="lane" id="lane1"></div>
+      </div>
+
+      <div class="cells" id="cells1"></div>
+      <div class="cellgroups"><div class="lbl">the selected step</div><div class="lbl">the whole arpeggiator</div></div>
+
+      <div class="more">
+        <span class="lbl">Also</span>
+        <span class="f"><span class="lbl">Swing</span><span class="chip">12%</span></span>
+        <span class="f"><span class="lbl">Feel</span><span class="chip on">straight</span><span class="chip">triplet</span><span class="chip">dotted</span></span>
+        <span class="f"><span class="lbl">Octaves</span><span class="chip on">1</span><span class="chip">2</span><span class="chip">3</span><span class="chip">4</span></span>
+        <span class="f"><span class="lbl">Steps</span><span class="chip">16 ▾</span></span>
+        <span class="f"><span class="lbl">Scale lock</span><span class="chip">off</span></span>
+      </div>
+      <div class="hint">Click a step to select it (the keyboard's knob 1 does the same) · drag across the bars to paint them · the square under a step turns it on or off, as the pads do · the letters switch what the bars show.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================================================ -->
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · Drawn mode: the arpeggiator as a step sequencer</h2>
+    <p>In Drawn mode the steps also carry a note. The grid above the bars is the melody; it follows the key you hold, so one finger transposes it. Here the chain is folded to one line to give the grid room, and the bars show Octave, drawn up and down from the middle.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker"><i></i>Part 3 · Bell Pluck ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Zone</span>
+      <span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Unfold the chain ▾</span>
+    </div>
+    <div class="compact">
+      <span class="lbl" style="margin-right:6px">Chain</span>
+      <span class="crumb">Key</span>›<span class="crumb sel"><b>Arpeggiator</b></span>›<span class="crumb" style="opacity:.55">Humanize</span>›
+      <span class="crumb">Diva</span>›<span class="crumb">ValhallaDelay</span>›<span class="crumb">Pro-Q 3 <span style="color:var(--pending)">●</span></span>›<span class="crumb">Fader</span>›<span class="crumb">Sends</span>
+    </div>
+    <div class="detail">
+      <div class="dhead">
+        <h3>Arpeggiator</h3><span class="toggle">● ON</span>
+        <div class="modes" id="modes2"></div>
+        <span class="spacer" style="flex:1"></span>
+        <span class="chip">Patterns ▾</span><span class="chip">Latch</span>
+        <span class="hw"><i></i>CTRL49 · LIVE PAGE</span>
+      </div>
+
+      <div class="melody">
+        <div class="gutter">
+          <span class="lbl">Melody rows</span>
+          <div class="seg"><span>Chord <em>notes held</em></span><span class="on">Free <em>±12</em></span></div>
+        </div>
+        <div style="display:flex; gap:6px; flex:1">
+          <div class="rowlbls" id="rowl"></div>
+          <div class="mgrid" id="mgrid"></div>
+        </div>
+      </div>
+
+      <div class="lanewrap">
+        <div class="gutter">
+          <span class="lbl">Bars show</span>
+          <div class="seg">
+            <span>Velocity <em>V</em></span><span class="on">Octave <em>O</em></span><span>Repeats <em>R</em></span><span>Chance <em>C</em></span><span>Tie <em>T</em></span>
+          </div>
+        </div>
+        <div class="lane" id="lane2"></div>
+      </div>
+      <div class="cells" id="cells2"></div>
+      <div class="hint">The lowest key you hold is the ground row (shaded). Drag across the grid to draw notes; drag back over a note to clear it.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================================================ -->
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · The same arpeggiator on the CTRL49</h2>
+    <p>The Live page already shows this arpeggiator on the keyboard. The dock now uses the same eight controls in the same order, so the knob under each cell does what the cell shows. Selecting a step on either one selects it on both.</p>
+  </div>
+  <div class="pair">
+    <div class="notes">
+      <h4>What matches</h4>
+      <ul>
+        <li>Knobs 1–8 are the eight cells: step, velocity, octave, ratchet, chance, gate, rate, mode.</li>
+        <li>Knob 1 and a click on a step choose the same step.</li>
+        <li>The pads turn steps on and off, as the square under each step does.</li>
+        <li>The playhead is the engine's own step, on both screens.</li>
+        <li>The held keys and the arp's note light on both keyboards.</li>
+      </ul>
+      <h4>What only the dock has</h4>
+      <ul>
+        <li>Painting many steps in one drag.</li>
+        <li>The melody grid in Drawn mode.</li>
+        <li>Swing, feel, octaves, number of steps and scale lock.</li>
+        <li>Patterns, and the rest of the chain.</li>
+      </ul>
+    </div>
+    <div>
+      <div class="ctrl"><img src="../../tools/ctrl49/screen-lab/feature-mockups/hostage-live/preview-1-live.png" alt="The CTRL49's Live page"></div>
+      <div class="mapcells" id="map"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ---- invented data ---------------------------------------------------------------------------
+  const vel   = [96, 70, 84, 0, 112, 78, 90, 104, 116, 0, 88, 66, 92, 74, 100, 82];
+  const rep   = [1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 3, 1, 1, 2, 1, 1];
+  const oct   = [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 1, 0, 0];
+  const chance= [100, 100, 100, 100, 100, 80, 100, 100, 100, 100, 100, 60, 100, 100, 90, 100];
+  const tie   = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0];
+  const sel = 4, play = 8;    // step 5 selected, step 9 sounding
+
+  // keyboard slice: C3..B5, held A3 C4 E4, arp on E4
+  function keyboard(el) {
+    const whites = []; const names = ['C','D','E','F','G','A','B'];
+    for (let o = 3; o <= 5; o++) for (const n of names) whites.push(n + o);
+    const held = ['A3','C4','E4'];
+    whites.forEach((k) => {
+      const w = document.createElement('div'); w.className = 'w' + (held.includes(k) ? ' held' : '');
+      if (k === 'E4') { const d = document.createElement('span'); d.className = 'dot'; w.appendChild(d); }
+      el.appendChild(w);
+    });
+    const blackAfter = { C:1, D:1, F:1, G:1, A:1 };
+    whites.forEach((k, i) => {
+      if (blackAfter[k[0]]) { const b = document.createElement('div'); b.className = 'b';
+        b.style.left = `calc(${((i + 1) / whites.length) * 100}% - 0.7%)`; el.appendChild(b); }
+    });
+  }
+  keyboard(document.getElementById('kbd1'));
+
+  // the eight modes, drawn as shapes like today's editor
+  const MODES = [['Up',[1,3,5]],['Down',[5,3,1]],['Up-down',[1,3,5,3]],['Down-up',[5,3,1,3]],
+                 ['As played',[3,1,5]],['Random',[3,5,1,4]],['Chord',null],['Drawn',[1,4,2,5,3]]];
+  function modes(el, active) {
+    el.innerHTML = MODES.map(([label, shape]) => {
+      const rects = shape ? shape.map((y, i) => `<rect x="${3 + i * (28 / shape.length)}" y="${16 - y * 2.6}" width="5" height="2.6" rx="1"/>`).join('')
+                          : [4, 9, 14].map((y) => `<rect x="14" y="${y}" width="7" height="2.6" rx="1"/>`).join('');
+      return `<div class="mode${label === active ? ' on' : ''}"><svg viewBox="0 0 34 18">${rects}</svg>${label}</div>`;
+    }).join('');
+  }
+  modes(document.getElementById('modes1'), 'Up');
+  modes(document.getElementById('modes2'), 'Drawn');
+
+  // the lane: one card per step
+  function lane(el, show) {
+    el.innerHTML = vel.map((v, i) => {
+      const cls = ['step', i % 4 === 0 ? 'beat' : '', i === sel ? 'sel' : '', i === play ? 'play' : '', v === 0 && show === 'vel' ? 'rest' : ''].join(' ');
+      const dots = rep[i] > 1 ? `<span class="rdots">${'<i></i>'.repeat(rep[i])}</span>` : '<span></span>';
+      const o = oct[i] ? `<span class="oct">${oct[i] > 0 ? '+' : ''}${oct[i]}</span>` : '';
+      const c = chance[i] < 100 ? `<span class="ch">${chance[i]}%</span>` : '';
+      let bar = '';
+      if (show === 'vel') bar = v ? `<div class="bar" style="height:${(v / 127) * 100}%"></div>` : '';
+      else bar = `<div class="bipolar"></div>` + (oct[i] ? `<div class="obar" style="${oct[i] > 0 ? 'bottom:50%' : 'top:50%'};height:${Math.abs(oct[i]) * 22}%"></div>` : '');
+      return `<div class="${cls}"><div class="marks">${dots}${o}${c}</div><div class="barbox">${bar}</div>`
+           + `${tie[i] ? '<span class="tie"></span>' : ''}<div class="sfoot"><span class="snum">${i + 1}</span><span class="pad${v === 0 ? ' off' : ''}"></span></div></div>`;
+    }).join('');
+  }
+  lane(document.getElementById('lane1'), 'vel');
+  lane(document.getElementById('lane2'), 'oct');
+
+  // the eight cells, the CTRL49's knobs
+  function cells(el, mode) {
+    const c = [['Step', `${sel + 1} / 16`, (sel + 1) / 16], ['Velocity', vel[sel], vel[sel] / 127], ['Octave', '0', .5],
+               ['Ratchet', `×${rep[sel]}`, rep[sel] / 4], ['Chance', `${chance[sel]}%`, chance[sel] / 100],
+               ['Gate', '50%', .5], ['Rate', '1/16', .6], ['Mode', mode, .1]];
+    el.innerHTML = c.map(([l, v, f], i) => `<div class="cell${i === 0 ? ' step1' : ''}"><span class="lbl">${l}</span>`
+      + `<span class="e">KNOB ${i + 1}</span><div class="v">${v}</div><div class="track"><i style="width:${f * 100}%"></i></div></div>`).join('');
+  }
+  cells(document.getElementById('cells1'), 'UP');
+  cells(document.getElementById('cells2'), 'DRAWN');
+
+  // drawn mode: 13 visible rows around the ground note (row 6 here = ground)
+  const melody = [6, 8, 10, -1, 12, 10, 8, 6, 3, -1, 6, 8, 10, 11, 8, 6];
+  const rowl = document.getElementById('rowl');
+  rowl.innerHTML = Array.from({ length: 13 }, (_, r) => { const off = 6 - r; return `<span>${off === 0 ? 'key' : (off > 0 ? '+' : '') + off}</span>`; }).join('');
+  rowl.style.width = '30px';
+  document.getElementById('mgrid').innerHTML = melody.map((m, i) =>
+    `<div class="mcol${i === play ? ' play' : ''}${i === sel ? ' sel' : ''}">` + Array.from({ length: 13 }, (_, r) => {
+      const row = 12 - r; const on = m === row; const ground = row === 6;
+      return `<i class="${on ? 'on' : ''}${ground ? ' ground' : ''}"></i>`; }).join('') + '</div>').join('');
+
+  // frame 3: the dock's cells under the keyboard's own
+  document.getElementById('map').innerHTML = ['Step','Velocity','Octave','Ratchet','Chance','Gate','Rate','Mode']
+    .map((l, i) => `<div class="${i === 0 ? 's' : ''}"><span class="lbl">dock</span><b>${l}</b></div>`).join('');
+</script>
+</body>
+</html>
