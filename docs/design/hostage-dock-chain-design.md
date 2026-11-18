@@ -333,9 +333,13 @@ on/off, its **dry/wet** (Effects, 1), **what it is doing** to the sound in one l
    what it does (**gain**: louder or quieter; **tone**: brighter or darker; **squash**: how far the
    loudest moments come down; **width**; **tail**: how long it rings on) and the one that matters
    named. Under the cards, the selected effect's spectrum in and out, its level over the last four
-   seconds, and its five measures. An effect that changes nothing says so. Knobs: 1 the slot,
-   2 to 4 the selected effect's first three parameters, 5 whose notes it hears for an effect that
-   takes notes (live inputs section) and its fourth parameter otherwise, 6 its mix. **Pad N switches effect N on and off**,
+   seconds, and its five measures. An effect that changes nothing says so. Knobs: the slot, the
+   selected effect's parameters, its mix, and whose notes it hears for an effect that takes notes
+   (live inputs section). **Which knob does which is left open** (the owner, 2026-11-18): it is
+   settled when the page is built, against everything else the keyboard by then does with its
+   knobs, faders, pads and keys, so that no assignment clashes with another; the whole keyboard
+   and shortcuts are available. The mockups show one possibility: slot, three parameters, notes or
+   a fourth parameter, mix. **Pad N switches effect N on and off**,
    without a click (Effects, 2).
 2. **EFFECT**: one plug-in's own parameters on the eight knobs, named and written the way the
    plug-in does ("−20 dB", "4.6:1"), a group at a time, the groups the plug-in itself declares
@@ -531,7 +535,8 @@ interface is step 2b's screen; the dock's **Map inputs…** opens it.
 2. **The tuner** silencing the part while open, from the INPUT page, the Stage screen or a
    footswitch: yes.
 3. **The limiter** on every output pair, on by default, ceiling and release only: yes.
-4. **Whose notes an effect hears** on the EFFECTS page's knob 5: yes.
+4. **Whose notes an effect hears** on the EFFECTS page's knob 5: yes. *Later (2026-11-18): which
+   knob it sits on is left open until the page is built (audio effects section, EFFECTS).*
 
 ## What changes from today
 

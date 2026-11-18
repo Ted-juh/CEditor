@@ -521,9 +521,9 @@ follows what is played.
    part's coloured band and it layers with that part. Splits and layers made the way a player
    thinks of them. (As settled in the Rack design.)
 3. **Smart placement.** The library knows what kind of sound it is: a bass takes the keys below the
-   key it is dropped on, anything else the keys above, and ⇄ flips it before letting go. Offered,
-   never forced. (The Rack design settled this; an earlier idea, a pad offering a layer, was left
-   out.)
+   key it is dropped on, anything else the keys above, and a pad offers to layer over what is
+   there; ⇄ flips it before letting go. Offered, never forced. (The Rack design settles this; the
+   pad's layer was left out at first and kept by the owner on 2026-11-18.)
 4. **Duplicate a part**, with its effects and zone, to start a variation from it.
 5. **Select several parts and change them together**: the channel, the transpose, an effect, the
    output.

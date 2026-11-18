@@ -38,7 +38,11 @@ something is held, the keyboard shows every part's band, as Range does today.
   which ("Grand Piano gives up C1–B2"). To keep them, drop on a band instead and it layers.
 - **Which side.** The library knows a sound's kind (the Bass, Keys, Pads chips). A bass takes the
   keys below the key it is dropped on; anything else takes the keys above. **⇄** in the tooltip
-  flips it before letting go. That is the whole of smart placement: offered, never forced.
+  flips it before letting go.
+- **A pad offers a layer.** A pad dropped on a key offers to layer over the parts already there
+  (same keys) rather than split them; ⇄ makes it a split instead. Kept by the owner on 2026-11-18,
+  after this design had first left it out. That is the whole of smart placement: offered, never
+  forced.
 - **An instrument** brings its default sound; **a sound** brings the plug-in with that sound.
 - **Replacing** a part's instrument by dropping asks first, until undo covers loading ("Build
   mode", 1); then it just happens and is undone like anything else.
