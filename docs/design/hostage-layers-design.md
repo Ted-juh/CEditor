@@ -1,6 +1,6 @@
 # HoSTage: the Layers tab
 
-*Design with mockups for the owner to approve, 2026-11-18. Nothing built. The owner asked to expand
+*Design with mockups, approved by the owner on 2026-11-18 as drawn. Nothing built. The owner asked to expand
 on layers, building on what exists. Mockups: `hostage-layers-mockups.html`, pictures
 `docs/media/hostage-layers-1.png` to `-3.png`. When this and the code disagree, the code is right.*
 
@@ -87,9 +87,10 @@ shows which part had the last note.
 - **LAYERS**: today's page payload with each part's velocity range and fade added, two more knobs,
   the pads.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-18: "Approved.")
 
 1. **The Layers tab as one picture**: velocity inside each part's lane, groups as brackets, a played
-   note shown through every lane?
-2. **Layering two parts** by choosing one of four ways, said in words?
-3. **LAYERS on the CTRL49** grown the same way, with fade and group knobs and play-to-set pads?
+   note shown through every lane. **Yes.**
+2. **Layering two parts** by choosing one of four ways, said in words. **Yes.**
+3. **LAYERS on the CTRL49** grown the same way, with fade and group knobs and play-to-set pads.
+   **Yes.**
