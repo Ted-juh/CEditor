@@ -136,8 +136,8 @@ stood.
 
 ### Decision 9: what the mixing desk needs
 
-*Worked out with mockups on 2026-11-18, built on the CTRL49's METERS page and the Mixer tab:
-`hostage-desk-design.md`.*
+*Worked out with mockups and approved on 2026-11-18, built on the CTRL49's METERS page and the Mixer
+tab: `hostage-desk-design.md`.*
 
 **Why it is close already.** After the planned work HoSTage has live inputs, several outputs, monitor
 mixes, Listen, input meters and a limiter. It already has faders, pan, mute, solo, meters, buses,

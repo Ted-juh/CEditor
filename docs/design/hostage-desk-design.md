@@ -1,6 +1,6 @@
 # HoSTage: the mixing desk
 
-*Design with mockups for the owner to approve, 2026-11-18. Nothing built. It works out decision 9
+*Design with mockups, approved by the owner on 2026-11-18 as drawn. Nothing built. It works out decision 9
 of `hostage-wider-not-a-daw.md` ("HoSTage becomes a mixing desk, as a future improvement") on the
 owner's instruction: "We already have a meters page that has the groundwork to become the mixing
 desk. Build upon it." Mockups: `hostage-desk-mockups.html`, pictures `docs/media/hostage-desk-1.png`
@@ -92,12 +92,13 @@ effects, "Which knob does which is left open").
 - **Talkback**: an input heard only in the mixes while TALK is held.
 - **The Mixer tab**: compact strips, the banks, "Faders show", the channel strip panel.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-18)
 
 1. **METERS becomes DESK**: eight strips and the master on the nine faders, the four banks, pads
-   for mute, solo, listen and select, knobs for pan?
+   for mute, solo, listen and select, knobs for pan. **Approved.**
 2. **CHANNEL**: the built-in channel strip in this order (trim, high-pass, gate, EQ, compressor),
-   before any plug-in inserts?
+   before any plug-in inserts. **Approved.**
 3. **MIX**: sends on faders for each player's in-ears, taken before the main fader, with talkback
-   held on a pad?
-4. **The Mixer tab** with the same banks, "Faders show", and the channel strip beside it?
+   held on a pad. **Approved.**
+4. **The Mixer tab** with the same banks, "Faders show", and the channel strip beside it.
+   **Approved.**
