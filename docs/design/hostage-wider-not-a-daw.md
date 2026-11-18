@@ -136,6 +136,9 @@ stood.
 
 ### Decision 9: what the mixing desk needs
 
+*Worked out with mockups on 2026-11-18, built on the CTRL49's METERS page and the Mixer tab:
+`hostage-desk-design.md`.*
+
 **Why it is close already.** After the planned work HoSTage has live inputs, several outputs, monitor
 mixes, Listen, input meters and a limiter. It already has faders, pan, mute, solo, meters, buses,
 returns, sends and effects, and scenes recall each part's mute, volume and pan. A desk is that, made
@@ -660,6 +663,7 @@ rig). Within a track, a step needs the ones before it only where it says so.*
 | `hostage-build-further-design.md` | knobs that follow the selection, a macro by moving, swap a plug-in and keep the mappings, find a sound from a recording | Build 6 |
 | `hostage-build-small-design.md` | ranges by showing, layers by playing, a synth plugged in, new plug-ins noticed, drag to assign in Performance, a page from what you touched | Build 7 |
 | `hostage-skins-design.md` | the fourteen CTRL49 skins as colour; three skin choices (CTRL49, program, Stage) | Build 1 and 8 |
+| `hostage-desk-design.md` | the mixing desk (decision 9): METERS grown into DESK, CHANNEL and MIX pages, the Mixer tab as the desk | after both tracks ("After that") |
 | `hostage-controller-design.md` | the Controller tab: pages as a list, the keyboard's screen beside the controller, short labels, commands on pads, copying a page | Build 7, beside the smaller ones |
 | `hostage-practice-design.md` | Practice mode, from MIDI and MusicXML | Stage 7 |
 | `ctrl49-panel-scan.md` | the SECTION pages: a plug-in's own window on the CTRL49 | when the scan is tested on real plug-ins |

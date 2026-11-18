@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: the mixing desk, mockups</title>
+<!--
+  Mockups for docs/design/hostage-desk-design.md: decision 9 of hostage-wider-not-a-daw.md, the
+  mixing desk, built on the CTRL49's METERS page (tools/ctrl49/README.md, "The stage pages") and the
+  Mixer tab (HostMixerPanel.svelte). CTRL49 pages drawn once at 480 x 272 in the original look
+  (Midnight); the Mixer tab in HoSTage's own colours. Static, invented data.
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --danger: #d98c8c; --danger-surface: #452529;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  figure { margin: 0; }
+  figure img, figure svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  figcaption { margin-top: 8px; color: var(--soft); font-size: 12.5px; } figcaption b { color: var(--text); }
+  .app { border: 1px solid var(--line-soft); background: var(--bg); overflow: hidden; }
+  .hdr { height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .logo { font: 700 15px var(--sans); } .logo i { color: var(--accent-strong); font-style: normal; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs span { padding: 5px 12px; border-radius: 3px; color: var(--soft); font-size: 12.5px; }
+  .tabs span.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .sp { flex: 1; }
+  .bar2 { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line-soft); }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .k { color: var(--dim); font-size: 12px; }
+  .dd { padding: 4px 10px; border: 1px solid var(--pending); border-radius: 3px; background: var(--pending-surface); color: var(--pending); font-size: 12px; font-weight: 600; }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .desk { display: flex; gap: 12px; padding: 12px 14px; }
+  .strips { flex: 1; display: flex; gap: 4px; }
+  .st { width: 56px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 3px; background: var(--surface); border: 1px solid var(--line-soft); border-top: 3px solid var(--sc); border-radius: 4px; }
+  .st.sel { border-color: var(--accent); border-top-color: var(--sc); background: #1a2229; }
+  .st .nm { font: 600 11px var(--sans); white-space: nowrap; overflow: hidden; max-width: 50px; text-overflow: ellipsis; }
+  .st .src { font: 9.5px var(--mono); color: var(--faint); }
+  .gr { width: 44px; height: 6px; background: var(--field); border-radius: 2px; position: relative; } .gr i { position: absolute; right: 0; top: 0; bottom: 0; background: var(--pending); border-radius: 2px; }
+  .chain { display: flex; gap: 2px; } .chain span { font: 700 8.5px var(--mono); padding: 1px 2px; border-radius: 2px; background: var(--raised); color: var(--faint); } .chain span.on { background: var(--active-surface); color: #8fd1a8; }
+  .send { font: 10px var(--mono); color: var(--pending); }
+  .fz { position: relative; width: 44px; height: 170px; }
+  .fz .m { position: absolute; bottom: 0; width: 5px; border-radius: 1px; background: linear-gradient(to top, #58a879 0%, #58a879 70%, #d7a44e 85%, #d98c8c 100%); background-size: 100% 170px; background-position: bottom; }
+  .fz .tr { position: absolute; left: 20px; top: 0; bottom: 0; width: 4px; background: var(--field); border-radius: 2px; }
+  .fz .cap { position: absolute; left: 10px; width: 24px; height: 12px; border-radius: 2px; background: #c9d2da; box-shadow: 0 1px 0 #000; }
+  .db { font: 600 10.5px var(--mono); }
+  .msl { display: flex; gap: 2px; } .msl span { width: 15px; height: 15px; border-radius: 2px; font: 700 9px/15px var(--mono); text-align: center; background: var(--raised); color: var(--faint); }
+  .msl span.m { background: var(--pending-surface); color: var(--pending); } .msl span.s { background: #3a3a1d; color: #e6d85a; } .msl span.l { background: var(--accent-surface); color: var(--accent-strong); }
+  .gap { width: 10px; flex: none; }
+  .chan { width: 360px; flex: none; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .chan h4 { margin: 0; font-size: 14px; } .chan .sub { color: var(--dim); font-size: 12px; }
+  .blk { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line-soft); border-radius: 4px; background: var(--bg); font-size: 12.5px; }
+  .blk .on { margin-left: auto; font: 700 10px var(--mono); color: #8fd1a8; }
+  .blk b { width: 70px; }
+  .note { color: var(--faint); font-size: 11.5px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · METERS grows into DESK</h2>
+    <p>Left, today's METERS page: five parts and the master on strips, the knobs as faders. Right, the same page grown: eight strips and the
+      master, played by the CTRL49's nine faders, a strip per fader. The bank above says what the eight are: the inputs, the parts, buses and
+      returns, or the monitor mixes; Bank ◀ ▶ steps through them, eight at a time, so 32 inputs are four banks. The pads mute, solo, listen and
+      select, one strip each; the knobs are each strip's pan.</p>
+  </div>
+  <div class="pair">
+    <figure><img src="../../tools/ctrl49/screen-lab/feature-mockups/hostage-live/preview-4-meters.png" alt="Today's METERS page"><figcaption><b>Today: METERS</b> · five parts and the master, E1–E6 as faders, E7 for the next parts</figcaption></figure>
+    <figure id="desk1"></figure>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · CHANNEL and MIX</h2>
+    <p>Pad layer D selects a strip; CHANNEL then shows its built-in channel strip: high-pass, gate, four-band EQ and compressor, all HoSTage's
+      own, so no isolation block. MIX turns the faders into one monitor mix (sends on faders): each fader sets how much of its strip that
+      player hears, the ninth the mix's own level. Pick the mix on the pads; hold TALK to speak into it.</p>
+  </div>
+  <div class="pair"><figure id="chan2"></figure><figure id="mix2"></figure></div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · The Mixer tab as the desk</h2>
+    <p>The same desk on screen, from today's Mixer tab: the same banks, narrower strips so sixteen fit, each with its source, its channel strip
+      at a glance (HP, G, EQ, C lit when on) and its gain reduction. "Faders show" flips every strip to one monitor mix, as MIX does on the
+      keyboard. The selected strip's channel strip opens on the right.</p>
+  </div>
+  <div class="app" id="mixer3"></div>
+</section>
+
+<script>
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378', grid: '#1F2742', gridS: '#2B3456',
+              violet: '#8B7CFF', teal: '#2DD4BF', pink: '#FF5C93', amber: '#FFB547', orange: '#FF9408' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const colX = (i) => i * 60 + 6;
+  const PC = ['#FF9408', '#2DD4BF', '#8B7CFF', '#FF5C93', '#FFB547', '#5B9BFF', '#7BD88F', '#E6E9F5'];
+  const svg = (s) => `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  const head = (title, right, accent = C.violet) => `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${accent}"/>` + T(18, 22, title, C.text, 16, "font-weight='700'") + T(472, 21, right, C.dim, 10, "text-anchor='end'");
+  const tabs = (names, on) => names.map((g, k) => { const x = 8 + k * 80; return `<rect x="${x}" y="29" width="76" height="14" rx="3" fill="${k === on ? C.violet : C.raised}"/>` + T(x + 38, 39.5, g, k === on ? C.bg : C.label, 7.5, "text-anchor='middle' font-weight='700'"); }).join('');
+  const pads = (list) => list.map((p, i) => { const x = colX(i); if (!p) return `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`;
+    return `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'"); }).join('');
+  const cells = (list) => list.map((c, i) => { if (!c) return ''; const cx = i * 60 + 30;
+    return T(cx, 217, c.l, c.focus ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, c.v, c.focus ? C.teal : (c.vc || C.text), c.vs || 13, "text-anchor='middle' font-weight='600'")
+      + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (c.f !== undefined ? `<rect x="${i * 60 + 8 + (c.pan ? 22 + Math.min(0, c.f) * 22 : 0)}" y="244" width="${c.pan ? Math.max(2, Math.abs(c.f) * 22) : 44 * c.f}" height="4" rx="2" fill="${C.bar}"/>` : ''); }).join('');
+
+  // strips: x0, width, name, meter L/R (0..1), fader (0..1), dB, colour, mute/solo/listen, clip
+  function strips(list, master, opts = {}) {
+    let s = ''; const W = 49, top = 50, H = 122;
+    list.forEach((st, i) => {
+      const x = 8 + i * (W + 3), sel = opts.sel === i;
+      s += `<rect x="${x}" y="${top}" width="${W}" height="${H}" rx="3" fill="${C.card}" ${sel ? `stroke="${C.teal}" stroke-width="1.5"` : ''}/>`;
+      s += `<rect x="${x}" y="${top}" width="${W}" height="2.5" fill="${st.c}"/>` + T(x + W / 2, top + 13, st.n, sel ? C.teal : C.text, 7.5, "text-anchor='middle' font-weight='700'");
+      const mt = top + 18, mh = 78;
+      [st.l, st.r].forEach((v, k) => { s += `<rect x="${x + 10 + k * 7}" y="${mt}" width="5" height="${mh}" rx="1" fill="${C.raised}"/><rect x="${x + 10 + k * 7}" y="${mt + mh * (1 - v)}" width="5" height="${mh * v}" rx="1" fill="${opts.send ? C.amber : st.c}" opacity="${st.m ? .35 : 1}"/>`; });
+      const fy = mt + mh * (1 - st.f); s += `<rect x="${x + 28}" y="${mt}" width="3" height="${mh}" rx="1" fill="${C.raised}"/><rect x="${x + 24}" y="${fy - 2}" width="11" height="4" rx="1" fill="${C.text}"/>`;
+      if (st.clip) s += `<rect x="${x + 37}" y="${mt}" width="7" height="5" rx="1" fill="#FF4D4D"/>`;
+      if (st.gr) s += `<rect x="${x + 38}" y="${mt + 8}" width="4" height="${st.gr * 6}" rx="1" fill="${C.amber}"/>`;
+      s += T(x + W / 2, mt + mh + 13, st.db, opts.send ? C.amber : C.text, 8, "text-anchor='middle' font-weight='600'");
+      ['M', 'S', 'L'].forEach((t, k) => { const on = (t === 'M' && st.m) || (t === 'S' && st.s) || (t === 'L' && st.li); const col = t === 'M' ? C.amber : t === 'S' ? '#E6D85A' : '#5B9BFF';
+        s += `<rect x="${x + 5 + k * 14}" y="${top + H - 10}" width="12" height="8" rx="1.5" fill="${on ? col : C.raised}"/>` + T(x + 11 + k * 14, top + H - 3.6, t, on ? C.bg : C.dim, 6.5, "text-anchor='middle' font-weight='700'"); });
+    });
+    if (master) { const x = 8 + 8 * (W + 3), w = 464 - (x - 8);
+      s += `<rect x="${x}" y="${top}" width="${w}" height="${H}" rx="3" fill="${C.card}"/>` + T(x + w / 2, top + 13, master.n, C.text, 7.5, "text-anchor='middle' font-weight='700'");
+      const mt = top + 18, mh = 78; [master.l, master.r].forEach((v, k) => { s += `<rect x="${x + 8 + k * 6}" y="${mt}" width="4.5" height="${mh}" rx="1" fill="${C.raised}"/><rect x="${x + 8 + k * 6}" y="${mt + mh * (1 - v)}" width="4.5" height="${mh * v}" rx="1" fill="${opts.send ? C.amber : C.text}"/>`; });
+      const fy = mt + mh * (1 - master.f); s += `<rect x="${x + 24}" y="${mt}" width="3" height="${mh}" rx="1" fill="${C.raised}"/><rect x="${x + 20}" y="${fy - 2}" width="11" height="4" rx="1" fill="${C.text}"/>`;
+      s += T(x + w / 2, mt + mh + 13, master.db, C.text, 8, "text-anchor='middle' font-weight='600'") + T(x + w / 2, top + H - 3.6, master.sub || 'LIMIT 0.8', C.dim, 6.5, "text-anchor='middle' font-weight='700'"); }
+    return s;
+  }
+  const INPUTS = [
+    { n: 'VOX', c: PC[0], l: .78, r: .78, f: .74, db: '−2.0', gr: 1.2, li: true },
+    { n: 'BVOX', c: PC[1], l: .55, r: .55, f: .66, db: '−6.5' },
+    { n: 'GTR', c: PC[2], l: .7, r: .64, f: .7, db: '−4.0', gr: .6 },
+    { n: 'BASS DI', c: PC[3], l: .74, r: .74, f: .72, db: '−3.0', gr: 1.6 },
+    { n: 'KICK', c: PC[4], l: .9, r: .9, f: .76, db: '−1.0', clip: true },
+    { n: 'SNARE', c: PC[5], l: .62, r: .62, f: .7, db: '−4.0', m: true },
+    { n: 'OH', c: PC[6], l: .5, r: .56, f: .6, db: '−9.0' },
+    { n: 'ACOUS', c: PC[7], l: .0, r: .0, f: .6, db: '−9.0', s: false },
+  ];
+  // ---- frame 1: DESK ----
+  { let s = head('DESK', 'INPUTS 1–8 · BANK 1 OF 4') + tabs(['INPUTS', 'PARTS', 'BUS · RET', 'MIXES'], 0);
+    s += strips(INPUTS, { n: 'MAIN', l: .8, r: .78, f: .75, db: '0.0' }, { sel: 0 });
+    s += pads(INPUTS.map((st) => ({ l: st.n, on: !!st.m, col: C.amber })));
+    s += cells([{ l: 'PAN', v: 'C', f: 0, pan: 1, focus: true }, { l: 'PAN', v: 'L20', f: -.2, pan: 1 }, { l: 'PAN', v: 'R30', f: .3, pan: 1 }, { l: 'PAN', v: 'C', f: 0, pan: 1 }, { l: 'PAN', v: 'C', f: 0, pan: 1 }, { l: 'PAN', v: 'C', f: 0, pan: 1 }, { l: 'PAN', v: 'WIDE', f: 0, pan: 1, vs: 11 }, { l: 'PAN', v: 'R10', f: .1, pan: 1 }]);
+    s += T(8, 265, 'FADER N: STRIP N · PADS: MUTE (A) SOLO (B) LISTEN (C) SELECT (D)', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('desk1').innerHTML = svg(s) + '<figcaption><b>Grown: DESK</b> · eight strips on the eight faders, the master on the ninth; pad layer A shown, muting (SNARE is muted)</figcaption>'; }
+
+  // ---- frame 2: CHANNEL ----
+  { let s = head('CHANNEL', 'VOX · INPUT 1 · SCARLETT 18I8', C.teal);
+    s += `<rect x="8" y="30" width="300" height="146" rx="4" fill="${C.card}"/><rect x="14" y="36" width="288" height="134" rx="3" fill="${C.bg}"/>`;
+    // the EQ curve: high-pass at 80 Hz, low -2, lo-mid -3 at 400, hi-mid +2 at 3k, high +1.5
+    const X = (f) => 14 + Math.log10(f / 20) / 3 * 288, Y = (db) => 103 - db * 5;
+    [100, 1000, 10000].forEach((f) => { s += `<line x1="${X(f)}" y1="36" x2="${X(f)}" y2="170" stroke="${C.grid}"/>` + T(X(f) + 2, 166, f >= 1000 ? f / 1000 + 'k' : f, C.dim, 7); });
+    s += `<line x1="14" y1="${Y(0)}" x2="302" y2="${Y(0)}" stroke="${C.gridS}"/>`;
+    const pts = []; for (let i = 0; i <= 120; i++) { const f = 20 * Math.pow(1000, i / 120); let db = 0;
+      db += f < 80 ? -12 * Math.log2(80 / f) : 0; db += -2 / (1 + Math.pow(f / 120, 2)); db += -3 * Math.exp(-Math.pow(Math.log2(f / 400), 2) * 1.6); db += 2 * Math.exp(-Math.pow(Math.log2(f / 3000), 2) * 1.6); db += 1.5 / (1 + Math.pow(8000 / f, 2));
+      pts.push(`${X(f)},${Math.max(38, Math.min(168, Y(db)))}`); }
+    s += `<polyline points="${pts.join(' ')}" fill="none" stroke="${C.teal}" stroke-width="2"/>` + T(20, 48, 'HP 80', C.teal, 8, "font-weight='700'");
+    // gate and compressor
+    s += `<rect x="314" y="30" width="158" height="70" rx="4" fill="${C.card}"/>` + T(322, 44, 'GATE', C.label, 8, "font-weight='700'") + T(464, 44, '● OPEN', C.teal, 8, "text-anchor='end' font-weight='700'");
+    s += T(322, 64, '−48 dB', C.text, 13, "font-weight='700'") + T(322, 78, 'closes below, after 120 ms', C.dim, 7.5) + `<rect x="322" y="86" width="142" height="5" rx="2" fill="${C.raised}"/><rect x="322" y="86" width="96" height="5" rx="2" fill="${PC[0]}"/><rect x="${322 + 142 * .3}" y="83" width="2" height="11" fill="${C.text}"/>`;
+    s += `<rect x="314" y="106" width="158" height="70" rx="4" fill="${C.card}"/>` + T(322, 120, 'COMP', C.label, 8, "font-weight='700'") + T(464, 120, '3:1', C.text, 8, "text-anchor='end' font-weight='700'");
+    s += T(322, 140, '−18 dB', C.text, 13, "font-weight='700'") + T(322, 154, 'SQUASHING NOW', C.amber, 7.5, "font-weight='700'") + `<rect x="322" y="162" width="142" height="5" rx="2" fill="${C.raised}"/><rect x="${322 + 142 - 32}" y="162" width="32" height="5" rx="2" fill="${C.amber}"/>` + T(464, 154, '−4.1 dB', C.amber, 8, "text-anchor='end' font-weight='700'");
+    s += pads([{ l: 'HP', on: true }, { l: 'GATE', on: true }, { l: 'EQ', on: true }, { l: 'COMP', on: true }, null, null, { l: 'LISTEN', on: true, col: '#5B9BFF' }, { l: '‹ DESK', on: true, col: C.violet }]);
+    s += cells([{ l: 'TRIM', v: '+32', f: .7, focus: true }, { l: 'GATE', v: '−48', f: .3 }, { l: 'LOW', v: '−2.0', f: .4 }, { l: 'LO MID', v: '−3.0', f: .35 }, { l: 'HI MID', v: '+2.0', f: .6 }, { l: 'HIGH', v: '+1.5', f: .58 }, { l: 'COMP', v: '−18', f: .5 }, { l: 'RATIO', v: '3:1', f: .4 }]);
+    s += T(8, 265, 'BUILT IN, NO ISOLATION BLOCK · SHIFT + KNOB: A BAND\'S FREQUENCY', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('chan2').innerHTML = svg(s) + '<figcaption><b>CHANNEL</b> · the selected strip: high-pass, gate, four bands of EQ, compressor; the fader stays its fader</figcaption>'; }
+
+  // ---- frame 2: MIX (sends on faders) ----
+  { const SENDS = [{ n: 'VOX', c: PC[0], l: .85, r: .85, f: .85, db: '+2.0' }, { n: 'BVOX', c: PC[1], l: .5, r: .5, f: .5, db: '−9.0' }, { n: 'GTR', c: PC[2], l: .45, r: .45, f: .45, db: '−11' },
+      { n: 'BASS DI', c: PC[3], l: .35, r: .35, f: .4, db: '−14' }, { n: 'KICK', c: PC[4], l: .5, r: .5, f: .5, db: '−9.0' }, { n: 'SNARE', c: PC[5], l: .3, r: .3, f: .35, db: '−16' }, { n: 'OH', c: PC[6], l: .0, r: .0, f: .0, db: '−∞' }, { n: 'ACOUS', c: PC[7], l: .55, r: .55, f: .55, db: '−8.0' }];
+    let s = head('MIX', 'SINGER IN-EARS · OUT 3–4', C.amber) + tabs(['SINGER', 'GUITAR', 'DRUMS', 'KEYS'], 0);
+    s += strips(SENDS, { n: 'MIX', l: .74, r: .74, f: .7, db: '−3.0', sub: 'TO OUT 3–4' }, { send: true });
+    s += pads([{ l: 'SINGER', on: true, col: C.amber }, { l: 'GUITAR' }, { l: 'DRUMS' }, { l: 'KEYS' }, { l: 'BASS' }, null, { l: 'HOLD TALK', on: false }, { l: '‹ DESK', on: true, col: C.violet }]);
+    s += cells([{ l: 'PAN', v: 'C', f: 0, pan: 1 }, { l: 'PAN', v: 'L40', f: -.4, pan: 1 }, { l: 'PAN', v: 'R40', f: .4, pan: 1 }, { l: 'PAN', v: 'C', f: 0, pan: 1 }, { l: 'PAN', v: 'C', f: 0, pan: 1 }, { l: 'PAN', v: 'C', f: 0, pan: 1 }, { l: 'PAN', v: 'C', f: 0, pan: 1 }, { l: 'PAN', v: 'R20', f: .2, pan: 1 }]);
+    s += T(8, 265, 'FADERS: WHAT THE SINGER HEARS OF EACH STRIP · BEFORE THE MAIN FADER', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('mix2').innerHTML = svg(s) + '<figcaption><b>MIX</b> · sends on faders: the faders set one player\'s in-ear mix; the main mix is untouched</figcaption>'; }
+
+  // ---- frame 3: the Mixer tab ----
+  { const all = [['Vocal mic', 'VOX', 'IN 1', '#FF9408', .78, .74, '−2.0', [1, 1, 1, 1], .3, 'L'], ['Backing vox', 'BVOX', 'IN 2', '#2DD4BF', .55, .66, '−6.5', [1, 1, 1, 0], 0, ''], ['Guitar DI', 'GTR', 'IN 3', '#8B7CFF', .68, .7, '−4.0', [1, 0, 1, 1], .2, ''],
+      ['Bass DI', 'BASS', 'IN 4', '#FF5C93', .74, .72, '−3.0', [1, 0, 0, 1], .4, ''], ['Kick', 'KICK', 'IN 5', '#FFB547', .9, .76, '−1.0', [1, 1, 1, 1], .2, ''], ['Snare', 'SNARE', 'IN 6', '#5B9BFF', .62, .7, '−4.0', [1, 1, 1, 1], .1, 'M'],
+      ['Overheads', 'OH', 'IN 7–8', '#7BD88F', .52, .6, '−9.0', [1, 0, 1, 0], 0, ''], ['Acoustic', 'ACOUS', 'IN 9', '#E6E9F5', .0, .6, '−9.0', [1, 0, 1, 1], 0, ''], ['Tom 1', 'TOM 1', 'IN 10', '#FF9408', .4, .66, '−6.0', [1, 1, 1, 0], 0, ''],
+      ['Tom 2', 'TOM 2', 'IN 11', '#2DD4BF', .3, .66, '−6.0', [1, 1, 1, 0], 0, ''], ['Hi-hat', 'HAT', 'IN 12', '#8B7CFF', .45, .55, '−12', [1, 0, 1, 0], 0, ''], ['Sax', 'SAX', 'IN 13', '#FF5C93', .0, .7, '−4.0', [1, 0, 1, 1], 0, ''],
+      ['Talkback', 'TALK', 'IN 14', '#FFB547', .0, .0, '−∞', [1, 1, 0, 0], 0, 'M'], ['Spare', '—', 'IN 15', '#3b4652', 0, .6, '−9.0', [0, 0, 0, 0], 0, ''], ['Spare', '—', 'IN 16', '#3b4652', 0, .6, '−9.0', [0, 0, 0, 0], 0, '']];
+    const strip = ([full, n, src, c, m, f, db, ch, gr, state], i) => `<div class="st${i === 0 ? ' sel' : ''}" style="--sc:${c}" title="${full}"><span class="nm">${n}</span><span class="src">${src}</span>
+      <span class="chain">${['HP', 'G', 'EQ', 'C'].map((t, k) => `<span class="${ch[k] ? 'on' : ''}">${t}</span>`).join('')}</span><span class="gr"><i style="width:${gr * 100}%"></i></span>
+      <div class="fz"><div class="m" style="left:4px;height:${m * 170}px"></div><div class="m" style="left:11px;height:${m * 160}px"></div><div class="tr"></div><div class="cap" style="top:${(1 - f) * 158}px"></div></div>
+      <span class="db">${db}</span><span class="msl"><span class="${state === 'M' ? 'm' : ''}">M</span><span>S</span><span class="${state === 'L' ? 'l' : ''}">L</span></span></div>`;
+    document.getElementById('mixer3').innerHTML = `
+      <div class="hdr"><span class="logo">Ho<i>ST</i>age</span><div class="tabs"><span>Rack</span><span>Sounds</span><span>Performance</span><span class="on">Mixer</span><span>Layers</span><span>Controller</span></div><span class="sp"></span><span class="ghostb">Feedback finder</span><span class="ghostb">Talkback</span></div>
+      <div class="bar2"><span class="seg"><span class="on">Inputs · 16</span><span>Parts · 5</span><span>Buses &amp; returns · 4</span><span>Mixes · 5</span><span>All</span></span><span class="sp"></span><span class="k">Faders show</span><span class="seg"><span class="on">Main</span><span>Singer</span><span>Guitar</span><span>Drums</span><span>Keys</span><span>Bass</span></span></div>
+      <div class="desk"><div class="strips">${all.map(strip).join('')}<span class="gap"></span>
+        <div class="st" style="--sc:#d9e0e6;width:62px"><span class="nm">MAIN</span><span class="src">OUT 1–2</span><span class="chain"><span class="on">LIM</span></span><span class="gr"><i style="width:10%"></i></span>
+          <div class="fz"><div class="m" style="left:4px;height:136px"></div><div class="m" style="left:11px;height:132px"></div><div class="tr"></div><div class="cap" style="top:40px"></div></div><span class="db">0.0</span><span class="msl"><span>M</span></span></div></div>
+        <div class="chan"><h4>VOX · Vocal mic</h4><span class="sub">IN 1 · Scarlett 18i8 · the built-in channel strip</span>
+          <div class="blk"><b>High-pass</b>80 Hz<span class="on">ON</span></div>
+          <div class="blk"><b>Gate</b>−48 dB · 120 ms<span class="on">ON</span></div>
+          <div class="blk" style="flex-direction:column;align-items:stretch"><div style="display:flex"><b>EQ</b><span style="color:var(--dim)">4 bands</span><span class="on">ON</span></div><svg viewBox="0 0 300 70" style="width:100%;height:70px;margin-top:4px" id="eq3"></svg></div>
+          <div class="blk"><b>Compressor</b>−18 dB · 3:1<span style="margin-left:auto;font:600 11px var(--mono);color:var(--pending)">−4.1 dB</span></div>
+          <div class="blk"><b>Inserts</b>Vocal EQ plug-in · De-esser<span style="margin-left:auto;font:11px var(--mono);color:var(--dim)">+2 blocks</span></div>
+          <div class="note">The channel strip comes first and costs no block; plug-in inserts after it each add their block, as on any part (decision 7).</div></div></div>`;
+    const X = (f) => Math.log10(f / 20) / 3 * 300, Y = (db) => 35 - db * 3; const p = [];
+    for (let i = 0; i <= 100; i++) { const f = 20 * Math.pow(1000, i / 100); let db = 0; db += f < 80 ? -12 * Math.log2(80 / f) : 0; db += -2 / (1 + Math.pow(f / 120, 2)); db += -3 * Math.exp(-Math.pow(Math.log2(f / 400), 2) * 1.6); db += 2 * Math.exp(-Math.pow(Math.log2(f / 3000), 2) * 1.6); db += 1.5 / (1 + Math.pow(8000 / f, 2)); p.push(`${X(f)},${Math.max(2, Math.min(68, Y(db)))}`); }
+    document.getElementById('eq3').innerHTML = `<rect width="300" height="70" fill="#12171b"/><line x1="0" y1="35" x2="300" y2="35" stroke="#2c353e"/><polyline points="${p.join(' ')}" fill="none" stroke="#2DD4BF" stroke-width="2"/>`; }
+</script>
+</body>
+</html>
