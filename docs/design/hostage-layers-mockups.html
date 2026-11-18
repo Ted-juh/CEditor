@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: the Layers tab, mockups</title>
+<!--
+  Mockups for docs/design/hostage-layers-design.md: the Layers tab and the CTRL49's LAYERS page,
+  built on what exists: each part's zone (PartMidiRules.h: channel, keys, velocity, transpose), parts
+  fed by another part (midiSourcePartId), layer groups (LayerGroup in RackModel.h), the Layers tab
+  (LayerGroupsPanel / LayerGroupEditor.svelte) and the LAYERS page (feature-mockups/hostage-rig).
+  Static, invented data; HoSTage's own colours and part colours; the CTRL49 page in Midnight.
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { border: 1px solid var(--line-soft); background: var(--bg); overflow: hidden; }
+  .hdr { height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .logo { font: 700 15px var(--sans); } .logo i { color: var(--accent-strong); font-style: normal; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs span { padding: 5px 12px; border-radius: 3px; color: var(--soft); font-size: 12.5px; }
+  .tabs span.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .sp { flex: 1; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .chip { padding: 1px 7px; border-radius: 9px; font: 600 10.5px/16px var(--sans); white-space: nowrap; border: 1px solid var(--line); color: var(--soft); background: var(--raised); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .wrap { display: grid; grid-template-columns: 1fr 360px; gap: 12px; padding: 12px 14px; }
+  .map { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 10px; }
+  .map svg { display: block; width: 100%; height: auto; }
+  .insp { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; }
+  .insp h4 { margin: 0; font-size: 14px; } .insp .sub { color: var(--dim); font-size: 12px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 8px 10px; align-items: center; font-size: 12.5px; }
+  .kv > span:nth-child(odd) { color: var(--dim); }
+  .field { padding: 3px 8px; background: var(--field); border: 1px solid var(--line); border-radius: 3px; font: 12px var(--mono); display: inline-block; }
+  .say { padding: 9px 11px; border-left: 3px solid var(--accent); background: var(--accent-surface); border-radius: 0 4px 4px 0; font-size: 13px; color: var(--text); }
+  .note { color: var(--faint); font-size: 11.5px; }
+  .kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 12px 14px 0; }
+  .kind { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 10px; }
+  .kind.on { border-color: var(--accent); background: #1a2229; }
+  .kind h5 { margin: 0 0 2px; font-size: 13px; } .kind p { margin: 0 0 6px; color: var(--soft); font-size: 11.5px; }
+  .kind svg { display: block; width: 100%; height: 70px; background: var(--field); border-radius: 4px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  figure { margin: 0; } figure img, figure svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  figcaption { margin-top: 8px; color: var(--soft); font-size: 12.5px; } figcaption b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · Keys and velocity, in one picture</h2>
+    <p>Every part is a lane across the keyboard, as on the CTRL49's LAYERS page; inside its lane, height is velocity, so a part that plays only
+      hard notes fills only the top of its keys. A layer group is a bracket joining its lanes; a crossfade is a soft edge. Play a note and a
+      line drops through every lane: a dot where it sounds, and how loud. Drag an edge to change keys or velocity, or set it by playing.</p>
+  </div>
+  <div class="app">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span><div class="tabs"><span>Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span class="on">Layers</span><span>Controller</span></div><span class="sp"></span><span class="ghostb">+ Layer two parts…</span></div>
+    <div class="wrap">
+      <div class="map" id="map1"></div>
+      <div class="insp"><span class="lbl">Selected part</span><h4>2 · Warm Pad</h4><span class="sub">Pigments · in layer L1 with Grand Piano</span>
+        <div class="say">Warm Pad joins the piano on <b>hard notes</b>: from velocity 92 up, fading in over the 10 below.</div>
+        <div class="kv">
+          <span>Keys</span><span><span class="field">C3</span> to <span class="field">C7</span> <span class="ghostb">Play the ends</span></span>
+          <span>Velocity</span><span><span class="field">92</span> to <span class="field">127</span> <span class="ghostb">Play the softest</span></span>
+          <span>Fade in</span><span><span class="field">10</span> <span class="note">velocities below 92</span></span>
+          <span>Transpose</span><span><span class="field">0</span> semitones</span>
+          <span>Channel</span><span><span class="field">any</span></span>
+          <span>Notes from</span><span><span class="field">the keyboard</span> <span class="note">or another part's output</span></span>
+        </div>
+        <div class="note">The fields are what the part already stores (keys, velocity, transpose, channel, where its notes come from) and the layer group's crossfade. Dragging in the picture and "Play…" set the same numbers.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · Layer two parts</h2>
+    <p>Select two lanes and choose how they share the keys. Four ways, each drawn and said in one line, the ones a layer group already offers.
+      The chosen one opens in words: who plays when, and how the change-over sounds. A group by a controller shows where the controller is now
+      and each part's share at that point.</p>
+  </div>
+  <div class="app">
+    <div class="kinds" id="kinds2"></div>
+    <div class="wrap" style="grid-template-columns:1fr 1fr">
+      <div class="insp"><span class="lbl">Layer L2 · by mod wheel</span><h4>Strings ↔ Brass</h4>
+        <div class="say">The mod wheel moves from <b>Strings</b> (down) to <b>Brass</b> (up). Both sound in the middle, half each at 50 %.</div>
+        <div id="morph2"></div>
+        <div class="kv"><span>Controller</span><span><span class="field">Mod wheel · CC 1</span> <span class="note">or expression, any CC, a macro</span></span>
+          <span>Change-over</span><span><span class="field">35 %</span> to <span class="field">65 %</span> <span class="note">the crossfade</span></span></div>
+      </div>
+      <div class="insp"><span class="lbl">Layer L3 · round robin</span><h4>Snare A · Snare B</h4>
+        <div class="say">Each new note goes to the <b>next</b> part in turn, so two identical hits never sound the same. <b>Least busy</b> instead sends it to whichever has the fewest notes sounding.</div>
+        <div class="kv"><span>Order</span><span><span class="field">A, B, A, B…</span></span><span>Last note</span><span>went to <b>Snare B</b></span></div>
+        <div class="note">Round robin and least busy pick one part per note; the other two ways weigh every member.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · LAYERS on the CTRL49, grown</h2>
+    <p>Left, today's page: a lane a part over the keys, velocity as text. Right, the same page with velocity inside each lane and the groups
+      bracketed, as in the tab. Two more knobs: the picked part's fade and its group's controller. The pads set the picked part by playing:
+      hold one and play a key or a note's strength.</p>
+  </div>
+  <div class="pair">
+    <figure><img src="../../tools/ctrl49/screen-lab/feature-mockups/hostage-rig/preview-1-layers.png" alt="Today's LAYERS page"><figcaption><b>Today: LAYERS</b> · zones over the keys, velocity and transpose as text, E1 picks a part, E2–E6 its keys, transpose and velocity</figcaption></figure>
+    <figure id="lay3"></figure>
+  </div>
+</section>
+
+<script>
+  // ---- the parts and groups ----------------------------------------------------------------------------
+  const P = [
+    { n: '1 · Grand Piano', c: '#3d81c4', lo: 48, hi: 96, vlo: 1, vhi: 127 },
+    { n: '2 · Warm Pad', c: '#4aa88c', lo: 48, hi: 96, vlo: 92, vhi: 127, fade: 10, sel: true },
+    { n: '3 · Juno-106', c: '#b4854a', lo: 48, hi: 96, vlo: 1, vhi: 127, tag: 'ch 2 only' },
+    { n: '4 · Strings', c: '#9a6bbf', lo: 48, hi: 96, vlo: 1, vhi: 127, share: .7 },
+    { n: '6 · Brass', c: '#c4a14a', lo: 48, hi: 96, vlo: 1, vhi: 127, share: .3 },
+    { n: '5 · Moog Bass', c: '#c46a6a', lo: 24, hi: 47, vlo: 1, vhi: 127, tag: '+12', muted: false },
+    { n: '7 · Pluck', c: '#6a94c4', lo: 60, hi: 84, vlo: 1, vhi: 127, tag: 'notes from part 1', via: 1 },
+  ];
+  const GROUPS = [{ id: 'L1', what: 'by velocity', a: 0, b: 1 }, { id: 'L2', what: 'by mod wheel', a: 3, b: 4 }];
+  const isBlack = (n) => [1, 3, 6, 8, 10].includes(n % 12);
+  const NM = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+  // ---- frame 1: the map ----
+  function map({ W = 1000, held = { n: 64, v: 104 } } = {}) {
+    const LX = 150, X0 = LX + 30, LO = 24, HI = 96, kw = (W - X0 - 120) / (HI - LO + 1), laneH = 58, top = 22;
+    const x = (n) => X0 + (n - LO) * kw; let s = '';
+    const H = top + P.length * (laneH + 6) + 74;
+    s += `<rect width="${W}" height="${H}" fill="#171c21"/>`;
+    for (let n = LO; n <= HI; n += 12) s += `<line x1="${x(n)}" y1="${top - 4}" x2="${x(n)}" y2="${top + P.length * (laneH + 6)}" stroke="#2c353e"/><text x="${x(n) + 3}" y="${top - 8}" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#7f8b96">C${n / 12 - 1}</text>`;
+    P.forEach((p, i) => {
+      const y = top + i * (laneH + 6), vy = (v) => y + laneH - (v / 127) * laneH;
+      s += `<rect x="${X0}" y="${y}" width="${x(HI + 1) - X0}" height="${laneH}" rx="3" fill="#12171b" ${p.sel ? 'stroke="#79b9ee" stroke-width="1.5"' : ''}/>`;
+      s += `<text x="${LX - 4}" y="${y + 19}" font-family="DejaVu Sans, sans-serif" font-size="12.5" font-weight="600" text-anchor="end" fill="${p.sel ? '#79b9ee' : '#d9e0e6'}">${p.n}</text>`;
+      s += `<text x="${LX - 4}" y="${y + 35}" font-family="DejaVu Sans Mono, monospace" font-size="10" text-anchor="end" fill="#7f8b96">${NM[p.lo % 12]}${Math.floor(p.lo / 12) - 1}–${NM[p.hi % 12]}${Math.floor(p.hi / 12) - 1} · v${p.vlo}–${p.vhi}</text>`;
+      const id = 'g' + i; let fill = p.c;
+      if (p.fade) s += `<defs><linearGradient id="${id}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${p.c}" stop-opacity="0"/><stop offset="${p.fade / (p.vhi - p.vlo + p.fade)}" stop-color="${p.c}" stop-opacity=".85"/><stop offset="1" stop-color="${p.c}" stop-opacity=".85"/></linearGradient></defs>`, fill = `url(#${id})`;
+      const vbottom = p.fade ? p.vlo - p.fade : p.vlo;
+      s += `<rect x="${x(p.lo)}" y="${vy(p.vhi)}" width="${x(p.hi + 1) - x(p.lo)}" height="${vy(vbottom) - vy(p.vhi)}" rx="2" fill="${fill}" opacity="${p.share !== undefined ? .25 + .6 * p.share : .85}"/>`;
+      if (p.sel) { s += `<rect x="${x(p.lo)}" y="${vy(p.vlo) - 1.5}" width="${x(p.hi + 1) - x(p.lo)}" height="3" rx="1" fill="#79b9ee"/><text x="${x(p.lo) + 8}" y="${vy(p.vlo) + 14}" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#79b9ee">↕ drag the edge: velocity 92</text>`; }
+      if (p.tag) { const tw = p.tag.length * 6.4 + 12; s += `<rect x="${x(p.hi + 1) - tw - 6}" y="${y + 5}" width="${tw}" height="16" rx="8" fill="#0f1215" opacity=".8"/><text x="${x(p.hi + 1) - tw}" y="${y + 16.5}" font-family="DejaVu Sans, sans-serif" font-size="10.5" font-weight="600" fill="#fff">${p.tag}</text>`; }
+      if (p.share !== undefined) s += `<text x="${x(p.lo) + 8}" y="${y + laneH - 8}" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="700" fill="#fff">${Math.round(p.share * 100)} % now</text>`;
+      // the held note
+      const inKeys = held.n >= p.lo && held.n <= p.hi, inVel = held.v >= vbottom && held.v <= p.vhi, ch = (!p.tag || !p.tag.startsWith('ch')) && !p.via;
+      if (inKeys) { const hit = inVel && ch; s += `<circle cx="${x(held.n) + kw / 2}" cy="${vy(held.v)}" r="5.5" fill="${hit ? '#ffffff' : 'none'}" stroke="#ffffff" stroke-width="1.6"/>`;
+        s += `<text x="${W - 8}" y="${y + 33}" font-family="DejaVu Sans, sans-serif" font-size="11.5" text-anchor="end" fill="${hit && !p.via ? '#8fd1a8' : '#7f8b96'}">${p.via ? 'via part 1' : hit ? (p.fade ? 'sounds 100 %' : p.share !== undefined ? 'sounds ' + Math.round(p.share * 100) + ' %' : 'sounds') : 'other channel'}</text>`; }
+    });
+    // group brackets
+    GROUPS.forEach((g, k) => { const ya = top + g.a * (laneH + 6) + 6, yb = top + g.b * (laneH + 6) + laneH - 6, bx = LX + 8 + k * 0;
+      s += `<path d="M${bx + 12} ${ya} h-6 v${yb - ya} h6" fill="none" stroke="#d7a44e" stroke-width="2"/><text x="${bx + 2}" y="${(ya + yb) / 2 + 4}" font-family="DejaVu Sans Mono, monospace" font-size="10" font-weight="700" fill="#d7a44e" text-anchor="end">${g.id}</text>`; });
+    // the held note's line and the keyboard
+    const ky = top + P.length * (laneH + 6) + 8;
+    s += `<line x1="${x(held.n) + kw / 2}" y1="${top - 4}" x2="${x(held.n) + kw / 2}" y2="${ky}" stroke="#ffffff" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>`;
+    for (let n = LO; n <= HI; n++) if (!isBlack(n)) s += `<rect x="${x(n)}" y="${ky}" width="${kw * (n % 12 === 4 || n % 12 === 11 ? 1 : 1.5)}" height="44" fill="${n === held.n ? '#8fd1a8' : '#e9edf1'}" stroke="#9aa4ad" stroke-width=".6"/>`;
+    for (let n = LO; n <= HI; n++) if (isBlack(n)) s += `<rect x="${x(n)}" y="${ky}" width="${kw}" height="27" fill="#1a1f24"/>`;
+    s += `<text x="${x(held.n) + 12}" y="${ky + 62}" font-family="DejaVu Sans Mono, monospace" font-size="11" fill="#8fd1a8">E4 · velocity 104 · channel 1</text>`;
+    s += `<text x="${X0}" y="${ky + 62}" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#7f8b96">in each lane: up is louder (velocity 1 at the bottom, 127 at the top)</text>`;
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+  document.getElementById('map1').innerHTML = map();
+
+  // ---- frame 2: the four kinds ----
+  const kinds = [
+    ['By velocity', 'Soft notes play one, hard notes the other, with a fade between.', false, 'vel'],
+    ['By key', 'One plays below a point, the other above, with a blend across it.', false, 'key'],
+    ['By a controller', 'The mod wheel, a pedal, any CC or a macro moves from one to the other.', true, 'cc'],
+    ['Taking turns', 'Round robin, or least busy: each note goes to one of them.', false, 'rr'],
+  ];
+  document.getElementById('kinds2').innerHTML = kinds.map(([h, p, on, k]) => {
+    let s = '';
+    if (k === 'vel') s = `<defs><linearGradient id="kv" x1="0" y1="1" x2="0" y2="0"><stop offset=".45" stop-color="#3d81c4"/><stop offset=".65" stop-color="#4aa88c"/></linearGradient></defs><rect x="10" y="8" width="280" height="54" fill="url(#kv)" opacity=".85"/><text x="16" y="56" font-size="10" fill="#fff" font-family="DejaVu Sans, sans-serif">soft</text><text x="16" y="20" font-size="10" fill="#fff" font-family="DejaVu Sans, sans-serif">hard</text>`;
+    if (k === 'key') s = `<defs><linearGradient id="kk"><stop offset=".45" stop-color="#c46a6a"/><stop offset=".6" stop-color="#3d81c4"/></linearGradient></defs><rect x="10" y="8" width="280" height="54" fill="url(#kk)" opacity=".85"/><text x="16" y="38" font-size="10" fill="#fff" font-family="DejaVu Sans, sans-serif">low keys</text><text x="282" y="38" font-size="10" fill="#fff" text-anchor="end" font-family="DejaVu Sans, sans-serif">high keys</text>`;
+    if (k === 'cc') s = `<rect x="10" y="10" width="280" height="22" fill="#9a6bbf" opacity=".85"/><rect x="10" y="38" width="280" height="22" fill="#c4a14a" opacity=".45"/><line x1="94" y1="6" x2="94" y2="64" stroke="#fff" stroke-dasharray="3 3"/><text x="98" y="24" font-size="10" fill="#fff" font-family="DejaVu Sans, sans-serif">Strings 70 %</text><text x="98" y="53" font-size="10" fill="#fff" font-family="DejaVu Sans, sans-serif">Brass 30 %</text>`;
+    if (k === 'rr') s = [0, 1, 2, 3, 4, 5].map((i) => `<rect x="${14 + i * 46}" y="${i % 2 ? 36 : 12}" width="36" height="20" rx="2" fill="${i % 2 ? '#b4854a' : '#6a94c4'}"/>`).join('') + `<text x="14" y="66" font-size="9.5" fill="#aab5be" font-family="DejaVu Sans, sans-serif">A B A B A B</text>`;
+    return `<div class="kind${on ? ' on' : ''}"><h5>${h}</h5><p>${p}</p><svg viewBox="0 0 300 70">${s}</svg></div>`; }).join('');
+  { // the controller strip for L2
+    let s = `<rect width="460" height="64" rx="4" fill="#12171b"/>`; const X = (f) => 14 + f * 432;
+    s += `<defs><linearGradient id="ms"><stop offset=".35" stop-color="#9a6bbf"/><stop offset=".65" stop-color="#c4a14a"/></linearGradient></defs><rect x="14" y="14" width="432" height="18" rx="3" fill="url(#ms)"/>`;
+    s += `<line x1="${X(.35)}" y1="10" x2="${X(.35)}" y2="36" stroke="#fff" stroke-width="1" opacity=".6"/><line x1="${X(.65)}" y1="10" x2="${X(.65)}" y2="36" stroke="#fff" stroke-width="1" opacity=".6"/>`;
+    s += `<circle cx="${X(.42)}" cy="23" r="7" fill="#fff"/><text x="${X(.42)}" y="52" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="10.5" fill="#d9e0e6">mod wheel 42 % · Strings 70 %, Brass 30 %</text>`;
+    s += `<text x="14" y="52" font-family="DejaVu Sans, sans-serif" font-size="10.5" fill="#9a6bbf">Strings</text><text x="446" y="52" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="10.5" fill="#c4a14a">Brass</text>`;
+    document.getElementById('morph2').innerHTML = `<svg viewBox="0 0 460 64" style="width:100%;height:auto;display:block">${s}</svg>`; }
+
+  // ---- frame 3: LAYERS grown, Midnight ----
+  { const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378', violet: '#8B7CFF', teal: '#2DD4BF', amber: '#FFB547' };
+    const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+    const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+    let s = `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${C.violet}"/>` + T(18, 22, 'LAYERS', C.text, 16, "font-weight='700'") + T(472, 21, 'E4 · VEL 104 · 4 SOUND', C.dim, 10, "text-anchor='end'");
+    const LO = 36, HI = 96, X0 = 30, W = 442, kx = (n) => X0 + (n - LO) / (HI - LO + 1) * W, kw = W / (HI - LO + 1);
+    const L = [['PIANO', '#3d81c4', 48, 96, 1, 127], ['PAD', '#4aa88c', 48, 96, 82, 127, 1], ['JUNO', '#b4854a', 48, 96, 1, 127], ['STRINGS', '#9a6bbf', 48, 96, 1, 127], ['BRASS', '#c4a14a', 48, 96, 1, 127], ['BASS', '#c46a6a', 36, 47, 1, 127]];
+    L.forEach(([n, c, lo, hi, vlo, vhi, sel], i) => { const y = 32 + i * 21, h = 18, vy = (v) => y + h - v / 127 * h;
+      s += `<rect x="${X0}" y="${y}" width="${W}" height="${h}" rx="2" fill="${C.card}" ${sel ? `stroke="${C.violet}" stroke-width="1.2"` : ''}/>`;
+      s += `<rect x="${kx(lo)}" y="${vy(vhi)}" width="${kx(hi + 1) - kx(lo)}" height="${vy(vlo) - vy(vhi)}" rx="1.5" fill="${c}" opacity="${n === 'BRASS' ? .4 : .85}"/>` + T(kx(lo) + 4, y + 12.5, n, '#fff', 8, "font-weight='700'");
+      if (sel) s += `<rect x="${kx(lo)}" y="${vy(vlo) - 1}" width="${kx(hi + 1) - kx(lo)}" height="2" fill="#fff"/>`;
+      if ([0, 1, 3, 4].includes(i)) s += `<circle cx="${kx(64) + kw / 2}" cy="${vy(104)}" r="3" fill="#fff"/>`; });
+    s += `<path d="M24 36 h-6 v34 h6" fill="none" stroke="${C.amber}" stroke-width="1.5"/><path d="M24 99 h-6 v34 h6" fill="none" stroke="${C.amber}" stroke-width="1.5"/>`;
+    s += `<line x1="${kx(64) + kw / 2}" y1="30" x2="${kx(64) + kw / 2}" y2="160" stroke="#fff" stroke-dasharray="2 2" opacity=".6"/>`;
+    for (let n = LO; n <= HI; n++) if (!isBlack(n)) { const m = isBlack(n + 1) ? n + 2 : n + 1; s += `<rect x="${kx(n)}" y="160" width="${kx(Math.min(m, HI + 1)) - kx(n)}" height="18" fill="${n === 64 ? C.teal : '#D9DCE8'}" stroke="#8D93A8" stroke-width=".4"/>`; }
+    for (let n = LO; n <= HI; n++) if (isBlack(n)) s += `<rect x="${kx(n) + kw * .15}" y="160" width="${kw * .9}" height="11" fill="#1a1f33"/>`;
+    const pads = [{ l: 'PLAY LOW' }, { l: 'PLAY HIGH' }, { l: 'PLAY SOFT', on: true }, { l: 'PLAY HARD' }, null, null, { l: 'MUTE' }, { l: '‹ BACK', on: true, col: C.violet }];
+    pads.forEach((p, i) => { const x = i * 60 + 6; if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; return; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 6.8, "text-anchor='middle' font-weight='700'"); });
+    [['PART', '2 / 7', 1], ['LOW', 'C3'], ['HIGH', 'C7'], ['TRANSP', '0'], ['VEL LOW', '92'], ['VEL HIGH', '127'], ['FADE', '10'], ['GROUP', 'L1 VEL']].forEach(([l, v, f], i) => { const cx = i * 60 + 30;
+      s += T(cx, 217, l, f ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, f ? C.teal : C.text, 13, "text-anchor='middle' font-weight='600'") + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>`; });
+    s += T(8, 265, 'HOLD PLAY SOFT AND PLAY THE SOFTEST NOTE THAT SHOULD BRING IT IN', C.foot, 8, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('lay3').innerHTML = `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg><figcaption><b>Grown: LAYERS</b> · velocity inside each lane, the groups bracketed, E7 the fade, E8 the group; pads set the picked part by playing</figcaption>`; }
+</script>
+</body>
+</html>

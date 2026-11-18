@@ -663,6 +663,7 @@ rig). Within a track, a step needs the ones before it only where it says so.*
 | `hostage-build-further-design.md` | knobs that follow the selection, a macro by moving, swap a plug-in and keep the mappings, find a sound from a recording | Build 6 |
 | `hostage-build-small-design.md` | ranges by showing, layers by playing, a synth plugged in, new plug-ins noticed, drag to assign in Performance, a page from what you touched | Build 7 |
 | `hostage-skins-design.md` | the fourteen CTRL49 skins as colour; three skin choices (CTRL49, program, Stage) | Build 1 and 8 |
+| `hostage-layers-design.md` | the Layers tab: keys and velocity in one picture, layering two parts in four ways, LAYERS on the CTRL49 grown | Build 7, beside the smaller ones |
 | `hostage-desk-design.md` | the mixing desk (decision 9): METERS grown into DESK, CHANNEL and MIX pages, the Mixer tab as the desk | after both tracks ("After that") |
 | `hostage-controller-design.md` | the Controller tab: pages as a list, the keyboard's screen beside the controller, short labels, commands on pads, copying a page | Build 7, beside the smaller ones |
 | `hostage-practice-design.md` | Practice mode, from MIDI and MusicXML | Stage 7 |
@@ -722,7 +723,8 @@ rig). Within a track, a step needs the ones before it only where it says so.*
    a recording, which runs the library's measures on an audio file.
 7. **The smaller ones** (their design): ranges by showing, layers by playing, drag to assign in
    Performance and a page from what you touched are screen work on fields that exist. With them,
-   **the Controller tab** (its design): commands on pads need the command list (Build 1), copying a
+   **the Layers tab** (its design), also on fields that exist, and **the Controller tab** (its
+   design): commands on pads need the command list (Build 1), copying a
    page needs the swap's matching (Build 6). Then a synth
    plugged in, which needs the device profiles' identity request brought into the host, and new
    plug-ins noticed, which needs a watch on the plug-in folders on the native side.
