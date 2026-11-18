@@ -24,6 +24,8 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **Four more ease-of-use features**, taken: [More ease of use](#more-ease-of-use).
 - **Eight more ease-of-use features**, taken: [Even more ease of use](#even-more-ease-of-use).
 - **Five more Build-mode features**, taken: [Build mode, further](#build-mode-further).
+- **Your own pages**, laid out with CEditor's controls, taken with two questions open:
+  [Your own pages](#your-own-pages).
 - **A practice mode with falling notes**, for learning any song: [Practice mode](#practice-mode).
 - **The designs with mockups**, approved 2026-11-17, one record each: listed in
   [Where each design is](#where-each-design-is), with where each sits in the order.
@@ -610,6 +612,26 @@ assignments unresolved, and there is no search for sounds from an audio file.
 6. ~~**Tidy the rig.**~~ **Out.** A list of what does nothing (parts no song plays, effects bypassed
    in every scene, pages for plug-ins that are gone, the same sound loaded twice), each with a
    button to remove it.
+
+### Your own pages
+
+**Taken, 2026-11-18**: "Yes." Pages you lay out yourself with CEditor's panel editor and its
+controls (knobs, sliders, buttons, drum pads, XY joysticks, ribbons, meters, displays: about forty
+kinds), each control connected to a HoSTage target: a plug-in's parameter, a macro, a command from
+the command list, or a mixer level. Checked on `main`: today HoSTage's Controller tab only decides
+what the controller's physical knobs, faders and pads do, and the CTRL49 shows a page in one fixed
+layout; CEditor's panel editor lays out controls freely but connects them to hardware synths over
+MIDI, not to HoSTage. HoSTage and CEditor share their code, so the editor and the controls exist;
+the new piece is the connection to HoSTage's targets.
+
+**Open:**
+
+1. **Where these pages show**: on screen in Build, also on the Stage screen, and whether on the
+   CTRL49's own screen. "To be decided" (the owner).
+2. **Scripts on these pages.** HoSTage runs no scripts today. It has a bounded scripting surface,
+   built and tested but connected to nothing (`InstrumentHostService::runScriptAction`: six events
+   in, thirteen actions out, a Pro feature, never on the audio thread). CEditor's panels run
+   scripts in seven languages (`CE/src/Scripting`). Worked out with the owner next.
 
 ### Practice mode
 
