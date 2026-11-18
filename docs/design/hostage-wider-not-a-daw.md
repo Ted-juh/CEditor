@@ -624,14 +624,66 @@ layout; CEditor's panel editor lays out controls freely but connects them to har
 MIDI, not to HoSTage. HoSTage and CEditor share their code, so the editor and the controls exist;
 the new piece is the connection to HoSTage's targets.
 
-**Open:**
+**Open: where these pages show**: on screen in Build, also on the Stage screen, and whether on the
+CTRL49's own screen. "To be decided" (the owner, 2026-11-18).
 
-1. **Where these pages show**: on screen in Build, also on the Stage screen, and whether on the
-   CTRL49's own screen. "To be decided" (the owner).
-2. **Scripts on these pages.** HoSTage runs no scripts today. It has a bounded scripting surface,
-   built and tested but connected to nothing (`InstrumentHostService::runScriptAction`: six events
-   in, thirteen actions out, a Pro feature, never on the audio thread). CEditor's panels run
-   scripts in seven languages (`CE/src/Scripting`). Worked out with the owner next.
+#### Scripting, and command sequences instead of it for now
+
+Documented on 2026-11-18 at the owner's word ("Document it"), after the owner asked whether
+HoSTage would benefit from scripting at all.
+
+**What exists.** HoSTage runs no scripts. It has a bounded scripting surface, built and tested but
+connected to nothing: `InstrumentHostService::runScriptAction` and `scriptPerformanceState`. Six
+events go out (transport started and stopped, a clip started and stopped, a scene applied, the
+setlist changed) and thirteen actions come in (play, stop, continue, set tempo, launch and stop
+clips, stop all, launch a scene, next, previous and go to a song, read the show's state, panic).
+Any other action returns nothing, acting needs Pro ("advanced scripting"), reading does not, and
+nothing of it runs on the audio thread. CEditor's panels run scripts in seven languages
+(`CE/src/Scripting`), and a hardware part's CEditor panel already runs its own.
+
+**Whether it would benefit.** Yes, narrowly. Scripting helps with show logic that spans features
+("when this song starts, send the Juno its patch and turn the click on"), with your own pages, and
+with power users, who choose other hosts for their scripting. But most of that logic is several
+actions in a row, which needs no code; hardware synths are already scripted through their panels;
+and scripts that process notes as they are played would have to run on the audio thread, where one
+slow script is a dropout on stage. The cost is a show stopped by a script bug, unless every script
+has a time limit, switches itself off when it fails and can do only what the command list allows,
+and a scripting interface that has to keep up with every new feature in every language.
+
+**So, in this order:**
+
+1. **Command sequences now, with no code** (below).
+2. **Scripting later, as Pro**: scripts react to events (a song, a scene, a section, the transport)
+   and act only through the command list, which the bounded surface grows into; never on the audio
+   thread; a time limit, and a script that fails switches itself off and says so; Stage Lock as
+   everywhere.
+3. **Not**: scripts that process notes as they are played.
+
+**A command sequence** is a list of commands from the command list (Build tools design, section 1)
+that runs in order, each step at once, at the next bar or after a number of bars. It runs from a
+pad (Controller design, a pad layer's "runs"), when a song or a scene is selected, or when a section
+starts. Stage Lock is checked step by step: a step it refuses is skipped and named, and the rest
+still run. Two examples:
+
+- **When "Evening Song" starts**: send the Juno-106 its patch A14 Brass; set the tempo to 92; the
+  click on, in the in-ears only; show the page Strings Swell; mute the Strings until the chorus.
+  Five things done by hand today, or only partly by a scene.
+- **Pad 8, the big ending**: go to the Outro at the next bar; unmute the Strings; move the macro
+  Brightness to 100 % over two bars; the click off after four bars. One press for four hands.
+
+**How a sequence is made**, in a small editor opened where it will run (a song's or a scene's
+"When it starts", a section, or a pad's "Runs → a sequence"):
+
+- **Pick each step.** **+ Step** opens the commands grouped by what they act on (parts; song and
+  show; controller; macros and mixer), or narrowed by typing, as in the command palette. A command
+  asks only for what it needs, from lists of valid choices: Mute asks which part, Set tempo a
+  number, Send patch which hardware part and then that synth's patches, Show page which page. Each
+  step says when (at once, next bar, after N bars). Steps are dragged to reorder; **▶ Try** runs the
+  sequence once.
+- **Or record it by doing it.** **● Record sequence**, then do the things the normal way (pick the
+  patch, type the tempo, turn the click on, choose the page, mute the part), then **■ Stop**:
+  HoSTage has written each action down as a step, in words, still editable. The same idea as
+  "set by showing, set by playing": nobody needs to know a command's name.
 
 ### Practice mode
 
@@ -753,6 +805,9 @@ rig). Within a track, a step needs the ones before it only where it says so.*
 8. **Skins** (skins design): the fourteen CTRL49 palettes with their contrast check, after the roles
    (Build 1); the Stage skin, whose screen already has its tokens; then the HoSTage skin, after the
    tokens (Build 1), every screen checked in the four light skins.
+9. **Command sequences** ("Your own pages", scripting), after the command list (Build 1) and with
+   commands on pads (the Controller tab, Build 7). Then **your own pages**, once where they show is
+   decided: CEditor's controls connected to HoSTage's targets.
 
 **Alongside, independent of both tracks:** show control (MIDI clock out and Ableton Link first, the
 two everyone asks for), the whole rig, and three of the more features that need nothing else: song
@@ -762,7 +817,8 @@ gap, and the drum map (7). From still more: two keyboards with their own parts (
 gig-ready check (3).
 
 **Later:** parallel chains (5) and sidechain ducking (6), which need new routing in the rack; the
-tablet remote, LV2 and CLAP, JACK. **After that:** the mixing desk (decision 9).
+tablet remote, LV2 and CLAP, JACK; scripting as Pro, on the bounded surface grown into the command
+list ("Your own pages"). **After that:** the mixing desk (decision 9).
 
 ## Glossary
 
