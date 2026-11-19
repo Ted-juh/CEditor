@@ -33,6 +33,12 @@ is right.*
 | 10 | **The kick ducks the bass**, from the pattern's own hits | taken; design to come | |
 | 11 | **A line machine**: the drum grid's twin for basslines and synth lines | taken; design to come | |
 | 12 | **Samples, on pads and keys**: a built-in one-shot sampler, the file player made playable | approved with mockups, 2026-11-19 | `hostage-sampler-design.md` |
+| 13 | **Full strength**: every pad hit at full velocity | listed, 2026-11-19 (MPK-style playing) | |
+| 14 | **One drum on every pad**, at eight strengths or eight pitches | listed (MPK-style playing) | |
+| 15 | **Erase while it plays**: hold ERASE and a pad to clear that drum's hits | listed (MPK-style playing) | |
+| 16 | **Mute drums from the pads** | listed (MPK-style playing) | |
+| 17 | **Pad response**: a soft, normal or hard curve for the pads alone, or a fixed strength | listed (MPK-style playing) | |
+| 18 | **Double the pattern**: one bar copied to two, ready to vary | listed (MPK-style playing) | |
 
 ## 1. A drum machine
 
@@ -111,4 +117,87 @@ files dropped one by one or as a folder, collected into the show, and SAMPLES an
 CTRL49. **Approved, 2026-11-19**, with the owner's change: "It shouldn't just be tied to drum
 pads.. the keys could also work or be assignable." Every sample plays from the keys as well, on one
 key or across a range of keys, pitched from a root, and a keyboard map shows which keys play what.
+
+## Where the line is
+
+Written on 2026-11-19, when the owner asked whether all this gets into DAW territory. Every feature
+here passes the first round's question, "does it make the next sound better, or the last sound
+editable?" Five sit close to the line, and each has an obvious next step that would cross it,
+written down, as the first round does, so nobody takes it by accident:
+
+| Feature | Why it is fine | The step that would cross the line | Keep it as |
+| --- | --- | --- | --- |
+| **The drum machine, the line machine** (1, 11) | patterns are loops you perform | patterns chained into a song timeline; long parts | loops of up to 64 steps, started by sections as cues |
+| **Recording into patterns** (KIT's record, 7, 8) | what you play lands on the grid as one loop | takes kept and compared; long recordings not snapped to the grid | written onto the grid, one loop, nothing kept beside it |
+| **A MIDI file on the grid** (6) | a drum loop becomes a pattern | a whole song's part imported as one long part | only the bars that fit a pattern; a whole song's file plays as a MIDI backing file, play-only |
+| **Step effects** (9) | a setting moves inside a loop | automation drawn across a whole song | inside the pattern's loop |
+| **Samples** (12) | files are played, not made | cutting, slicing or normalising a file; recording or bouncing samples | start, end and fades only say how it plays; the file never changes |
+
+The closest is Samples' TRIM page, because it looks like waveform editing, which the first round
+keeps out for good. It is not: nothing is cut or saved, the file stays as it arrived, and only where
+playing starts and stops is stored.
+
+## MPK-style playing
+
+Written on 2026-11-19 at the owner's request ("document the missing features for MPK machines"),
+after the owner noted that the drum machine and Samples reach into Akai's territory.
+
+**What that territory is.** Akai's MPK keyboards (MPK Mini, MPK249, MPK261, MPK Road) are MIDI
+controllers like the CTRL49: they make no sound themselves (the MPK Mini Play, with sounds and a
+speaker, is the exception), and their sound comes from software on the computer, Akai's bundled MPC
+Beats or anything else. Akai's MPC machines (MPC One, Live, X) are another line: standalone, with
+their own sound engine, sampler and sequencer. An MPC is two things: a **performance instrument**
+(pads, note repeat, patterns, one-shots, swing) and a **production workstation** (sampling and
+chopping, song mode, audio tracks, mixdown). **HoSTage takes the playing side and never the
+production side**, which is the DAW the first round keeps out. Put plainly: the CTRL49 with HoSTage
+is what an MPK is with its bundled software, played live, with any plug-in or hardware synth as the
+sound and a colour screen to show it.
+
+**Our own words.** Common terms (note repeat, swing, choke, pad banks) are used as everyone uses
+them; Akai's own names (MPC, Full Level, 16 Levels) and Akai's look are not copied. The features
+below are named for what they do.
+
+**Already covered**, by approved designs or by what exists:
+
+- **Note repeat**: feature 2, done by HoSTage, so no button is needed on the controller.
+- **Pad banks**: the CTRL49 has four (A to D), and HoSTage already lights its pads.
+- **Assignable knobs, faders and buttons**: control pages (Controller design), with commands on
+  pads.
+- **The arpeggiator**, and **chords on the pads** (today, in the CTRL49's own bank, from a part's
+  Chords module).
+- **Swing**: the pattern's groove (the drum machine, PATTERN).
+- **Tap tempo**: a command on a pad (Controller design).
+- **Undo of a recording pass**: undo that covers everything (first round, Build tools design).
+
+**Missing, now listed as features 13 to 18:**
+
+13. **Full strength.** A switch on KIT: every hit at full velocity, whatever the touch, for programming
+    a beat evenly.
+14. **One drum on every pad.** The selected drum spread over all eight pads, at eight strengths
+    (softest to hardest) or, for a sample, at eight pitches: to play a roll that swells, or a tuned
+    hit as a bassline.
+15. **Erase while it plays.** Hold ERASE and press a pad while the pattern plays: that drum's hits are
+    cleared as the playhead passes them, the way a drum machine is tidied without stopping.
+16. **Mute drums from the pads.** A KIT pad layer where each pad mutes or unmutes its drum, for
+    dropping the kick out of a groove and back in.
+17. **Pad response.** A soft, normal or hard curve for the pads alone, or one fixed strength, set
+    apart from the keys, since pads and keys rarely feel alike.
+18. **Double the pattern.** One bar copied to make two, ready to vary the second, the quick way to a
+    longer loop (still within the line's 64 steps).
+
+**What the CTRL49 itself can and cannot do**, from the repository's hardware notes
+(`tools/ctrl49/README.md`) and the Screen Builder design:
+
+- **Eight pads** (2 × 4) where an MPK249 has sixteen: the real difference. A sixteen-step lane is
+  played in two halves (DRUMS: Shift for the other half), and KIT shows eight drums a bank.
+- **Four pad banks**, its own colours on each pad, **eight encoders, nine faders** (the faders suit
+  drum levels better than knobs), **49 keys**, and a **480 × 272 colour screen** that an MPK does not
+  have: the grid, the kit and the waveforms can be seen on the keyboard itself.
+- **Hardware-identical to Akai's Advance keyboards** (Screen Builder design), so these pages would
+  apply there too.
+- **Pad pressure: not known.** The repository records the pads' colours and banks, but not whether
+  they send pressure (aftertouch) when pressed harder. Note repeat's "how hard is set by how hard it
+  is held" needs it; without it, a repeat takes its strength from the first hit. **To test on the
+  owner's CTRL49**: in Audio & MIDI, which shows the last message received, tap a pad softly and hard
+  (does the velocity change?), then hold one and press harder (does pressure arrive?).
 
