@@ -22,7 +22,7 @@ is right.*
 | # | Feature | Status | Design |
 | --- | --- | --- | --- |
 | 1 | **A drum machine**: a drum part's patterns as a grid in the dock and three pages on the CTRL49 | approved with mockups, 2026-11-19; it plays the drum instrument you load and has no sounds of its own | `hostage-drums-design.md` |
-| 2 | **Note repeat** on the KIT pads | taken, 2026-11-19; design to come | |
+| 2 | **Note repeat** on the KIT pads | taken, 2026-11-19; design with mockups for approval | `hostage-kit-design.md` |
 | 3 | **A kit from anywhere**: each drum from a different instrument | taken; design to come | |
 | 4 | **Split a kit onto mixer strips** | taken; design to come | |
 | 5 | **An energy knob** that thins a pattern out or fills it in | taken; design to come | |
@@ -33,12 +33,12 @@ is right.*
 | 10 | **The kick ducks the bass**, from the pattern's own hits | taken; design to come | |
 | 11 | **A line machine**: the drum grid's twin for basslines and synth lines | taken; design to come | |
 | 12 | **Samples, on pads and keys**: a built-in one-shot sampler, the file player made playable | approved with mockups, 2026-11-19 | `hostage-sampler-design.md` |
-| 13 | **Full strength**: every pad hit at full velocity | listed, 2026-11-19 (MPK-style playing) | |
-| 14 | **One drum on every pad**, at eight strengths or eight pitches | listed (MPK-style playing) | |
-| 15 | **Erase while it plays**: hold ERASE and a pad to clear that drum's hits | listed (MPK-style playing) | |
-| 16 | **Mute drums from the pads** | listed (MPK-style playing) | |
-| 17 | **Pad response**: a soft, normal or hard curve for the pads alone, or a fixed strength | listed (MPK-style playing) | |
-| 18 | **Double the pattern**: one bar copied to two, ready to vary | listed (MPK-style playing) | |
+| 13 | **Full strength**: every pad hit at full velocity | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
+| 14 | **One drum on every pad**, at eight strengths or eight pitches | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
+| 15 | **Erase while it plays**: hold ERASE and a pad to clear that drum's hits | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
+| 16 | **Mute drums from the pads** | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
+| 17 | **Pad response**: a soft, normal or hard curve for the pads alone, or a fixed strength | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
+| 18 | **Double the pattern**: one bar copied to two, ready to vary | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
 
 ## 1. A drum machine
 
@@ -169,7 +169,7 @@ below are named for what they do.
 - **Tap tempo**: a command on a pad (Controller design).
 - **Undo of a recording pass**: undo that covers everything (first round, Build tools design).
 
-**Missing, now listed as features 13 to 18:**
+**Missing, now features 13 to 18, all approved by the owner on 2026-11-19 ("All approved"):**
 
 13. **Full strength.** A switch on KIT: every hit at full velocity, whatever the touch, for programming
     a beat evenly.
