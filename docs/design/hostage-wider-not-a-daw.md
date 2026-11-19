@@ -404,7 +404,9 @@ setting; bypass has no crossfade; a part's inserts run in series only; no MIDI m
 5. **Parallel chains inside a part.** The signal splits into two chains and is mixed back: clean and
    distorted guitar side by side, or a dry vocal beside a heavily treated one.
 6. **Sidechain ducking.** A pad dips under the vocal or the kick. Needs the sidechain routing found
-   missing above.
+   missing above. *For every kick HoSTage plays or receives, the second round does it without a
+   sidechain, from the hits themselves (`hostage-duck-design.md`, 2026-11-19); this item stays for
+   ducking from audio, a vocal or a kick drum's microphone.*
 7. **A drum map MIDI module.** Remaps an electronic drum kit's notes to what a drum instrument
    expects. Small, and it is what a drummer on HoSTage needs first (decision 2).
 8. **A better effects screen in the dock.** The chain shown as one row of blocks, in signal order:
