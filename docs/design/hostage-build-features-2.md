@@ -30,7 +30,7 @@ is right.*
 | 7 | **Take the groove from your playing** | taken; design to come | |
 | 8 | **Beatbox it in** | taken; design to come | |
 | 9 | **Step effects**: a lane that changes an effect's setting step by step | approved with mockups, 2026-11-19 | `hostage-steps-design.md` |
-| 10 | **The kick ducks the bass**, from the pattern's own hits | taken; design with mockups for approval, 2026-11-19 | `hostage-duck-design.md` |
+| 10 | **The kick ducks the bass**, from the pattern's own hits | approved with mockups, 2026-11-19 | `hostage-duck-design.md` |
 | 11 | **A line machine**: the drum grid's twin for basslines and synth lines | approved with mockups, 2026-11-19 | `hostage-line-design.md` |
 | 12 | **Samples, on pads and keys**: a built-in one-shot sampler, the file player made playable | approved with mockups, 2026-11-19 | `hostage-sampler-design.md` |
 | 13 | **Full strength**: every pad hit at full velocity | approved with mockups, 2026-11-19 (MPK-style playing) | `hostage-kit-design.md` |

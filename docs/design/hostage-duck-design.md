@@ -1,6 +1,7 @@
 # HoSTage: the kick ducks the bass
 
-*Design with mockups for the owner to approve, 2026-11-19. Nothing built. Feature 10 of
+*Design with mockups, approved by the owner on 2026-11-19 as recommended ("Do what is recommended").
+Nothing built. Feature 10 of
 `hostage-build-features-2.md`, taken. Mockups: `hostage-duck-mockups.html`, pictures
 `docs/media/hostage-duck-1.png` (the dock) and `-2.png` (the DUCK page on the CTRL49). When this and
 the code disagree, the code is right.*
@@ -61,12 +62,12 @@ needs the audio sidechain, which stays later.
   hardware part.
 - **The DUCK block, the dock view and the page.**
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-19: "Do what is recommended")
 
 1. **Ducking from the hits HoSTage plays or receives**, on the part's own level, with the audio
-   sidechain for a real kick drum left for later?
-2. **Pattern and pads** by default, **pattern only** as the choice?
+   sidechain for a real kick drum left for later. **Yes.**
+2. **Pattern and pads** by default, **pattern only** as the choice. **Yes.**
 3. **Release in note values** by default, milliseconds as the choice; **other parts ducked** too, each
-   with its own depth?
-4. **A hardware kick's dip waits for its sound**, by its measured lateness?
-5. **The DUCK page** on the CTRL49?
+   with its own depth. **Yes.**
+4. **A hardware kick's dip waits for its sound**, by its measured lateness. **Yes.**
+5. **The DUCK page** on the CTRL49. **Yes.**
