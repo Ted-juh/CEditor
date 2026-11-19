@@ -1,6 +1,7 @@
 # HoSTage: playing the kit
 
-*Design with mockups for the owner to approve, 2026-11-19. Nothing built. It draws seven features
+*Design with mockups, approved by the owner on 2026-11-19, with one change to the pads' strength
+(decision 2). Nothing built. It draws seven features
 of `hostage-build-features-2.md` that live on the drum machine's pads, all taken: 2 (note repeat)
 and 13 to 18 (full strength, one drum on every pad, erase while it plays, mute drums from the pads,
 pad response, double the pattern). They are decided; this record decides only how they look and
@@ -37,10 +38,10 @@ The drum machine's editor gains a **Pads** panel: what the eight pads do now, an
   - **Mute** (16): each pad mutes or unmutes its drum while the pattern plays.
   - **Erase** (15): hold a pad and its drum's hits are cleared as the playhead passes them; let go
     to stop. Undo puts them back.
-- **Strength** (17 and 13): how the pads answer, for the pads alone; the keys keep their own
-  response. **Soft** (a light touch gives more), **Normal**, **Hard** (it takes a harder hit),
-  **Full** (every hit 127: feature 13) or **Fixed** (one strength you choose). Drawn as a curve,
-  how hard you hit against the strength sent.
+- **Full strength** (13): on or off. On, every hit is 127, for programming a beat evenly.
+- **No response curve for the pads** (17, changed by decision 2): pads that send velocity play as
+  hard as they are hit, and nothing changes it. Only if the pads send no velocity do they get one
+  **fixed strength**, set here. The keys keep their own response either way.
 - **×2 Double** (18) in the pattern bar: the pattern's bar copied to make two, ready to vary the
   second, within the line's 64 steps.
 
@@ -50,7 +51,7 @@ The drum machine's editor gains a **Pads** panel: what the eight pads do now, an
 
 - **KIT keeps the pads as the drums** and gains a **MODE** knob (play, repeat, one drum, mute,
   erase), a **RATE** knob for repeat, a **SPREAD** knob for one drum (strength or pitch) and a
-  **STRENGTH** knob for the response, with FULL at its top. The first four knobs stay the drums'
+  **FULL** knob for full strength. The first four knobs stay the drums'
   levels.
 - **REPEAT** shows the held pad's repeats as they play. **MUTE** shows each drum playing or muted.
   **ERASE** shows the held drum's lane, the hits cleared since the pad went down, and the playhead.
@@ -67,17 +68,18 @@ The drum machine's editor gains a **Pads** panel: what the eight pads do now, an
   pitches (Samples design).
 - **Mute and erase**: a lane's mute, and its steps cleared in real time as the playhead passes, as
   one undo step per press.
-- **Strength**: a curve applied to the pads' velocity only, before the drum machine and Samples
-  see it.
+- **Full strength**: every pad hit sent at 127 while on; a fixed strength instead of velocity only
+  if the pads send none (the pad test says which).
 - **Double**: a pattern's steps copied into a second bar.
 - **The pad pressure test** on the owner's CTRL49 (features record, MPK-style playing).
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-19: "Approved. 1. Yes. 2. If the pads have velocity, no. 3. Yes. 4. Yes")
 
 1. **Five ways for the pads to play** (play, repeat, one drum, mute, erase), chosen in the dock and
-   with a MODE knob on KIT?
-2. **One strength setting for the pads alone** (soft, normal, hard, full, fixed), the keys keeping
-   their own?
+   with a MODE knob on KIT. **Yes.**
+2. **A strength setting for the pads alone.** **No, if the pads have velocity**: they play as hard as
+   they are hit, with no response curve. Full strength (feature 13) stays, as a switch. Only pads
+   without velocity get one fixed strength. The mockups show this.
 3. **Note repeat swung by the pattern's groove**, louder when held harder only if the pads send
-   pressure?
-4. **×2 in the pattern bar and on PATTERN**, within the 64 steps?
+   pressure. **Yes.**
+4. **×2 in the pattern bar and on PATTERN**, within the 64 steps. **Yes.**

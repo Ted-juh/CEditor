@@ -22,7 +22,7 @@ is right.*
 | # | Feature | Status | Design |
 | --- | --- | --- | --- |
 | 1 | **A drum machine**: a drum part's patterns as a grid in the dock and three pages on the CTRL49 | approved with mockups, 2026-11-19; it plays the drum instrument you load and has no sounds of its own | `hostage-drums-design.md` |
-| 2 | **Note repeat** on the KIT pads | taken, 2026-11-19; design with mockups for approval | `hostage-kit-design.md` |
+| 2 | **Note repeat** on the KIT pads | approved with mockups, 2026-11-19 | `hostage-kit-design.md` |
 | 3 | **A kit from anywhere**: each drum from a different instrument | taken; design to come | |
 | 4 | **Split a kit onto mixer strips** | taken; design to come | |
 | 5 | **An energy knob** that thins a pattern out or fills it in | taken; design to come | |
@@ -33,12 +33,12 @@ is right.*
 | 10 | **The kick ducks the bass**, from the pattern's own hits | taken; design to come | |
 | 11 | **A line machine**: the drum grid's twin for basslines and synth lines | taken; design to come | |
 | 12 | **Samples, on pads and keys**: a built-in one-shot sampler, the file player made playable | approved with mockups, 2026-11-19 | `hostage-sampler-design.md` |
-| 13 | **Full strength**: every pad hit at full velocity | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
-| 14 | **One drum on every pad**, at eight strengths or eight pitches | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
-| 15 | **Erase while it plays**: hold ERASE and a pad to clear that drum's hits | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
-| 16 | **Mute drums from the pads** | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
-| 17 | **Pad response**: a soft, normal or hard curve for the pads alone, or a fixed strength | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
-| 18 | **Double the pattern**: one bar copied to two, ready to vary | approved, 2026-11-19 (MPK-style playing); design with mockups for approval | `hostage-kit-design.md` |
+| 13 | **Full strength**: every pad hit at full velocity | approved with mockups, 2026-11-19 (MPK-style playing) | `hostage-kit-design.md` |
+| 14 | **One drum on every pad**, at eight strengths or eight pitches | approved with mockups, 2026-11-19 (MPK-style playing) | `hostage-kit-design.md` |
+| 15 | **Erase while it plays**: hold ERASE and a pad to clear that drum's hits | approved with mockups, 2026-11-19 (MPK-style playing) | `hostage-kit-design.md` |
+| 16 | **Mute drums from the pads** | approved with mockups, 2026-11-19 (MPK-style playing) | `hostage-kit-design.md` |
+| 17 | **Pad response**: changed by the owner: no curve when the pads send velocity; a fixed strength only for pads without it | approved with mockups, 2026-11-19 (MPK-style playing) | `hostage-kit-design.md` |
+| 18 | **Double the pattern**: one bar copied to two, ready to vary | approved with mockups, 2026-11-19 (MPK-style playing) | `hostage-kit-design.md` |
 
 ## 1. A drum machine
 
@@ -181,7 +181,9 @@ below are named for what they do.
 16. **Mute drums from the pads.** A KIT pad layer where each pad mutes or unmutes its drum, for
     dropping the kick out of a groove and back in.
 17. **Pad response.** A soft, normal or hard curve for the pads alone, or one fixed strength, set
-    apart from the keys, since pads and keys rarely feel alike.
+    apart from the keys, since pads and keys rarely feel alike. *Changed when drawn (the owner,
+    2026-11-19: "If the pads have velocity, no"): pads that send velocity play as hit, with no curve;
+    only pads without velocity get one fixed strength (`hostage-kit-design.md`, decision 2).*
 18. **Double the pattern.** One bar copied to make two, ready to vary the second, the quick way to a
     longer loop (still within the line's 64 steps).
 

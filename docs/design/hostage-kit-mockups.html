@@ -62,8 +62,8 @@
 <section class="frame" id="f1">
   <div class="caption">
     <h2>1 · Playing the kit, in the dock</h2>
-    <p>The drum machine gets a Pads panel: what the eight pads do now, and how they feel. Five ways of playing (play, repeat, one drum, mute,
-      erase), one strength setting for the pads alone, and the repeat rate. Here "one drum" is on: the snare is spread over all eight pads,
+    <p>The drum machine gets a Pads panel: what the eight pads do now. Five ways of playing (play, repeat, one drum, mute, erase), full strength
+      on or off, and the repeat rate. Here "one drum" is on: the snare is spread over all eight pads,
       softest to hardest. The pattern bar gains ×2, which doubles the pattern.</p>
   </div>
   <div class="app">
@@ -82,9 +82,8 @@
           <span class="kk">Repeat rate</span><span class="seg"><span>1/8</span><span class="on">1/16</span><span>1/32</span><span>1/8T</span><span>1/16T</span></span>
           <span class="kk">Repeat swing</span><span><span class="v">the pattern's groove</span></span>
         </div>
-        <div class="kv"><span class="kk">Strength</span><span class="seg"><span>Soft</span><span class="on">Normal</span><span>Hard</span><span>Full</span><span>Fixed</span></span></div>
-        <div id="curve1"></div>
-        <div class="say">The pads answer normally: a hit as hard as you play it. Full makes every hit 127; Fixed holds one strength you choose. The keys keep their own response.</div>
+        <div class="kv"><span class="kk">Full strength</span><span class="seg"><span class="on">Off</span><span>On</span></span></div>
+        <div class="say">The pads play as hard as they are hit: they send velocity, so nothing changes it. Full strength makes every hit 127, for programming a beat evenly. Had the pads sent no velocity, one fixed strength would be set here instead.</div>
         <div class="warn">Held pressure not detected on these pads: a repeat takes its strength from the first hit. If they send pressure, holding harder makes the repeat louder.</div>
       </div>
     </div>
@@ -96,7 +95,7 @@
     <h2>2 · KIT on the CTRL49, three ways of playing</h2>
     <p>KIT keeps the pads as the drums and gains a MODE knob. REPEAT: hold a pad and it repeats at the rate, swung like the pattern. MUTE: each
       pad mutes or unmutes its drum while the pattern plays. ERASE: hold a pad and its drum's hits are cleared as the playhead passes them.
-      STRENGTH is the pads' response, FULL its top. PATTERN gains ×2. Which knob and pad does what is settled when the pages are built.</p>
+      FULL makes every hit full strength. PATTERN gains ×2. Which knob and pad does what is settled when the pages are built.</p>
   </div>
   <div class="three"><figure id="p1"></figure><figure id="p2"></figure><figure id="p3"></figure></div>
 </section>
@@ -112,7 +111,7 @@
     s += curve(1.8, '#65717c', 1.2, 1) + curve(.55, '#65717c', 1.2, 1) + curve(1, '#79b9ee', 2.5) + `<line x1="${X(0)}" y1="${Y(127)}" x2="${X(127)}" y2="${Y(127)}" stroke="#d7a44e" stroke-width="1.2" stroke-dasharray="4 3"/>`;
     s += `<text x="${X(127) - 4}" y="${Y(127) - 4}" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#d7a44e">full</text><text x="${X(100)}" y="${Y(58)}" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#65717c">hard</text><text x="${X(32)}" y="${Y(80)}" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#65717c">soft</text>`;
     s += `<text x="${W / 2}" y="${H - 6}" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="10.5" fill="#7f8b96">how hard you hit</text><text x="14" y="${H / 2}" font-family="DejaVu Sans, sans-serif" font-size="10.5" fill="#7f8b96" transform="rotate(-90 14 ${H / 2})" text-anchor="middle">strength sent</text>`;
-    document.getElementById('curve1').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; }
+    const c1 = document.getElementById('curve1'); if (c1) c1.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; }
 
   // ---- CTRL49 pages ----
   const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378', violet: '#8B7CFF', teal: '#2DD4BF', amber: '#FFB547', pink: '#FF5C93' };
@@ -125,7 +124,7 @@
   const cells = (list) => list.map((c, i) => { if (!c) return ''; const cx = i * 60 + 30;
     return T(cx, 217, c.l, c.focus ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, c.v, c.focus ? C.teal : C.text, c.vs || 13, "text-anchor='middle' font-weight='600'") + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (c.f ? `<rect x="${i * 60 + 8}" y="244" width="${44 * c.f}" height="4" rx="2" fill="${C.bar}"/>` : ''); }).join('');
   const kitCells = (mode, focus) => cells([{ l: 'KICK', v: '−2.0', f: .8 }, { l: 'SNARE', v: '0.0', f: .9 }, { l: 'CLAP', v: '−6.0', f: .6 }, { l: 'HAT CL', v: '−4.0', f: .7 },
-    { l: 'STRENGTH', v: 'NORMAL', vs: 10.5 }, { l: 'RATE', v: '1/16', focus: focus === 'rate' }, { l: 'SPREAD', v: 'STRENGTH', vs: 9.5 }, { l: 'MODE', v: mode, vs: 11, focus: true }]);
+    { l: 'FULL', v: 'OFF', vs: 12 }, { l: 'RATE', v: '1/16', focus: focus === 'rate' }, { l: 'SPREAD', v: 'STRENGTH', vs: 9.5 }, { l: 'MODE', v: mode, vs: 11, focus: true }]);
   const svg = (s) => `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
   const grid = (draw) => { let s = `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>`; KIT.forEach(([n, c], i) => { const x = 16 + (i % 4) * 114, y = 38 + Math.floor(i / 4) * 68; s += draw(n, c, i, x, y); }); return s; };
   // REPEAT
