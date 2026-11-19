@@ -21,7 +21,7 @@ is right.*
 
 | # | Feature | Status | Design |
 | --- | --- | --- | --- |
-| 1 | **A drum machine**: a drum part's patterns as a grid in the dock and three pages on the CTRL49 | design with mockups for approval, 2026-11-19; one question open: whether it has sounds of its own | `hostage-drums-design.md` |
+| 1 | **A drum machine**: a drum part's patterns as a grid in the dock and three pages on the CTRL49 | approved with mockups, 2026-11-19; it plays the drum instrument you load and has no sounds of its own | `hostage-drums-design.md` |
 
 ## 1. A drum machine
 
@@ -35,6 +35,6 @@ drum part a **DRUMS** block at the head of its chain, the grid below it, and thr
 **DRUMS** (the grid), **KIT** (the pads are the drums) and **PATTERN** (which pattern, its
 variations, the groove, the fill).
 
-**Open:** whether it plays only drum instruments you load (a plug-in or a hardware drum machine), as
-the first round's decision 3 says, or has drum sounds of its own, which would change that decision.
-See the design record, decision 1.
+**Approved, 2026-11-19.** It plays the drum instrument you load, a plug-in or a hardware drum
+machine, and has no sounds of its own, so the first round's decision 3 stands. It is built on the
+existing patterns, and the three CTRL49 pages are as drawn.

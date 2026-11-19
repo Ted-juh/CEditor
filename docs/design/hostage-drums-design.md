@@ -1,6 +1,6 @@
 # HoSTage: the drum machine
 
-*Design with mockups for the owner to approve, 2026-11-19. Nothing built. Feature 1 of
+*Design with mockups, approved by the owner on 2026-11-19 ("1. A. 2. Yes. 3. Yes"). Nothing built. Feature 1 of
 `hostage-build-features-2.md`. Mockups: `hostage-drums-mockups.html`, pictures
 `docs/media/hostage-drums-1.png` (the dock) and `-2.png` (the three CTRL49 pages). When this and
 the code disagree, the code is right.*
@@ -75,15 +75,15 @@ translates a kit's notes for an instrument that expects others.
   General MIDI names.
 - **Recording from KIT**: hits written to the nearest step, strength from the pad.
 - **▶ Play pattern** in Build: the pattern's clip launched on its own, with the transport.
-- **The sound**, depending on decision 1.
+- **No sound of its own** (decision 1): a drum part needs a drum instrument loaded, a plug-in or a
+  hardware drum machine, like any other part.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-19)
 
-1. **The sounds.** (a) It plays any drum instrument you load, a plug-in or a hardware drum machine,
-   and has no sounds of its own, as the first round's decision 3 says (built-ins are utilities
-   only). Or (b) it has drum sounds of its own, so a drum part works with nothing loaded, which
-   changes decision 3. Recommended: (a).
+1. **The sounds: (a).** It plays any drum instrument you load, a plug-in or a hardware drum
+   machine, and has no sounds of its own, as the first round's decision 3 says. The alternative,
+   drum sounds of its own, was declined.
 2. **Built on the existing patterns**, one engine for melody and drums, shown in the dock as the
-   drum part's DRUMS block?
+   drum part's DRUMS block. **Yes.**
 3. **The three CTRL49 pages**, DRUMS, KIT and PATTERN, as drawn, with their knobs and pads settled
-   when built?
+   when built. **Yes.**
