@@ -12,6 +12,9 @@ is right.*
 
 - **What this record is**: the list of the second round's Build features, each with its status and
   its design record. The decisions are in the design records; this record says where they are.
+- **Where it stands** (2026-11-19): all eighteen features are designed and approved, in nine
+  design records, each with mockups. Nothing is built. The order to build them in is not decided
+  yet.
 - **The rules carried over**: Build mode first, Stage last (the owner, 2026-11-18); a page's knobs
   set values and its pads switch options; which knob and pad does what is checked against the rest
   of the keyboard when a page is built (the owner, 2026-11-18); built-ins are utilities only, no
@@ -25,7 +28,7 @@ is right.*
 | 2 | **Note repeat** on the KIT pads | approved with mockups, 2026-11-19 | `hostage-kit-design.md` |
 | 3 | **A kit from anywhere**: each drum from a different instrument | approved with mockups, 2026-11-19 | `hostage-kitbuild-design.md` |
 | 4 | **Split a kit onto mixer strips** | approved with mockups, 2026-11-19 | `hostage-kitbuild-design.md` |
-| 5 | **An energy knob** that thins a pattern out or fills it in | designed with mockups, 2026-11-19; for the owner to decide. Not built on B to D: see the design | `hostage-energy-design.md` |
+| 5 | **An energy knob** that thins a pattern out or fills it in | approved with mockups, 2026-11-19; not built on B to D: see the design | `hostage-energy-design.md` |
 | 6 | **Drop a MIDI file on the grid** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |
 | 7 | **Take the groove from your playing** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |
 | 8 | **Beatbox it in** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |

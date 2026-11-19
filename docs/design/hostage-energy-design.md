@@ -1,6 +1,7 @@
 # HoSTage: the energy knob
 
-*Design with mockups, for the owner to decide. Nothing built. Feature 5 of
+*Design with mockups, approved by the owner on 2026-11-19 as recommended ("Document it").
+Nothing built. Feature 5 of
 `hostage-build-features-2.md`, taken. The record's first idea, building on variations B, C and D,
 was checked against the code and fails, so the design does it another way and says why. Mockups:
 `hostage-energy-mockups.html`, pictures `docs/media/hostage-energy-1.png` (the knob in the dock),
@@ -97,15 +98,15 @@ or build towards the chorus without changing pattern, live or set per section.
   section's scene.
 - **The block's knob, the five small grids, Keep as a pattern, and the ENERGY page.**
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-19: "Document it and make it a download")
 
 1. **Not built on B, C and D**, for the reasons above; instead a knob whose middle is the pattern as
    written, thinning in a fixed order to the backbone, filling from a pattern you choose or from the
-   pattern itself. *Recommended: yes.*
+   pattern itself. **Yes.**
 2. **Fixed, not random**: each position always the same pattern, so a build can be rehearsed.
-   *Recommended: yes.*
+   **Yes.**
 3. **The choices in the program**: strength with it, drums or drums and lines, its own knob or one
-   for all. *Recommended: yes, with the defaults drawn.*
+   for all. **Yes**, with the defaults drawn.
 4. **Per section**: energy and a rise over up to 8 bars, a setting rising with it, the knob taking
-   over when touched. *Recommended: yes.*
-5. **The ENERGY page** with DROP, RISE, AS WRITTEN and KEEP. *Recommended: yes.*
+   over when touched. **Yes.**
+5. **The ENERGY page** with DROP, RISE, AS WRITTEN and KEEP. **Yes.**
