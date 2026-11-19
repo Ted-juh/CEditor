@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: the line machine, mockups</title>
+<!--
+  Mockups for docs/design/hostage-line-design.md: feature 11 of hostage-build-features-2.md, the
+  drum grid's twin for basslines and synth lines, built on the pattern model's note lanes
+  (PatternModel.h: LaneType::note; PatternStep note, velocity, gate, tie, probability, ratchets,
+  microtiming). Static, invented data; HoSTage's own colours in the dock; the CTRL49 page drawn once
+  at 480 x 272 in the original look (Midnight).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { border: 1px solid var(--line-soft); background: var(--bg); overflow: hidden; }
+  .dtabs { display: flex; align-items: center; gap: 2px; padding: 5px 12px; border-bottom: 1px solid var(--line-soft); background: var(--surface); }
+  .dtabs span.tb { padding: 4px 11px; font-size: 12px; color: var(--soft); border-radius: 3px; }
+  .dtabs span.tb.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .dtabs .subj { margin-left: 14px; font-weight: 600; }
+  .sp { flex: 1; }
+  .strip { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); background: var(--surface); }
+  .blk { display: flex; flex-direction: column; gap: 3px; min-width: 160px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--raised); font-size: 12.5px; }
+  .blk small { font: 600 9.5px var(--mono); letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+  .blk span { color: var(--soft); font-size: 11.5px; }
+  .blk.sel { border-color: var(--accent); background: var(--accent-surface); }
+  .arrow { align-self: center; color: var(--faint); }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--line-soft); }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .k { color: var(--dim); font-size: 12px; } .v { font: 600 12px var(--mono); }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .play { padding: 4px 12px; border: 1px solid var(--active); border-radius: 3px; background: var(--active-surface); color: #8fd1a8; font-weight: 600; font-size: 12px; }
+  .body { display: flex; gap: 12px; padding: 12px 14px; }
+  .insp { width: 310px; flex: none; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .insp h4 { margin: 0; font-size: 14px; } .insp .sub { color: var(--dim); font-size: 12px; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+  .say { padding: 8px 11px; border-left: 3px solid var(--accent); background: var(--accent-surface); border-radius: 0 4px 4px 0; font-size: 12.5px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 7px 10px; align-items: center; font-size: 12.5px; }
+  .kv > span.kk { color: var(--dim); }
+  .field { padding: 3px 8px; background: var(--field); border: 1px solid var(--line); border-radius: 3px; font: 12px var(--mono); display: inline-block; }
+  .note { color: var(--faint); font-size: 11.5px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  figure { margin: 0; } figure svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  figcaption { margin-top: 8px; color: var(--soft); font-size: 12.5px; } figcaption b { color: var(--text); }
+  .refnotes { color: var(--soft); } .refnotes h4 { margin: 0 0 6px; color: var(--text); } .refnotes ul { margin: 0 0 14px; padding-left: 18px; } .refnotes li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · The line machine in the dock</h2>
+    <p>A bass part's chain starts with a LINE block: its patterns, as a drum part's starts with DRUMS. Below it, the line on a piano roll that
+      shows only the notes of the key, so every row is a right note. Under the roll, two rows of switches: <b>accent</b> (played harder, and if you
+      like, brighter) and <b>slide</b> (the note runs into the next, and the synth glides). Hold a key to move the whole line from it.</p>
+  </div>
+  <div class="app">
+    <div class="dtabs"><span class="tb on">Chain</span><span class="tb">Params</span><span class="tb">Zone</span><span class="tb">Sounds</span><span class="subj">5 · Moog Bass</span><span class="sp"></span></div>
+    <div class="strip">
+      <div class="blk sel"><small>Line</small>Verse · A<span>16 steps · A minor · follows the key</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>Instrument</small>Diva<span>Moog Bass · glide on</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>Insert</small>Drive<span>TONE +3.1 dB</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>Out</small>Main<span>−6.0 dB</span></div>
+    </div>
+    <div class="bar"><span class="k">Pattern</span><span class="seg"><span>Intro</span><span class="on">Verse</span><span>Chorus</span><span>Bridge</span></span><span class="seg"><span class="on">A</span><span>B</span><span>C</span><span>D</span></span>
+      <span class="k">Key</span><span class="seg"><span class="on">A minor</span><span>change…</span></span><span class="k">Follows</span><span class="seg"><span>off</span><span class="on">the key held</span><span>the chord held</span></span>
+      <span class="sp"></span><span class="k">Groove</span><span class="v">Swing 16 · 54 %</span><span class="ghostb">×2</span><span class="play">▶ Play pattern</span></div>
+    <div class="body"><div id="roll1"></div>
+      <div class="insp"><span class="lbl">Step 4</span><h4>C2, sliding into E2</h4><span class="sub">a quarter of a beat, held into the next note</span>
+        <div class="say">Plays C2 at normal strength and runs into step 5, so Diva glides up to E2 instead of starting it again.</div>
+        <div class="kv"><span class="kk">Note</span><span><span class="field">C2</span> <span class="note">rows show A minor only</span></span>
+          <span class="kk">Accent</span><span><span class="field">off</span></span>
+          <span class="kk">Slide</span><span><span class="field">on</span> <span class="note">into the next note</span></span>
+          <span class="kk">Length</span><span><span class="field">55 %</span> <span class="note">of a step, when not sliding</span></span>
+          <span class="kk">Chance</span><span><span class="field">100 %</span></span>
+          <span class="kk">Octave</span><span><span class="field">0</span></span></div>
+        <span class="lbl" style="margin-top:6px">The whole line</span>
+        <div class="kv"><span class="kk">Accent</span><span><span class="field">+30</span> strength, and <span class="field">Cutoff +20 %</span></span>
+          <span class="kk">Slide</span><span><span class="field">the synth's own glide</span></span></div>
+        <div class="note">Accent and slide are new per step; note, strength, length, tie and chance are what a note lane already stores.</div>
+      </div></div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · LINE on the CTRL49</h2>
+    <p>One new page; the other two are already designed. LINE is the line at the keyboard's size, with the accents and slides marked; knob 1 walks
+      the steps, the next ones set the step's note, accent, slide and length; the pads turn steps on and off, a half at a time. The melody's
+      piano roll is the step sequencer's NOTES page, and choosing the pattern is the drum machine's PATTERN page.</p>
+  </div>
+  <div class="two"><figure id="p1"></figure>
+    <div class="refnotes"><h4>Three pages, one new</h4>
+      <ul><li><b>LINE</b> (new): the line, accents and slides, steps on the pads.</li>
+        <li><b>NOTES</b>: the step sequencer's page from the Chain design, the whole keyboard on its side, for writing the melody note by note.</li>
+        <li><b>PATTERN</b>: the drum machine's page, the same for drums and lines: which part of the song, A to D, the groove, ×2.</li></ul>
+      <h4>Not the step sequencer</h4>
+      <ul><li>The step sequencer is a module that plays while you hold keys, like the arpeggiator.</li>
+        <li>The line machine is a pattern: it plays with the song, started by its sections; a held key only moves it.</li></ul>
+    </div></div>
+</section>
+
+<script>
+  // the line: [note, accent, slide] per step, null = rest. Notes named as this project names them (C3 = 60).
+  const N = { G1: 43, A1: 45, B1: 47, C2: 48, D2: 50, E2: 52, F2: 53, G2: 55, A2: 57 };
+  const STEPS = [['A1', 1, 0], null, ['A1', 0, 0], ['C2', 0, 1], ['E2', 1, 0], ['A1', 0, 0], null, ['G1', 0, 1],
+                 ['A1', 1, 0], ['A2', 0, 0], ['A1', 0, 1], ['G1', 0, 0], ['C2', 1, 1], ['D2', 0, 1], ['E2', 0, 0], ['G1', 0, 0]];
+  const ROWS = ['A2', 'G2', 'F2', 'E2', 'D2', 'C2', 'B1', 'A1', 'G1'];   // A minor, high to low
+  { const W = 1040, NAME = 60, SW = (W - NAME - 14) / 16, RH = 26, top = 22, rowsH = ROWS.length * RH; let s = '';
+    const H = top + rowsH + 74; s += `<rect width="${W}" height="${H}" rx="6" fill="#171c21"/>`;
+    for (let i = 0; i < 16; i++) s += `<text x="${NAME + i * SW + SW / 2}" y="15" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="10.5" fill="${i % 4 ? '#65717c' : '#aab5be'}">${i + 1}</text>`;
+    ROWS.forEach((r, k) => { const y = top + k * RH; const root = r[0] === 'A';
+      s += `<rect x="${NAME}" y="${y}" width="${W - NAME - 14}" height="${RH - 1}" fill="${root ? '#1d252c' : (k % 2 ? '#191f25' : '#1b2128')}"/>`;
+      s += `<text x="${NAME - 8}" y="${y + 17}" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="11" fill="${root ? '#79b9ee' : '#aab5be'}">${r}</text>`; });
+    for (let i = 1; i < 16; i++) s += `<line x1="${NAME + i * SW}" y1="${top}" x2="${NAME + i * SW}" y2="${top + rowsH}" stroke="${i % 4 ? '#22292f' : '#2c353e'}"/>`;
+    const ry = (n) => top + ROWS.indexOf(n) * RH;
+    STEPS.forEach((st, i) => { if (!st) return; const [n, acc, sl] = st; const x = NAME + i * SW + 3, y = ry(n) + 3, w = sl ? SW - 3 : SW * .55, sel = i === 3;
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${RH - 7}" rx="3" fill="${acc ? '#e8a33a' : '#5b9bd5'}" ${sel ? 'stroke="#fff" stroke-width="2"' : ''}/>`;
+      if (sl) { const nx = STEPS[i + 1]; if (nx) { const y2 = ry(nx[0]) + 3 + (RH - 7) / 2; s += `<path d="M${x + w - 2} ${y + (RH - 7) / 2} C ${x + w + 8} ${y + (RH - 7) / 2}, ${x + w + 2} ${y2}, ${x + w + 12} ${y2}" stroke="#fff" stroke-width="1.6" fill="none" opacity=".8"/>`; } } });
+    // accent and slide rows
+    const rowY = top + rowsH + 10;
+    [['accent', 1, '#e8a33a'], ['slide', 2, '#ffffff']].forEach(([lab, idx, col], k) => { const y = rowY + k * 26;
+      s += `<text x="${NAME - 8}" y="${y + 15}" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#aab5be">${lab}</text>`;
+      for (let i = 0; i < 16; i++) { const st = STEPS[i]; const on = st && st[idx]; s += `<rect x="${NAME + i * SW + SW / 2 - 9}" y="${y + 3}" width="18" height="18" rx="4" fill="${on ? col : '#20272e'}" opacity="${on ? .9 : 1}"/>`; } });
+    s += `<rect x="${NAME + 4 * SW}" y="${top - 4}" width="${SW}" height="3" fill="#58a879"/>`;
+    document.getElementById('roll1').innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${s}</svg>`; }
+
+  // ---- the LINE page ----
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378', grid: '#1F2742', gridS: '#2B3456', violet: '#8B7CFF', teal: '#2DD4BF', amber: '#FFB547' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  { let s = `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${C.violet}"/>` + T(18, 22, 'LINE', C.text, 16, "font-weight='700'") + T(472, 21, 'VERSE A · A MINOR · FOLLOWS KEY', C.dim, 10, "text-anchor='end'");
+    s += `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>`;
+    const X0 = 40, cw = 26.5, rh = 12.5, top = 34;
+    ROWS.forEach((r, k) => { const y = top + k * rh; s += `<rect x="${X0}" y="${y}" width="${cw * 16}" height="${rh - 1}" fill="${r[0] === 'A' ? '#1b2342' : C.bg}" opacity=".7"/>` + T(X0 - 4, y + 9.5, r, r[0] === 'A' ? C.teal : C.dim, 7.5, "text-anchor='end' font-weight='700'"); });
+    for (let i = 8; i < 16; i++) s += `<rect x="${X0 + i * cw}" y="${top}" width="${cw}" height="${ROWS.length * rh}" fill="${C.gridS}" opacity=".25"/>`;
+    STEPS.forEach((st, i) => { if (!st) return; const [n, acc, sl] = st; const x = X0 + i * cw + 2, y = top + ROWS.indexOf(n) * rh + 2, w = sl ? cw - 2 : cw * .55;
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${rh - 5}" rx="1.5" fill="${acc ? C.amber : C.violet}" ${i === 11 ? 'stroke="#fff" stroke-width="1.2"' : ''}/>`; });
+    STEPS.forEach((st, i) => { const x = X0 + i * cw + cw / 2; if (st && st[1]) s += T(x, 160, '›', C.amber, 11, "text-anchor='middle' font-weight='700'"); if (st && st[2]) s += `<path d="M${x - 6} 168 q 6 -6 12 0" stroke="#fff" stroke-width="1.3" fill="none"/>`; });
+    s += T(14, 160, 'ACC', C.label, 6.5, "font-weight='700'") + T(14, 170, 'SLIDE', C.label, 6.5, "font-weight='700'");
+    s += `<rect x="${X0 + 4 * cw}" y="${top - 2}" width="${cw}" height="2" fill="${C.teal}"/>`;
+    [8, 9, 10, 11, 12, 13, 14, 15].forEach((st, i) => { const x = i * 60 + 6, on = !!STEPS[st]; s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${on ? (STEPS[st][1] ? C.amber : C.violet) : C.raised}" ${st === 11 ? 'stroke="#fff" stroke-width="1.5"' : ''}/>` + T(x + 24, 192, `${st + 1}`, on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'"); });
+    [['STEP', '12', 1], ['NOTE', 'G1'], ['ACCENT', 'OFF'], ['SLIDE', 'OFF'], ['LENGTH', '55%', 0, .55], ['OCTAVE', '0'], ['CHANCE', '100%', 0, 1], ['HALF', '9–16']].forEach(([l, v, f, b], i) => { const cx = i * 60 + 30;
+      s += T(cx, 217, l, f ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, f ? C.teal : C.text, 13, "text-anchor='middle' font-weight='600'") + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (b ? `<rect x="${i * 60 + 8}" y="244" width="${44 * b}" height="4" rx="2" fill="${C.bar}"/>` : ''); });
+    s += T(8, 265, 'PADS: THE STEPS, A HALF AT A TIME · HOLD A KEY TO MOVE THE LINE', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('p1').innerHTML = `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg><figcaption><b>LINE</b> · the line in A minor, accents amber, slides marked; knob 1 the step, then note, accent, slide, length, octave, chance</figcaption>`; }
+</script>
+</body>
+</html>
