@@ -26,9 +26,9 @@ is right.*
 | 3 | **A kit from anywhere**: each drum from a different instrument | approved with mockups, 2026-11-19 | `hostage-kitbuild-design.md` |
 | 4 | **Split a kit onto mixer strips** | approved with mockups, 2026-11-19 | `hostage-kitbuild-design.md` |
 | 5 | **An energy knob** that thins a pattern out or fills it in | taken; design to come | |
-| 6 | **Drop a MIDI file on the grid** | designed with mockups, 2026-11-19; for the owner to decide | `hostage-patterns-in-design.md` |
-| 7 | **Take the groove from your playing** | designed with mockups, 2026-11-19; for the owner to decide | `hostage-patterns-in-design.md` |
-| 8 | **Beatbox it in** | designed with mockups, 2026-11-19; for the owner to decide | `hostage-patterns-in-design.md` |
+| 6 | **Drop a MIDI file on the grid** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |
+| 7 | **Take the groove from your playing** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |
+| 8 | **Beatbox it in** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |
 | 9 | **Step effects**: a lane that changes an effect's setting step by step | approved with mockups, 2026-11-19 | `hostage-steps-design.md` |
 | 10 | **The kick ducks the bass**, from the pattern's own hits | approved with mockups, 2026-11-19 | `hostage-duck-design.md` |
 | 11 | **A line machine**: the drum grid's twin for basslines and synth lines | approved with mockups, 2026-11-19 | `hostage-line-design.md` |

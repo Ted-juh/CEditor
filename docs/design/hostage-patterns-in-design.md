@@ -1,6 +1,7 @@
 # HoSTage: getting patterns in
 
-*Design with mockups, for the owner to decide. Nothing built. Features 6 (drop a MIDI file on the
+*Design with mockups, approved by the owner on 2026-11-19 as recommended ("Document it").
+Nothing built. Features 6 (drop a MIDI file on the
 grid), 7 (take the groove from your playing) and 8 (beatbox it in) of
 `hostage-build-features-2.md`, taken, and drawn together because all three put a pattern on the
 grid without placing steps by hand. Each easy version was checked for where it fails first.
@@ -127,18 +128,17 @@ feel of your own hands on the pads, and your voice.
   from the count-in, and the round trip from the line check.
 - **The dialogs and the two pages.**
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-19: "Document it and go to 5")
 
 1. **A MIDI file**: only the chosen bars, up to 64 steps, on the grid that fits best, **keeping the
-   feel** by default; a whole song offered as a MIDI backing file. *Recommended: yes.*
+   feel** by default; a whole song offered as a MIDI backing file. **Yes.**
 2. **Drums the kit does not have** offered as new lanes by their General MIDI names, or left out.
-   *Recommended: yes.*
+   **Yes.**
 3. **The groove from your playing**, read from what is already kept, measured against the click with
    the interface's lateness removed, averaged with slips left out, strength per drum; only with the
-   transport running. *Recommended: yes.*
+   transport running. **Yes.**
 4. **Beatbox, taught to each voice** (four tries per sound), several measures to tell sounds apart,
-   unsure hits faded, only the hits kept. *Recommended: yes.*
-5. **On speakers**, the leak heard in the count-in and ignored, headphones advised. *Recommended:
-   yes.*
+   unsure hits faded, only the hits kept. **Yes.**
+5. **On speakers**, the leak heard in the count-in and ignored, headphones advised. **Yes.**
 6. **Two CTRL49 pages**, GROOVE (from KIT) and BEATBOX (from PATTERN); a MIDI file in the dock only.
-   *Recommended: yes.*
+   **Yes.**
