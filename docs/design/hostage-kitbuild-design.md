@@ -1,6 +1,7 @@
 # HoSTage: building a kit
 
-*Design with mockups for the owner to approve, 2026-11-19. Nothing built. Features 3 (a kit from
+*Design with mockups, approved by the owner on 2026-11-19 as recommended ("Do what you recommend").
+Nothing built. Features 3 (a kit from
 anywhere) and 4 (split a kit onto mixer strips) of `hostage-build-features-2.md`, taken, drawn
 together because both are about one kit made of several instruments and outputs. Each easy version
 was checked for where it fails first. Mockups: `hostage-kitbuild-mockups.html`, pictures
@@ -70,12 +71,12 @@ drums each on their own mixer strip, with their own effects, all into one fader 
 - **Extra outputs as full strips**: effects, sends, pan, mute, solo and a destination for each extra
   pair, which `ExtraOut` does not have today; the outputs' names read from the plug-in.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-19: "Do what you recommend")
 
 1. **Each drum chooses its source** (Samples, a plug-in's drum, a hardware note), one grid playing
-   them as one kit?
+   them as one kit. **Yes.**
 2. **A hardware drum machine's pattern hits sent early** by its measured lateness, live hits as they
-   are?
-3. **Choke groups across sources**, done by HoSTage?
-4. **Extra outputs as full strips**, named by the plug-in, all into one bus for the kit?
-5. **Even the kit** from the library's measured levels?
+   are. **Yes.**
+3. **Choke groups across sources**, done by HoSTage. **Yes.**
+4. **Extra outputs as full strips**, named by the plug-in, all into one bus for the kit. **Yes.**
+5. **Even the kit** from the library's measured levels. **Yes.**
