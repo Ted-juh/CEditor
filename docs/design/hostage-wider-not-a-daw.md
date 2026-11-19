@@ -29,6 +29,8 @@ port of HoSTage was not pushed when this was written, so check that branch befor
 - **A practice mode with falling notes**, for learning any song: [Practice mode](#practice-mode).
 - **The designs with mockups**, approved 2026-11-17, one record each: listed in
   [Where each design is](#where-each-design-is), with where each sits in the order.
+- **The second round of Build features** (from 2026-11-19) has a record of its own:
+  `hostage-build-features-2.md`.
 - **What to do next**: [Order of work](#order-of-work), in two tracks, Stage and Build. The first
   Stage items fix things that are wrong today; the first Build items are groundwork the screens
   stand on.

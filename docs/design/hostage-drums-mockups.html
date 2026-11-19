@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: the drum machine, mockups</title>
+<!--
+  Mockups for docs/design/hostage-drums-design.md: a drum machine in the dock and on the CTRL49,
+  built on the pattern model's drum lanes (PatternModel.h: LaneType::drum, PatternStep velocity,
+  probability, ratchets, microtiming, conditions; per-lane step counts; Euclidean fill; groove
+  templates; variations A-D; the held fill). Static, invented data; HoSTage's own colours in the
+  dock; the CTRL49 pages drawn once at 480 x 272 in the original look (Midnight).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { border: 1px solid var(--line-soft); background: var(--bg); overflow: hidden; }
+  .dtabs { display: flex; align-items: center; gap: 2px; padding: 5px 12px; border-bottom: 1px solid var(--line-soft); background: var(--surface); }
+  .dtabs span.tb { padding: 4px 11px; font-size: 12px; color: var(--soft); border-radius: 3px; }
+  .dtabs span.tb.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .dtabs .subj { margin-left: 14px; font-weight: 600; }
+  .sp { flex: 1; }
+  .strip { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); background: var(--surface); }
+  .blk { display: flex; flex-direction: column; gap: 3px; min-width: 150px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--raised); font-size: 12.5px; }
+  .blk small { font: 600 9.5px var(--mono); letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+  .blk span { color: var(--soft); font-size: 11.5px; }
+  .blk.sel { border-color: var(--accent); background: var(--accent-surface); }
+  .arrow { align-self: center; color: var(--faint); }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--line-soft); }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .k { color: var(--dim); font-size: 12px; } .v { font: 600 12px var(--mono); }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .play { padding: 4px 12px; border: 1px solid var(--active); border-radius: 3px; background: var(--active-surface); color: #8fd1a8; font-weight: 600; font-size: 12px; }
+  .hold { padding: 4px 10px; border: 1px solid var(--pending); border-radius: 3px; background: var(--pending-surface); color: var(--pending); font-size: 12px; font-weight: 600; }
+  .body { display: flex; gap: 12px; padding: 12px 14px; }
+  .grid svg { display: block; }
+  .insp { width: 300px; flex: none; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .insp h4 { margin: 0; font-size: 14px; } .insp .sub { color: var(--dim); font-size: 12px; }
+  .kv { display: grid; grid-template-columns: 100px 1fr; gap: 7px 10px; align-items: center; font-size: 12.5px; }
+  .kv > span:nth-child(odd) { color: var(--dim); }
+  .field { padding: 3px 8px; background: var(--field); border: 1px solid var(--line); border-radius: 3px; font: 12px var(--mono); display: inline-block; }
+  .note { color: var(--faint); font-size: 11.5px; }
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  figure { margin: 0; } figure svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  figcaption { margin-top: 8px; color: var(--soft); font-size: 12.5px; } figcaption b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · The drum machine in the dock</h2>
+    <p>A drum part's chain starts with a DRUMS block: its patterns. Below it, the grid: a lane per drum, named from the instrument's own note
+      names, sixteen steps across. Each hit shows its strength as height; a faded hit plays only sometimes; dots are repeats; a small "1:2"
+      plays every second time round. The shaker's lane is twelve steps long and drifts against the rest. Click to place a hit, drag up or down
+      for its strength. ▶ plays the pattern on its own while you build it.</p>
+  </div>
+  <div class="app">
+    <div class="dtabs"><span class="tb on">Chain</span><span class="tb">Params</span><span class="tb">Zone</span><span class="tb">Sounds</span><span class="subj">8 · Drums</span><span class="sp"></span></div>
+    <div class="strip">
+      <div class="blk sel"><small>Drums</small>Verse · A<span>16 steps · swing 56 %</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>MIDI</small>Drum map<span>kit notes → instrument</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>Instrument</small>Drum plug-in<span>Studio Kit · 8 pieces</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>Insert</small>Bus compressor<span>SQUASH 3.4 dB</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>Out</small>Main<span>−6.0 dB</span></div>
+    </div>
+    <div class="bar"><span class="k">Pattern</span><span class="seg"><span>Intro</span><span class="on">Verse</span><span>Chorus</span><span>Bridge</span><span>+</span></span>
+      <span class="seg"><span class="on">A</span><span>B</span><span>C</span><span>D</span></span><span class="ghostb">Make B, C, D from A…</span>
+      <span class="sp"></span><span class="k">Length</span><span class="v">1 bar</span><span class="k">Groove</span><span class="v">Swing 16 · 56 %</span><span class="hold">Fill (hold)</span><span class="play">▶ Play pattern</span></div>
+    <div class="body"><div class="grid" id="grid1"></div>
+      <div class="insp"><span class="lbl" style="font:600 10px var(--mono);letter-spacing:.08em;color:var(--dim)">STEP 11 · SNARE</span><h4>Ghost note</h4><span class="sub">plays 3 times in 4, quietly, just after the beat</span>
+        <div class="kv"><span>Strength</span><span><span class="field">48</span> <span class="note">of 127</span></span>
+          <span>Chance</span><span><span class="field">75 %</span></span>
+          <span>Repeats</span><span><span class="field">1</span> <span class="note">2 to 8 makes a roll</span></span>
+          <span>Nudge</span><span><span class="field">+12 %</span> <span class="note">of a step, late</span></span>
+          <span>Plays</span><span><span class="field">every time</span> <span class="note">or 1 in 2, 2 in 4…</span></span>
+          <span>Also sets</span><span><span class="field">Snare tune −2</span> <span class="note">on this step only</span></span></div>
+        <div class="note">Every field is a step's own, as the pattern model stores it: velocity, probability, ratchets, microtiming, its condition, and a parameter lock.</div>
+      </div></div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · Three pages on the CTRL49</h2>
+    <p>DRUMS is the grid at the keyboard's size: knob 1 picks the drum, the pads are the sixteen steps of that drum in two halves. KIT turns the
+      pads into the drums themselves, to play them and to record into the pattern. PATTERN chooses the pattern and its variation, the groove
+      and the length, and holds the fill. Which knob and pad does what is checked against the rest of the keyboard when the pages are built.</p>
+  </div>
+  <div class="three"><figure id="p1"></figure><figure id="p2"></figure><figure id="p3"></figure></div>
+</section>
+
+<script>
+  // ---- the kit and the pattern ----
+  const KIT = [
+    { n: 'Kick', note: 36, c: '#ff9408', len: 16, s: { 0: 120, 6: 90, 8: 118, 10: [70, 60], 14: 96 } },
+    { n: 'Snare', note: 38, c: '#2dd4bf', len: 16, s: { 4: 115, 10: [48, 75, 1, 0, 1], 12: 118, 15: [60, 100, 3] } },
+    { n: 'Clap', note: 39, c: '#8b7cff', len: 16, s: { 4: 90, 12: 92 } },
+    { n: 'Closed hat', note: 42, c: '#5b9bff', len: 16, s: { 0: 90, 2: 70, 4: 92, 6: 66, 8: 90, 9: [50, 60], 10: 72, 12: 92, 14: 68 } },
+    { n: 'Open hat', note: 46, c: '#7bd88f', len: 16, s: { 7: [80, 100, 1, '1:2'], 15: 84 } },
+    { n: 'Low tom', note: 45, c: '#ff5c93', len: 16, s: { 13: [90, 100, 2] } },
+    { n: 'Ride', note: 51, c: '#ffb547', len: 16, s: {} },
+    { n: 'Shaker', note: 70, c: '#e6e9f5', len: 12, s: { 0: 60, 1: 40, 3: 55, 4: 60, 5: 40, 7: 55, 8: 60, 9: 40, 11: 55 } },
+  ];
+  // ---- frame 1: the grid ----
+  { const W = 1060, LH = 46, NAME = 210, SW = (W - NAME - 16) / 16, top = 26; let s = `<rect width="${W}" height="${top + KIT.length * LH + 28}" fill="#171c21" rx="6"/>`;
+    for (let i = 0; i < 16; i++) s += `<text x="${NAME + i * SW + SW / 2}" y="17" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="10.5" fill="${i % 4 ? '#65717c' : '#aab5be'}">${i + 1}</text>`;
+    KIT.forEach((k, r) => { const y = top + r * LH;
+      s += `<rect x="8" y="${y + 3}" width="${NAME - 16}" height="${LH - 6}" rx="4" fill="#12171b"/><rect x="8" y="${y + 3}" width="4" height="${LH - 6}" rx="2" fill="${k.c}"/>`;
+      s += `<text x="20" y="${y + 21}" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="600" fill="#d9e0e6">${k.n}</text><text x="20" y="${y + 36}" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#7f8b96">note ${k.note}${k.len !== 16 ? ' · ' + k.len + ' steps' : ''}</text>`;
+      ['M', 'S'].forEach((t, j) => { s += `<rect x="${NAME - 62 + j * 22}" y="${y + 13}" width="18" height="18" rx="3" fill="#20272e"/><text x="${NAME - 53 + j * 22}" y="${y + 26}" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="10" font-weight="700" fill="#7f8b96">${t}</text>`; });
+      for (let i = 0; i < 16; i++) { const x = NAME + i * SW; const beyond = i >= k.len;
+        s += `<rect x="${x + 2}" y="${y + 3}" width="${SW - 4}" height="${LH - 6}" rx="3" fill="${beyond ? '#0d1013' : (Math.floor(i / 4) % 2 ? '#1a2027' : '#20272e')}" ${beyond ? 'stroke="#20272e" stroke-dasharray="2 2"' : ''}/>`;
+        const st = k.s[i]; if (st === undefined) continue;
+        const [vel, chance = 100, rat = 1, cond, sel] = Array.isArray(st) ? st : [st]; const h = (LH - 12) * vel / 127;
+        s += `<rect x="${x + 6}" y="${y + LH - 6 - h}" width="${SW - 12}" height="${h}" rx="2" fill="${k.c}" opacity="${chance < 100 ? .35 + .5 * chance / 100 : .9}"/>`;
+        if (chance < 100) s += `<text x="${x + SW / 2}" y="${y + 15}" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="9.5" fill="#d9e0e6">${chance}%</text>`;
+        if (rat > 1) for (let d = 0; d < rat; d++) s += `<circle cx="${x + SW / 2 - (rat - 1) * 4 + d * 8}" cy="${y + 9}" r="2.4" fill="#fff"/>`;
+        if (cond) s += `<rect x="${x + SW - 26}" y="${y + 6}" width="22" height="13" rx="3" fill="#0f1215"/><text x="${x + SW - 15}" y="${y + 16}" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="9" fill="#ffb547">${cond}</text>`;
+        if (sel) s += `<rect x="${x + 2}" y="${y + 3}" width="${SW - 4}" height="${LH - 6}" rx="3" fill="none" stroke="#79b9ee" stroke-width="2"/><circle cx="${x + SW - 7}" cy="${y + LH - 10}" r="3" fill="#ffb547"/>`; }
+      // shaker drifts: show its own playhead position
+    });
+    const ph = 6; s += `<rect x="${NAME + ph * SW + 1}" y="${top}" width="${SW - 2}" height="${7 * LH}" rx="3" fill="#58a879" opacity=".09"/><rect x="${NAME + ph * SW + 1}" y="${top - 4}" width="${SW - 2}" height="3" fill="#58a879"/>`;
+    s += `<rect x="${NAME + 6 * SW + 1}" y="${top + 7 * LH}" width="${SW - 2}" height="${LH}" rx="3" fill="#58a879" opacity=".09"/>`;
+    s += `<text x="${NAME}" y="${top + KIT.length * LH + 18}" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#7f8b96">height: strength · faded: only sometimes · dots: repeats · 1:2: every second time · amber dot: sets more · dark: past the lane's end</text>`;
+    document.getElementById('grid1').innerHTML = `<svg width="${W}" height="${top + KIT.length * LH + 28}" viewBox="0 0 ${W} ${top + KIT.length * LH + 28}">${s}</svg>`; }
+
+  // ---- the CTRL49 pages ----
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378', grid: '#1F2742', gridS: '#2B3456', violet: '#8B7CFF', teal: '#2DD4BF', amber: '#FFB547', pink: '#FF5C93' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const head = (t, r, a = C.violet) => `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${a}"/>` + T(18, 22, t, C.text, 16, "font-weight='700'") + T(472, 21, r, C.dim, 10, "text-anchor='end'");
+  const pads = (list) => list.map((p, i) => { const x = i * 60 + 6; if (!p) return `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`;
+    return `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}" ${p.ring ? `stroke="${p.ring}" stroke-width="1.5"` : ''}/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'"); }).join('');
+  const cells = (list) => list.map((c, i) => { if (!c) return ''; const cx = i * 60 + 30;
+    return T(cx, 217, c.l, c.focus ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, c.v, c.focus ? C.teal : C.text, c.vs || 13, "text-anchor='middle' font-weight='600'") + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (c.f ? `<rect x="${i * 60 + 8}" y="244" width="${44 * c.f}" height="4" rx="2" fill="${C.bar}"/>` : ''); }).join('');
+  const svg = (s) => `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+
+  // DRUMS
+  { let s = head('DRUMS', 'VERSE A · STEPS 9–16 OF 16');
+    s += `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>`;
+    const NX = 64, cw = (464 - NX) / 16, rh = 17.5;
+    KIT.forEach((k, r) => { const y = 33 + r * rh, sel = r === 1;
+      if (sel) s += `<rect x="10" y="${y}" width="460" height="${rh - 1}" rx="2" fill="#2a2550" stroke="${C.violet}" stroke-width="1"/>`;
+      s += T(14, y + 12, k.n.toUpperCase().slice(0, 8), sel ? C.text : C.label, 7.5, "font-weight='700'");
+      for (let i = 0; i < 16; i++) { const x = 8 + NX + i * cw; const st = k.s[i]; const beyond = i >= k.len;
+        s += `<rect x="${x + 1}" y="${y + 2}" width="${cw - 2}" height="${rh - 5}" rx="1.5" fill="${beyond ? C.bg : (i >= 8 && sel ? '#2B3456' : C.raised)}"/>`;
+        if (st !== undefined) { const [vel, ch = 100] = Array.isArray(st) ? st : [st]; s += `<rect x="${x + 2}" y="${y + 2 + (rh - 5) * (1 - vel / 127)}" width="${cw - 4}" height="${(rh - 5) * vel / 127}" rx="1" fill="${k.c}" opacity="${ch < 100 ? .5 : 1}"/>`; } } });
+    s += `<rect x="${8 + NX + 6 * cw}" y="31" width="${cw}" height="144" fill="${C.teal}" opacity=".12"/>`;
+    s += pads([8, 9, 10, 11, 12, 13, 14, 15].map((i) => { const st = KIT[1].s[i]; return { l: `${i + 1}`, on: st !== undefined, col: KIT[1].c, ring: i === 10 ? '#fff' : null }; }));
+    s += cells([{ l: 'DRUM', v: 'SNARE', vs: 11, focus: true }, { l: 'STEP', v: '11' }, { l: 'STRENGTH', v: '48', f: .38 }, { l: 'CHANCE', v: '75%', f: .75 }, { l: 'REPEATS', v: '1' }, { l: 'NUDGE', v: '+12%', f: .6 }, { l: 'PLAYS', v: 'ALWAYS', vs: 11 }, { l: 'HALF', v: '9–16' }]);
+    s += T(8, 265, 'PADS: THE DRUM\'S STEPS · SHIFT + PAD: THE OTHER HALF', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('p1').innerHTML = svg(s) + '<figcaption><b>DRUMS</b> · the grid; knob 1 the drum, the pads its steps in halves (9–16 shown), knobs 2–7 the selected step</figcaption>'; }
+
+  // KIT
+  { let s = head('KIT', 'PLAY · RECORDING INTO VERSE A', C.pink);
+    s += `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>`;
+    KIT.forEach((k, i) => { const x = 16 + (i % 4) * 114, y = 38 + Math.floor(i / 4) * 68, hit = i === 0 || i === 3;
+      s += `<rect x="${x}" y="${y}" width="106" height="60" rx="6" fill="${hit ? k.c : C.raised}" opacity="${hit ? .95 : 1}"/>` + T(x + 8, y + 18, k.n.toUpperCase(), hit ? C.bg : C.text, 9.5, "font-weight='700'") + T(x + 8, y + 32, 'note ' + k.note, hit ? C.bg : C.dim, 8)
+        + `<rect x="${x + 8}" y="${y + 44}" width="90" height="5" rx="2" fill="${hit ? '#0F1424' : C.bg}" opacity=".6"/><rect x="${x + 8}" y="${y + 44}" width="${[.9, .8, .6, .7, .65, .7, .5, .45][i] * 90}" height="5" rx="2" fill="${hit ? C.bg : k.c}"/>`; });
+    s += pads(KIT.map((k, i) => ({ l: k.n.toUpperCase().slice(0, 8), on: i === 0 || i === 3, col: k.c })));
+    s += cells([{ l: 'KICK', v: '−2.0', f: .8 }, { l: 'SNARE', v: '0.0', f: .9 }, { l: 'CLAP', v: '−6.0', f: .6 }, { l: 'C HAT', v: '−4.0', f: .7 }, { l: 'O HAT', v: '−5.0', f: .65 }, { l: 'L TOM', v: '−3.0', f: .7 }, { l: 'RIDE', v: '−8.0', f: .5 }, { l: 'SHAKER', v: '−9.0', f: .45 }]);
+    s += T(8, 265, 'PADS PLAY THE KIT · ● REC WRITES HITS INTO THE PATTERN, ON THE GRID', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('p2').innerHTML = svg(s) + '<figcaption><b>KIT</b> · the pads are the drums; play, or record into the pattern on the grid; knobs are each drum\'s level</figcaption>'; }
+
+  // PATTERN
+  { let s = head('PATTERN', 'VERSE · A OF A–D · 1 BAR', C.amber);
+    s += `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>`;
+    ['INTRO', 'VERSE', 'CHORUS', 'BRIDGE'].forEach((n, i) => { const x = 16 + i * 114, on = i === 1; s += `<rect x="${x}" y="38" width="106" height="26" rx="4" fill="${on ? C.amber : C.raised}"/>` + T(x + 53, 55, n, on ? C.bg : C.label, 9.5, "text-anchor='middle' font-weight='700'"); });
+    ['A', 'B', 'C', 'D'].forEach((n, i) => { const x = 16 + i * 114, on = i === 0;
+      s += `<rect x="${x}" y="72" width="106" height="58" rx="4" fill="${C.bg}" stroke="${on ? C.amber : C.gridS}" stroke-width="${on ? 1.5 : 1}"/>` + T(x + 10, 90, n, on ? C.amber : C.label, 13, "font-weight='700'");
+      for (let j = 0; j < 16; j++) { const lit = [0, 4, 6, 8, 12, 14].includes(j) || (i > 0 && (j * (i + 3)) % 7 === 0); s += `<rect x="${x + 10 + j * 5.6}" y="${100 + (j % 2) * 10}" width="4" height="8" rx="1" fill="${lit ? (on ? C.amber : C.label) : C.raised}"/>`; }
+      s += T(x + 96, 90, i === 0 ? 'SOURCE' : `${[0, 30, 55, 80][i]}%`, C.dim, 7.5, "text-anchor='end' font-weight='700'"); });
+    s += T(16, 150, 'FILL WHILE HELD: VERSE FILL · BACK TO A ON THE NEXT BEAT', C.label, 8, "font-weight='700'") + T(16, 166, 'B, C AND D ARE MADE FROM A, MORE CHANGED EACH; EDIT ANY OF THEM', C.dim, 7.5, "font-weight='700'");
+    s += pads([{ l: 'A', on: true, col: C.amber }, { l: 'B' }, { l: 'C' }, { l: 'D' }, { l: 'FILL', col: C.pink }, { l: 'EUCLID' }, { l: '▶ PLAY', on: true }, { l: '‹ DRUMS', on: true, col: C.violet }]);
+    s += cells([{ l: 'PATTERN', v: 'VERSE', vs: 11, focus: true }, { l: 'VARIES', v: '55%', f: .55 }, { l: 'GROOVE', v: 'SW 16', vs: 11 }, { l: 'SWING', v: '56%', f: .56 }, { l: 'LENGTH', v: '1 BAR', vs: 11 }, { l: 'PULSES', v: '5', f: .3 }, { l: 'ROTATE', v: '2', f: .12 }, { l: 'TEMPO', v: '96', f: .4 }]);
+    s += T(8, 265, 'HOLD FILL FOR A FILL · EUCLID WRITES THE DRUM\'S STEPS FROM PULSES', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('p3').innerHTML = svg(s) + '<figcaption><b>PATTERN</b> · which pattern and variation, how much B–D differ, the groove, the length; hold FILL</figcaption>'; }
+</script>
+</body>
+</html>
