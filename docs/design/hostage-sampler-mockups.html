@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: sample pads, mockups</title>
+<!--
+  Mockups for docs/design/hostage-sampler-design.md: sample pads, a built-in one-shot sampler that
+  extends the first round's file player (decision 3). Static, invented data; HoSTage's own colours
+  in the dock; the CTRL49 pages drawn once at 480 x 272 in the original look (Midnight).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --danger: #d98c8c; --danger-surface: #452529;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { border: 1px solid var(--line-soft); background: var(--bg); overflow: hidden; }
+  .dtabs { display: flex; align-items: center; gap: 2px; padding: 5px 12px; border-bottom: 1px solid var(--line-soft); background: var(--surface); }
+  .dtabs span.tb { padding: 4px 11px; font-size: 12px; color: var(--soft); border-radius: 3px; }
+  .dtabs span.tb.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .dtabs .subj { margin-left: 14px; font-weight: 600; }
+  .sp { flex: 1; }
+  .strip { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); background: var(--surface); }
+  .blk { display: flex; flex-direction: column; gap: 3px; min-width: 160px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--raised); font-size: 12.5px; }
+  .blk small { font: 600 9.5px var(--mono); letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+  .blk span { color: var(--soft); font-size: 11.5px; }
+  .blk.sel { border-color: var(--accent); background: var(--accent-surface); }
+  .arrow { align-self: center; color: var(--faint); }
+  .body { display: grid; grid-template-columns: 560px 1fr; gap: 14px; padding: 12px 14px; }
+  .pads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pad { position: relative; height: 104px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line-soft); padding: 7px 8px; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+  .pad b { font-size: 12.5px; } .pad small { color: var(--dim); font: 10px var(--mono); }
+  .pad.sel { border: 2px solid var(--accent-strong); }
+  .pad.empty { border-style: dashed; align-items: center; justify-content: center; color: var(--faint); font-size: 11.5px; text-align: center; }
+  .pad.miss { border-color: var(--danger); background: var(--danger-surface); }
+  .pad .wf { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 34px; }
+  .pad .ch { position: absolute; right: 7px; top: 7px; font: 700 9.5px var(--mono); padding: 1px 5px; border-radius: 8px; background: #0f1215; color: var(--pending); }
+  .pad .bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+  .edit { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .edit h4 { margin: 0; font-size: 15px; } .edit .sub { color: var(--dim); font-size: 12px; }
+  .say { padding: 8px 11px; border-left: 3px solid var(--accent); background: var(--accent-surface); border-radius: 0 4px 4px 0; font-size: 13px; }
+  .kv { display: grid; grid-template-columns: 130px 1fr 130px 1fr; gap: 8px 12px; align-items: center; font-size: 12.5px; }
+  .kv > span.k { color: var(--dim); }
+  .field { padding: 3px 8px; background: var(--field); border: 1px solid var(--line); border-radius: 3px; font: 12px var(--mono); display: inline-block; }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 11.5px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .note { color: var(--faint); font-size: 11.5px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  figure { margin: 0; } figure svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  figcaption { margin-top: 8px; color: var(--soft); font-size: 12.5px; } figcaption b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · Sample pads in the dock</h2>
+    <p>A built-in instrument, the file player made playable: sixteen pads a bank, each one sound file, played as it is. Drop files on the pads,
+      or a whole folder: each file on its own pad, named after the file, a kick on the kick's note when its name says so. Select a pad to trim it
+      on its waveform. The drum machine plays it like any instrument; so does the keyboard.</p>
+  </div>
+  <div class="app">
+    <div class="dtabs"><span class="tb on">Chain</span><span class="tb">Params</span><span class="tb">Zone</span><span class="tb">Sounds</span><span class="subj">9 · Hits &amp; FX</span><span class="sp"></span><span class="ghostb">Collect files into the show</span></div>
+    <div class="strip">
+      <div class="blk"><small>Drums</small>Chorus · A<span>16 steps</span></div><span class="arrow">▸</span>
+      <div class="blk sel"><small>Instrument · built in</small>Sample pads<span>My Hits · 13 of 16 pads · 42 MB</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>Insert</small>Valhalla Room<span>TAIL 1.8 s</span></div><span class="arrow">▸</span>
+      <div class="blk"><small>Out</small>Main<span>−4.0 dB</span></div>
+    </div>
+    <div class="body">
+      <div><div class="row" style="margin-bottom:8px"><span class="seg"><span class="on">Bank A</span><span>B</span><span>C</span><span>D</span></span><span class="sp"></span><span class="note">drop sound files or a folder on the pads</span></div>
+        <div class="pads" id="pads1"></div></div>
+      <div class="edit"><div class="row"><h4>Brass stab</h4><span class="note">pad 6 · note 41 (F1) · brass-stab-Eb.wav · 0.9 s · 48 kHz stereo</span></div>
+        <div class="say">Plays from the attack to just before the room noise, fading out over the last 40 ms. It stops when the next stab starts.</div>
+        <div id="wave1"></div>
+        <div class="kv">
+          <span class="k">Start · end</span><span><span class="field">0.012 s</span> to <span class="field">0.71 s</span></span>
+          <span class="k">Fade in · out</span><span><span class="field">0 ms</span> · <span class="field">40 ms</span></span>
+          <span class="k">Level</span><span><span class="field">−3.0 dB</span> <span class="ghostb">Even it</span></span>
+          <span class="k">Pitch</span><span><span class="field">0</span> semitones</span>
+          <span class="k">Plays</span><span class="seg"><span class="on">to the end</span><span>while held</span></span>
+          <span class="k">Strength</span><span><span class="field">60 %</span> <span class="note">how much a soft hit is quieter</span></span>
+          <span class="k">Stops</span><span><span class="field">itself · group 2</span> <span class="note">a new hit cuts the old</span></span>
+          <span class="k">Note</span><span><span class="field">41 · F1</span> <span class="ghostb">Play the key</span></span>
+        </div>
+        <div class="note">Nothing more: no loops, no filter, no envelope beyond the fades, one sample a pad. A sound that needs more is a sampler plug-in's job (decision 3).</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · Two pages on the CTRL49</h2>
+    <p>SAMPLES puts the bank on the pads: play them, or hold SELECT and press one to edit it. TRIM is the selected sample on its waveform:
+      start, end and the fades on the knobs, then level, pitch and how it plays. Which knob and pad does what is settled when the pages are built.</p>
+  </div>
+  <div class="two"><figure id="p1"></figure><figure id="p2"></figure></div>
+</section>
+
+<script>
+  const PADS = [
+    ['Kick', 36, '#ff9408'], ['Snare', 38, '#2dd4bf'], ['Clap', 39, '#8b7cff'], ['Hat closed', 42, '#5b9bff', 'G1'],
+    ['Hat open', 46, '#7bd88f', 'G1'], ['Brass stab', 41, '#ffb547', 'G2', 'sel'], ['Brass fall', 43, '#ffb547', 'G2'], ['Vocal "hey"', 48, '#ff5c93'],
+    ['Riser 4 bars', 49, '#e6e9f5'], ['Impact', 50, '#ff9408'], ['Reverse cymbal', 51, '#8b7cff'], ['Count-in', 52, '#2dd4bf'],
+    ['Crowd', 53, '#5b9bff', null, 'miss'], [null], [null], [null],
+  ];
+  let seed = 9; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const wave = (w, h, shape, col, trim) => { let p = ''; const n = 90; for (let i = 0; i < n; i++) { const t = i / n; let a = shape === 'hit' ? Math.exp(-t * 7) : shape === 'rise' ? t : shape === 'rev' ? t * t : Math.exp(-t * 2.2) * (t < .02 ? t * 50 : 1);
+      a = Math.min(1, a * (.55 + .45 * rnd())); const x = (i + .5) / n * w; p += `<line x1="${x}" y1="${h / 2 - a * h / 2}" x2="${x}" y2="${h / 2 + a * h / 2}" stroke="${col}" stroke-width="${w / n * .7}"/>`; }
+    if (trim) p += `<rect x="0" y="0" width="${trim[0] * w}" height="${h}" fill="#000" opacity=".55"/><rect x="${trim[1] * w}" y="0" width="${w - trim[1] * w}" height="${h}" fill="#000" opacity=".55"/>`;
+    return p; };
+  document.getElementById('pads1').innerHTML = PADS.map(([n, note, c, ch, st], i) => {
+    if (!n) return `<div class="pad empty">pad ${i + 1}<br>drop a file</div>`;
+    const shape = /Riser/.test(n) ? 'rise' : /Reverse/.test(n) ? 'rev' : /Kick|Snare|Clap|Hat|Impact/.test(n) ? 'hit' : 'stab';
+    return `<div class="pad${st === 'sel' ? ' sel' : ''}${st === 'miss' ? ' miss' : ''}"><span class="bar" style="background:${c}"></span><b>${n}</b><small>note ${note}</small>${ch ? `<span class="ch">${ch}</span>` : ''}
+      ${st === 'miss' ? '<small style="color:var(--danger);font-family:var(--sans)">not on this computer · Find…</small>' : `<svg class="wf" viewBox="0 0 120 34" preserveAspectRatio="none">${wave(120, 34, shape, c)}</svg>`}</div>`; }).join('');
+  { const W = 760, H = 120; let s = `<rect width="${W}" height="${H}" rx="4" fill="#12171b"/>` + wave(W, H, 'stab', '#ffb547', [.017, .79]);
+    const sx = .017 * W, ex = .79 * W;
+    s += `<line x1="${sx}" y1="0" x2="${sx}" y2="${H}" stroke="#79b9ee" stroke-width="2"/><rect x="${sx - 5}" y="0" width="10" height="12" fill="#79b9ee"/>`;
+    s += `<line x1="${ex}" y1="0" x2="${ex}" y2="${H}" stroke="#79b9ee" stroke-width="2"/><rect x="${ex - 5}" y="0" width="10" height="12" fill="#79b9ee"/>`;
+    s += `<path d="M${ex - 34} 14 L${ex} ${H - 4}" stroke="#d7a44e" stroke-width="1.5" fill="none"/><text x="${ex - 30}" y="${H - 8}" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#d7a44e" text-anchor="end">fade 40 ms</text>`;
+    s += `<text x="${sx + 6}" y="${H - 8}" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#79b9ee">start</text><text x="${ex + 6}" y="22" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#79b9ee">end</text>`;
+    document.getElementById('wave1').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; }
+
+  // ---- CTRL49 pages ----
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378', violet: '#8B7CFF', teal: '#2DD4BF', amber: '#FFB547', pink: '#FF5C93' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const head = (t, r, a) => `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${a}"/>` + T(18, 22, t, C.text, 16, "font-weight='700'") + T(472, 21, r, C.dim, 10, "text-anchor='end'");
+  const pads = (list) => list.map((p, i) => { const x = i * 60 + 6; if (!p) return `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`;
+    return `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}" ${p.ring ? 'stroke="#fff" stroke-width="1.5"' : ''}/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 6.8, "text-anchor='middle' font-weight='700'"); }).join('');
+  const cells = (list) => list.map((c, i) => { if (!c) return ''; const cx = i * 60 + 30;
+    return T(cx, 217, c.l, c.focus ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, c.v, c.focus ? C.teal : C.text, c.vs || 13, "text-anchor='middle' font-weight='600'") + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (c.f ? `<rect x="${i * 60 + 8}" y="244" width="${44 * c.f}" height="4" rx="2" fill="${C.bar}"/>` : ''); }).join('');
+  const svg = (s) => `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  { let s = head('SAMPLES', 'MY HITS · BANK A · PADS 1–8', C.amber);
+    s += `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>`;
+    PADS.slice(0, 8).forEach(([n, note, c, ch, st], i) => { const x = 14 + (i % 4) * 115, y = 36 + Math.floor(i / 4) * 70, hit = i === 0 || i === 5;
+      s += `<rect x="${x}" y="${y}" width="108" height="64" rx="5" fill="${hit ? c : C.raised}" ${st === 'sel' ? 'stroke="#fff" stroke-width="1.5"' : ''}/>` + T(x + 7, y + 15, n.toUpperCase().slice(0, 12), hit ? C.bg : C.text, 8.5, "font-weight='700'") + T(x + 7, y + 27, 'NOTE ' + note + (ch ? ' · ' + ch : ''), hit ? C.bg : C.dim, 7.5, "font-weight='700'");
+      seed = i + 3; const shape = /Hat|Kick|Snare|Clap/.test(n) ? 'hit' : 'stab'; s += `<g transform="translate(${x + 7},${y + 34})">${wave(94, 24, shape, hit ? C.bg : c)}</g>`; });
+    const SHORT = ['KICK', 'SNARE', 'CLAP', 'HAT CL', 'HAT OP', 'STAB', 'FALL', 'HEY'];
+    s += pads(PADS.slice(0, 8).map(([n, , c], i) => ({ l: SHORT[i], on: i === 0 || i === 5, col: c, ring: i === 5 })));
+    s += cells([{ l: 'BANK', v: 'A', focus: true }, { l: 'KICK', v: '0.0', f: .9 }, { l: 'SNARE', v: '−1.0', f: .85 }, { l: 'CLAP', v: '−4.0', f: .7 }, { l: 'HAT C', v: '−6.0', f: .6 }, { l: 'HAT O', v: '−6.0', f: .6 }, { l: 'STAB', v: '−3.0', f: .75 }, { l: 'FALL', v: '−3.0', f: .75 }]);
+    s += T(8, 265, 'PADS PLAY · HOLD SELECT AND PRESS A PAD TO EDIT IT', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('p1').innerHTML = svg(s) + '<figcaption><b>SAMPLES</b> · the bank on the pads, each with its waveform; knobs: the bank, then each pad\'s level</figcaption>'; }
+  { let s = head('TRIM', 'BRASS STAB · PAD 6 · 0.9 S', C.amber);
+    s += `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>`; seed = 9;
+    s += `<g transform="translate(16,38)">${wave(448, 110, 'stab', C.amber, [.017, .79])}</g>`;
+    s += `<rect x="${16 + .017 * 448 - 1}" y="36" width="2" height="114" fill="${C.teal}"/><rect x="${16 + .79 * 448 - 1}" y="36" width="2" height="114" fill="${C.teal}"/>`;
+    s += `<path d="M${16 + .79 * 448 - 20} 44 L${16 + .79 * 448} 146" stroke="${C.amber}" stroke-width="1.5" fill="none"/>`;
+    s += T(16, 166, 'PLAYS TO THE END · STOPS ITSELF AND GROUP 2', C.label, 8, "font-weight='700'");
+    s += pads([{ l: 'AUDITION', on: true }, { l: 'TO END', on: true, col: C.amber }, { l: 'HELD' }, { l: 'CHOKE G2', on: true, col: C.amber }, null, null, { l: 'SELECT' }, { l: '‹ PADS', on: true, col: C.violet }]);
+    s += cells([{ l: 'START', v: '0.012', vs: 12, focus: true, f: .02 }, { l: 'END', v: '0.71', f: .79 }, { l: 'FADE IN', v: '0 ms', vs: 12 }, { l: 'FADE OUT', v: '40 ms', vs: 12, f: .2 }, { l: 'LEVEL', v: '−3.0', f: .75 }, { l: 'PITCH', v: '0', f: .5 }, { l: 'STRENGTH', v: '60%', f: .6 }, { l: 'NOTE', v: 'F1' }]);
+    s += T(8, 265, 'KNOBS TRIM THE SELECTED SAMPLE · PAD 1 PLAYS IT', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('p2').innerHTML = svg(s) + '<figcaption><b>TRIM</b> · the selected sample on its waveform: start, end, fades, level, pitch, strength, its note</figcaption>'; }
+</script>
+</body>
+</html>
