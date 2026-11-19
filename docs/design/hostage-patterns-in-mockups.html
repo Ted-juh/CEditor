@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: getting patterns in, mockups</title>
+<!--
+  Mockups for docs/design/hostage-patterns-in-design.md: features 6 (a MIDI file on the grid), 7 (the
+  groove from your playing) and 8 (beatbox it in) of hostage-build-features-2.md. Built on the pattern
+  model (PatternStep microtiming and velocity; GrooveTemplate timing offsets and velocity
+  multipliers), the always-listening MIDI capture journal (MidiCaptureJournal.h, the last 120 s) and
+  the live inputs. Static, invented data; HoSTage's own colours.
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { border: 1px solid var(--line-soft); background: var(--bg); overflow: hidden; padding: 14px; }
+  .dlg { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 7px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .dlg h4 { margin: 0; font-size: 15px; } .sub { color: var(--dim); font-size: 12px; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .say { padding: 8px 11px; border-left: 3px solid var(--accent); background: var(--accent-surface); border-radius: 0 4px 4px 0; font-size: 12.5px; }
+  .warn { padding: 8px 11px; border-left: 3px solid var(--pending); background: var(--pending-surface); border-radius: 0 4px 4px 0; font-size: 12px; color: #f1d3a0; }
+  .ok { padding: 7px 10px; border-left: 3px solid var(--active); background: var(--active-surface); border-radius: 0 4px 4px 0; font-size: 12px; color: #bfe6cd; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .k { color: var(--dim); font-size: 12px; } .field { padding: 3px 8px; background: var(--field); border: 1px solid var(--line); border-radius: 3px; font: 12px var(--mono); }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .rec { padding: 4px 12px; border: 1px solid #e05c5c; border-radius: 3px; background: #3a2020; color: #f2c4c4; font-weight: 600; font-size: 12px; }
+  table { border-collapse: collapse; font-size: 12.5px; width: 100%; } th { text-align: left; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 5px 8px; border-bottom: 1px solid var(--line-soft); }
+  td { padding: 5px 8px; border-bottom: 1px solid var(--line-soft); } td small { color: var(--dim); }
+  .tag { padding: 1px 7px; border-radius: 9px; font: 600 10.5px/16px var(--sans); border: 1px solid; }
+  .t-ok { border-color: var(--active); color: #8fd1a8; background: var(--active-surface); } .t-new { border-color: var(--pending); color: var(--pending); background: var(--pending-surface); }
+  .note { color: var(--faint); font-size: 11.5px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: 440px 1fr; gap: 14px; }
+  .snd { display: grid; grid-template-columns: 70px 1fr 120px; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--line-soft); border-radius: 5px; background: var(--bg); font-size: 12.5px; }
+  .snd b { font-size: 13px; }
+  figure { margin: 0; } figure svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  figcaption { margin-top: 8px; color: var(--soft); font-size: 12.5px; } figcaption b { color: var(--text); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · A MIDI file on the grid</h2>
+    <p>Drop a drum loop's file on the drum machine. The whole file is drawn small; choose the bars that become the pattern, up to its 64 steps.
+      Each note goes to the drum on that note, or offers a new lane. The feel can be kept: each hit snaps to its step and keeps how early or late
+      it was, as the step's nudge. A whole song's file is offered as a MIDI backing file instead, play-only.</p>
+  </div>
+  <div class="app"><div class="grid2">
+    <div class="dlg"><h4>funk-groove-96bpm.mid</h4><span class="sub">one track · 32 bars · 4/4 · 96 BPM · drum notes</span>
+      <div id="file1"></div>
+      <div class="row"><span class="k">Bars</span><span class="field">9</span>to<span class="field">10</span><span class="note">2 bars, 32 steps</span></div>
+      <div class="row"><span class="k">Grid</span><span class="seg"><span class="on">sixteenths · fits best</span><span>triplets</span></span></div>
+      <div class="row"><span class="k">Timing</span><span class="seg"><span class="on">keep the feel</span><span>snap to the grid</span></span><span class="k">Strength</span><span class="seg"><span class="on">as played</span><span>even</span></span></div>
+      <div class="warn">The file is a whole song. Only bars become a pattern, never the song: to play all of it, add it as a <b>MIDI backing file</b>, play-only (first round, more features 4).</div>
+    </div>
+    <div class="dlg"><h4>Into Verse · B</h4><span class="sub">each note to its drum</span>
+      <table><tr><th>Note</th><th>In the file</th><th>Goes to</th><th></th></tr>
+        <tr><td>36</td><td>48 hits</td><td>Kick</td><td><span class="tag t-ok">lane</span></td></tr>
+        <tr><td>38</td><td>22 hits</td><td>Snare</td><td><span class="tag t-ok">lane</span></td></tr>
+        <tr><td>42</td><td>96 hits</td><td>Closed hat</td><td><span class="tag t-ok">lane</span></td></tr>
+        <tr><td>46</td><td>8 hits</td><td>Open hat</td><td><span class="tag t-ok">lane</span></td></tr>
+        <tr><td>37</td><td>12 hits</td><td>Side stick <small>not in the kit</small></td><td><span class="tag t-new">new lane</span></td></tr>
+        <tr><td>49</td><td>2 hits</td><td><small>leave out</small></td><td><span class="ghostb">add</span></td></tr></table>
+      <div class="ok">The hits sit on sixteenths (a triplet grid fit worse). Each keeps how early or late it was, up to half a step.</div>
+      <div class="note">Two closed-hat hits in one step, bar 10: the louder is kept, as a step holds one hit.</div>
+      <div class="row" style="justify-content:flex-end"><span class="ghostb">Cancel</span><span class="btn">Make the pattern</span></div>
+    </div></div></div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · The groove from your playing</h2>
+    <p>Nothing to arm: HoSTage keeps the last two minutes of everything played. Play along with the click on the pads, then "Take the groove from
+      what I just played". It finds where each sixteenth sat (how early or late) and how hard, averaged over the bars, and keeps it as a groove of
+      your own, to put on any pattern.</p>
+  </div>
+  <div class="app"><div class="grid3">
+    <div class="dlg"><h4>Take the groove</h4><span class="sub">from the last 8 bars played on the KIT pads, against the click at 96 BPM</span>
+      <div class="kv"></div>
+      <div class="row"><span class="k">From</span><span class="seg"><span>last 4 bars</span><span class="on">last 8</span><span>last 16</span></span></div>
+      <div class="row"><span class="k">Keep</span><span class="seg"><span class="on">timing and strength</span><span>timing only</span></span></div>
+      <div class="row"><span class="k">Name</span><span class="field">My pocket 96</span></div>
+      <div class="ok">212 hits, enough for every sixteenth: each position heard at least 9 times.</div>
+      <div class="note">Measured against the click, not your first hit, and moved earlier by what the audio output adds (5.8 ms): the groove is yours, not the interface's. Strength is each drum against its own average, so a loud kick is not read as an accent.</div>
+      <div class="warn">Two hits more than a third of a step off were left out as slips, not feel.</div>
+      <div class="row"><span class="k">Put it on</span><span class="seg"><span class="on">this pattern</span><span>every pattern of the song</span></span><span class="k">by</span><span class="field">80 %</span></div>
+      <div class="row" style="justify-content:flex-end"><span class="ghostb">Cancel</span><span class="btn">Keep the groove</span></div>
+    </div>
+    <div class="dlg"><h4>My pocket 96</h4><span class="sub">sixteen positions of a bar: above, how early or late; below, how hard</span><div id="groove2"></div>
+      <div class="say">The second and fourth sixteenth of every beat sit late, the off-beats lighter: a laid-back swing of your own, not a preset's.</div></div>
+  </div></div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · Beatbox it in</h2>
+    <p>First, teach it your voice: each sound four times. Then beatbox along with the click: each sound becomes a hit on its drum, on the grid,
+      with how sure HoSTage is. Your voice is not kept, only the hits. Mistakes are fixed on the grid like any hit.</p>
+  </div>
+  <div class="app"><div class="grid2">
+    <div class="dlg"><h4>Teach it your sounds</h4><span class="sub">microphone: Vocal mic · IN 1 · each sound four times</span>
+      <div class="snd"><b>"Boom"</b><span id="w1"></span><span class="tag t-ok">Kick · 4 of 4</span></div>
+      <div class="snd"><b>"Ka"</b><span id="w2"></span><span class="tag t-ok">Snare · 4 of 4</span></div>
+      <div class="snd"><b>"Tss"</b><span id="w3"></span><span class="tag t-ok">Closed hat · 4 of 4</span></div>
+      <div class="snd"><b>+ sound</b><span class="note">an open hat, a clap: say it four times</span><span class="ghostb">Teach</span></div>
+      <div class="note">Taught once a voice and kept with the microphone: anyone's "boom" differs, so HoSTage learns yours rather than guessing.</div>
+      <div class="warn">On speakers the mic hears the click too. The count-in listens to what leaks in and hears only what is louder; headphones are better.</div>
+    </div>
+    <div class="dlg"><div class="row"><h4>Into Chorus · A</h4><span class="sp"></span><span class="rec">● Listening · bar 3 of 4</span></div><span class="sub">count-in one bar, then four bars at 96 BPM</span>
+      <div id="bb3"></div>
+      <div class="ok">The microphone's lateness is taken off (the round trip, measured in Audio &amp; MIDI), so hits land where you said them.</div>
+      <div class="warn">Two hits were unsure, a "ka" or a "tss": drawn faded, to check on the grid.</div>
+      <div class="note">Nothing of your voice is kept: only the hits, written onto the pattern as one loop (features record, "Where the line is").</div>
+    </div></div></div>
+</section>
+
+<section class="frame" id="f4">
+  <div class="caption">
+    <h2>4 · On the CTRL49</h2>
+    <p>Taking the groove and beatboxing are things you do at the keyboard, so each has a page, reached from KIT and PATTERN. A MIDI file is
+      on the computer, so dropping one stays in the dock. Which knob and pad does what is settled when the pages are built.</p>
+  </div>
+  <div class="two"><figure id="p1"></figure><figure id="p2"></figure></div>
+</section>
+
+<script>
+  // frame 1: the whole file, small, with bars 9-10 selected
+  { const W = 640, H = 120, bars = 32, bw = (W - 20) / bars; let s = `<rect width="${W}" height="${H}" rx="4" fill="#12171b"/>`;
+    const rows = { 36: ['#ff9408', 0], 38: ['#2dd4bf', 1], 42: ['#5b9bff', 2], 46: ['#7bd88f', 3], 37: ['#d7a44e', 4], 49: ['#aab5be', 5] };
+    s += `<rect x="${10 + 8 * bw}" y="6" width="${2 * bw}" height="${H - 12}" rx="3" fill="#243746" stroke="#79b9ee"/>`;
+    let seed = 4; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    for (let b = 0; b < bars; b++) for (let st = 0; st < 16; st++) { const x = 10 + b * bw + st * bw / 16;
+      if (st % 8 === 0 || st === 10 || st === 14) s += `<rect x="${x}" y="${14 + 0 * 16}" width="1.6" height="10" fill="${rows[36][0]}"/>`;
+      if (st === 4 || st === 12) s += `<rect x="${x}" y="${14 + 16}" width="1.6" height="10" fill="${rows[38][0]}"/>`;
+      if (st % 2 === 0) s += `<rect x="${x}" y="${14 + 32}" width="1.6" height="10" fill="${rows[42][0]}"/>`;
+      if (st === 7 && b % 4 === 3) s += `<rect x="${x}" y="${14 + 48}" width="1.6" height="10" fill="${rows[46][0]}"/>`;
+      if ((st === 6 || st === 15) && rnd() > .6) s += `<rect x="${x}" y="${14 + 64}" width="1.6" height="10" fill="${rows[37][0]}"/>`;
+      if (st === 0 && (b === 0 || b === 16)) s += `<rect x="${x}" y="${14 + 80}" width="1.6" height="10" fill="${rows[49][0]}"/>`; }
+    s += `<text x="${10 + 8 * bw + 4}" y="${H - 2}" font-family="DejaVu Sans Mono, monospace" font-size="9.5" fill="#79b9ee">bars 9–10</text>`;
+    document.getElementById('file1').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; }
+  // frame 2: the groove picture
+  { const W = 820, H = 210, x0 = 40, sw = (W - x0 - 10) / 16; let s = `<rect width="${W}" height="${H}" rx="4" fill="#12171b"/>`;
+    const off = [0, .14, -.02, .2, 0, .16, -.03, .18, .01, .15, -.02, .21, 0, .13, -.04, .19], vel = [1.15, .7, .95, .72, 1.1, .68, .9, .7, 1.12, .72, .93, .7, 1.1, .7, .95, .74];
+    const mid = 70; s += `<line x1="${x0}" y1="${mid}" x2="${W - 10}" y2="${mid}" stroke="#3b4652"/><text x="8" y="${mid - 30}" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#7f8b96">late</text><text x="8" y="${mid + 40}" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#7f8b96">early</text>`;
+    off.forEach((o, i) => { const x = x0 + i * sw + sw / 2, h = o * 160; s += `<rect x="${x - 7}" y="${h > 0 ? mid - h : mid}" width="14" height="${Math.max(2, Math.abs(h))}" rx="2" fill="${o > .05 ? '#d7a44e' : '#79b9ee'}"/>`;
+      s += `<text x="${x}" y="${mid + 54}" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="9.5" fill="${i % 4 ? '#65717c' : '#aab5be'}">${i + 1}</text>`; });
+    const base = H - 12; s += `<line x1="${x0}" y1="${base}" x2="${W - 10}" y2="${base}" stroke="#3b4652"/>`;
+    vel.forEach((v, i) => { const x = x0 + i * sw + sw / 2, h = v * 48; s += `<rect x="${x - 7}" y="${base - h}" width="14" height="${h}" rx="2" fill="#58a879" opacity=".85"/>`; });
+    s += `<text x="8" y="${base - 20}" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#7f8b96">hard</text>`;
+    document.getElementById('groove2').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; }
+  // frame 3: the taught sounds and the hits
+  const mini = (shape, col) => { let s = '', seed = shape.length * 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    for (let k = 0; k < 4; k++) for (let i = 0; i < 18; i++) { const t = i / 18; const a = (shape === 'boom' ? Math.exp(-t * 3) : shape === 'ka' ? Math.exp(-t * 7) : (1 - t) * .5) * (.6 + .4 * rnd()); const x = k * 60 + i * 3; s += `<line x1="${x}" y1="${14 - a * 12}" x2="${x}" y2="${14 + a * 12}" stroke="${col}" stroke-width="2"/>`; }
+    return `<svg viewBox="0 0 240 28" style="width:100%;height:28px;display:block">${s}</svg>`; };
+  document.getElementById('w1').innerHTML = mini('boom', '#ff9408'); document.getElementById('w2').innerHTML = mini('ka', '#2dd4bf'); document.getElementById('w3').innerHTML = mini('tss', '#5b9bff');
+  { const W = 640, H = 150, x0 = 90, sw = (W - x0 - 10) / 16; let s = `<rect width="${W}" height="${H}" rx="4" fill="#12171b"/>`;
+    const L = [['Kick', '#ff9408', { 0: 1, 6: 1, 8: 1, 10: 1 }], ['Snare', '#2dd4bf', { 4: 1, 12: 1, 15: .45 }], ['Closed hat', '#5b9bff', { 0: 1, 2: 1, 4: 1, 6: 1, 8: 1, 10: 1, 12: 1, 14: .5 }]];
+    L.forEach(([n, c, hits], r) => { const y = 14 + r * 44; s += `<text x="10" y="${y + 24}" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#d9e0e6">${n}</text>`;
+      for (let i = 0; i < 16; i++) { const x = x0 + i * sw; s += `<rect x="${x + 2}" y="${y}" width="${sw - 4}" height="36" rx="3" fill="${Math.floor(i / 4) % 2 ? '#1a2027' : '#20272e'}"/>`;
+        if (hits[i]) s += `<rect x="${x + 5}" y="${y + 6}" width="${sw - 10}" height="24" rx="2" fill="${c}" opacity="${hits[i] < 1 ? .35 : .9}" ${hits[i] < 1 ? 'stroke="#d7a44e" stroke-dasharray="3 2"' : ''}/>`; } });
+    s += `<rect x="${x0 + 9 * sw}" y="8" width="2" height="${H - 16}" fill="#e05c5c"/>`;
+    document.getElementById('bb3').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; }
+
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378', violet: '#8B7CFF', teal: '#2DD4BF', amber: '#FFB547', red: '#E05C5C' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const page = (title, right, card, pads, knobs, foot) => { let s = `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${C.teal}"/>` + T(18, 22, title, C.text, 16, "font-weight='700'") + T(472, 21, right, C.dim, 10, "text-anchor='end'");
+    s += `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>` + card;
+    pads.forEach((p, i) => { const x = i * 60 + 6; if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; return; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 6.8, "text-anchor='middle' font-weight='700'"); });
+    knobs.forEach((k, i) => { if (!k) return; const [l, v, f, b, vs] = k, cx = i * 60 + 30;
+      s += T(cx, 217, l, f ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, f ? C.teal : C.text, vs || 13, "text-anchor='middle' font-weight='600'") + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (b ? `<rect x="${i * 60 + 8}" y="244" width="${44 * b}" height="4" rx="2" fill="${C.bar}"/>` : ''); });
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s + T(8, 265, foot, C.foot, 8.2, "font-weight='600' letter-spacing='0.3'")}</svg>`; };
+  { const off = [0, .14, -.02, .2, 0, .16, -.03, .18, .01, .15, -.02, .21, 0, .13, -.04, .19], vel = [1.15, .7, .95, .72, 1.1, .68, .9, .7, 1.12, .72, .93, .7, 1.1, .7, .95, .74];
+    let c = ''; const x0 = 44, sw = 26, mid = 82; c += `<line x1="${x0}" y1="${mid}" x2="${x0 + 16 * sw}" y2="${mid}" stroke="#2B3456"/>` + T(16, 62, 'LATE', C.amber, 7, "font-weight='700'") + T(16, 98, 'EARLY', C.label, 7, "font-weight='700'") + T(16, 160, 'HARD', C.teal, 7, "font-weight='700'");
+    off.forEach((o, i) => { const x = x0 + i * sw + sw / 2, h = o * 150; c += `<rect x="${x - 6}" y="${h > 0 ? mid - h : mid}" width="12" height="${Math.max(2, Math.abs(h))}" rx="2" fill="${o > .05 ? C.amber : '#79b9ee'}"/>`;
+      c += T(x, 116, i + 1, i % 4 ? C.foot : C.label, 7.5, "text-anchor='middle'"); const v = vel[i] * 36; c += `<rect x="${x - 6}" y="${168 - v}" width="12" height="${v}" rx="2" fill="${C.teal}" opacity=".8"/>`; });
+    document.getElementById('p1').innerHTML = page('GROOVE', 'LAST 8 BARS · 212 HITS · 96 BPM', c,
+      [{ l: 'TAKE', on: true }, { l: 'KEEP' }, null, null, null, null, { l: 'HEAR IT' }, { l: '‹ KIT', on: true, col: C.violet }],
+      [['FROM', '8 BARS', 1, .5, 12], ['KEEP', 'TIME+HIT', 0, 0, 11], ['AMOUNT', '80%', 0, .8], ['PUT ON', 'THIS', 0, 0, 12], ['SLIPS', '1/3 STEP', 0, .33, 11], null, null, null],
+      'YOUR FEEL, FROM WHAT YOU JUST PLAYED · NOTHING ARMED') + `<figcaption><b>GROOVE</b> · the sixteen positions of a bar: how early or late, how hard; TAKE reads the last bars, KEEP stores it as a groove</figcaption>`; }
+  { let c = ''; const x0 = 82, sw = 23.5;
+    [['KICK', '#ff9408', { 0: 1, 6: 1, 8: 1, 10: 1 }], ['SNARE', C.teal, { 4: 1, 12: 1, 15: .4 }], ['HAT', '#5b9bff', { 0: 1, 2: 1, 4: 1, 6: 1, 8: 1, 10: 1, 12: 1, 14: .4 }]].forEach(([n, col, hits], r) => { const y = 42 + r * 40; c += T(16, y + 21, n, col, 9, "font-weight='700'");
+      for (let i = 0; i < 16; i++) { const x = x0 + i * sw; c += `<rect x="${x + 1.5}" y="${y}" width="${sw - 3}" height="30" rx="3" fill="${Math.floor(i / 4) % 2 ? '#1A2140' : C.raised}"/>`;
+        if (hits[i]) c += `<rect x="${x + 4}" y="${y + 5}" width="${sw - 8}" height="20" rx="2" fill="${col}" opacity="${hits[i] < 1 ? .35 : .95}" ${hits[i] < 1 ? `stroke="${C.amber}" stroke-dasharray="3 2"` : ''}/>`; } });
+    c += `<rect x="${x0 + 9 * sw}" y="36" width="2" height="132" fill="${C.red}"/>`;
+    document.getElementById('p2').innerHTML = page('BEATBOX', 'INTO CHORUS · A · BAR 3 OF 4', c,
+      [{ l: '● LISTEN', on: true, col: C.red }, { l: 'TEACH' }, { l: 'UNDO' }, null, null, null, { l: 'HEAR IT' }, { l: '‹ PATTERN', on: true, col: C.violet }],
+      [['MIC', 'IN 1', 1, 0, 12], ['BARS', '4', 0, .25], ['COUNT-IN', '1 BAR', 0, 0, 12], ['SURE', '70%', 0, .7], ['ABOVE', '−32 dB', 0, .4, 12], null, null, null],
+      'BOOM · KA · TSS TAUGHT · ONLY THE HITS ARE KEPT') + `<figcaption><b>BEATBOX</b> · the hits as they land, unsure ones faded; LISTEN records the bars, TEACH learns a sound from four tries</figcaption>`; }
+</script>
+</body>
+</html>
