@@ -1,6 +1,8 @@
 # HoSTage: step effects
 
-*Design with mockups for the owner to approve, 2026-11-19. Nothing built. Feature 9 of
+*Design with mockups, approved by the owner on 2026-11-19: "Do the recommendations or make it a choice
+in the program." Each recommendation is taken, and where a reasonable alternative exists it is a
+setting in HoSTage, the recommendation its default (Decisions). Nothing built. Feature 9 of
 `hostage-build-features-2.md`, taken: a lane that changes an effect's setting step by step. Drawn as
 the line machine was, with each easy version checked for where it fails first. Mockups:
 `hostage-steps-mockups.html`, pictures `docs/media/hostage-steps-1.png` (the dock) and `-2.png` (the
@@ -56,6 +58,9 @@ after the drum machine and the line machine.
   then: **mode** (sets it, around the knob), **between steps** (jumps, glides), **range** (by numbers,
   or **Show it** by moving the setting to each end, as ranges by showing does), and **fill from** a
   shape (ramp, peaks, steps, random).
+- **When it stops**: **back to the knob** (the default) or **stays** where the lane left it.
+- **Plays in**: **this pattern** (the default, so it follows the song's sections and A to D) or
+  **every pattern** of the part (a gate that runs through the whole song).
 - **Checks**, on the lane: whether changes land on the step, whether a gate is ramped, whether a jump
   may click.
 
@@ -85,13 +90,19 @@ song (features record, "Where the line is").
 - **The checks**: ramps, jumps likely to click, and the lane offered to the new plug-in when one is
   swapped (Build mode, further, keeping the mappings).
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-19: "Do the recommendations or make it a choice in the program")
 
-1. **A STEPS block at the head of the chain**, its lanes part of the part's pattern, so they follow
-   the song's sections and the variations A to D?
-2. **Every lane either sets the setting or moves it around the knob**, and the setting goes back to the
-   knob when the pattern stops?
-3. **A gate on the part's own level**, ramped so it never clicks; other settings jump or glide, with a
-   warning when a jump may click?
-4. **Changes land on the step**, not at the start of the audio block, through plug-in isolation?
-5. **The STEPS page** on the CTRL49, the pads as steps?
+Each recommendation is taken. Where a reasonable alternative exists, it is a setting in HoSTage, with
+the recommendation as its default; where the alternative would only be wrong, there is no setting.
+
+1. **A STEPS block at the head of the chain**, its lanes part of the part's pattern. **Taken.** A
+   choice per lane: **plays in this pattern** (default: it follows the sections and A to D) or **every
+   pattern** of the part.
+2. **Sets it, or around the knob**: already a choice per lane, as drawn. **The setting goes back to
+   the knob when the pattern stops**: **taken as the default**, with **stays** as the choice per lane.
+3. **A gate on the part's own level, ramped**: **taken.** The ramp is a choice (a few milliseconds by
+   default). A gate on a plug-in's setting is allowed as a choice, with the click warning. Jumps or
+   glides is a choice per lane, as drawn.
+4. **Changes land on the step**: **taken, no choice.** Landing a block early is never wanted.
+5. **The STEPS page** on the CTRL49, the pads as steps: **taken**, its knobs and pads settled when
+   built.
