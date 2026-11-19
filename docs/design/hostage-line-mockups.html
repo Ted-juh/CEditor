@@ -108,13 +108,45 @@
   </div>
   <div class="two"><figure id="p1"></figure>
     <div class="refnotes"><h4>Three pages, one new</h4>
-      <ul><li><b>LINE</b> (new): the line, accents and slides, steps on the pads.</li>
+      <ul><li><b>LINE</b> (new): the line, accents and slides. The pads have three layers: <b>A</b> the steps on and off, <b>B</b> each step's accent, <b>C</b> its slide, one press each, a half at a time.</li>
         <li><b>NOTES</b>: the step sequencer's page from the Chain design, the whole keyboard on its side, for writing the melody note by note.</li>
         <li><b>PATTERN</b>: the drum machine's page, the same for drums and lines: which part of the song, A to D, the groove, ×2.</li></ul>
       <h4>Not the step sequencer</h4>
       <ul><li>The step sequencer is a module that plays while you hold keys, like the arpeggiator.</li>
         <li>The line machine is a pattern: it plays with the song, started by its sections; a held key only moves it.</li></ul>
     </div></div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · Slide, accent and following, made to work on any synth</h2>
+    <p>The easy versions would fail quietly: a slide on a synth that does not glide is two notes at once, an accent on a sound that ignores
+      strength does nothing, and "follow the key" leaves open which keys and how. So the line machine checks the synth, uses the library's own
+      measure of how a sound answers strength, and says exactly how it follows.</p>
+  </div>
+  <div class="app"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px 14px">
+    <div class="insp" style="width:auto"><span class="lbl">Slide</span><h4>How the slides glide</h4>
+      <div class="kv"><span class="kk">Glide by</span><span class="seg"><span class="on">the synth</span><span>pitch bend</span><span>portamento CC</span></span></div>
+      <div class="say" style="border-left-color:#58a879;background:#20372a">Diva is in mono, legato glide is on: slides will glide. ✓</div>
+      <div class="say" style="border-left-color:#d7a44e;background:#46371d;color:#f1d3a0">If the synth were in poly mode, each slide would sound as two notes. HoSTage reads its mode where the plug-in names it and offers <b>Set mono legato</b>, one click, undoable.</div>
+      <div class="note"><b>Pitch bend</b>: HoSTage bends from note to note itself, for synths without glide, within the bend range (told once, or read from the device profile). <b>Portamento CC</b> (5 and 65): for hardware that answers it. A slide between two of the same note is a tie: held, not started again.</div>
+    </div>
+    <div class="insp" style="width:auto"><span class="lbl">Accent</span><h4>What an accent does</h4>
+      <div class="kv"><span class="kk">Harder by</span><span><span class="field">+30</span> strength</span>
+        <span class="kk">And raises</span><span><span class="field">Cutoff +20 %</span> <span class="note">on accented steps only</span></span></div>
+      <div class="say">Moog Bass answers strength: measured by the library, a hard note is clearly louder and brighter than a soft one. ✓</div>
+      <div class="say" style="border-left-color:#d7a44e;background:#46371d;color:#f1d3a0">A sound that hardly answers strength gets this instead: "This sound barely changes with strength, so accents will not be heard. Raise a setting on accents?" with its likeliest settings offered (cutoff, envelope amount, level).</div>
+      <div class="note">The measure is the library's own (how much harder velocity 100 hits than 40), already taken for every sound it has auditioned.</div>
+    </div>
+    <div class="insp" style="width:auto"><span class="lbl">Follow</span><h4>How the line follows</h4>
+      <div class="kv"><span class="kk">Follows</span><span class="seg"><span>off</span><span class="on">a key</span><span>a chord</span></span>
+        <span class="kk">Played on</span><span class="seg"><span class="on">this part's keys</span><span>1 · Grand Piano</span></span>
+        <span class="kk">Moves</span><span class="seg"><span class="on">keeps its shape</span><span>stays in the key</span></span>
+        <span class="kk">No key held</span><span class="seg"><span class="on">the last one</span><span>as written</span></span></div>
+      <div class="say">The keys of this part's zone (C1–B2) steer the line and do not sound themselves. Holding F moves every note by the same distance as A to F, so the line keeps its shape; let go and it stays on F until another key.</div>
+      <div class="note">"A chord" listens to a chord held on this part, or on another (the pianist's right hand), and moves each note to the nearest note of that chord, roots to the root. The roll shows the key's notes; <b>Chromatic</b> shows all twelve for a passing note, marked as outside the key.</div>
+    </div>
+  </div></div>
 </section>
 
 <script>
@@ -159,7 +191,7 @@
     [8, 9, 10, 11, 12, 13, 14, 15].forEach((st, i) => { const x = i * 60 + 6, on = !!STEPS[st]; s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${on ? (STEPS[st][1] ? C.amber : C.violet) : C.raised}" ${st === 11 ? 'stroke="#fff" stroke-width="1.5"' : ''}/>` + T(x + 24, 192, `${st + 1}`, on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'"); });
     [['STEP', '12', 1], ['NOTE', 'G1'], ['ACCENT', 'OFF'], ['SLIDE', 'OFF'], ['LENGTH', '55%', 0, .55], ['OCTAVE', '0'], ['CHANCE', '100%', 0, 1], ['HALF', '9–16']].forEach(([l, v, f, b], i) => { const cx = i * 60 + 30;
       s += T(cx, 217, l, f ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, f ? C.teal : C.text, 13, "text-anchor='middle' font-weight='600'") + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (b ? `<rect x="${i * 60 + 8}" y="244" width="${44 * b}" height="4" rx="2" fill="${C.bar}"/>` : ''); });
-    s += T(8, 265, 'PADS: THE STEPS, A HALF AT A TIME · HOLD A KEY TO MOVE THE LINE', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    s += T(8, 265, 'PAD LAYER A: STEPS · B: ACCENTS · C: SLIDES · HOLD A KEY TO MOVE THE LINE', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
     document.getElementById('p1').innerHTML = `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg><figcaption><b>LINE</b> · the line in A minor, accents amber, slides marked; knob 1 the step, then note, accent, slide, length, octave, chance</figcaption>`; }
 </script>
 </body>
