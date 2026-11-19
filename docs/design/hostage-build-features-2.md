@@ -32,7 +32,7 @@ is right.*
 | 9 | **Step effects**: a lane that changes an effect's setting step by step | taken; design to come | |
 | 10 | **The kick ducks the bass**, from the pattern's own hits | taken; design to come | |
 | 11 | **A line machine**: the drum grid's twin for basslines and synth lines | taken; design to come | |
-| 12 | **Sample pads**: a built-in one-shot sampler, the file player made playable | proposal with mockups, 2026-11-19 | `hostage-sampler-design.md` |
+| 12 | **Samples, on pads and keys**: a built-in one-shot sampler, the file player made playable | approved with mockups, 2026-11-19 | `hostage-sampler-design.md` |
 
 ## 1. A drum machine
 
@@ -100,7 +100,7 @@ exists: 2, 3, 9, 11 and 6.
     accent and a slide, the notes able to follow the chord being played. Note lanes exist; this is
     their face, built the way the drum machine is.
 
-## 12. Sample pads
+## 12. Samples, on pads and keys
 
 The owner, 2026-11-19: "What about a sampler?", then "Give me a proposal". HoSTage plays no sound
 files of its own today. A full sampler instrument (many samples across keys and velocities, loops,
@@ -108,5 +108,7 @@ envelopes, filters) would be a synth and is ruled out by the first round's decis
 one file a pad played as it is, are the file player that decision already allows, made playable.
 The proposal draws sample pads only: sixteen pads a bank in the dock, each trimmed on its waveform,
 files dropped one by one or as a folder, collected into the show, and SAMPLES and TRIM pages on the
-CTRL49. Four decisions in the design record.
+CTRL49. **Approved, 2026-11-19**, with the owner's change: "It shouldn't just be tied to drum
+pads.. the keys could also work or be assignable." Every sample plays from the keys as well, on one
+key or across a range of keys, pitched from a root, and a keyboard map shows which keys play what.
 

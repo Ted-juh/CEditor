@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HoSTage: sample pads, mockups</title>
+<title>HoSTage: samples, mockups</title>
 <!--
   Mockups for docs/design/hostage-sampler-design.md: sample pads, a built-in one-shot sampler that
   extends the first round's file player (decision 3). Static, invented data; HoSTage's own colours
@@ -70,24 +70,24 @@
 
 <section class="frame" id="f1">
   <div class="caption">
-    <h2>1 · Sample pads in the dock</h2>
-    <p>A built-in instrument, the file player made playable: sixteen pads a bank, each one sound file, played as it is. Drop files on the pads,
-      or a whole folder: each file on its own pad, named after the file, a kick on the kick's note when its name says so. Select a pad to trim it
-      on its waveform. The drum machine plays it like any instrument; so does the keyboard.</p>
+    <h2>1 · Samples in the dock: pads and keys</h2>
+    <p>A built-in instrument, the file player made playable: each sound file on a pad and on the keys. A sample sits on one key, or across a
+      range of keys, pitched from a root, so a brass stab plays as a melody. The map under the pads shows which keys play what. Drop files on
+      pads or on keys, or a whole folder. Select a sample to trim it on its waveform. The drum machine plays it like any instrument.</p>
   </div>
   <div class="app">
     <div class="dtabs"><span class="tb on">Chain</span><span class="tb">Params</span><span class="tb">Zone</span><span class="tb">Sounds</span><span class="subj">9 · Hits &amp; FX</span><span class="sp"></span><span class="ghostb">Collect files into the show</span></div>
     <div class="strip">
       <div class="blk"><small>Drums</small>Chorus · A<span>16 steps</span></div><span class="arrow">▸</span>
-      <div class="blk sel"><small>Instrument · built in</small>Sample pads<span>My Hits · 13 of 16 pads · 42 MB</span></div><span class="arrow">▸</span>
+      <div class="blk sel"><small>Instrument · built in</small>Samples<span>My Hits · 13 samples · 42 MB</span></div><span class="arrow">▸</span>
       <div class="blk"><small>Insert</small>Valhalla Room<span>TAIL 1.8 s</span></div><span class="arrow">▸</span>
       <div class="blk"><small>Out</small>Main<span>−4.0 dB</span></div>
     </div>
     <div class="body">
-      <div><div class="row" style="margin-bottom:8px"><span class="seg"><span class="on">Bank A</span><span>B</span><span>C</span><span>D</span></span><span class="sp"></span><span class="note">drop sound files or a folder on the pads</span></div>
-        <div class="pads" id="pads1"></div></div>
-      <div class="edit"><div class="row"><h4>Brass stab</h4><span class="note">pad 6 · note 41 (F1) · brass-stab-Eb.wav · 0.9 s · 48 kHz stereo</span></div>
-        <div class="say">Plays from the attack to just before the room noise, fading out over the last 40 ms. It stops when the next stab starts.</div>
+      <div><div class="row" style="margin-bottom:8px"><span class="seg"><span class="on">Bank A</span><span>B</span><span>C</span><span>D</span></span><span class="sp"></span><span class="note">drop sound files or a folder on the pads or the keys</span></div>
+        <div class="pads" id="pads1"></div><div id="keys1" style="margin-top:10px"></div></div>
+      <div class="edit"><div class="row"><h4>Brass stab</h4><span class="note">pad 6 · keys C3–C5 · brass-stab-Eb.wav · 0.9 s · 48 kHz stereo</span></div>
+        <div class="say">Plays from the attack to just before the room noise, fading out over the last 40 ms, on every key from C3 to C5, pitched from C4. It stops when the next stab starts.</div>
         <div id="wave1"></div>
         <div class="kv">
           <span class="k">Start · end</span><span><span class="field">0.012 s</span> to <span class="field">0.71 s</span></span>
@@ -97,9 +97,10 @@
           <span class="k">Plays</span><span class="seg"><span class="on">to the end</span><span>while held</span></span>
           <span class="k">Strength</span><span><span class="field">60 %</span> <span class="note">how much a soft hit is quieter</span></span>
           <span class="k">Stops</span><span><span class="field">itself · group 2</span> <span class="note">a new hit cuts the old</span></span>
-          <span class="k">Note</span><span><span class="field">41 · F1</span> <span class="ghostb">Play the key</span></span>
+          <span class="k">Keys</span><span class="seg"><span>one key</span><span class="on">a range, pitched</span></span>
+          <span class="k">Range · root</span><span><span class="field">C3</span>–<span class="field">C5</span> · <span class="field">C4</span> <span class="ghostb">Play the keys</span></span>
         </div>
-        <div class="note">Nothing more: no loops, no filter, no envelope beyond the fades, one sample a pad. A sound that needs more is a sampler plug-in's job (decision 3).</div>
+        <div class="note">Nothing more: no loops, no filter, no envelope beyond the fades, one file a sample. Many files across the keys and velocities is a sampler plug-in's job (decision 3).</div>
       </div>
     </div>
   </div>
@@ -108,7 +109,7 @@
 <section class="frame" id="f2">
   <div class="caption">
     <h2>2 · Two pages on the CTRL49</h2>
-    <p>SAMPLES puts the bank on the pads: play them, or hold SELECT and press one to edit it. TRIM is the selected sample on its waveform:
+    <p>SAMPLES puts the bank on the pads, and the keys play what is mapped to them: play, or hold SELECT and press a pad or a key to edit its sample. TRIM is the selected sample on its waveform:
       start, end and the fades on the knobs, then level, pitch and how it plays. Which knob and pad does what is settled when the pages are built.</p>
   </div>
   <div class="two"><figure id="p1"></figure><figure id="p2"></figure></div>
@@ -117,7 +118,7 @@
 <script>
   const PADS = [
     ['Kick', 36, '#ff9408'], ['Snare', 38, '#2dd4bf'], ['Clap', 39, '#8b7cff'], ['Hat closed', 42, '#5b9bff', 'G1'],
-    ['Hat open', 46, '#7bd88f', 'G1'], ['Brass stab', 41, '#ffb547', 'G2', 'sel'], ['Brass fall', 43, '#ffb547', 'G2'], ['Vocal "hey"', 48, '#ff5c93'],
+    ['Hat open', 46, '#7bd88f', 'G1'], ['Brass stab', 'C3–C5', '#ffb547', 'G2', 'sel'], ['Brass fall', 43, '#ffb547', 'G2'], ['Vocal "hey"', 48, '#ff5c93'],
     ['Riser 4 bars', 49, '#e6e9f5'], ['Impact', 50, '#ff9408'], ['Reverse cymbal', 51, '#8b7cff'], ['Count-in', 52, '#2dd4bf'],
     ['Crowd', 53, '#5b9bff', null, 'miss'], [null], [null], [null],
   ];
@@ -129,8 +130,17 @@
   document.getElementById('pads1').innerHTML = PADS.map(([n, note, c, ch, st], i) => {
     if (!n) return `<div class="pad empty">pad ${i + 1}<br>drop a file</div>`;
     const shape = /Riser/.test(n) ? 'rise' : /Reverse/.test(n) ? 'rev' : /Kick|Snare|Clap|Hat|Impact/.test(n) ? 'hit' : 'stab';
-    return `<div class="pad${st === 'sel' ? ' sel' : ''}${st === 'miss' ? ' miss' : ''}"><span class="bar" style="background:${c}"></span><b>${n}</b><small>note ${note}</small>${ch ? `<span class="ch">${ch}</span>` : ''}
+    return `<div class="pad${st === 'sel' ? ' sel' : ''}${st === 'miss' ? ' miss' : ''}"><span class="bar" style="background:${c}"></span><b>${n}</b><small>${typeof note === 'number' ? 'note ' + note : 'keys ' + note}</small>${ch ? `<span class="ch">${ch}</span>` : ''}
       ${st === 'miss' ? '<small style="color:var(--danger);font-family:var(--sans)">not on this computer · Find…</small>' : `<svg class="wf" viewBox="0 0 120 34" preserveAspectRatio="none">${wave(120, 34, shape, c)}</svg>`}</div>`; }).join('');
+  { const LO = 36, HI = 96, W = 560, kw = W / (HI - LO + 1); const blk = (n) => [1, 3, 6, 8, 10].includes(n % 12); let s = '';
+    const single = { 36: '#ff9408', 38: '#2dd4bf', 39: '#8b7cff', 42: '#5b9bff', 46: '#7bd88f', 43: '#ffb547', 48: '#ff5c93', 49: '#e6e9f5', 50: '#ff9408', 51: '#8b7cff', 52: '#2dd4bf' };
+    s += `<rect x="${(60 - LO) * kw}" y="0" width="${(85 - 60) * kw}" height="14" rx="3" fill="#ffb547" opacity=".85"/><text x="${(60 - LO) * kw + 6}" y="11" font-family="DejaVu Sans, sans-serif" font-size="10" font-weight="700" fill="#111">Brass stab · C3–C5, pitched</text>`;
+    s += `<polygon points="${(72 - LO) * kw + kw / 2 - 5},16 ${(72 - LO) * kw + kw / 2 + 5},16 ${(72 - LO) * kw + kw / 2},22" fill="#ffb547"/>`;
+    for (let n = LO; n <= HI; n++) if (!blk(n)) { const m = blk(n + 1) ? n + 2 : n + 1; s += `<rect x="${(n - LO) * kw}" y="24" width="${(Math.min(m, HI + 1) - n) * kw}" height="40" fill="${single[n] || (n >= 60 && n <= 84 ? '#f3dcae' : '#e9edf1')}" stroke="#9aa4ad" stroke-width=".6"/>`; }
+    for (let n = LO; n <= HI; n++) if (blk(n)) s += `<rect x="${(n - LO) * kw + kw * .15}" y="24" width="${kw * .9}" height="25" fill="${single[n] || (n >= 60 && n <= 84 ? '#8a6a2a' : '#1a1f24')}"/>`;
+    [36, 48, 60, 72, 84, 96].forEach((n) => { s += `<text x="${(n - LO) * kw + 2}" y="76" font-family="DejaVu Sans Mono, monospace" font-size="9.5" fill="#7f8b96">C${n / 12 - 2}</text>`; });
+    s += `<text x="${(72 - LO) * kw - 2}" y="76" font-family="DejaVu Sans Mono, monospace" font-size="9.5" fill="#ffb547" text-anchor="end">root</text>`;
+    document.getElementById('keys1').innerHTML = `<div class="note" style="margin-bottom:4px">Which keys play what: drum hits on single keys, the brass stab across C3–C5</div><svg viewBox="0 0 ${W} 80" style="width:100%;height:auto;display:block">${s}</svg>`; }
   { const W = 760, H = 120; let s = `<rect width="${W}" height="${H}" rx="4" fill="#12171b"/>` + wave(W, H, 'stab', '#ffb547', [.017, .79]);
     const sx = .017 * W, ex = .79 * W;
     s += `<line x1="${sx}" y1="0" x2="${sx}" y2="${H}" stroke="#79b9ee" stroke-width="2"/><rect x="${sx - 5}" y="0" width="10" height="12" fill="#79b9ee"/>`;
@@ -164,11 +174,11 @@
     s += `<g transform="translate(16,38)">${wave(448, 110, 'stab', C.amber, [.017, .79])}</g>`;
     s += `<rect x="${16 + .017 * 448 - 1}" y="36" width="2" height="114" fill="${C.teal}"/><rect x="${16 + .79 * 448 - 1}" y="36" width="2" height="114" fill="${C.teal}"/>`;
     s += `<path d="M${16 + .79 * 448 - 20} 44 L${16 + .79 * 448} 146" stroke="${C.amber}" stroke-width="1.5" fill="none"/>`;
-    s += T(16, 166, 'PLAYS TO THE END · STOPS ITSELF AND GROUP 2', C.label, 8, "font-weight='700'");
+    s += T(16, 166, 'PLAYS TO THE END · STOPS ITSELF AND GROUP 2 · KEYS C3–C5, PITCHED FROM C4', C.label, 8, "font-weight='700'");
     s += pads([{ l: 'AUDITION', on: true }, { l: 'TO END', on: true, col: C.amber }, { l: 'HELD' }, { l: 'CHOKE G2', on: true, col: C.amber }, null, null, { l: 'SELECT' }, { l: '‹ PADS', on: true, col: C.violet }]);
-    s += cells([{ l: 'START', v: '0.012', vs: 12, focus: true, f: .02 }, { l: 'END', v: '0.71', f: .79 }, { l: 'FADE IN', v: '0 ms', vs: 12 }, { l: 'FADE OUT', v: '40 ms', vs: 12, f: .2 }, { l: 'LEVEL', v: '−3.0', f: .75 }, { l: 'PITCH', v: '0', f: .5 }, { l: 'STRENGTH', v: '60%', f: .6 }, { l: 'NOTE', v: 'F1' }]);
+    s += cells([{ l: 'START', v: '0.012', vs: 12, focus: true, f: .02 }, { l: 'END', v: '0.71', f: .79 }, { l: 'FADE IN', v: '0 ms', vs: 12 }, { l: 'FADE OUT', v: '40 ms', vs: 12, f: .2 }, { l: 'LEVEL', v: '−3.0', f: .75 }, { l: 'PITCH', v: '0', f: .5 }, { l: 'STRENGTH', v: '60%', f: .6 }, { l: 'KEYS', v: 'C3–C5', vs: 12 }]);
     s += T(8, 265, 'KNOBS TRIM THE SELECTED SAMPLE · PAD 1 PLAYS IT', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
-    document.getElementById('p2').innerHTML = svg(s) + '<figcaption><b>TRIM</b> · the selected sample on its waveform: start, end, fades, level, pitch, strength, its note</figcaption>'; }
+    document.getElementById('p2').innerHTML = svg(s) + '<figcaption><b>TRIM</b> · the selected sample on its waveform: start, end, fades, level, pitch, strength, its keys</figcaption>'; }
 </script>
 </body>
 </html>
