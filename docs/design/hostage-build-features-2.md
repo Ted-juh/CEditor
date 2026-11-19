@@ -23,8 +23,8 @@ is right.*
 | --- | --- | --- | --- |
 | 1 | **A drum machine**: a drum part's patterns as a grid in the dock and three pages on the CTRL49 | approved with mockups, 2026-11-19; it plays the drum instrument you load and has no sounds of its own | `hostage-drums-design.md` |
 | 2 | **Note repeat** on the KIT pads | approved with mockups, 2026-11-19 | `hostage-kit-design.md` |
-| 3 | **A kit from anywhere**: each drum from a different instrument | taken; design to come | |
-| 4 | **Split a kit onto mixer strips** | taken; design to come | |
+| 3 | **A kit from anywhere**: each drum from a different instrument | taken; design with mockups for approval, 2026-11-19 | `hostage-kitbuild-design.md` |
+| 4 | **Split a kit onto mixer strips** | taken; design with mockups for approval, 2026-11-19 | `hostage-kitbuild-design.md` |
 | 5 | **An energy knob** that thins a pattern out or fills it in | taken; design to come | |
 | 6 | **Drop a MIDI file on the grid** | taken; design to come | |
 | 7 | **Take the groove from your playing** | taken; design to come | |
