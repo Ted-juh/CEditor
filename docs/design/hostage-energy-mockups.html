@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: the energy knob, mockups</title>
+<!--
+  Mockups for docs/design/hostage-energy-design.md: feature 5 of hostage-build-features-2.md. One
+  knob per pattern: left thins it out in a fixed order, right brings hits in from a fuller pattern
+  of your own, the centre is the pattern as written. Built on the per-hit check playback already
+  makes (CompiledEvent probability, eventPlays) and on scenes' morph (Scene::morphBeats). Static,
+  invented data; HoSTage's own colours in the dock; the CTRL49 page at 480 x 272 (Midnight).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { border: 1px solid var(--line-soft); background: var(--bg); overflow: hidden; padding: 14px; }
+  .dlg { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 7px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .dlg h4 { margin: 0; font-size: 15px; } .sub { color: var(--dim); font-size: 12px; }
+  .say { padding: 8px 11px; border-left: 3px solid var(--accent); background: var(--accent-surface); border-radius: 0 4px 4px 0; font-size: 12.5px; }
+  .warn { padding: 8px 11px; border-left: 3px solid var(--pending); background: var(--pending-surface); border-radius: 0 4px 4px 0; font-size: 12px; color: #f1d3a0; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg span { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .seg span.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .k { color: var(--dim); font-size: 12px; min-width: 92px; } .field { padding: 3px 8px; background: var(--field); border: 1px solid var(--line); border-radius: 3px; font: 12px var(--mono); }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .note { color: var(--faint); font-size: 11.5px; }
+  .lg { display: flex; gap: 16px; font-size: 11.5px; color: var(--soft); align-items: center; }
+  .lg i { display: inline-block; width: 14px; height: 12px; border-radius: 2px; margin-right: 5px; vertical-align: -2px; }
+  .cols { display: grid; grid-template-columns: 1fr 420px; gap: 14px; }
+  figure { margin: 0; } figure svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  figcaption { margin-top: 8px; color: var(--soft); font-size: 12.5px; } figcaption b { color: var(--text); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  .side { color: var(--soft); font-size: 12.5px; display: flex; flex-direction: column; gap: 8px; }
+  .side b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · The energy knob, in the dock</h2>
+    <p>One knob on the DRUMS block. In the middle, the pattern as written. Turned left, hits leave in a fixed order, the softest and the
+      off-beat ones first, until only the backbone is left. Turned right, the hits of a fuller pattern you choose come in, the strongest
+      first. Each position is always the same pattern, so a build can be rehearsed.</p>
+  </div>
+  <div class="app"><div class="cols">
+    <div class="dlg"><div class="row"><h4>Verse · A</h4><span class="sub">energy +40, towards Chorus · A</span></div>
+      <div id="grid1"></div>
+      <div class="lg"><span><i style="background:#5b9bff"></i>written, playing</span><span><i style="border:1.5px solid #5b9bff;opacity:.6"></i>written, left out</span><span><i style="background:#5b9bff;opacity:.45;outline:1.5px dashed #79b9ee"></i>brought in from Chorus · A</span></div>
+      <div class="sub" style="margin-top:4px">The same pattern at five positions of the knob</div>
+      <div id="ladder1"></div>
+    </div>
+    <div class="dlg"><h4>Energy</h4><span class="sub">DRUMS block · Verse · A</span>
+      <div id="knob1"></div>
+      <div class="say">At +40, 8 of the 21 hits Chorus · A has and Verse · A does not come in, the strongest first. Nothing of Verse · A leaves.</div>
+      <div class="row"><span class="k">Fuller from</span><span class="seg"><span class="on">Chorus · A</span><span>this pattern, filled in</span></span></div>
+      <div class="row"><span class="k">Strength</span><span class="seg"><span class="on">rises a little with it</span><span>stays</span></span></div>
+      <div class="row"><span class="k">Lanes</span><span class="seg"><span class="on">drums</span><span>drums and lines</span></span></div>
+      <div class="row"><span class="k">With the others</span><span class="seg"><span class="on">its own</span><span>one knob for all</span></span></div>
+      <div class="note">The backbone never leaves: a lane's hits on the beat at full strength. A lane without one, the shaker here, drops out.</div>
+      <div class="note">Editing the grid edits the written pattern. Fills stay the held FILL's.</div>
+      <div class="row" style="justify-content:flex-end"><span class="ghostb">As written</span><span class="btn">Keep as a pattern: "Verse +40"</span></div>
+    </div>
+  </div></div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · Energy over the song</h2>
+    <p>A section can set each pattern's energy and let it rise, so the pre-chorus builds on its own. Scenes already move settings over up
+      to 32 beats; energy is one more thing they move, and a setting can rise with it, the pad's filter opening as the drums fill in.</p>
+  </div>
+  <div class="app"><div class="cols">
+    <div class="dlg"><h4>Verse → Pre-chorus → Chorus</h4><span class="sub">24 bars at 96 BPM; the drums' energy, and the pad's filter rising with it</span>
+      <div id="song2"></div></div>
+    <div class="dlg"><h4>Pre-chorus</h4><span class="sub">section · its scene · Verse · A playing</span>
+      <div class="row"><span class="k">Drums</span><span class="field">−30</span>to<span class="field">+70</span><span class="k" style="min-width:0">over</span><span class="seg"><span>4 bars</span><span class="on">8 bars</span></span></div>
+      <div class="row"><span class="k">Bass line</span><span class="seg"><span class="on">thin only</span><span>as written</span></span><span class="field">−30</span>to<span class="field">0</span></div>
+      <div class="row"><span class="k">Rises with it</span><span class="field">Pad · Cutoff 30 → 70 %</span><span class="ghostb">+ setting</span></div>
+      <div class="say">The pre-chorus starts thinner than the verse, so the build has somewhere to go, and is almost the chorus by its last bar.</div>
+      <div class="warn">A rise is the knob turning itself: touch the knob and you take over, until the next section.</div>
+      <div class="note">8 bars of 4/4 is 32 beats, the longest a scene moves a setting today (Scene::morphBeats). A scene moves a setting from where it is; starting the rise from a value of its own, −30, is new.</div>
+    </div>
+  </div></div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · On the CTRL49</h2>
+    <p>ENERGY, reached from PATTERN: the pattern as it plays now, the knob's position, and the pads for a live build. Which knob and pad does
+      what is settled when the page is built.</p>
+  </div>
+  <div class="two"><figure id="p1"></figure>
+    <div class="side">
+      <div><b>DROP</b> takes it straight to the backbone while held: a breakdown, back on release.</div>
+      <div><b>RISE</b> turns the knob for you, from where it is to RISE TO over the bars set, starting on the next bar.</div>
+      <div><b>AS WRITTEN</b> goes back to the middle. <b>KEEP</b> makes a pattern of what is playing.</div>
+      <div><b>Knob 1</b> is the energy itself; the encoders are endless, so the screen shows where it is, and it stops at the middle on the way through.</div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // The pattern: Verse A as written, and Chorus A to build towards.
+  const LANES = [['Kick', '#ff9408'], ['Snare', '#2dd4bf'], ['Closed hat', '#5b9bff'], ['Open hat', '#7bd88f'], ['Shaker', '#d7a44e']];
+  const verse = [[0, 0, 110], [0, 6, 75], [0, 8, 110], [1, 4, 110], [1, 12, 110], [1, 7, 35], [1, 14, 35],
+    ...[0, 4, 8, 12].map(s => [2, s, 100]), ...[2, 6, 10, 14].map(s => [2, s, 70]), [4, 3, 50], [4, 11, 50]];
+  const chorus = [[0, 0, 110], [0, 3, 80], [0, 8, 110], [0, 10, 90], [1, 4, 110], [1, 12, 110], [1, 15, 70],
+    ...Array.from({ length: 16 }, (_, s) => [2, s, s % 4 === 0 ? 100 : s % 2 ? 50 : 70]), [3, 6, 80], [3, 14, 90], ...[0, 2, 4, 6, 8, 10, 12, 14].map(s => [4, s, 60])];
+  const key = h => h[0] + ':' + h[1];
+  const metric = s => s % 4 === 0 ? 3 : s % 2 === 0 ? 2 : 1;
+  const score = h => metric(h[1]) * 200 + h[2];
+  const backbone = h => metric(h[1]) === 3 && h[2] >= 90;
+  const vKeys = new Set(verse.map(key));
+  const thinOrder = verse.filter(h => !backbone(h)).sort((a, b) => score(a) - score(b) || a[0] - b[0] || a[1] - b[1]);
+  const inOrder = chorus.filter(h => !vKeys.has(key(h))).sort((a, b) => score(b) - score(a) || a[0] - b[0] || a[1] - b[1]);
+  const at = e => { const out = new Set(e < 0 ? thinOrder.slice(0, Math.round(-e / 100 * thinOrder.length)).map(key) : []);
+    const inn = e > 0 ? inOrder.slice(0, Math.round(e / 100 * inOrder.length)) : [];
+    return { playing: verse.filter(h => !out.has(key(h))), out: verse.filter(h => out.has(key(h))), inn }; };
+
+  const grid = (st, W, H, opts = {}) => { const x0 = opts.names ? 92 : 6, rows = LANES.length, rh = (H - 12) / rows, sw = (W - x0 - 6) / 16;
+    let s = `<rect width="${W}" height="${H}" rx="4" fill="#12171b"/>`;
+    LANES.forEach(([n, c], r) => { const y = 6 + r * rh; if (opts.names) s += `<text x="10" y="${y + rh / 2 + 4}" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#d9e0e6">${n}</text>`;
+      for (let i = 0; i < 16; i++) s += `<rect x="${x0 + i * sw + 1.5}" y="${y + 1.5}" width="${sw - 3}" height="${rh - 3}" rx="${opts.names ? 3 : 1.5}" fill="${Math.floor(i / 4) % 2 ? '#1a2027' : '#20272e'}"/>`; });
+    const cell = (h, kind) => { const [r, i, v] = h, c = LANES[r][1], y = 6 + r * rh, x = x0 + i * sw, p = opts.names ? 4 : 2, op = .45 + .55 * v / 110;
+      if (kind === 'play') return `<rect x="${x + p}" y="${y + p}" width="${sw - 2 * p}" height="${rh - 2 * p}" rx="2" fill="${c}" opacity="${op}"/>`;
+      if (kind === 'out') return `<rect x="${x + p + .75}" y="${y + p + .75}" width="${sw - 2 * p - 1.5}" height="${rh - 2 * p - 1.5}" rx="2" fill="none" stroke="${c}" stroke-width="1.5" opacity=".55"/>`;
+      return `<rect x="${x + p}" y="${y + p}" width="${sw - 2 * p}" height="${rh - 2 * p}" rx="2" fill="${c}" opacity=".42" stroke="#79b9ee" stroke-width="1.4" stroke-dasharray="3 2"/>`; };
+    st.playing.forEach(h => s += cell(h, 'play')); st.out.forEach(h => s += cell(h, 'out')); st.inn.forEach(h => s += cell(h, 'in'));
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; };
+  document.getElementById('grid1').innerHTML = grid(at(40), 900, 230, { names: true });
+  { const pos = [[-100, 'the backbone'], [-50, 'thinner'], [0, 'as written'], [50, 'fuller'], [100, 'with all of Chorus · A']];
+    document.getElementById('ladder1').innerHTML = `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">` + pos.map(([e, l]) =>
+      `<div>${grid(at(e), 200, 92)}<div style="font-size:11.5px;color:${e === 0 ? '#d9e0e6' : '#aab5be'};margin-top:4px"><b style="font-family:var(--mono)">${e > 0 ? '+' : ''}${e}</b> · ${l}</div></div>`).join('') + `</div>`; }
+  // the knob in the dock: a centred bar
+  { const W = 388, H = 74, x0 = 14, w = W - 28, mid = x0 + w / 2, v = 40; let s = '';
+    s += `<rect x="${x0}" y="22" width="${w}" height="10" rx="5" fill="#12171b" stroke="#3b4652"/>`;
+    s += `<rect x="${mid}" y="22" width="${w / 2 * v / 100}" height="10" rx="3" fill="#5b9bd5"/>`;
+    s += `<line x1="${mid}" y1="16" x2="${mid}" y2="38" stroke="#aab5be" stroke-width="2"/>`;
+    s += `<circle cx="${mid + w / 2 * v / 100}" cy="27" r="9" fill="#d9e0e6" stroke="#12171b" stroke-width="2"/>`;
+    s += `<text x="${x0}" y="56" font-family="DejaVu Sans, sans-serif" font-size="11.5" fill="#7f8b96">thinner</text><text x="${mid}" y="56" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="11.5" fill="#aab5be">as written</text><text x="${x0 + w}" y="56" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="11.5" fill="#7f8b96">fuller</text>`;
+    s += `<text x="${W - 14}" y="12" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="700" fill="#79b9ee">+40</text>`;
+    document.getElementById('knob1').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; }
+  // frame 2: energy over 24 bars
+  { const W = 900, H = 300, x0 = 50, bw = (W - x0 - 14) / 24, top = 48, h = 150, y = e => top + h / 2 - e / 100 * h / 2;
+    let s = `<rect width="${W}" height="${H}" rx="4" fill="#12171b"/>`;
+    [['Verse · A', 0, 8, '#243746'], ['Pre-chorus · Verse · A', 8, 16, '#46371d'], ['Chorus · A', 16, 24, '#20372a']].forEach(([n, a, b, c]) => {
+      s += `<rect x="${x0 + a * bw + 1}" y="12" width="${(b - a) * bw - 2}" height="24" rx="3" fill="${c}"/><text x="${x0 + a * bw + 10}" y="28" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#d9e0e6">${n}</text>`; });
+    [100, 0, -100].forEach(e => s += `<line x1="${x0}" y1="${y(e)}" x2="${W - 14}" y2="${y(e)}" stroke="${e ? '#2c353e' : '#526170'}" ${e ? 'stroke-dasharray="3 3"' : ''}/><text x="${x0 - 8}" y="${y(e) + 4}" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="10" fill="#7f8b96">${e > 0 ? '+' : ''}${e}</text>`);
+    s += `<text x="${x0 + 4}" y="${y(0) - 6}" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#7f8b96">as written</text>`;
+    const pts = [[0, 0], [8, 0], [8, -30], [16, 70], [16, 0], [24, 0]].map(([b, e]) => `${x0 + b * bw},${y(e)}`).join(' ');
+    s += `<polyline points="${pts}" fill="none" stroke="#5b9bd5" stroke-width="2.5"/>`;
+    s += `<text x="${x0 + 16 * bw - 6}" y="${y(70) - 8}" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="11" fill="#79b9ee">+70</text><text x="${x0 + 8 * bw + 6}" y="${y(-30) + 16}" font-family="DejaVu Sans Mono, monospace" font-size="11" fill="#79b9ee">−30</text>`;
+    s += `<text x="${x0 + 16 * bw + 8}" y="${y(0) + 16}" font-family="DejaVu Sans, sans-serif" font-size="10.5" fill="#aab5be">Chorus · A, its own pattern</text>`;
+    const fy = 252, fh = 34; s += `<text x="${x0 - 8}" y="${fy - fh / 2 + 4}" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#7f8b96">pad</text>`;
+    const fp = [[0, 30], [8, 30], [16, 70], [24, 70]].map(([b, v]) => `${x0 + b * bw},${fy - v / 100 * fh}`).join(' ');
+    s += `<line x1="${x0}" y1="${fy}" x2="${W - 14}" y2="${fy}" stroke="#2c353e"/><polyline points="${fp}" fill="none" stroke="#2dd4bf" stroke-width="2"/><text x="${x0 + 4}" y="${fy + 12}" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#7f8b96">Pad · Cutoff, 30 → 70 % with the build</text>`;
+    for (let b = 0; b <= 24; b += 4) s += `<text x="${x0 + b * bw}" y="${top + h + 18}" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="9.5" fill="#65717c">${b + 1}</text>`;
+    s += `<rect x="${x0 + 13.5 * bw}" y="40" width="2" height="${h + 16}" fill="#e05c5c"/>`;
+    document.getElementById('song2').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${s}</svg>`; }
+  // frame 3: the ENERGY page
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393', label: '#8890B0', foot: '#565E7E', bar: '#4A5378', violet: '#8B7CFF', teal: '#2DD4BF', amber: '#FFB547' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  { let s = `<rect width="480" height="272" fill="${C.bg}"/><rect x="8" y="7" width="4" height="17" rx="1" fill="${C.teal}"/>` + T(18, 22, 'ENERGY', C.text, 16, "font-weight='700'") + T(472, 21, 'VERSE · A · TOWARDS CHORUS · A', C.dim, 10, "text-anchor='end'");
+    s += `<rect x="8" y="30" width="464" height="146" rx="4" fill="${C.card}"/>`;
+    const st = at(40), x0 = 70, sw = 24.5, rh = 19; const names = ['KICK', 'SNARE', 'HAT', 'OPEN', 'SHAKER'];
+    names.forEach((n, r) => { const y = 38 + r * rh; s += T(16, y + 13, n, LANES[r][1], 7.5, "font-weight='700'");
+      for (let i = 0; i < 16; i++) s += `<rect x="${x0 + i * sw + 1}" y="${y}" width="${sw - 2}" height="${rh - 3}" rx="2" fill="${Math.floor(i / 4) % 2 ? '#1A2140' : C.raised}"/>`; });
+    const cell = (h, k) => { const [r, i, v] = h, c = LANES[r][1], y = 38 + r * rh, x = x0 + i * sw;
+      return k === 'play' ? `<rect x="${x + 3}" y="${y + 2}" width="${sw - 6}" height="${rh - 7}" rx="1.5" fill="${c}" opacity="${.5 + .5 * v / 110}"/>`
+        : k === 'out' ? `<rect x="${x + 3.5}" y="${y + 2.5}" width="${sw - 7}" height="${rh - 8}" rx="1.5" fill="none" stroke="${c}" opacity=".5"/>`
+        : `<rect x="${x + 3}" y="${y + 2}" width="${sw - 6}" height="${rh - 7}" rx="1.5" fill="${c}" opacity=".4" stroke="#79b9ee" stroke-dasharray="2 1.5"/>`; };
+    st.playing.forEach(h => s += cell(h, 'play')); st.out.forEach(h => s += cell(h, 'out')); st.inn.forEach(h => s += cell(h, 'in'));
+    const bx = 70, bwid = 392, mid = bx + bwid / 2; s += `<rect x="${bx}" y="140" width="${bwid}" height="8" rx="4" fill="${C.raised}"/><rect x="${mid}" y="140" width="${bwid / 2 * .4}" height="8" rx="3" fill="${C.teal}"/><rect x="${mid - 1}" y="135" width="2" height="18" fill="${C.label}"/>`;
+    s += T(16, 148, '+40', C.teal, 12, "font-weight='700'") + T(bx, 166, 'THINNER', C.foot, 7.5, "font-weight='700'") + T(mid, 166, 'AS WRITTEN', C.label, 7.5, "text-anchor='middle' font-weight='700'") + T(bx + bwid, 166, 'FULLER', C.foot, 7.5, "text-anchor='end' font-weight='700'");
+    [{ l: 'DROP' }, { l: 'RISE', on: true }, { l: 'AS WRITTEN' }, { l: 'KEEP' }, null, null, { l: 'HEAR IT' }, { l: '‹ PATTERN', on: true, col: C.violet }].forEach((p, i) => { const x = i * 60 + 6; if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; return; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>` + T(x + 24, 192, p.l, p.on ? C.bg : C.label, 6.8, "text-anchor='middle' font-weight='700'"); });
+    [['ENERGY', '+40', 1, .7, 13], ['RISE TO', '+70', 0, .85], ['OVER', '8 BARS', 0, .5, 12], ['TOWARDS', 'CHORUS A', 0, 0, 10.5], ['STRENGTH', 'RISES', 0, 0, 12], ['LANES', 'DRUMS', 0, 0, 12], null, null].forEach((k, i) => { if (!k) return; const [l, v, f, b, vs] = k, cx = i * 60 + 30;
+      s += T(cx, 217, l, f ? C.teal : C.label, 8.5, "text-anchor='middle' font-weight='700'") + T(cx, 236, v, f ? C.teal : C.text, vs || 13, "text-anchor='middle' font-weight='600'") + `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>` + (b ? `<rect x="${i * 60 + 8}" y="244" width="${44 * b}" height="4" rx="2" fill="${C.bar}"/>` : ''); });
+    s += T(8, 265, 'RISING TO +70 OVER 8 BARS · STARTS ON THE NEXT BAR', C.foot, 8.2, "font-weight='600' letter-spacing='0.3'");
+    document.getElementById('p1').innerHTML = `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg><figcaption><b>ENERGY</b> · the pattern as it plays at +40: written hits solid, Chorus · A's coming in dashed; DROP for a breakdown, RISE for a build</figcaption>`; }
+  // the dock's sentence, checked against the drawing
+  window.__counts = { incoming: inOrder.length, at40: at(40).inn.length, thinnable: thinOrder.length };
+</script>
+</body>
+</html>

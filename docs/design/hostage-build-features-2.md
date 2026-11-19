@@ -25,7 +25,7 @@ is right.*
 | 2 | **Note repeat** on the KIT pads | approved with mockups, 2026-11-19 | `hostage-kit-design.md` |
 | 3 | **A kit from anywhere**: each drum from a different instrument | approved with mockups, 2026-11-19 | `hostage-kitbuild-design.md` |
 | 4 | **Split a kit onto mixer strips** | approved with mockups, 2026-11-19 | `hostage-kitbuild-design.md` |
-| 5 | **An energy knob** that thins a pattern out or fills it in | taken; design to come | |
+| 5 | **An energy knob** that thins a pattern out or fills it in | designed with mockups, 2026-11-19; for the owner to decide. Not built on B to D: see the design | `hostage-energy-design.md` |
 | 6 | **Drop a MIDI file on the grid** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |
 | 7 | **Take the groove from your playing** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |
 | 8 | **Beatbox it in** | approved with mockups, 2026-11-19 | `hostage-patterns-in-design.md` |
@@ -77,7 +77,9 @@ exists: 2, 3, 9, 11 and 6.
    (`ExtraOut`, `RackModel.h`); this makes it one click from the kit.
 5. **An energy knob.** One knob per pattern that thins it out or fills it in, bringing in the hits
    of variations B, C and D bit by bit, so a verse builds towards the chorus without a change of
-   pattern. Built on the variations that exist (`makePatternVariation`).
+   pattern. Built on the variations that exist (`makePatternVariation`). *The design found that
+   this fails (B adds no hits, C removes them at random, D fills only the bar's end) and does it
+   another way: `hostage-energy-design.md`.*
 
 **Getting patterns in**
 
