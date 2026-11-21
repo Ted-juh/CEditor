@@ -283,6 +283,25 @@ operation are the settings and presets (setting 33) and an erase that sits with 
 debug page's output; the firmware itself is only rewritten in update mode. No command was found
 that stores a page.
 
+**Extending what a page can draw.** Lua itself draws nothing; a page draws only through the
+firmware's functions (rectangles with alpha, text in the sixteen faces, images and crops of
+them), and there is no line, arc, circle, gradient or pixel primitive. What can be added, and how:
+
+- *Lua helpers, inside the page.* Lines, rounded rectangles, filled circles and rings (one rect
+  per row), gradients (bands of translucent rects), bars and sparklines, all built on `draw_rect`.
+  The firmware sees only more calls, so the cost is the per-redraw budget measured on the CTRL49:
+  stutter at about 880 rects a redraw at 9 redraws/s. A filled circle of radius 20 is about 40.
+- *Code sent while the page runs.* `load()` is in the firmware, so a page can compile Lua handed
+  to it as text through 02/3C and add or replace functions without re-uploading itself or
+  re-decoding its images. One frame carries at most 1000 bytes, so longer code goes in parts.
+- *Shapes the firmware cannot draw* (arcs, waveforms, logos, smooth gradients): render them on the
+  PC into 8-bit grey filmstrips, as HoSTage does for knobs. Heavy once (upload, decode, memory),
+  one cheap DMA2D blit per frame after that.
+- *Not possible:* new built-in (C) functions. Lua cannot load native code (the firmware carries
+  "dynamic libraries not enabled"), and adding primitives means replacing the firmware.
+- *Untested:* if a page can draw into one of the off-screen canvases (02/31–02/33), something
+  expensive could be built once and redrawn as a single image every frame.
+
 **The command map.** Type 02 implements 51 commands: 00–06, 0D–1C, 21–3C; the gaps (07–0C,
 1D–20) fall through to an error reply. Type 04: 00, 01 (set setting), 02 (read setting), 04, 05
 (LED level), 06 (pad RGB), 07 and 08; 03 is not implemented. 04/00, 04/04, 04/07 and 04/08 work
