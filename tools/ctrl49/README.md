@@ -308,6 +308,56 @@ them), and there is no line, arc, circle, gradient or pixel primitive. What can 
 on controls and the active preset and are not mapped yet. Types 01, 03, 05 and 06 have handlers of
 their own; 03 includes the request for update mode.
 
+### Changing the firmware, and sound (assessed 2026-11-22)
+
+What new firmware would add for HoSTage: native drawing (lines, arcs, gradients through DMA2D), a
+working clock for Lua, encoders and buttons delivered to Lua so pages navigate without a round
+trip, pages kept in flash so the screen appears at power-on with no 3–5 s upload, and larger
+frames than 1000 bytes. Everything else the host already does.
+
+**Patching Akai's image** is technically within reach (the application fills 566 KB of a 768 KB
+slot, and the updater shows no sign of signing), but: no CTRL49 firmware exists to patch, so it
+would mean cross-flashing a patched Advance image; the CTRL49's own bootloader and update protocol
+are unknown; a patched vendor firmware cannot be distributed, so it could never be a HoSTage
+feature; and nothing would restore a CTRL49 to stock.
+
+**Firmware of our own** is shippable and starts with a head start (the chip, memory, screen
+timing and peripherals above, and the pin map, which the firmware's start-up code reveals), but it
+is months of work (key velocity scanning, pads, encoders, LEDs, display, USB and DIN MIDI, the
+flash chip), needs the case open, and is one-way without a backup of the stock firmware.
+
+**The decisive first step, and it only reads.** Every STM32F42x/43x carries ST's system
+bootloader in ROM ([AN2606](https://www.st.com/resource/en/application_note/cd00167594-stm32-microcontroler-system-memory%20-Boot-mode-stmicroelectronics.pdf)),
+which cannot be erased. Started with BOOT0 high (BOOT1/PB2 low) it speaks USB DFU on PA11/PA12 and
+serial on USART1 (PA9/PA10). The Advance firmware puts its USB socket on exactly those pins
+(GPIOA 11 and 12 set to AF10, the OTG FS clock enabled), so DFU should appear on the keyboard's own
+USB cable. STM32CubeProgrammer, free from ST, then reads the readout-protection level:
+
+- **Level 0** (`0xAA`): the whole 2 MB of flash, the CTRL49's bootloader included, can be read.
+  That gives a backup, the real CTRL49 image, and a way back from any experiment.
+- **Level 1**: reads are refused. **Do not lower it to 0**: that mass-erases the chip and the
+  stock firmware is gone for good.
+- **Level 2**, or the level reads as `0xFF`: the ROM bootloader is unreachable for good. Firmware
+  work on the CTRL49 is closed.
+
+It needs the case open and BOOT0 pulled to 3.3 V at power-up (on the pin or its pull-down
+resistor). Connect and read only: no download, no erase, no option-byte change.
+
+**Sound.** The STM32F429 is audio-capable: a serial audio interface (SAI), two I2S ports, an
+audio PLL, a two-channel 12-bit DAC, and DSP instructions. The board uses none of it for sound.
+The SAI and the DAC are never touched, and SPI2, the one I2S-capable port in use, is set up by
+`SPI_Init` as an SPI master (software chip select, clock / 16): a data bus, most likely to the
+asset flash or the LED drivers. Sound would take a DAC board on free I2S or SAI pins (whether any
+are free is unknown: the screen and the SDRAM take many), a jack, and firmware of our own. The chip
+is in the class of known open synth hardware (the Axoloti Core: an STM32F427 at 168 MHz with SDRAM
+and a codec; Mutable Instruments' Clouds and Elements: an STM32F405 at 168 MHz), so real synthesis
+and sample playback, never VST3s. That would be a different product from HoSTage.
+
+**ST's tools, if it ever comes to that.** STM32CubeProgrammer for the read above; STM32CubeIDE
+and STM32CubeMX for pins, clocks and building; STM32CubeF4's drivers and examples for the
+STM32F429I-Discovery (LTDC, DMA2D, SDRAM, USB device); TouchGFX Designer, ST's GUI framework for
+LTDC and DMA2D screens. None of them changes what a page can do under the stock firmware.
+
 ### Probe: does the CTRL49 carry images of its own?
 
 The ADVANCE's asset flash holds 512 tintable knob frames and other sprites, under asset types
