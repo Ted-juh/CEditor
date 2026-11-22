@@ -170,7 +170,7 @@ redraws per frame) and is noted for later.
 
 **Lua functions.** The full registered set: `get_byte`, `print`, `mem_usage(selector)`,
 `clear_errors()` (clears the on-screen Lua error), `set_hook_enabled(id, on)`,
-`led_control_set_level(_midi)`, `lua_ifc_load_script`, `draw_rect`, `draw_image`, `decode_image`,
+`led_control_set_level(_midi)`, `draw_rect`, `draw_image`, `decode_image`,
 `draw_text`, **`draw_system_text`** (earlier notes had it as `draw_system`),
 `lua_widget_make_dirty`, `asset_get_valid`, `text_data.new/set`. Hook 2 is MIDI notes: with
 `set_hook_enabled(2, 1)` the firmware calls the page's `note(args)` with the three MIDI bytes
@@ -230,7 +230,7 @@ bounds-checked**: an id past the table reads a wild pointer, so send only ids fr
 | 8 | Pad full level | 0–1 |
 | 10 / 11 / 12 | Time-div state / shift state / time-div value | 0–1 / 0–1 / 0–7 |
 | 16 | **Disable VIP timeout** | 0–1 (0) |
-| 17 | **Lua hooks** (the mask behind `set_hook_enabled`) | 32-bit mask |
+| 17 | "Lua Hooks" (a 32-bit value; not found connected to `set_hook_enabled`, see below) | 32-bit |
 | 18 | Common channel | 1–32 (1) |
 | 19 | Note display type | 0–1 |
 | 20 | **Screen brightness** | 1–10 (10) |
@@ -256,7 +256,8 @@ is a 3× margin), and only while setting 13 says VIP mode (2). Setting 16 = 1 tu
 off: a host stall such as a heavy song load no longer drops the screen, at the price of a stale
 screen if the host dies.
 
-**Lua hooks.** `set_hook_enabled(id, on)` sets bit `id` of setting 17. The firmware then calls the
+**Lua hooks.** `set_hook_enabled(id, on)` sets bit `id` of a mask held in RAM (setting 17 carries
+the name but no code was found joining the two). The firmware then calls the
 page's Lua global of the hook's name:
 
 | Hook | Lua function called | When |
@@ -266,7 +267,7 @@ page's Lua global of the hook's name:
 | 2 | `note(args)` | a note was generated (status, note, velocity); HoSTage uses this one |
 
 The only other Lua functions the firmware calls are `draw(args)` and the ones a host names in
-02/3C (or 02/00). Akai's own pages used names such as `set_widget_id(args)` and
+02/3C (or 02/2C, the same call aimed at one widget). Akai's own pages used names such as `set_widget_id(args)` and
 `arp_program_line_zero(args)`; those came from VIP over SysEx, not from the keyboard.
 
 **No clock, but frames.** `os.clock()` is unusable: the C library's `_times` is a stub that fills
@@ -307,6 +308,78 @@ them), and there is no line, arc, circle, gradient or pixel primitive. What can 
 (LED level), 06 (pad RGB), 07 and 08; 03 is not implemented. 04/00, 04/04, 04/07 and 04/08 work
 on controls and the active preset and are not mapped yet. Types 01, 03, 05 and 06 have handlers of
 their own; 03 includes the request for update mode.
+
+### Third reading (2026-11-22): what HoSTage does not use yet
+
+The same image, read for what it offers beyond the commands HoSTage already sends. Same caveat:
+this is the Advance's firmware. Three earlier statements are corrected by it: `lua_ifc_load_script`
+is not callable from Lua (it is the C loader's name in an error message; the preview's stub that
+throws behaves as the keyboard's missing global would), the hook mask is a RAM word and not
+setting 17, and a page's functions are called through 02/3C and 02/2C, not 02/00.
+
+**The firmware has widgets of its own, with their art in flash.** VIP's control page was not Lua:
+it was built from native widgets that the firmware draws in C from 8-bit coverage images it
+already holds and tints. HoSTage draws its knobs in Lua from a filmstrip it uploads.
+
+| Commands | Widget | Art in flash | What the commands carry |
+|---|---|---|---|
+| 02/12–1C | **Knob**, up to 1024 | type 11 id 0: a 74×71 base, 256 frames of 66×62 (two arc weights × 128 values) and 256 of 48×45 (an arc and a pie × 128) | 12 create (id, art id, two bytes); 13 and 14 a byte pair each, second ≥ first (defaults 0–0 and 0–127); 15, 16, 17 three colours; 18 a mode byte; 19 and 1B a string each; 1A and 1C a 14-bit value each |
+| 02/00–06 | **Pad**, up to 1024 | type 8 id 0: 74×74, off and on | 00 create (id, art id, byte); 01 a state byte; 02, 05, 06 three colours; 03 a string; 04 a value |
+| 02/21–22 | **Text object** | the Aileron faces | 21 create (id, two 14-bit numbers, byte); 22 set the string |
+| 02/24–2B | properties of an object addressed by (id, byte, byte) | | strings, colours and bytes; 2C calls a Lua function for such an object |
+
+A colour is sent as A, R, G, B, each a two-digit base-128 number 0–255, as 04/06 sends its RGB.
+The knob's defaults are `0x7F804000`, `0xFFFF0000` and `0xFFFF0000`. Replies are the usual 02/3D;
+`0x46` is a status not seen before: a pair sent with the second below the first. Type 13 holds
+button art (73×33 off and on, a 75×9 bar and a 6×10 marker) for a widget not matched to its
+commands yet; 2D–2F, 34 (a canvas operation taking two rectangles) and 38 (an id, a byte and two
+28-bit numbers) are unmapped; 30, 35, 36 and 37 are accepted and do nothing.
+
+What it would give HoSTage's knob pages: nothing to upload or decode at connect, a value change
+that is one 6-byte frame, and drawing that costs no Lua. What is missing is the recipe (which
+values mean what, how a widget is placed in a scene). VIP sent it: the VIP captures behind the
+engineering handoff contain 02/12–1C frames for its knob page, and reading those against this
+table is the short way to a working sequence. VIP drove the CTRL49 with the same code as the
+Advances, so the CTRL49 very likely carries the same art; `asset_get_valid(11, 0)` in the asset
+probe says so directly.
+
+**The device functions, as the code has them.**
+
+- `print(a, b)` does not reach the host: it writes its strings to the screen, on the overlay Lua
+  errors use, and `clear_errors()` wipes that. A page can show its own diagnostics on the keyboard.
+- `mem_usage(n)` returns field `n` of the C library's heap report: 0 is the heap claimed so far
+  (what the stress page read), **7 is bytes in use and 8 is bytes free**. `n` is not checked.
+- `led_control_set_level(id, level)` and `led_control_set_level_midi(id, level)` set an LED from
+  Lua, with no host round trip. Ids run 1–58 through a table: 42–45 are the pad-bank buttons (the
+  ids HoSTage sends in 04/05), 1–8 and 19–26 are two rows of eight, and ids with no LED are ignored.
+- Fonts are loaded once at start-up from resource type 15. An uploaded font is not picked up.
+
+**Liveness.** 06/02 is a ping: the keyboard answers 06/03 with one zero byte. 04/02 (read a
+setting) answers too. Either closes the gap noted under "Still requires hardware": the app can
+tell a keyboard that has stopped answering from one that is merely quiet.
+
+**Session commands (type 03).** 00 keepalive, 08 identity. **03/06 asks for update mode and must
+never be sent**; 03/07 puts the previous mode back. 03/03 is not mapped.
+
+**The other VIP keyboards.** The image serves the ADVANCE25, 49 and 61 alike, and its frame check
+is only the Akai maker byte. Everything HoSTage sends to a CTRL49 an Advance should take with its
+own header and ports (the table below); the VX49 very likely too. Untested: it needs one of them.
+
+**In order of what it buys HoSTage:**
+
+1. Native knobs and pads: the fastest and lightest pages, if the recipe from the VIP captures
+   works on the CTRL49.
+2. Settings over 04/01: octave, transpose, velocity curve, tempo, clock source and brightness per
+   song; the VIP timeout off during a heavy song load.
+3. Pages that redraw themselves (`lua_widget_make_dirty` from `draw()`): meters, peak hold and
+   marquees on the keyboard, the host sending only changes.
+4. A ping, so a dead keyboard is noticed.
+5. LEDs set from Lua, for feedback that does not wait for the host.
+6. `load()` for patching a running page; a Lua drawing library; `print` and `mem_usage(7)` while
+   developing pages.
+7. A refuse list in `Ctrl49Protocol` for what must never go out: 03/06, settings 13–15, 33, 36,
+   37, and setting ids outside the table.
+8. The Advance keyboards and the VX49 as further devices.
 
 ### Changing the firmware, and sound (assessed 2026-11-22)
 
