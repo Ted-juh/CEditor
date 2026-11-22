@@ -49,3 +49,8 @@
 .vscode
 .DS_Store
 build-installer.log
+
+# ST's own documents for the CTRL49's chip (datasheet, reference manual, application notes),
+# downloaded by hand for reading beside the firmware notes in tools/ctrl49/README.md. They are
+# ST's copyright and tens of megabytes: they stay on the machine that downloaded them.
+/docs/STM32F429/

@@ -1,0 +1,61 @@
+diff --git a/CE/src/InstrumentHost/HostRuntimeShell.cpp b/CE/src/InstrumentHost/HostRuntimeShell.cpp
+index acbd3701..19d00d00 100644
+--- a/CE/src/InstrumentHost/HostRuntimeShell.cpp
++++ b/CE/src/InstrumentHost/HostRuntimeShell.cpp
+@@ -340,7 +340,37 @@ HostRuntimeShell::HostRuntimeShell()
+             keyboardViewFile.replaceWithText (juce::JSON::toString (view));
+         });
+ 
+-    if (juce::WebBrowserComponent::areOptionsSupported (webViewOptions))
++    // LOCAL MEASUREMENT EXPERIMENT — not for commit. HOSTAGE_EXPERIMENT_COMMANDS names a JSON
++    // array of host commands ({"cmd": ...}) and pauses ({"waitMs": n}) fed to the service in
++    // order after startup, so a run with and without the web view does identical work.
++    // HOSTAGE_EXPERIMENT_HEADLESS skips creating the web view altogether.
++    const auto experimentHeadless = juce::SystemStats::getEnvironmentVariable (
++                                        "HOSTAGE_EXPERIMENT_HEADLESS", {}).isNotEmpty();
++    if (const auto commandsPath = juce::SystemStats::getEnvironmentVariable (
++            "HOSTAGE_EXPERIMENT_COMMANDS", {}); commandsPath.isNotEmpty())
++    {
++        auto steps = std::make_shared<juce::var> (juce::JSON::parse (juce::File (commandsPath)));
++        auto index = std::make_shared<int> (0);
++        auto next = std::make_shared<std::function<void()>>();
++        *next = [safe = juce::Component::SafePointer<HostRuntimeShell> (this), steps, index, next]
++        {
++            if (safe == nullptr || safe->service == nullptr || ! steps->isArray()
++                || *index >= steps->size())
++                return;
++            const auto step = (*steps)[(*index)++];
++            const auto waitMs = (int) step.getProperty ("waitMs", 0);
++            if (step.hasProperty ("cmd"))
++            {
++                std::fprintf (stderr, "[experiment] %s\n",
++                              juce::JSON::toString (step, true).toRawUTF8());
++                safe->service->handleCommand (step);
++            }
++            juce::Timer::callAfterDelay (juce::jmax (1, waitMs), [next] { (*next)(); });
++        };
++        juce::Timer::callAfterDelay (1000, [next] { (*next)(); });
++    }
++
++    if (! experimentHeadless && juce::WebBrowserComponent::areOptionsSupported (webViewOptions))
+     {
+         webView = std::make_unique<ceditor::TrustedWebBrowser> (webViewOptions);
+         addAndMakeVisible (*webView);
+diff --git a/CE/src/InstrumentHost/InstrumentHostService.cpp b/CE/src/InstrumentHost/InstrumentHostService.cpp
+index 19904bc2..f070bf56 100644
+--- a/CE/src/InstrumentHost/InstrumentHostService.cpp
++++ b/CE/src/InstrumentHost/InstrumentHostService.cpp
+@@ -22020,7 +22020,12 @@ licensing::LicenceStatus InstrumentHostService::licenceStatus()
+ licensing::Entitlements InstrumentHostService::entitlements()
+ {
+     ensureLicence();
+-    return licence->entitlements();
++    auto granted = licence->entitlements();
++    // LOCAL MEASUREMENT EXPERIMENT — not for commit: lift the free tier's one-plug-in limit
++    // so a measured rig can hold several instruments.
++    if (juce::SystemStats::getEnvironmentVariable ("HOSTAGE_EXPERIMENT_MULTI_PART", {}).isNotEmpty())
++        granted.maxLoadedParts = 1024;
++    return granted;
+ }
+ 
+ juce::String InstrumentHostService::installLicence (const juce::String& licenceFileText)
