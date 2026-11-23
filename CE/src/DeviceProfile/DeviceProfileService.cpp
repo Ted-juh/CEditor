@@ -7,6 +7,7 @@
 #include "../AtomicFileWrite.h"
 
 #include <algorithm>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -63,6 +64,67 @@ std::shared_ptr<DeviceProfileEngine> sharedEngineForFile (const juce::File& file
 }
 } // namespace
 DeviceProfileService::DeviceProfileService()
+{
+    startUp();
+}
+
+DeviceProfileService::DeviceProfileService (const juce::var& panelDocument)
+{
+    if (panelDocument.isObject())
+    {
+        limitedToProfiles = true;
+        wantedProfileIds = profileIdsNamedIn (panelDocument);
+        // The default mapping below, and what a device nobody described is mapped to.
+        wantedProfileIds.addIfNotAlreadyThere ("test-cc-synth");
+        wantedProfileIds.addIfNotAlreadyThere ("generic-cc-dpd");
+    }
+    startUp();
+}
+
+juce::StringArray DeviceProfileService::profileIdsNamedIn (const juce::var& panelDocument)
+{
+    static const juce::Identifier profileIdKey ("profileId");
+    juce::StringArray ids;
+    std::function<void (const juce::var&)> walk = [&] (const juce::var& value)
+    {
+        if (auto* array = value.getArray())
+        {
+            for (const auto& item : *array)
+                walk (item);
+            return;
+        }
+        if (auto* object = value.getDynamicObject())
+            for (const auto& property : object->getProperties())
+            {
+                if (property.name == profileIdKey && property.value.isString())
+                    ids.addIfNotAlreadyThere (property.value.toString());
+                else
+                    walk (property.value);
+            }
+    };
+    walk (panelDocument);
+    ids.removeEmptyStrings();
+    return ids;
+}
+
+bool DeviceProfileService::wantsProfileFile (const juce::File& file) const
+{
+    if (! limitedToProfiles)
+        return true;
+    static const juce::String suffix (".ceditor-device.json");
+    const auto name = file.getFileName();
+    return name.endsWithIgnoreCase (suffix) && wantedProfileIds.contains (name.dropLastCharacters (suffix.length()));
+}
+
+bool DeviceProfileService::wantProfile (const juce::String& profileId)
+{
+    if (! limitedToProfiles || profileId.isEmpty() || wantedProfileIds.contains (profileId))
+        return false;
+    wantedProfileIds.add (profileId);
+    return true;
+}
+
+void DeviceProfileService::startUp()
 {
     {
         const std::scoped_lock lock (liveServices().lock);
@@ -749,7 +811,7 @@ void DeviceProfileService::loadInternalTestProfiles (bool force)
 
     for (const auto& file : files)
     {
-        if (isLoadedProfileCurrent (file))
+        if (! wantsProfileFile (file) || isLoadedProfileCurrent (file))
             continue;
 
         // A file the engine refuses is not in `profiles`, so without this it would be re-parsed on
@@ -793,6 +855,7 @@ bool DeviceProfileService::loadProfileFile (const juce::File& file, juce::String
     }
 
     profiles[profileId] = LoadedProfile { file, file.getLastModificationTime(), engine };
+    wantProfile (profileId);   // a limited service keeps a profile it was given current, as the editor's does
     return true;
 }
 
@@ -801,6 +864,10 @@ DeviceProfileEngine* DeviceProfileService::resolveEngine (const juce::String& pr
     loadInternalTestProfiles();
 
     auto resolvedProfileId = resolveProfileId (profileId, deviceRole);
+    // A limited service reads a profile it was not told about the first time it is asked for it, and
+    // once only: a stream of messages for a profile with no file does not rescan the disk each time.
+    if (wantProfile (resolvedProfileId))
+        loadInternalTestProfiles (true);
     auto profile = profiles.find (resolvedProfileId);
     return profile != profiles.end() ? profile->second.engine.get() : nullptr;
 }

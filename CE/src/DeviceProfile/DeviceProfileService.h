@@ -23,8 +23,22 @@ class DeviceProfileService final : private juce::Timer,
 public:
     using EventCallback = std::function<void (const juce::String&, const juce::var&)>;
 
+    /** Every profile in the profile folders: the editor's, which offers them all. */
     DeviceProfileService();
+
+    /** Only the profiles a panel names (profileIdsNamedIn), the two every service may fall back to
+        (test-cc-synth, generic-cc-dpd), and any other asked for by id later: a player's, exported or
+        standalone. The library is some 400 MB of JSON, and loading all of it took a GAIA plug-in
+        instance ten seconds to create, past clap-validator's 45 on CI. A document that is not an
+        object names nothing to go by, and gets every profile. */
+    explicit DeviceProfileService (const juce::var& panelDocument);
+
     ~DeviceProfileService() override;
+
+    /** Every `profileId` value anywhere in a panel document (its requiredProfiles, its device
+        session's role mappings, a binding's), once each, in the order first met. The exporter copies
+        the same profiles beside a plug-in (tools/scripts/export-panel-template.mjs). */
+    static juce::StringArray profileIdsNamedIn (const juce::var& panelDocument);
 
     juce::var listProfiles();
     juce::var loadProfileFromFile (const juce::File& file);
@@ -290,6 +304,10 @@ private:
     double lastInboundHeavyEmitMs = 0.0;  // throttles per-incoming heavy bridge emits (CC streams)
     double lastProfileScanMs = 0.0;       // throttles the profile directory rescan (see loadInternalTestProfiles)
     std::map<juce::String, juce::Time> refusedProfiles;  // path -> mtime of the copy we already refused
+    // A player's service reads only these profiles' files (a file is named by its profile's id);
+    // the editor's reads them all. See the panel-document constructor.
+    bool limitedToProfiles = false;
+    juce::StringArray wantedProfileIds;
     EventCallback eventCallback;
     mutable juce::CriticalSection midiInputLock;
 
@@ -349,6 +367,10 @@ private:
     juce::File userProfilesFolder = defaultUserProfilesFolder();
     bool isLoadedProfileCurrent (const juce::File& file) const;
     bool loadProfileFile (const juce::File& file, juce::String& error);
+    void startUp();
+    bool wantsProfileFile (const juce::File& file) const;
+    /** A limited service adds an id it is asked for; true when it was not wanted before. */
+    bool wantProfile (const juce::String& profileId);
     DeviceProfileEngine* resolveEngine (const juce::String& profileId, const juce::String& deviceRole);
     juce::String resolveProfileId (const juce::String& profileId, const juce::String& deviceRole) const;
     MidiDestination resolveDestination (const juce::String& deviceRole) const;

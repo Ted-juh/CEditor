@@ -87,6 +87,9 @@ private:
         , panelParams (ce::parseExportParameters (panel->doc))
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams, ce::readSpareParameterCount (panel->doc)))
 #endif
+        // The profiles this panel names, not the whole library: every profile there is was ten seconds
+        // of creating each instance (DeviceProfileService's panel-document constructor).
+        , deviceService (panel->doc)
     {
         const juce::var& panelDocument = panel->doc;
         logTag = logTagFor (panelDocument);

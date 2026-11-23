@@ -121,8 +121,10 @@ public:
 
 PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfileService* externalService)
     : panelFile (std::move (panelFileToLoad)),
+      // The standalone player's own service: the profiles its panel names, as the plug-in's.
       ownedService (externalService != nullptr ? nullptr
-                                               : std::make_unique<ceditor::device::DeviceProfileService>()),
+                                               : std::make_unique<ceditor::device::DeviceProfileService> (
+                                                     juce::JSON::parse (panelFile.loadFileAsString()))),
       service (externalService != nullptr ? *externalService : *ownedService)
 {
     if (panelFile.existsAsFile())

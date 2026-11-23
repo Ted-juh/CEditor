@@ -88,6 +88,16 @@ The VST3 passed pluginval at strictness 10 throughout. pluginval restores state 
 instance, and clap-validator into a fresh one; only the fresh-instance case exposed the missing
 re-read.
 
+From 14 November 2026 every CLAP run on CI failed: 35 clap-validator tests, every one that creates
+the plug-in, "Timed out after 45 seconds". The device-profile library had grown that day from 95
+profiles to 363, some 400 MB of JSON, and every plug-in instance read all of it, though a panel
+uses one or two: ten seconds an instance on a 32-thread machine, past 45 on CI's runner. The
+exporter copied all of it beside every plug-in, too. A player's service now reads only the profiles
+its panel names, two fallbacks and any other a role is mapped to (`DeviceProfileService`'s
+panel-document constructor), and the exporter copies only those (`copyPanelProfiles` in
+`tools/scripts/export-panel-template.mjs`). The same `descriptor-consistency` test went from 9.6 s
+to 0.17 s, and the three formats validate in 41 s. pluginval's longer timeout had hidden it for the VST3 and the LV2.
+
 ## What it does not cover
 
 - **macOS.** The first runs were on Linux, and CI now runs the same check on Windows on every

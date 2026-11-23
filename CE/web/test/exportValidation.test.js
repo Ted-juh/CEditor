@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { assertNativeHandlersBuilt, validateTemplateScripting, validateRuntimeFormats } from '../../../tools/scripts/exportValidation.mjs';
-import { exportFromTemplate, TEMPLATE_FORMATS } from '../../../tools/scripts/export-panel-template.mjs';
+import { exportFromTemplate, TEMPLATE_FORMATS, profileIdsNamedIn, copyPanelProfiles } from '../../../tools/scripts/export-panel-template.mjs';
 
 const scripted = (language, extra = {}) => ({
   name: 'Validation', panelGuid: 'validation-guid', controls: [],
@@ -154,6 +154,26 @@ test('formats without runtime bundling cannot silently omit required script supp
   })));
 });
 
+test('an export carries the profiles its panel names and the two fallbacks, not the whole library', () => {
+  const panel = {
+    requiredProfiles: [{ role: 'primary', profileId: 'roland-gaia-sh01', version: '*' }],
+    deviceSession: { roleMappings: { mainSynth: { profileId: 'test-cc-synth' } } },
+    controls: [{ bindings: [{ profileId: 'roland-gaia-sh01' }, { profileId: 'no-such-synth' }] }],
+  };
+  assert.deepEqual(profileIdsNamedIn(panel), ['roland-gaia-sh01', 'test-cc-synth', 'no-such-synth'],
+    'every profileId the document names, once each, in the order met (as DeviceProfileService::profileIdsNamedIn)');
+  const to = mkdtempSync(path.join(tmpdir(), 'ceditor-export-profiles-'));
+  try {
+    const library = fileURLToPath(new URL('../../profiles/test/', import.meta.url));
+    assert.deepEqual(copyPanelProfiles(panel, library, to), ['no-such-synth'], 'a named profile with no file is reported');
+    assert.deepEqual(readdirSync(to).sort(), [
+      'generic-cc-dpd.ceditor-device.json', 'roland-gaia-sh01.ceditor-device.json', 'test-cc-synth.ceditor-device.json',
+    ]);
+  } finally {
+    rmSync(to, { recursive: true, force: true });
+  }
+});
+
 test('a CLAP is exported into a folder of its own, with its panel and device profiles beside it', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'ceditor-export-clap-'));
   try {
@@ -174,6 +194,9 @@ test('a CLAP is exported into a folder of its own, with its panel and device pro
       'the one panel the plug-in reads its identity from, beside it');
     assert.ok(existsSync(path.join(folder, 'CE/profiles/test/generic-cc-dpd.ceditor-device.json')),
       'the device profiles where the plug-in looks for them');
+    assert.deepEqual(readdirSync(path.join(folder, 'CE/profiles/test')).sort(),
+      ['generic-cc-dpd.ceditor-device.json', 'test-cc-synth.ceditor-device.json'],
+      'only what the plug-in reads: this panel names no profile, so the two fallbacks, not the library');
     assert.ok(result.written.some((p) => p.endsWith('Validation.vst3')), 'and the VST3 as before');
     assert.ok(lines.some((line) => /install the whole "Validation" folder/.test(line)), 'the log says to keep the folder together');
 

@@ -3565,6 +3565,52 @@ int runSharedInputReplyTests()
 /*  Each plug-in instance has a device service of its own, and each scans the whole profiles folder.
     A profile file loaded unchanged is one engine for all of them (sharedEngineForFile): two GAIA
     instances held every profile in the folder twice, 9.4 MB apiece. */
+/*  A player's service reads only the profiles its panel names, the two every service falls back
+    to, and any other the moment a role is mapped to it. Reading the whole library, some 400 MB, made
+    every GAIA plug-in instance take ten seconds to create, past clap-validator's 45 on CI. */
+int runPanelProfileServiceTests()
+{
+    using ceditor::device::DeviceProfileService;
+    auto failures = 0;
+    auto check = [&failures] (bool ok, const char* what)
+    {
+        std::cout << (ok ? "[PASS] " : "[FAIL] ") << "a player's profiles :: " << what << '\n';
+        if (! ok) ++failures;
+    };
+    const auto listed = [] (DeviceProfileService& service)
+    {
+        juce::StringArray ids;
+        const auto list = service.listProfiles();   // kept: the array lives in it
+        if (auto* entries = list.getArray())
+            for (const auto& entry : *entries)
+                ids.add (entry.getProperty ("id", "").toString());
+        ids.sort (false);
+        return ids;
+    };
+
+    const auto panel = juce::JSON::parse (R"({"requiredProfiles":[{"role":"primary","profileId":"test-sysex-synth"}],)"
+                                          R"("deviceSession":{"roleMappings":{"mainSynth":{"profileId":"test-nrpn-synth"}}},)"
+                                          R"("controls":[{"bindings":[{"profileId":"test-sysex-synth"}]}]})");
+    check (DeviceProfileService::profileIdsNamedIn (panel) == juce::StringArray { "test-sysex-synth", "test-nrpn-synth" },
+           "every profileId the document names, once each, in the order met");
+
+    DeviceProfileService player (panel);
+    check (listed (player) == juce::StringArray { "generic-cc-dpd", "test-cc-synth", "test-nrpn-synth", "test-sysex-synth" },
+           "its service lists the panel's profiles and the two fallbacks, and nothing else");
+    check (player.engineForRole ({}) != nullptr, "the default role still resolves");
+
+    auto* mapping = new juce::DynamicObject();
+    mapping->setProperty ("role", "mainSynth");
+    mapping->setProperty ("profileId", "roland-sh-201");
+    const auto mapped = player.setDeviceRoleMapping (juce::var (mapping));
+    check ((bool) mapped.getProperty ("ok", false) && listed (player).contains ("roland-sh-201"),
+           "a profile the panel did not name is read when a role is mapped to it");
+
+    DeviceProfileService everything (juce::var {});
+    check (listed (everything).size() > 300, "a document that is not an object names nothing to go by: every profile");
+    return failures;
+}
+
 int runSharedProfileEngineTests()
 {
     using ceditor::device::DeviceProfileService;
@@ -4986,6 +5032,7 @@ int main (int argc, char** argv)
     const ceditor::device::DeviceProfileService keepsEnginesShared;
 
     failures += runCatalogSummaryTests (root);
+    failures += runPanelProfileServiceTests();
     failures += runNewProfileSaveTests (root.getChildFile ("test-cc-synth.ceditor-device.json"));
     failures += runMonitorClearTests();
     failures += runRealtimeMonitorTests();

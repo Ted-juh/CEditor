@@ -124,6 +124,45 @@ function fixVst3Manifest(bundleRoot, helperExe, log) {
 }
 
 /** Locate a prebuilt template for one format inside a templates directory. */
+/**
+ * Every `profileId` value anywhere in a panel document (its requiredProfiles, its device session's
+ * role mappings, a binding's), once each, in the order met. DeviceProfileService::profileIdsNamedIn
+ * collects the same, and the plug-in reads only those profiles and the two below.
+ */
+export function profileIdsNamedIn(panelDoc) {
+  const ids = [];
+  const walk = (value) => {
+    if (Array.isArray(value)) { value.forEach(walk); return; }
+    if (!value || typeof value !== 'object') return;
+    for (const [key, item] of Object.entries(value)) {
+      if (key === 'profileId' && typeof item === 'string') { if (item && !ids.includes(item)) ids.push(item); }
+      else walk(item);
+    }
+  };
+  walk(panelDoc);
+  return ids;
+}
+
+/** What every player's service may fall back to: its default mapping, and an undescribed device's. */
+export const FALLBACK_PROFILE_IDS = ['test-cc-synth', 'generic-cc-dpd'];
+
+/**
+ * The device profiles an export carries: the panel's and the fallbacks, copied into `to` from the
+ * library (a file is named by its profile's id). The whole library was copied until 2026-11-23: some
+ * 400 MB beside every plug-in, all of it read by every instance. Returns the ids it found no file for.
+ */
+export function copyPanelProfiles(panelDoc, from, to) {
+  mkdirSync(to, { recursive: true });   // there even when empty: the plug-in looks here before anywhere else
+  const missing = [];
+  const named = profileIdsNamedIn(panelDoc);
+  for (const id of [...named, ...FALLBACK_PROFILE_IDS.filter((fallback) => !named.includes(fallback))]) {
+    const file = path.join(from, `${id}.ceditor-device.json`);
+    if (existsSync(file)) cpSync(file, path.join(to, path.basename(file)));
+    else missing.push(id);
+  }
+  return missing;
+}
+
 export function findTemplate(templatesDir, format) {
   if (!existsSync(templatesDir)) return null;
   const match = readdirSync(templatesDir).find((entry) => entry.toLowerCase().endsWith(format.ext));
@@ -305,10 +344,14 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
       // The native MIDI service needs its codecs on a machine without CEditor's checkout. It looks
       // in the module's directory and the one above (DeviceProfileServiceInternal.h, sourceRoot):
       // Contents for a VST3, whose module sits in Contents/<arch>; the export's folder for a CLAP.
+      // Only the panel's profiles and the fallbacks (copyPanelProfiles): the plug-in reads no others.
       const profiles = path.join(REPO, 'CE/profiles/test');
-      if (existsSync(profiles)) {
-        if (format.id === 'vst3') cpSync(profiles, path.join(dest, 'Contents/CE/profiles/test'), { recursive: true });
-        if (format.id === 'clap' || format.id === 'lv2') cpSync(profiles, path.join(root, 'CE/profiles/test'), { recursive: true });
+      const profilesTo = format.id === 'vst3' ? path.join(dest, 'Contents/CE/profiles/test')
+        : format.id === 'clap' || format.id === 'lv2' ? path.join(root, 'CE/profiles/test') : null;
+      if (profilesTo && existsSync(profiles)) {
+        for (const id of copyPanelProfiles(panelDoc, profiles, profilesTo)) {
+          log(`  device profile ${id}: the panel names it, and CE/profiles/test has no ${id}.ceditor-device.json`);
+        }
       }
 
       if (format.id === 'vst3') fixVst3Manifest(dest, helperExe, log);
