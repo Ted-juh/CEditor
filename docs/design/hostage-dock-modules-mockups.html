@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage dock: MIDI module pages</title>
+<!--
+  Mockups for the remaining MIDI modules in docs/design/hostage-dock-chain-design.md: Key,
+  Velocity / Expression, Echo, Strum, Humanize, Chance, Note length, Latch, MPE Transformer and
+  Articulation Manager. Static, invented data. As with the arpeggiator and Chords, each CTRL49 page
+  is drawn ONCE at 480 x 272 in the original look (Midnight 2020) and the dock shows that drawing.
+  The rule for these pages: the eight knobs set values, the eight pads switch the page's on/off
+  options (a strip of labelled pads above the knob row).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --part: #52b58a;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame.wide { width: 1520px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1160px; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .dock { background: var(--surface); border: 1px solid var(--line-soft); border-top: 2px solid var(--line); }
+  .tabs { display: flex; align-items: center; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); background: var(--bg); }
+  .picker { display: flex; align-items: center; gap: 8px; padding: 4px 10px; margin-right: 14px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); }
+  .picker i { width: 4px; height: 16px; background: var(--part); border-radius: 2px; }
+  .tab { padding: 6px 14px; border-radius: 3px; color: var(--soft); font-weight: 600; }
+  .tab.on { background: var(--accent-surface); color: var(--accent-strong); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tabs .spacer { flex: 1; }
+  .ghostbtn { padding: 5px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--soft); background: var(--raised); font-size: 12px; }
+  .compact { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12px; color: var(--soft); }
+  .compact b { color: var(--accent-strong); font-weight: 600; }
+  .compact .crumb { padding: 2px 8px; border-radius: 3px; background: var(--raised); border: 1px solid var(--line-soft); }
+  .compact .crumb.sel { border-color: var(--accent); background: var(--accent-surface); }
+  .detail { padding: 12px 14px 14px; }
+  .dhead { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .dhead h3 { margin: 0; font: 600 14px var(--sans); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 3px; border: 1px solid var(--active); background: var(--active-surface); color: var(--active); font: 600 11px var(--mono); }
+  .hw { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); font: 600 10px var(--mono); color: var(--soft); }
+  .hw i { width: 7px; height: 7px; border-radius: 50%; background: var(--active); box-shadow: 0 0 6px var(--active); }
+  .chip { padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .chip.on { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-surface); }
+  .two { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: start; }
+  .two svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  .side { background: var(--field); border: 1px solid var(--line-soft); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 14px; }
+  .side .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .side p { margin: 0; color: var(--faint); font-size: 11.5px; }
+  .btn { padding: 6px 12px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; }
+  .ref { display: grid; grid-template-columns: repeat(3, 480px); gap: 18px 16px; }
+  .ref figure { margin: 0; }
+  .ref svg { display: block; width: 480px; height: 272px; border-radius: 4px; box-shadow: 0 0 0 1px #2b3456; }
+  .ref figcaption { margin-top: 6px; color: var(--soft); font-size: 12px; }
+  .ref figcaption b { color: var(--text); font: 600 11px var(--mono); margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · A small module in the dock: Humanize</h2>
+    <p>A module with one page shows it large, the same drawing as on the keyboard, with what only the mouse can do beside it. Knobs set the amounts; the pads switch the options: here chords together, beats kept, the roll frozen, and a new roll.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker"><i></i>Part 4 · Drum Kit ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Zone</span><span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Unfold the chain ▾</span>
+    </div>
+    <div class="compact"><span class="lbl" style="margin-right:6px">Chain</span>
+      <span class="crumb">Drum map</span>›<span class="crumb sel"><b>Humanize</b></span>›<span class="crumb">Chance</span>›<span class="crumb">Battery 4</span>›<span class="crumb">Fader</span>›<span class="crumb">Sends</span></div>
+    <div class="detail">
+      <div class="dhead"><h3>Humanize</h3><span class="toggle">● ON</span><span style="flex:1"></span><span class="hw"><i></i>CTRL49 · HUMANIZE PAGE</span></div>
+      <div class="two">
+        <div id="dockpage"></div>
+        <div class="side">
+          <div><span class="lbl">Presets</span><div class="row" style="margin-top:6px"><span class="chip">Tight</span><span class="chip on">Loose</span><span class="chip">Human</span><span class="chip">Drunk</span></div></div>
+          <div><span class="lbl">Frozen roll</span><div class="row" style="margin-top:6px"><span class="chip">seed 4127</span><span class="chip">↻ new</span></div>
+            <p style="margin-top:6px">With the roll frozen, the same notes in the same places vary the same way every time.</p></div>
+          <div><span class="lbl">Hear it</span><div class="row" style="margin-top:6px"><span class="btn">▶ Play a test bar</span></div>
+            <p style="margin-top:6px">Plays a bar of straight sixteenths through this module and the part, so the amounts can be judged by ear.</p></div>
+          <div><span class="lbl">In milliseconds</span><p style="margin-top:6px">Times are kept in beats, so they stay right when the tempo changes; at the song's 112 BPM, 0.03 beat is 16 ms.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="frame wide" id="f2">
+  <div class="caption">
+    <h2>2 · The eleven pages at the keyboard's own size</h2>
+    <p>480 × 272, in the original look. The knob row is the values; the pad strip above it is the switches, pad N under column N. Pages a module does not need are left out: Note length and Chance are one knob or two.</p>
+  </div>
+  <div class="ref" id="ref"></div>
+</section>
+
+<script>
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393',
+              label: '#8890B0', foot: '#565E7E', bar: '#4A5378', grid: '#1F2742', gridS: '#2B3456',
+              violet: '#8B7CFF', teal: '#2DD4BF', pink: '#FF5C93', amber: '#FFB547' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const NN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const colX = (i) => i * 60 + 6;
+
+  // the shared frame, plus the pad strip: switches, pad N under column N
+  function page(title, right, cells, pads, footer, inner) {
+    let s = `<rect width="480" height="272" fill="${C.bg}"/>`;
+    s += `<rect x="8" y="7" width="4" height="17" rx="1" fill="${C.teal}"/>` + T(18, 22, title, C.text, 16, "font-weight='700'");
+    s += T(472, 21, right, C.dim, 11, "text-anchor='end'");
+    s += inner;
+    for (let i = 0; i < 8; i++) {
+      const p = pads[i], x = colX(i);
+      if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; continue; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>`;
+      s += T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'");
+    }
+    cells.forEach((c, i) => {
+      if (!c || !c.l) return;
+      const cx = i * 60 + 30;
+      s += T(cx, 217, c.l, c.focus ? C.teal : C.label, 9, "text-anchor='middle' font-weight='700'");
+      s += T(cx, 236, c.v, c.focus ? C.teal : C.text, c.vs || 15, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>`;
+      if (c.f) s += `<rect x="${i * 60 + 8}" y="244" width="${44 * c.f}" height="4" rx="2" fill="${C.bar}"/>`;
+    });
+    s += T(8, 265, footer, C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+  const panel = (y = 32, h = 144) => `<rect x="8" y="${y}" width="464" height="${h}" rx="5" fill="${C.card}"/>`;
+  const grid = (x, y, w, h, cols) => { let s = ''; for (let i = 1; i < cols; i++) s += `<line x1="${x + i * w / cols}" y1="${y}" x2="${x + i * w / cols}" y2="${y + h}" stroke="${i % 4 ? C.grid : C.gridS}"/>`; return s; };
+
+  function keys(x0, y0, w, h, first, last, o = {}) {
+    const lit = o.lit || {}, scale = o.scale, isBlack = (n) => [1, 3, 6, 8, 10].includes(n % 12);
+    const whites = []; for (let n = first; n <= last; n++) if (!isBlack(n)) whites.push(n);
+    const ww = w / whites.length; let s = '';
+    whites.forEach((n, i) => {
+      s += `<rect x="${x0 + i * ww + .5}" y="${y0}" width="${ww - 1}" height="${h}" rx="1.5" fill="${lit[n] || (scale && !scale.has(n % 12) ? '#9EA3B8' : '#D9DCE8')}"/>`;
+      if (scale && scale.has(n % 12) && !lit[n]) s += `<circle cx="${x0 + i * ww + ww / 2}" cy="${y0 + h - 5}" r="1.8" fill="#8A90A8"/>`;
+    });
+    whites.forEach((n, i) => {
+      const b = n + 1; if (!isBlack(b) || b > last) return;
+      s += `<rect x="${x0 + (i + 1) * ww - ww * .32}" y="${y0}" width="${ww * .64}" height="${h * .6}" rx="1" fill="${lit[b] || '#1a1f33'}"/>`;
+      if (scale && scale.has(b % 12) && !lit[b]) s += `<circle cx="${x0 + (i + 1) * ww}" cy="${y0 + h * .6 - 4}" r="1.6" fill="#8A90A8"/>`;
+    });
+    return s;
+  }
+  // a response curve in a box
+  function curve(x, y, w, h, fn, win) {
+    let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${C.bg}"/>`;
+    for (let k = 1; k < 4; k++) s += `<line x1="${x + k * w / 4}" y1="${y}" x2="${x + k * w / 4}" y2="${y + h}" stroke="${C.grid}"/><line x1="${x}" y1="${y + k * h / 4}" x2="${x + w}" y2="${y + k * h / 4}" stroke="${C.grid}"/>`;
+    if (win) { const [a, b, c, d] = win; s += `<rect x="${x + a / 127 * w}" y="${y + h - d / 127 * h}" width="${(b - a) / 127 * w}" height="${(d - c) / 127 * h}" fill="${C.violet}" opacity=".10"/>`; }
+    const pts = Array.from({ length: 41 }, (_, i) => { const t = i / 40; return `${x + t * w},${y + h - fn(t) * h}`; }).join(' ');
+    s += `<line x1="${x}" y1="${y + h}" x2="${x + w}" y2="${y}" stroke="${C.gridS}" stroke-dasharray="3 3"/>`;
+    return s + `<polyline points="${pts}" fill="none" stroke="${C.violet}" stroke-width="2"/>`;
+  }
+
+  // ---- KEY -----------------------------------------------------------------------------------------
+  function keyPage() {
+    const scale = new Set([0, 2, 4, 5, 7, 9, 11]);
+    let s = panel();
+    s += T(18, 56, '+2', C.teal, 26, "font-weight='700'") + T(62, 56, 'SEMITONES', C.dim, 9, "font-weight='700'");
+    s += T(462, 50, 'C MAJOR', C.text, 14, "text-anchor='end' font-weight='700'") + T(462, 64, 'OUT-OF-SCALE NOTES SNAP', C.dim, 8, "text-anchor='end' font-weight='700'");
+    s += keys(14, 80, 452, 88, 48, 83, { scale, lit: { 66: C.pink, 69: C.teal } });
+    s += T(14 + 452 / 21 * 10.6, 77, 'F#4  →  A4', C.text, 8.5, "font-weight='700'");
+    return page('KEY', 'SCALE LOCK ON', [
+      { l: 'TRANSP', v: '+2', f: .52, focus: true }, { l: 'MODE', v: 'CHROM', vs: 13 }, { l: 'ROOT', v: 'C', f: 0 }, { l: 'SCALE', v: 'MAJOR', vs: 13 },
+      { l: 'FOLD', v: 'SNAP', vs: 14 }, {}, {}, {},
+    ], [{ l: 'SCALE ON', on: true }, { l: 'SONG KEY', on: true }], 'F#4 IS OUT OF C MAJOR: SNAPPED TO G4, THEN UP TWO', s);
+  }
+
+  // ---- VELOCITY / EXPRESSION: two pages -------------------------------------------------------------
+  function velocityPage() {
+    let s = panel();
+    s += curve(18, 40, 200, 128, (t) => (30 + Math.pow(Math.min(1, Math.max(0, (t * 127 - 20) / 98)), .7) * 97) / 127, [20, 118, 30, 127]);
+    s += T(228, 54, 'SOFT CURVE', C.text, 13, "font-weight='700'") + T(228, 70, 'IN 20–118  →  OUT 30–127', C.dim, 9, "font-weight='700'");
+    s += T(228, 96, 'PROFILE', C.dim, 8, "font-weight='700'") + T(228, 110, 'CTRL49 studio', C.text, 11, "font-weight='600'");
+    s += T(228, 140, 'PLAYED 64', C.dim, 9, "font-weight='700'") + T(310, 140, '→  SOUNDS 86', C.teal, 11, "font-weight='700'");
+    s += `<circle cx="${18 + 64 / 127 * 200}" cy="${40 + 128 - 86 / 127 * 128}" r="4" fill="${C.teal}"/>`;
+    return page('VELOCITY', 'PAGE 1 OF 2', [
+      { l: 'CURVE', v: 'SOFT', vs: 14 }, { l: 'IN MIN', v: '20', f: .16 }, { l: 'IN MAX', v: '118', f: .93 }, { l: 'OUT MIN', v: '30', f: .24 },
+      { l: 'OUT MAX', v: '127', f: 1 }, { l: 'SCALE', v: '1.0', f: .5 }, { l: 'FIXED', v: 'OFF' }, {},
+    ], [null, null, null, null, null, null, null, { l: 'EXPR ›', on: true, col: C.violet }], 'HOW HARD YOU PLAY, MAPPED TO HOW HARD IT SOUNDS   PAD 8: EXPRESSION', s);
+  }
+  function expressionPage() {
+    let s = panel();
+    s += curve(18, 40, 200, 128, (t) => (20 + (3 * t * t - 2 * t * t * t) * 107) / 127, [0, 127, 20, 127]);
+    s += T(228, 54, 'S-CURVE', C.text, 13, "font-weight='700'") + T(228, 70, 'CC 11  0–127  →  20–127', C.dim, 9, "font-weight='700'");
+    s += T(228, 96, 'THE PEDAL NEVER QUITE CLOSES:', C.dim, 8, "font-weight='700'") + T(228, 110, 'the sound stays audible at heel down', C.text, 9.5, "font-weight='600'");
+    return page('EXPRESSION', 'PAGE 2 OF 2', [
+      { l: 'SOURCE', v: 'CC', vs: 14 }, { l: 'CC', v: '11', f: .09 }, { l: 'CURVE', v: 'S', vs: 14 }, { l: 'IN MIN', v: '0' },
+      { l: 'IN MAX', v: '127', f: 1 }, { l: 'OUT MIN', v: '20', f: .16 }, { l: 'OUT MAX', v: '127', f: 1 }, {},
+    ], [{ l: 'EXPR ON', on: true }, null, null, null, null, null, null, { l: '‹ VELOC', on: true, col: C.violet }], 'A PEDAL OR CONTROLLER, MAPPED   PAD 8: VELOCITY', s);
+  }
+
+  // ---- ECHO ------------------------------------------------------------------------------------------
+  function echoPage() {
+    let s = panel() + grid(8, 32, 464, 144, 16);
+    let v = 112, len = 50, y0 = 140;
+    for (let r = 0; r <= 4; r++) {
+      const x = 14 + r * 58, y = y0 - r * 16, th = 4 + v / 127 * 8;
+      s += `<rect x="${x}" y="${y - th / 2}" width="${len}" height="${th}" rx="2" fill="${r === 0 ? C.teal : C.violet}" opacity="${r === 0 ? 1 : Math.max(.35, v / 127)}"/>`;
+      s += T(x + 2, y - th / 2 - 4, r === 0 ? 'PLAYED' : `${v}`, r === 0 ? C.teal : C.dim, 7.5, "font-weight='700'");
+      v = Math.max(20, Math.round(v * .7)); len = len * .75;
+    }
+    s += `<line x1="8" y1="160" x2="472" y2="160" stroke="${C.amber}" stroke-dasharray="3 3"/>` + T(466, 156, 'FLOOR 20', C.amber, 7.5, "text-anchor='end' font-weight='700'");
+    return page('ECHO', '4 REPEATS   1/8', [
+      { l: 'REPEATS', v: '4', f: .5 }, { l: 'STEP', v: '1/8', vs: 15 }, { l: 'FEEDBACK', v: '70%', f: .7 }, { l: 'TRANSP', v: '+2', f: .58 },
+      { l: 'FEEL', v: 'STR', vs: 14 }, { l: 'FLOOR', v: '20', f: .16 }, { l: 'AMOUNT', v: '100%', f: 1 }, {},
+    ], [{ l: 'CLIMB', on: true }, { l: 'SHORTER', on: true }], 'EACH REPEAT QUIETER, TWO SCALE STEPS UP, A QUARTER SHORTER', s);
+  }
+
+  // ---- STRUM -----------------------------------------------------------------------------------------
+  function strumPage() {
+    let s = panel() + grid(8, 32, 464, 144, 16);
+    const strings = ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'];
+    strings.forEach((n, k) => {
+      const y = 154 - k * 20, start = 60 + k * 18 * (1 - k * .05), vel = 110 - k * 8;
+      s += T(18, y + 3, n, C.dim, 8, "font-weight='700'") + `<line x1="40" y1="${y}" x2="466" y2="${y}" stroke="${C.gridS}"/>`;
+      s += `<rect x="${start}" y="${y - 4}" width="${440 - start}" height="8" rx="2" fill="${C.violet}" opacity="${.45 + vel / 254}"/>`;
+      s += `<circle cx="${start}" cy="${y}" r="3.5" fill="${C.teal}"/>`;
+    });
+    s += T(462, 46, 'GUITAR VOICING', C.dim, 8, "text-anchor='end' font-weight='700'");
+    return page('STRUM', 'UP   1/16 SPREAD', [
+      { l: 'SPREAD', v: '1/16', vs: 15, f: .25 }, { l: 'PATTERN', v: 'UP', vs: 15 }, { l: 'CURVE', v: '+0.3', f: .65 }, { l: 'VEL RAMP', v: '−20', f: .34 },
+      { l: 'REPEAT', v: 'OFF' }, { l: 'AMOUNT', v: '100%', f: 1 }, {}, {},
+    ], [{ l: 'GUITAR', on: true }, { l: 'HIT TIGHT', on: false }], 'THE CHORD SPREAD STRING BY STRING, LOWEST FIRST', s);
+  }
+
+  // ---- HUMANIZE --------------------------------------------------------------------------------------
+  function humanizePage() {
+    let s = panel() + grid(8, 32, 464, 144, 16);
+    const cw = 464 / 16;
+    const shift = [0, 3, 1, 5, 0, 2, 6, 1, 0, 4, 2, 5, 0, 1, 3, 2], vel = [100, 72, 88, 66, 104, 80, 70, 92, 100, 76, 84, 64, 108, 82, 74, 90];
+    for (let i = 0; i < 16; i++) {
+      const x = 8 + i * cw + 3, base = 166;
+      s += `<rect x="${x}" y="${base - 96}" width="${cw * .5}" height="96" rx="2" fill="none" stroke="${C.gridS}" stroke-dasharray="2 2"/>`;
+      const h = (vel[i] / 127) * 110;
+      s += `<rect x="${x + shift[i] * 1.6}" y="${base - h}" width="${cw * .5}" height="${h}" rx="2" fill="${i % 4 === 0 ? C.teal : C.violet}"/>`;
+    }
+    return page('HUMANIZE', 'LOOSE', [
+      { l: 'TIMING', v: '16 ms', vs: 13, f: .3 }, { l: 'VELOCITY', v: '±12', f: .2 }, { l: 'GATE', v: '±15%', vs: 14, f: .15 }, { l: 'LAY BACK', v: '5 ms', vs: 14, f: .1 },
+      { l: 'SWING', v: '20%', f: .27 }, { l: 'GRID', v: '1/16', vs: 15 }, { l: 'ACCENT', v: '+8', f: .2 }, { l: 'AMOUNT', v: '100%', f: 1 },
+    ], [{ l: 'CHORDS', on: true }, { l: 'BEATS', on: true }, { l: 'FREEZE', on: true }, { l: 'NEW ROLL', on: false, col: C.amber }],
+    'DASHED: WHERE YOU PLAYED   SOLID: WHERE AND HOW HARD IT SOUNDS', s);
+  }
+
+  // ---- CHANCE ----------------------------------------------------------------------------------------
+  function chancePage() {
+    let s = panel() + grid(8, 32, 464, 144, 16);
+    const cw = 464 / 16, plays = [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1];
+    for (let i = 0; i < 16; i++) {
+      const x = 8 + i * cw + 5, beat = i % 4 === 0;
+      s += plays[i] ? `<rect x="${x}" y="80" width="${cw - 10}" height="70" rx="3" fill="${beat ? C.teal : C.violet}"/>`
+                    : `<rect x="${x}" y="80" width="${cw - 10}" height="70" rx="3" fill="none" stroke="${C.bar}" stroke-dasharray="3 2"/>`;
+    }
+    s += T(18, 58, '11 OF 16 PLAY', C.text, 13, "font-weight='700'") + T(462, 58, 'TEAL: ON THE BEAT, ALWAYS KEPT', C.dim, 8, "text-anchor='end' font-weight='700'");
+    return page('CHANCE', '70%', [
+      { l: 'CHANCE', v: '70%', f: .7, focus: true }, { l: 'AMOUNT', v: '100%', f: 1 }, {}, {}, {}, {}, {}, {},
+    ], [{ l: 'BEATS', on: true }, { l: 'SOFT 1ST', on: false }], 'EACH NOTE PLAYS 70% OF THE TIME', s);
+  }
+
+  // ---- NOTE LENGTH -----------------------------------------------------------------------------------
+  function lengthPage() {
+    let s = panel() + grid(8, 32, 464, 144, 16);
+    const played = [[0, .2], [.5, .9], [1.5, .35], [2, 1.6], [3.75, .15]], beat = 100, min = .5;
+    played.forEach(([at, len], k) => {
+      const x = 18 + at * beat, y = 70 + k * 18;
+      s += `<rect x="${x}" y="${y}" width="${len * beat}" height="6" rx="2" fill="none" stroke="${C.bar}"/>`;
+      s += `<rect x="${x}" y="${y + 8}" width="${Math.max(len, min) * beat}" height="6" rx="2" fill="${len < min ? C.teal : C.violet}"/>`;
+    });
+    s += T(18, 52, 'AT LEAST 1/8', C.text, 13, "font-weight='700'") + T(462, 52, 'OUTLINE: AS PLAYED   FILLED: AS IT SOUNDS', C.dim, 8, "text-anchor='end' font-weight='700'");
+    return page('NOTE LENGTH', 'AT LEAST', [
+      { l: 'MODE', v: 'AT LEAST', vs: 11, focus: true }, { l: 'LENGTH', v: '1/8', vs: 15, f: .3 }, {}, {}, {}, {}, {}, {},
+    ], [], 'SHORT TAPS RING ON TO AN EIGHTH; LONGER NOTES END AS PLAYED', s);
+  }
+
+  // ---- LATCH -----------------------------------------------------------------------------------------
+  function latchPage() {
+    let s = panel();
+    s += T(18, 58, 'HOLDING  C4  E4  G4', C.teal, 14, "font-weight='700'") + T(462, 58, 'A NEW PHRASE REPLACES THEM', C.dim, 8, "text-anchor='end' font-weight='700'");
+    s += keys(14, 76, 452, 92, 48, 83, { lit: { 60: C.teal, 64: C.teal, 67: C.teal } });
+    return page('LATCH', 'ON   REPLACE', [
+      { l: 'MODE', v: 'REPLACE', vs: 11, focus: true }, {}, {}, {}, {}, {}, {}, {},
+    ], [{ l: 'LATCH', on: true }, { l: 'PEDAL', on: true }], 'NOTES STAY HELD AFTER YOUR HANDS LET GO', s);
+  }
+
+  // ---- MPE TRANSFORMER -------------------------------------------------------------------------------
+  function mpePage() {
+    let s = panel();
+    s += T(18, 52, 'IN: MPE PRESSURE', C.text, 11, "font-weight='700'") + T(462, 52, 'OUT: CHANNEL PRESSURE', C.text, 11, "text-anchor='end' font-weight='700'");
+    const lines = [[C.violet, (t) => .3 + .4 * Math.sin(t * 5)], [C.pink, (t) => .5 + .3 * Math.sin(t * 3 + 1)], [C.amber, (t) => .2 + .5 * t]];
+    lines.forEach(([c, fn]) => { s += `<polyline fill="none" stroke="${c}" stroke-width="1.8" points="${Array.from({ length: 30 }, (_, i) => `${18 + i * 6.5},${160 - fn(i / 29) * 90}`).join(' ')}"/>`; });
+    s += T(240, 120, '→', C.dim, 22, "text-anchor='middle'") + T(240, 140, 'HIGHEST', C.dim, 8, "text-anchor='middle' font-weight='700'");
+    s += `<polyline fill="none" stroke="${C.teal}" stroke-width="2.4" points="${Array.from({ length: 30 }, (_, i) => { const t = i / 29; const v = Math.max(...lines.map(([, fn]) => fn(t))); return `${270 + i * 6.7},${160 - v * 90}`; }).join(' ')}"/>`;
+    return page('MPE', 'ON', [
+      { l: 'IN', v: 'MPE', vs: 14 }, { l: 'IN AXIS', v: 'PRESS', vs: 13 }, { l: 'IN CC', v: '—', vs: 14 }, { l: 'OUT', v: 'CH PR', vs: 13 },
+      { l: 'OUT AXIS', v: '—', vs: 14 }, { l: 'OUT CC', v: '—', vs: 14 }, { l: 'COLLAPSE', v: 'HIGH', vs: 13 }, { l: 'CHANNEL', v: '1', f: .06 },
+    ], [{ l: 'MPE ON', on: true }], 'MANY NOTES’ PRESSURE IN, ONE STREAM OUT: THE HIGHEST WINS', s);
+  }
+
+  // ---- ARTICULATION MANAGER -------------------------------------------------------------------------
+  function articPage() {
+    const rows = [['Sustain', 'C0', 'KEYSWITCH C-1'], ['Staccato', 'C#0', 'KEYSWITCH C#-1'], ['Pizzicato', 'D0', 'PROGRAM 12'],
+                  ['Tremolo', 'D#0', 'KEYSWITCH D#-1'], ['Legato', 'E0', 'CC 68 = 127'], ['Marcato', 'F0', 'KEYSWITCH F-1']];
+    let s = panel(32, 146);
+    rows.forEach(([n, trig, sends], k) => {
+      const y = 38 + k * 23, sel = k === 2, active = k === 0;
+      s += `<rect x="12" y="${y}" width="456" height="20" rx="3" fill="${sel ? '#163a3a' : C.bg}" ${sel ? `stroke="${C.teal}" stroke-width="1.3"` : ''}/>`;
+      s += `<circle cx="24" cy="${y + 10}" r="3.5" fill="${active ? C.amber : C.raised}"/>`;
+      s += T(36, y + 14, n, sel ? C.teal : C.text, 10.5, "font-weight='700'") + T(170, y + 14, trig, C.dim, 9.5, "font-weight='700'") + T(464, y + 14, sends, C.label, 9, "text-anchor='end' font-weight='700'");
+    });
+    return page('ARTICULATIONS', 'SPITFIRE STRINGS   SUSTAIN', [
+      { l: 'ARTIC', v: '3 / 6', f: .5, focus: true }, { l: 'TRIGGER', v: 'D0', vs: 15 }, { l: 'SENDS', v: 'PROG', vs: 14 }, { l: 'VALUE', v: '12', f: .1 },
+      { l: 'CHANNEL', v: 'SAME', vs: 12 }, {}, {}, {},
+    ], rows.map(([n], k) => ({ l: n.slice(0, 7).toUpperCase(), on: k === 0, col: C.amber })),
+    'PAD N SWITCHES TO ARTICULATION N   THE TRIGGER KEYS STILL WORK', s);
+  }
+
+  const pages = [keyPage(), velocityPage(), expressionPage(), echoPage(), strumPage(), humanizePage(), chancePage(), lengthPage(), latchPage(), mpePage(), articPage()];
+  document.getElementById('dockpage').innerHTML = humanizePage();
+  const names = [['KEY', 'Key'], ['VELOCITY', 'Velocity / Expression, page 1'], ['EXPRESSION', 'Velocity / Expression, page 2'], ['ECHO', 'Echo'], ['STRUM', 'Strum'],
+                 ['HUMANIZE', 'Humanize'], ['CHANCE', 'Chance'], ['NOTE LENGTH', 'Note length'], ['LATCH', 'Latch'], ['MPE', 'MPE Transformer'], ['ARTICULATIONS', 'Articulation Manager']];
+  document.getElementById('ref').innerHTML = pages.map((svg, i) => `<figure>${svg}<figcaption><b>${names[i][0]}</b>${names[i][1]}</figcaption></figure>`).join('');
+</script>
+</body>
+</html>

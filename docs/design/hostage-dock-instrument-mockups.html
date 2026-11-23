@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage dock: instrument and Out pages</title>
+<!--
+  Mockups for the instrument and Out blocks in docs/design/hostage-dock-chain-design.md. Static,
+  invented data. Each CTRL49 page is drawn ONCE at 480 x 272 in the original look (Midnight 2020)
+  and the dock shows that drawing. SOUND is the CTRL49's existing browser page (kind 7); CHANGES
+  follows the real Changes stage page (feature-mockups/hostage-rig/preview-5-changes.png); SECTION
+  follows the Live mockup's Section page.
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --part: #9a7ad6;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame.wide { width: 1520px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1160px; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .dock { background: var(--surface); border: 1px solid var(--line-soft); border-top: 2px solid var(--line); }
+  .tabs { display: flex; align-items: center; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); background: var(--bg); }
+  .picker { display: flex; align-items: center; gap: 8px; padding: 4px 10px; margin-right: 14px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); }
+  .picker i { width: 4px; height: 16px; background: var(--part); border-radius: 2px; }
+  .picker.hw i { background: #d98b3a; }
+  .tab { padding: 6px 14px; border-radius: 3px; color: var(--soft); font-weight: 600; }
+  .tab.on { background: var(--accent-surface); color: var(--accent-strong); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tabs .spacer { flex: 1; }
+  .ghostbtn { padding: 5px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--soft); background: var(--raised); font-size: 12px; }
+  .compact { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12px; color: var(--soft); }
+  .compact b { color: var(--accent-strong); font-weight: 600; }
+  .compact .crumb { padding: 2px 8px; border-radius: 3px; background: var(--raised); border: 1px solid var(--line-soft); }
+  .compact .crumb.sel { border-color: var(--accent); background: var(--accent-surface); }
+  .detail { padding: 12px 14px 14px; }
+  .dhead { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .dhead h3 { margin: 0; font: 600 14px var(--sans); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 3px; border: 1px solid var(--active); background: var(--active-surface); color: var(--active); font: 600 11px var(--mono); }
+  .hwpill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); font: 600 10px var(--mono); color: var(--soft); }
+  .hwpill i { width: 7px; height: 7px; border-radius: 50%; background: var(--active); box-shadow: 0 0 6px var(--active); }
+  .chip { padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; }
+  .pages { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
+  .pages svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  .extras { display: flex; gap: 18px; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-soft); color: var(--faint); font-size: 11.5px; flex-wrap: wrap; }
+  .ref { display: grid; grid-template-columns: repeat(3, 480px); gap: 18px 16px; }
+  .ref figure { margin: 0; }
+  .ref svg { display: block; width: 480px; height: 272px; border-radius: 4px; box-shadow: 0 0 0 1px #2b3456; }
+  .ref figcaption { margin-top: 6px; color: var(--soft); font-size: 12px; }
+  .ref figcaption b { color: var(--text); font: 600 11px var(--mono); margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · A plug-in instrument in the dock: four pages</h2>
+    <p>SOUND is the CTRL49's browser, the library of this instrument's sounds; CHANGES is the existing page that sets the sound against its save; INSTRUMENT is its parameters, chosen the way the EFFECT page chooses them; SECTION is its own window, once the panel scan is proven. The same four drawings are the keyboard's pages.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker"><i></i>Part 2 · String Pad ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Zone</span><span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Unfold the chain ▾</span>
+    </div>
+    <div class="compact"><span class="lbl" style="margin-right:6px">Chain</span>
+      <span class="crumb">Chords</span>›<span class="crumb">Strum</span>›<span class="crumb sel"><b>Omnisphere</b></span>›<span class="crumb">Channel EQ</span>›<span class="crumb">Bus Comp</span>›<span class="crumb">Ensemble</span>›<span class="crumb">Plate</span>›<span class="crumb">Fader</span>›<span class="crumb">Sends</span></div>
+    <div class="detail">
+      <div class="dhead"><h3>Omnisphere</h3><span class="toggle">● ON</span><span class="chip">Warm Strings · 3 changes</span><span style="flex:1"></span><span class="btn">Open its window ↗</span><span class="chip">Save ▾</span><span class="hwpill"><i></i>CTRL49 · ON SOUND</span></div>
+      <div class="pages" id="inst"></div>
+      <div class="extras"><span class="lbl">Only in the dock</span><span>Its own window</span><span>The whole library (Sounds)</span><span>Save the sound, the chain or the rack</span><span>Drag a parameter onto a knob cell</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · A hardware synth in the dock: two pages, and its CEditor panel</h2>
+    <p>PATCH is what the synth is playing: program, the captured patch, and whether it arrived, read back where the synth allows. PARAMS is its parameters from its CEditor device profile, a group at a time, written the way the profile formats them. The panel itself opens like a plug-in's window.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker hw"><i></i>Part 5 · GAIA ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Zone</span><span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Unfold the chain ▾</span>
+    </div>
+    <div class="compact"><span class="lbl" style="margin-right:6px">Chain</span>
+      <span class="crumb">Arpeggiator</span>›<span class="crumb sel"><b>GAIA SH-01 (hardware)</b></span>›<span class="crumb">return in 3–4</span>›<span class="crumb">Fader</span>›<span class="crumb">Sends</span></div>
+    <div class="detail">
+      <div class="dhead"><h3>Roland GAIA SH-01</h3><span class="toggle">● ON</span><span class="chip">UM-ONE · channel 3</span><span style="flex:1"></span><span class="btn">Open its CEditor panel ↗</span><span class="chip">Save patch ▾</span><span class="hwpill"><i></i>CTRL49 · ON PATCH</span></div>
+      <div class="pages" id="hw"></div>
+      <div class="extras"><span class="lbl">Only in the dock</span><span>Its CEditor panel</span><span>Choose the MIDI port and the audio return</span><span>Compare with a patch in the library</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · Out in the dock: the strip, and the rig's meters</h2>
+    <p>STRIP is the part's mixer strip on the keyboard's knobs: level, pan, its sends and its output; the pads are On, Mute, Solo and Listen. Beside it, the existing METERS page with every part, so the strip is never on its own.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker"><i></i>Part 2 · String Pad ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Zone</span><span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Unfold the chain ▾</span>
+    </div>
+    <div class="compact"><span class="lbl" style="margin-right:6px">Chain</span>
+      <span class="crumb">Chords</span>›<span class="crumb">Strum</span>›<span class="crumb">Omnisphere</span>›<span class="crumb">Channel EQ</span>›<span class="crumb">Bus Comp</span>›<span class="crumb">Ensemble</span>›<span class="crumb">Plate</span>›<span class="crumb sel"><b>Fader</b></span>›<span class="crumb">Sends</span></div>
+    <div class="detail">
+      <div class="dhead"><h3>Out</h3><span class="chip">−6.0 dB · Main</span><span style="flex:1"></span><span class="chip">Open the Mixer ↗</span><span class="hwpill"><i></i>CTRL49 · ON STRIP</span></div>
+      <div class="pages" id="out"></div>
+      <div class="extras"><span class="lbl">Only in the dock</span><span>Name and colour the part</span><span>Add a send</span><span>The routing to buses (Routing tab)</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame wide" id="f4">
+  <div class="caption">
+    <h2>4 · The pages at the keyboard's own size</h2>
+    <p>480 × 272, in the original look. Knobs set values, pads switch, pad 8 goes back to the chain where a page has nothing else for it.</p>
+  </div>
+  <div class="ref" id="ref"></div>
+</section>
+
+<script>
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393',
+              label: '#8890B0', foot: '#565E7E', bar: '#4A5378', grid: '#1F2742', gridS: '#2B3456',
+              violet: '#8B7CFF', teal: '#2DD4BF', pink: '#FF5C93', amber: '#FFB547' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const colX = (i) => i * 60 + 6;
+
+  function page(title, right, cells, pads, footer, inner, accent = C.violet) {
+    let s = `<rect width="480" height="272" fill="${C.bg}"/>`;
+    s += `<rect x="8" y="7" width="4" height="17" rx="1" fill="${accent}"/>` + T(18, 22, title, C.text, 16, "font-weight='700'");
+    s += T(472, 21, right, C.dim, 10.5, "text-anchor='end'");
+    s += inner;
+    if (pads) for (let i = 0; i < 8; i++) {
+      const p = pads[i], x = colX(i);
+      if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; continue; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>`;
+      s += T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'");
+    }
+    cells.forEach((c, i) => {
+      if (!c || !c.l) return;
+      const cx = i * 60 + 30;
+      s += T(cx, 217, c.l, c.focus ? C.teal : C.label, 9, "text-anchor='middle' font-weight='700'");
+      s += T(cx, 236, c.v, c.focus ? C.teal : (c.vc || C.text), c.vs || 14, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>`;
+      if (c.f) s += `<rect x="${i * 60 + 8}" y="244" width="${44 * c.f}" height="4" rx="2" fill="${C.bar}"/>`;
+    });
+    s += T(8, 265, footer, C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+  const tabs = (names, on, y = 32) => names.map((g, k) => { const x = 8 + k * 80; return `<rect x="${x}" y="${y}" width="76" height="16" rx="3" fill="${k === on ? C.violet : C.raised}"/>` + T(x + 38, y + 11.5, g, k === on ? C.bg : C.label, 8, "text-anchor='middle' font-weight='700'"); }).join('');
+
+  // ---- SOUND: the CTRL49's browser, this instrument's sounds ---------------------------------------
+  function soundPage() {
+    const rows = [['Warm Strings', 'STRINGS', 5, true, true], ['Glass Strings', 'STRINGS', 4, false, true], ['Cinematic Swell', 'STRINGS', 4, false, false],
+                  ['Dark Ensemble', 'STRINGS', 3, false, false], ['Velvet Choir', 'CHOIR', 4, false, true], ['Analog Strings', 'STRINGS', 3, false, false]];
+    let s = `<rect x="8" y="32" width="464" height="144" rx="4" fill="${C.card}"/>`;
+    rows.forEach(([n, kind, stars, loaded, fav], k) => {
+      const y = 36 + k * 23, cur = k === 1;
+      if (cur) s += `<rect x="10" y="${y}" width="460" height="21" rx="3" fill="#2a2550" stroke="${C.violet}" stroke-width="1.3"/>`;
+      s += T(20, y + 14.5, loaded ? '▶' : '', C.teal, 9, "font-weight='700'") + T(34, y + 14.5, n, cur ? C.text : C.label, 11, "font-weight='700'");
+      s += T(250, y + 14.5, kind, C.dim, 8, "font-weight='700'") + T(330, y + 14.5, '★'.repeat(stars) + '☆'.repeat(5 - stars), C.amber, 8.5);
+      s += T(462, y + 14.5, fav ? '♥' : '', C.pink, 10, "text-anchor='end'");
+    });
+    return page('SOUND', 'OMNISPHERE   86 STRINGS OF 1,240', [
+      { l: 'SOUND', v: '2 / 86', f: .02, focus: true }, { l: 'KIND', v: 'STRINGS', vs: 11 }, { l: 'RATING', v: '3+', vs: 14 }, { l: 'FAVS', v: 'ALL', vs: 14 },
+      {}, {}, {}, {},
+    ], [{ l: 'LOAD', on: true }, { l: '‹ PREV', on: false }, { l: 'NEXT ›', on: false }, { l: '♥ FAV', on: false }, { l: 'HEAR', on: false }, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    'PAD 1 OR THE DATA DIAL LOADS   PAD 5 PLAYS ITS PREVIEW', s);
+  }
+
+  // ---- CHANGES: the sound against its save (the existing page) -------------------------------------
+  function changesPage() {
+    let s = `<rect x="8" y="32" width="464" height="40" rx="4" fill="${C.card}"/>` + T(18, 54, 'WARM STRINGS', C.text, 15, "font-weight='700'") + T(18, 66, 'SAVED 14 MAY, 21:04', C.dim, 7.5, "font-weight='700'");
+    s += `<rect x="372" y="38" width="44" height="28" rx="3" fill="${C.raised}"/>` + T(394, 52, 'A', C.label, 11, "text-anchor='middle' font-weight='700'") + T(394, 62, 'SAVED', C.label, 6.5, "text-anchor='middle' font-weight='700'");
+    s += `<rect x="420" y="38" width="44" height="28" rx="3" fill="${C.violet}"/>` + T(442, 52, 'B', C.bg, 11, "text-anchor='middle' font-weight='700'") + T(442, 62, 'NOW', C.bg, 6.5, "text-anchor='middle' font-weight='700'");
+    [['CUTOFF', .55, .2, '900 Hz  >  2.4 kHz'], ['ATTACK', .15, .3, '50 ms  >  447 ms'], ['REVERB MIX', .3, .1, '20%  >  35%']].forEach(([n, a, d, txt], k) => {
+      const y = 80 + k * 30, sel = k === 0;
+      s += `<rect x="8" y="${y}" width="464" height="26" rx="3" fill="${C.card}"/>` + (sel ? `<rect x="8" y="${y}" width="3" height="26" fill="${C.violet}"/>` : '');
+      s += T(18, y + 17, n, C.text, 9.5, "font-weight='700'") + `<rect x="130" y="${y + 11}" width="170" height="5" rx="2" fill="${C.raised}"/><rect x="${130 + a * 170}" y="${y + 9}" width="2" height="9" fill="${C.label}"/><rect x="${130 + a * 170}" y="${y + 11}" width="${d * 170}" height="5" rx="2" fill="${C.violet}"/>`;
+      s += T(462, y + 17, txt, C.text, 9.5, "text-anchor='end' font-weight='600'");
+    });
+    return page('CHANGES', '3 CHANGES SINCE SAVED', [
+      { l: 'LISTEN', v: 'B', vs: 15, focus: true, f: 1 }, { l: 'CHANGE', v: '1 / 3', f: .33 }, { l: 'UNDO IT', v: 'TURN', vs: 13 }, { l: 'HISTORY', v: 'NOW', vs: 14 },
+      {}, {}, {}, {},
+    ], null, 'E1 SAVED (A) TO NOW (B)   E3 UNDOES ONE', s);
+  }
+
+  // ---- INSTRUMENT: its parameters, the EFFECT page's rules ---------------------------------------------
+  function instrumentPage() {
+    let s = tabs(['FILTER', 'AMP ENV', 'OSC', 'FX'], 0) + T(472, 44, 'GROUP 1 OF 9', C.dim, 7.5, "text-anchor='end' font-weight='700'");
+    s += `<rect x="8" y="54" width="464" height="122" rx="4" fill="${C.card}"/>`;
+    // a picture of what the group does: the filter's response
+    s += `<rect x="16" y="62" width="300" height="106" rx="3" fill="${C.bg}"/>`;
+    s += `<polyline fill="none" stroke="${C.violet}" stroke-width="2" points="${Array.from({ length: 60 }, (_, i) => { const f = i / 59; const y = f < .55 ? 0 : (f < .62 ? -18 * Math.sin((f - .55) / .07 * Math.PI) : (f - .62) * 300); return `${16 + f * 300},${96 + Math.min(y, 68)}`; }).join(' ')}"/>`;
+    s += T(326, 78, 'LOW PASS 24', C.text, 11, "font-weight='700'") + T(326, 94, 'cutoff 2.4 kHz', C.label, 9, "font-weight='600'");
+    s += T(326, 120, 'LATENCY', C.label, 7.5, "font-weight='700'") + T(400, 120, 'PROCESSOR', C.label, 7.5, "font-weight='700'");
+    s += T(326, 134, '2.7 ms', C.text, 11, "font-weight='700'") + T(400, 134, '9%', C.text, 11, "font-weight='700'");
+    s += T(326, 160, '● RUNNING', C.teal, 9, "font-weight='700'");
+    return page('OMNISPHERE', 'WARM STRINGS', [
+      { l: 'CUTOFF', v: '2.4k', vs: 14, f: .62 }, { l: 'RESO', v: '18%', f: .18 }, { l: 'TYPE', v: 'LP24', vs: 13 }, { l: 'KEYTRACK', v: '50%', f: .5 },
+      { l: 'ENV AMT', v: '+30', f: .65 }, { l: 'VELOCITY', v: '40%', f: .4 }, { l: 'DRIVE', v: '12%', f: .12 }, {},
+    ], [{ l: 'ON', on: true }, { l: '◀ GROUP', on: false }, { l: 'GROUP ▶', on: false }, { l: 'PINNED', on: false }, null, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    'YOUR PAGE, YOUR PINS, THEN ITS OWN GROUPS: AS ON EFFECT', s);
+  }
+
+  // ---- SECTION: its own window (panel scan) -------------------------------------------------------------
+  function instSectionPage() {
+    let s = `<rect x="8" y="32" width="464" height="144" rx="4" fill="#26262E"/><rect x="8" y="32" width="464" height="20" rx="4" fill="#1D1D24"/>`;
+    s += `<text x="18" y="46" font-family="Liberation Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#D8D6F0" letter-spacing="1.5">FILTER</text>`;
+    s += `<text x="462" y="46" font-family="Liberation Sans, Arial, sans-serif" font-size="8" fill="#8F8DA8" text-anchor="end">layer A</text>`;
+    ['LP24', 'LP12', 'BP', 'HP'].forEach((n, k) => { s += `<rect x="${20 + k * 44}" y="58" width="40" height="16" rx="2" fill="${k === 0 ? '#6E4A2E' : '#34343E'}"/><text x="${40 + k * 44}" y="70" font-family="Liberation Sans, Arial, sans-serif" font-size="8" fill="#E8E2D2" text-anchor="middle">${n}</text>`; });
+    s += `<circle cx="16" cy="58" r="7" fill="${C.violet}"/>` + T(16, 61, 1, C.bg, 8, "text-anchor='middle' font-weight='700'");
+    [['CUTOFF', .62], ['RESONANCE', .18], ['DRIVE', .12], ['ENV AMOUNT', .65]].forEach(([n, v], k) => {
+      const cx = 56 + k * 88, cy = 118, a = (-135 + v * 270) * Math.PI / 180;
+      s += `<circle cx="${cx}" cy="${cy}" r="22" fill="#15151B" stroke="#4A4A58" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="16" fill="#3A3A46"/>`;
+      s += `<line x1="${cx}" y1="${cy}" x2="${cx + Math.sin(a) * 15}" y2="${cy - Math.cos(a) * 15}" stroke="${C.violet}" stroke-width="2.5" stroke-linecap="round"/>`;
+      s += `<text x="${cx}" y="${cy + 36}" font-family="Liberation Sans, Arial, sans-serif" font-size="8.5" fill="#D8D6F0" text-anchor="middle">${n}</text>`;
+      s += `<circle cx="${cx - 23}" cy="${cy - 23}" r="7" fill="${C.violet}"/>` + T(cx - 23, cy - 20, k + 2, C.bg, 8, "text-anchor='middle' font-weight='700'");
+      if (k === 0) s += `<circle cx="${cx}" cy="${cy}" r="26" fill="none" stroke="${C.teal}" stroke-width="1.5"/>`;
+    });
+    return page('OMNISPHERE', 'SECTION 3 OF 6   PANEL SCAN', [
+      { l: 'TYPE', v: 'LP24', vs: 13 }, { l: 'CUTOFF', v: '2.4k', vs: 14, focus: true }, { l: 'RESO', v: '18%' }, { l: 'DRIVE', v: '12%' },
+      { l: 'ENV AMT', v: '+30' }, { l: 'KEYTRACK', v: '50%' }, {}, {},
+    ], [{ l: 'ON', on: true }, { l: '◀ SECTION', on: false }, { l: 'SECTION ▶', on: false }, null, null, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    'ITS OWN WINDOW, A SECTION AT A TIME   NUMBER N IS KNOB N', s);
+  }
+
+  // ---- PATCH: a hardware synth's sound --------------------------------------------------------------
+  function patchPage() {
+    let s = `<rect x="8" y="32" width="300" height="144" rx="4" fill="${C.card}"/>`;
+    s += T(18, 50, 'ROLAND GAIA SH-01', C.label, 8.5, "font-weight='700'") + T(18, 76, 'Big Brass', C.amber, 24, "font-weight='700'");
+    s += T(18, 92, 'CAPTURED 2 JUN · BANK A · PROGRAM 12', C.dim, 8, "font-weight='700'");
+    [['SENT', 'when the song started', true], ['READ BACK', 'the synth holds it', true], ['RETURN', 'audio in 3–4, −12 dB', true]].forEach(([n, d, ok], k) => {
+      const y = 112 + k * 20;
+      s += `<circle cx="22" cy="${y - 3}" r="4" fill="${ok ? C.teal : C.pink}"/>` + T(32, y, n, C.text, 9, "font-weight='700'") + T(110, y, d, C.label, 9, "font-weight='600'");
+    });
+    s += `<rect x="314" y="32" width="158" height="144" rx="4" fill="${C.card}"/>` + T(322, 48, 'RETURN', C.label, 8, "font-weight='700'");
+    [[322, 70], [346, 64]].forEach(([x, h]) => { s += `<rect x="${x}" y="56" width="18" height="110" rx="2" fill="${C.raised}"/><rect x="${x}" y="${166 - h}" width="18" height="${h}" rx="2" fill="${C.amber}"/>`; });
+    s += T(378, 72, 'PORT', C.label, 7.5, "font-weight='700'") + T(378, 86, 'UM-ONE', C.text, 10, "font-weight='700'");
+    s += T(378, 108, 'CHANNEL', C.label, 7.5, "font-weight='700'") + T(378, 122, '3', C.text, 10, "font-weight='700'");
+    s += T(378, 144, 'ON OPEN', C.label, 7.5, "font-weight='700'") + T(378, 158, 'ASK FIRST', C.text, 10, "font-weight='700'");
+    return page('GAIA', 'HARDWARE   UM-ONE CH 3', [
+      { l: 'BANK', v: 'A', vs: 15 }, { l: 'PROGRAM', v: '12', f: .1, focus: true }, { l: 'CHANNEL', v: '3', f: .19 }, { l: 'RETURN', v: '−12', vs: 14, f: .6 },
+      { l: 'ON OPEN', v: 'ASK', vs: 14 }, {}, {}, {},
+    ], [{ l: 'SEND PROG', on: false, col: C.amber }, { l: 'SEND PTCH', on: false, col: C.amber }, { l: 'CAPTURE', on: false, col: C.amber }, { l: 'COMPARE', on: false }, { l: 'READ BACK', on: true }, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    'WHAT THE SYNTH IS PLAYING, AND WHETHER IT ARRIVED', s, C.amber);
+  }
+
+  // ---- PARAMS: its parameters from the CEditor device profile -------------------------------------
+  function paramsPage() {
+    let s = tabs(['OSC 1', 'FILTER', 'AMP', 'LFO'], 1) + T(472, 44, 'FROM ITS CEDITOR PROFILE', C.dim, 7.5, "text-anchor='end' font-weight='700'");
+    s += `<rect x="8" y="54" width="464" height="122" rx="4" fill="${C.card}"/>`;
+    [['CUTOFF', 78, '78'], ['RESONANCE', 34, '34'], ['ENV DEPTH', 90, '+26'], ['KEY FOLLOW', 64, '64'], ['TYPE', 1, 'LPF'], ['SLOPE', 2, '−24 dB']].forEach(([n, v, txt], k) => {
+      const x = 18 + (k % 3) * 152, y = 66 + Math.floor(k / 3) * 52;
+      s += T(x, y + 10, n, C.label, 8.5, "font-weight='700'") + T(x + 140, y + 10, txt, C.text, 10, "text-anchor='end' font-weight='700'");
+      if (k < 4) s += `<rect x="${x}" y="${y + 18}" width="140" height="6" rx="3" fill="${C.raised}"/><rect x="${x}" y="${y + 18}" width="${140 * v / 127}" height="6" rx="3" fill="${C.amber}"/>`;
+    });
+    s += T(18, 170, 'CHECKED: THE SYNTH READ BACK THESE VALUES', C.teal, 7.5, "font-weight='700'");
+    return page('GAIA', 'FILTER   GROUP 2 OF 9', [
+      { l: 'CUTOFF', v: '78', f: .61 }, { l: 'RESO', v: '34', f: .27 }, { l: 'ENV DPTH', v: '+26', f: .7 }, { l: 'KEY FLW', v: '64', f: .5 },
+      { l: 'TYPE', v: 'LPF', vs: 13 }, { l: 'SLOPE', v: '−24', vs: 13 }, {}, {},
+    ], [{ l: 'ON', on: true }, { l: '◀ GROUP', on: false }, { l: 'GROUP ▶', on: false }, { l: 'PINNED', on: false }, null, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    'NAMES AND VALUES AS ITS DEVICE PROFILE WRITES THEM', s, C.amber);
+  }
+
+  // ---- STRIP: the part's mixer strip ------------------------------------------------------------------
+  function stripPage() {
+    let s = `<rect x="8" y="32" width="150" height="144" rx="4" fill="${C.card}"/>`;
+    s += T(18, 48, 'LEVEL', C.label, 8, "font-weight='700'");
+    [[22, 92], [42, 86]].forEach(([x, h]) => { s += `<rect x="${x}" y="56" width="14" height="112" rx="2" fill="${C.raised}"/><rect x="${x}" y="${168 - h}" width="14" height="${h}" rx="2" fill="${C.teal}"/>`; });
+    s += `<rect x="72" y="56" width="6" height="112" rx="3" fill="${C.raised}"/><rect x="66" y="94" width="18" height="10" rx="2" fill="${C.text}"/>` + T(96, 102, '−6.0', C.text, 13, "font-weight='700'") + T(96, 116, 'dB', C.dim, 8, "font-weight='700'");
+    s += `<rect x="164" y="32" width="308" height="144" rx="4" fill="${C.card}"/>` + T(172, 48, 'SENDS', C.label, 8, "font-weight='700'");
+    [['REVERB A', .4, 'POST'], ['DELAY', 0, 'POST'], ['IN-EARS', .8, 'PRE']].forEach(([n, v, pp], k) => {
+      const y = 62 + k * 26;
+      s += T(172, y + 9, n, C.text, 9.5, "font-weight='700'") + `<rect x="250" y="${y + 3}" width="150" height="6" rx="3" fill="${C.raised}"/><rect x="250" y="${y + 3}" width="${150 * v}" height="6" rx="3" fill="${C.violet}"/>`;
+      s += T(440, y + 9, `${Math.round(v * 100)}%`, C.text, 9, "text-anchor='end' font-weight='700'") + T(464, y + 9, pp, C.dim, 7.5, "text-anchor='end' font-weight='700'");
+    });
+    s += T(172, 152, 'OUTPUT', C.label, 8, "font-weight='700'") + T(250, 152, 'MAIN  (PAIR 1)', C.text, 9.5, "font-weight='700'") + T(172, 168, 'PAN', C.label, 8, "font-weight='700'") + T(250, 168, 'CENTRE', C.text, 9.5, "font-weight='700'");
+    return page('STRIP', 'STRING PAD   −6.0 dB', [
+      { l: 'LEVEL', v: '−6.0', vs: 14, f: .7, focus: true }, { l: 'PAN', v: 'C', vs: 15, f: .5 }, { l: 'REVERB A', v: '40%', f: .4 }, { l: 'DELAY', v: '0%' },
+      { l: 'IN-EARS', v: '80%', f: .8 }, { l: 'OUTPUT', v: 'MAIN', vs: 13 }, {}, {},
+    ], [{ l: 'ON', on: true }, { l: 'MUTE', on: false }, { l: 'SOLO', on: false, col: C.amber }, { l: '🎧 LISTEN', on: false }, null, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    'KNOBS: LEVEL, PAN, SENDS, OUTPUT   PADS: ON, MUTE, SOLO, LISTEN', s);
+  }
+
+  // ---- METERS: the existing page, every part ------------------------------------------------------
+  function metersPage() {
+    const parts = [['SUB BASS', 70, 64, '#d98b3a'], ['STRING PAD', 92, 86, '#9a7ad6'], ['BELL PLUCK', 60, 66, '#4f9fd6'], ['DRUM KIT', 104, 100, '#52b58a'], ['GAIA', 52, 48, '#d6698f']];
+    let s = '';
+    parts.forEach(([n, l, r, c], k) => {
+      const x = 8 + k * 78;
+      s += `<rect x="${x}" y="32" width="72" height="168" rx="4" fill="${C.card}" ${k === 1 ? `stroke="${C.teal}" stroke-width="1.5"` : ''}/>` + `<rect x="${x + 6}" y="38" width="60" height="4" rx="2" fill="${c}"/>`;
+      s += T(x + 36, 54, n, C.text, 7.5, "text-anchor='middle' font-weight='700'");
+      [[x + 14, l], [x + 32, r]].forEach(([mx, h]) => { s += `<rect x="${mx}" y="62" width="12" height="120" rx="2" fill="${C.raised}"/><rect x="${mx}" y="${182 - h}" width="12" height="${h}" rx="2" fill="${C.teal}"/>`; });
+      s += `<rect x="${x + 52}" y="62" width="4" height="120" rx="2" fill="${C.raised}"/><rect x="${x + 48}" y="${100 + k * 6}" width="12" height="6" rx="1" fill="${C.text}"/>`;
+    });
+    s += `<rect x="398" y="32" width="74" height="168" rx="4" fill="${C.card}"/>` + T(435, 54, 'MASTER', C.text, 7.5, "text-anchor='middle' font-weight='700'");
+    [[410, 110], [428, 104]].forEach(([mx, h]) => { s += `<rect x="${mx}" y="62" width="12" height="120" rx="2" fill="${C.raised}"/><rect x="${mx}" y="${182 - h}" width="12" height="${h}" rx="2" fill="${C.teal}"/>`; });
+    return page('METERS', 'EVERY PART, AND THE MASTER', [
+      { l: 'SUB BASS', v: '−3', vs: 13 }, { l: 'STRINGS', v: '−6', vs: 13, focus: true }, { l: 'BELL', v: '−8', vs: 13 }, { l: 'DRUMS', v: '0', vs: 13 },
+      { l: 'GAIA', v: '−9', vs: 13 }, { l: 'MASTER', v: '−1', vs: 13 }, { l: 'MORE ›', v: '1/2', vs: 13 }, {},
+    ], null, 'THE EXISTING METERS PAGE', s, C.teal);
+  }
+
+  const inst = [soundPage(), changesPage(), instrumentPage(), instSectionPage()];
+  const hw = [patchPage(), paramsPage()];
+  const out = [stripPage(), metersPage()];
+  document.getElementById('inst').innerHTML = inst.join('');
+  document.getElementById('hw').innerHTML = hw.join('');
+  document.getElementById('out').innerHTML = out.join('');
+  const ref = [[inst[0], 'SOUND', 'plug-in instrument: the browser'], [inst[1], 'CHANGES', 'plug-in instrument: against its save (existing)'],
+               [inst[2], 'INSTRUMENT', 'plug-in instrument: its parameters'], [inst[3], 'SECTION', 'plug-in instrument: its own window'],
+               [hw[0], 'PATCH', 'hardware synth: what it plays'], [hw[1], 'PARAMS', 'hardware synth: its profile’s parameters'],
+               [out[0], 'STRIP', 'out: the part’s strip'], [out[1], 'METERS', 'out: every part (existing)']];
+  document.getElementById('ref').innerHTML = ref.map(([svg, n, d]) => `<figure>${svg}<figcaption><b>${n}</b>${d}</figcaption></figure>`).join('');
+</script>
+</body>
+</html>

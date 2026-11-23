@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage dock: live input pages</title>
+<!--
+  Mockups for the input part (decision 2 in hostage-wider-not-a-daw.md) in
+  docs/design/hostage-dock-chain-design.md. Static, invented data. Each CTRL49 page is drawn ONCE at
+  480 x 272 in the original look (Midnight 2020) and the dock shows that drawing. TUNER and LIMITER
+  are built-ins (decision 3).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --part: #d6698f;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame.wide { width: 1520px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1160px; }
+  .lbl { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .dock { background: var(--surface); border: 1px solid var(--line-soft); border-top: 2px solid var(--line); }
+  .tabs { display: flex; align-items: center; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); background: var(--bg); }
+  .picker { display: flex; align-items: center; gap: 8px; padding: 4px 10px; margin-right: 14px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); }
+  .picker i { width: 4px; height: 16px; background: var(--part); border-radius: 2px; }
+  .picker.gtr i { background: #c9b24a; }
+  .tab { padding: 6px 14px; border-radius: 3px; color: var(--soft); font-weight: 600; }
+  .tab.on { background: var(--accent-surface); color: var(--accent-strong); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tabs .spacer { flex: 1; }
+  .ghostbtn { padding: 5px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--soft); background: var(--raised); font-size: 12px; }
+  .chain { display: flex; align-items: stretch; padding: 12px 12px 10px; border-bottom: 1px solid var(--line-soft); overflow: hidden; }
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group .row { display: flex; align-items: center; }
+  .sep { width: 14px; display: flex; align-items: center; justify-content: center; color: var(--faint); padding-top: 18px; }
+  .block { width: 132px; height: 98px; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
+  .block.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 18px #5b9bd533; background: #1f2b36; }
+  .block.input { width: 176px; background: #2a1f26; border-color: #7a4a5c; }
+  .block.input.sel { border-color: var(--accent); }
+  .block .head { display: flex; align-items: center; gap: 6px; }
+  .block .name { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .pw { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--active); display: flex; align-items: center; justify-content: center; flex: none; }
+  .pw::after { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--active); }
+  .block .sub { color: var(--soft); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .block .what { font: 600 10px var(--mono); color: var(--accent-strong); }
+  .block .from { font: 600 10px var(--mono); color: #c9b24a; }
+  .block .foot { margin-top: auto; display: flex; align-items: center; gap: 6px; font: 10px var(--mono); color: var(--dim); }
+  .mix { display: flex; align-items: center; gap: 6px; font: 10px var(--mono); color: var(--soft); }
+  .mk { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--accent) 0 var(--v), var(--line) var(--v) 75%, transparent 75%); transform: rotate(-135deg); position: relative; flex: none; }
+  .mk::after { content: ''; position: absolute; inset: 4px; background: var(--raised); border-radius: 50%; }
+  .meterbar { display: flex; align-items: center; gap: 6px; }
+  .meterbar .m { flex: 1; height: 7px; border-radius: 3px; background: linear-gradient(90deg, #58a879 0 52%, #3b4652 52%); }
+  .meterbar .clip { width: 9px; height: 9px; border-radius: 2px; background: #3b4652; }
+  .state { margin-left: auto; padding: 1px 6px; border-radius: 9px; font: 600 9px var(--mono); }
+  .state.ok { color: var(--active); } .state.warn { background: var(--pending-surface); color: var(--pending); }
+  .add { width: 26px; height: 98px; border: 1px dashed var(--line); border-radius: 6px; color: var(--dim); display: flex; align-items: center; justify-content: center; font-size: 16px; margin-left: 6px; }
+  .compact { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12px; color: var(--soft); }
+  .compact b { color: var(--accent-strong); font-weight: 600; }
+  .compact .crumb { padding: 2px 8px; border-radius: 3px; background: var(--raised); border: 1px solid var(--line-soft); }
+  .compact .crumb.sel { border-color: var(--accent); background: var(--accent-surface); }
+  .detail { padding: 12px 14px 14px; }
+  .dhead { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .dhead h3 { margin: 0; font: 600 14px var(--sans); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 3px; font: 600 11px var(--mono); border: 1px solid var(--pending); background: var(--pending-surface); color: var(--pending); }
+  .toggle.live { border-color: var(--active); background: var(--active-surface); color: var(--active); }
+  .hwpill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); font: 600 10px var(--mono); color: var(--soft); }
+  .hwpill i { width: 7px; height: 7px; border-radius: 50%; background: var(--active); box-shadow: 0 0 6px var(--active); }
+  .chip { padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); color: var(--soft); font-size: 12px; }
+  .pages { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
+  .pages svg { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px #2b3456; }
+  .extras { display: flex; gap: 18px; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-soft); color: var(--faint); font-size: 11.5px; flex-wrap: wrap; }
+  .ref { display: grid; grid-template-columns: repeat(3, 480px); gap: 18px 16px; }
+  .ref figure { margin: 0; }
+  .ref svg { display: block; width: 480px; height: 272px; border-radius: 4px; box-shadow: 0 0 0 1px #2b3456; }
+  .ref figcaption { margin-top: 6px; color: var(--soft); font-size: 12px; }
+  .ref figcaption b { color: var(--text); font: 600 11px var(--mono); margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · A vocal input in the dock: the INPUT block and its pages</h2>
+    <p>An input part has an INPUT block where an instrument part has its instrument: the connection it plays from, its meter before anything else, its trim, whether it is muted, and how late the singer hears themselves. Here it opened muted, as every input part does. Its effects work as any part's do; the harmoniser takes its notes from the keys part.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker"><i></i>Part 6 · Vocals ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Input</span><span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Fold the chain ▴</span>
+    </div>
+    <div class="chain">
+      <div class="group"><span class="lbl">Input</span><div class="row">
+        <div class="block input sel"><div class="head"><span class="name">Vocal mic</span><span class="state warn">MUTED</span></div>
+          <span class="sub">input 1 · Scarlett 18i8 · mono</span>
+          <div class="meterbar"><span class="m"></span><span class="clip"></span></div>
+          <span class="sub">trim +6 dB</span>
+          <div class="foot">hears self 12.1 ms late</div></div></div></div>
+      <div class="sep" style="width:22px">›</div>
+      <div class="group"><span class="lbl">Audio</span><div class="row">
+        <div class="block"><div class="head"><span class="name">Vocal EQ</span><span class="pw"></span></div><div class="mix"><span class="mk" style="--v:75%"></span>mix 100%</div><span class="what">TONE +2.4 dB</span><div class="foot">2.7 ms <span class="state ok">●</span></div></div>
+        <div class="sep">›</div>
+        <div class="block"><div class="head"><span class="name">De-esser</span><span class="pw"></span></div><div class="mix"><span class="mk" style="--v:75%"></span>mix 100%</div><span class="what">SQUASH 3.1 dB</span><div class="foot">2.7 ms <span class="state ok">●</span></div></div>
+        <div class="sep">›</div>
+        <div class="block"><div class="head"><span class="name">Harmony</span><span class="pw"></span></div><div class="mix"><span class="mk" style="--v:30%"></span>mix 40%</div><span class="from">NOTES ← KEYS</span><div class="foot">2.7 ms <span class="state ok">●</span></div></div>
+        <div class="add">+</div></div></div>
+      <div class="sep" style="width:22px">›</div>
+      <div class="group"><span class="lbl">Out</span><div class="row">
+        <div class="block" style="width:110px"><div class="head"><span class="name">Fader</span></div><span class="sub">−3.0 dB</span><div class="foot">Main</div></div>
+        <div class="sep">›</div>
+        <div class="block" style="width:110px"><div class="head"><span class="name">Sends</span></div><span class="sub">In-ears 90% pre</span><span class="sub">Plate (A) 25%</span><div class="foot">pre / post</div></div></div></div>
+    </div>
+    <div class="detail">
+      <div class="dhead"><h3>Vocal mic</h3><span class="toggle">● MUTED, OPENED SO</span><span class="chip">input 1 · Scarlett 18i8</span><span style="flex:1"></span><span class="chip">Map inputs…</span><span class="hwpill"><i></i>CTRL49 · ON INPUT</span></div>
+      <div class="pages" id="vox"></div>
+      <div class="extras"><span class="lbl">Only in the dock</span><span>Map the show's inputs to this interface</span><span>Measure the round trip (a cable from an output to an input)</span><span>Save the chain as an input chain</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · A guitar input with the tuner open</h2>
+    <p>Pad 3 on the INPUT page opens the TUNER, a built-in. While it is open the part is silent, as with a pedal tuner; closing it brings the sound back. The same tuner is on the Stage screen and opens from a footswitch.</p>
+  </div>
+  <div class="dock">
+    <div class="tabs">
+      <span class="picker gtr"><i></i>Part 7 · Guitar ▾</span>
+      <span class="tab">Sounds</span><span class="tab">Input</span><span class="tab on">Chain</span>
+      <span class="tab">Routing</span><span class="tab">Params</span><span class="tab">Rack</span>
+      <span class="spacer"></span><span class="ghostbtn">Unfold the chain ▾</span>
+    </div>
+    <div class="compact"><span class="lbl" style="margin-right:6px">Chain</span>
+      <span class="crumb sel"><b>Guitar DI</b></span>›<span class="crumb">Amp sim</span>›<span class="crumb">Fader</span>›<span class="crumb">Sends</span></div>
+    <div class="detail">
+      <div class="dhead"><h3>Guitar DI</h3><span class="toggle live">● LIVE</span><span class="chip">input 3 · Scarlett 18i8</span><span style="flex:1"></span><span class="hwpill"><i></i>CTRL49 · ON TUNER</span></div>
+      <div class="pages" id="gtr"></div>
+      <div class="extras"><span class="lbl">Only in the dock</span><span>Choose the tuner's strings: guitar, bass, drop D or your own</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame wide" id="f3">
+  <div class="caption">
+    <h2>3 · The pages at the keyboard's own size</h2>
+    <p>480 × 272, in the original look. LIMITER is a built-in on every output pair, on by default; it opens from an output strip. Knobs set values, pads switch.</p>
+  </div>
+  <div class="ref" id="ref"></div>
+</section>
+
+<script>
+  const C = { bg: '#0F1424', card: '#171D33', raised: '#232B48', text: '#E6E9F5', dim: '#6B7393',
+              label: '#8890B0', foot: '#565E7E', bar: '#4A5378', grid: '#1F2742', gridS: '#2B3456',
+              violet: '#8B7CFF', teal: '#2DD4BF', pink: '#FF5C93', amber: '#FFB547', red: '#FF4D6A' };
+  const F = "font-family='DejaVu Sans, Archivo, sans-serif'";
+  const T = (x, y, s, fill, size, extra = '') => `<text x="${x}" y="${y}" ${F} font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+  const colX = (i) => i * 60 + 6;
+
+  function page(title, right, cells, pads, footer, inner, accent = C.pink) {
+    let s = `<rect width="480" height="272" fill="${C.bg}"/>`;
+    s += `<rect x="8" y="7" width="4" height="17" rx="1" fill="${accent}"/>` + T(18, 22, title, C.text, 16, "font-weight='700'");
+    s += T(472, 21, right, C.dim, 10.5, "text-anchor='end'");
+    s += inner;
+    if (pads) for (let i = 0; i < 8; i++) {
+      const p = pads[i], x = colX(i);
+      if (!p) { s += `<rect x="${x + 16}" y="184" width="16" height="10" rx="3" fill="${C.raised}" opacity=".5"/>`; continue; }
+      s += `<rect x="${x}" y="181" width="48" height="16" rx="3" fill="${p.on ? (p.col || C.teal) : C.raised}"/>`;
+      s += T(x + 24, 192, p.l, p.on ? C.bg : C.label, 7, "text-anchor='middle' font-weight='700'");
+    }
+    cells.forEach((c, i) => {
+      if (!c || !c.l) return;
+      const cx = i * 60 + 30;
+      s += T(cx, 217, c.l, c.focus ? C.teal : C.label, 9, "text-anchor='middle' font-weight='700'");
+      s += T(cx, 236, c.v, c.focus ? C.teal : (c.vc || C.text), c.vs || 14, "text-anchor='middle' font-weight='600'");
+      s += `<rect x="${i * 60 + 8}" y="244" width="44" height="4" rx="2" fill="${C.raised}"/>`;
+      if (c.f) s += `<rect x="${i * 60 + 8}" y="244" width="${44 * c.f}" height="4" rx="2" fill="${C.bar}"/>`;
+    });
+    s += T(8, 265, footer, C.foot, 8.5, "font-weight='600' letter-spacing='0.4'");
+    return `<svg viewBox="0 0 480 272" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+
+  // a vertical level meter with a scale, a peak hold and a CLIP lamp
+  function meter(x, y, h, level, peak, clipped, label) {
+    const dbY = (db) => y + 14 + (1 - (db + 48) / 48) * (h - 14);
+    let s = `<rect x="${x}" y="${y}" width="36" height="${h}" rx="3" fill="${C.card}"/>`;
+    s += `<rect x="${x + 8}" y="${y + 2}" width="20" height="9" rx="2" fill="${clipped ? C.red : C.raised}"/>` + T(x + 18, y + 9.5, 'CLIP', clipped ? C.bg : C.label, 6, "text-anchor='middle' font-weight='700'");
+    s += `<rect x="${x + 10}" y="${dbY(0)}" width="16" height="${dbY(-48) - dbY(0)}" rx="2" fill="${C.raised}"/>`;
+    s += `<rect x="${x + 10}" y="${dbY(level)}" width="16" height="${dbY(-48) - dbY(level)}" rx="2" fill="${level > -6 ? C.amber : C.teal}"/>`;
+    s += `<rect x="${x + 10}" y="${dbY(peak) - 1}" width="16" height="2" fill="${C.text}"/>`;
+    [0, -12, -24, -36].forEach((db) => { s += T(x + 33, dbY(db) + 3, db, C.dim, 6, "text-anchor='end'"); });
+    if (label) s += T(x + 18, y + h + 9, label, C.label, 7, "text-anchor='middle' font-weight='700'");
+    return s;
+  }
+
+  // ---- INPUT: the input block's page -------------------------------------------------------------------
+  function inputPage(o) {
+    let s = meter(8, 32, 144, o.level, o.peak, false);
+    s += `<rect x="50" y="32" width="422" height="144" rx="4" fill="${C.card}"/>`;
+    s += T(60, 52, o.conn, C.text, 15, "font-weight='700'") + T(60, 66, o.where, C.dim, 8.5, "font-weight='700'");
+    s += T(462, 52, `${o.peak} dB`, C.text, 15, "text-anchor='end' font-weight='700'") + T(462, 66, 'PEAK, BEFORE ANYTHING', C.dim, 7.5, "text-anchor='end' font-weight='700'");
+    // muted or live
+    s += `<rect x="60" y="78" width="${o.muted ? 128 : 60}" height="20" rx="3" fill="${o.muted ? C.amber : C.teal}"/>` + T(o.muted ? 124 : 90, 92, o.muted ? 'MUTED · OPENED SO' : 'LIVE', C.bg, 8.5, "text-anchor='middle' font-weight='700'");
+    s += `<circle cx="${o.muted ? 200 : 132}" cy="88" r="4" fill="${C.teal}"/>` + T(o.muted ? 208 : 140, 91.5, 'SIGNAL ARRIVING', C.teal, 8, "font-weight='700'");
+    // how late the player hears themselves
+    const lc = o.lat < 5 ? C.teal : o.lat < 10 ? C.amber : C.pink;
+    s += T(60, 120, 'YOU HEAR YOURSELF', C.label, 8, "font-weight='700'") + T(60, 140, `${o.lat} ms LATE`, lc, 16, "font-weight='700'");
+    s += `<rect x="200" y="128" width="200" height="6" rx="3" fill="${C.raised}"/><rect x="200" y="128" width="${Math.min(1, o.lat / 20) * 200}" height="6" rx="3" fill="${lc}"/>`;
+    [[5, 'singer on in-ears', 121], [10, 'amp at 3 m', 147]].forEach(([ms, t, ty]) => { s += `<line x1="${200 + ms / 20 * 200}" y1="124" x2="${200 + ms / 20 * 200}" y2="138" stroke="${C.dim}"/>` + T(200 + ms / 20 * 200, ty, t, C.dim, 6.5, "text-anchor='middle'"); });
+    s += T(60, 166, o.note, C.label, 8, "font-weight='700'");
+    return page('INPUT', o.title, o.cells, o.pads, o.footer, s);
+  }
+  const voxInput = () => inputPage({
+    title: 'VOCALS', conn: 'VOCAL MIC', where: 'INPUT 1 · SCARLETT 18I8 · MONO', level: -18, peak: -6, muted: true, lat: 12.1,
+    note: 'THREE PLUG-INS IN A ROW ADD 8.1 ms OF IT: SEE THE LATENCY CHOICES',
+    cells: [{ l: 'TRIM', v: '+6 dB', vs: 13, f: .6, focus: true }, { l: 'SOURCE', v: 'IN 1', vs: 13 }, { l: 'CHANNELS', v: 'MONO', vs: 13 }, { l: 'IN-EARS', v: '90%', f: .9 },
+            { l: 'LEVEL', v: '−3.0', vs: 13, f: .7 }, {}, {}, {}],
+    pads: [{ l: 'MUTE', on: true, col: C.amber }, { l: 'LISTEN', on: false }, { l: 'TUNER', on: false }, null, null, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    footer: 'THE METER READS BEFORE THE EFFECTS AND THE MUTE' });
+  const gtrInput = () => inputPage({
+    title: 'GUITAR', conn: 'GUITAR DI', where: 'INPUT 3 · SCARLETT 18I8 · MONO', level: -22, peak: -10, muted: false, lat: 6.7,
+    note: 'ONE PLUG-IN: ABOUT LIKE STANDING TWO METRES FROM THE AMP',
+    cells: [{ l: 'TRIM', v: '0 dB', vs: 13, f: .5, focus: true }, { l: 'SOURCE', v: 'IN 3', vs: 13 }, { l: 'CHANNELS', v: 'MONO', vs: 13 }, { l: 'IN-EARS', v: '70%', f: .7 },
+            { l: 'LEVEL', v: '−4.5', vs: 13, f: .65 }, {}, {}, {}],
+    pads: [{ l: 'MUTE', on: false, col: C.amber }, { l: 'LISTEN', on: false }, { l: 'TUNER', on: true }, null, null, null, null, { l: '‹ CHAIN', on: true, col: C.violet }],
+    footer: 'THE METER READS BEFORE THE EFFECTS AND THE MUTE' });
+
+  // ---- TUNER: a built-in ------------------------------------------------------------------------------
+  function tunerPage() {
+    let s = `<rect x="8" y="32" width="464" height="144" rx="4" fill="${C.card}"/>`;
+    s += T(240, 82, 'E', C.teal, 44, "text-anchor='middle' font-weight='700'") + T(270, 70, '2', C.label, 13, "font-weight='700'");
+    s += T(240, 98, '−7 CENTS', C.amber, 10, "text-anchor='middle' font-weight='700'");
+    // the scale and the needle
+    for (let k = -50; k <= 50; k += 5) { const x = 240 + k * 4; s += `<line x1="${x}" y1="${k % 25 ? 112 : 108}" x2="${x}" y2="120" stroke="${k === 0 ? C.teal : C.gridS}" stroke-width="${k === 0 ? 2 : 1}"/>`; }
+    s += `<rect x="${240 - 7 * 4 - 2}" y="104" width="4" height="20" rx="2" fill="${C.amber}"/>`;
+    s += T(40, 120, '−50', C.dim, 7) + T(440, 120, '+50', C.dim, 7, "text-anchor='end'");
+    ['E', 'A', 'D', 'G', 'B', 'E'].forEach((n, k) => {
+      const x = 120 + k * 48, on = k === 0;
+      s += `<rect x="${x}" y="134" width="40" height="22" rx="3" fill="${on ? C.teal : C.raised}"/>` + T(x + 20, 149, n, on ? C.bg : C.label, 11, "text-anchor='middle' font-weight='700'");
+    });
+    s += `<rect x="8" y="160" width="464" height="16" rx="0" fill="${C.amber}" opacity=".18"/>` + T(240, 171.5, 'THE PART IS SILENT WHILE THE TUNER IS OPEN', C.amber, 8, "text-anchor='middle' font-weight='700'");
+    return page('TUNER', 'GUITAR   STANDARD', [
+      { l: 'A =', v: '440', vs: 14, f: .5 }, { l: 'STRINGS', v: 'GUITAR', vs: 12 }, { l: 'SHOW', v: 'NEEDLE', vs: 12 }, {}, {}, {}, {}, {},
+    ], [{ l: 'SILENT', on: true, col: C.amber }, null, null, null, null, null, null, { l: '‹ INPUT', on: true, col: C.violet }],
+    'OPENS FROM THE INPUT PAGE, THE STAGE SCREEN OR A FOOTSWITCH', s, C.teal);
+  }
+
+  // ---- LIMITER: a built-in on every output pair -------------------------------------------------------
+  function limiterPage() {
+    let s = meter(8, 32, 144, -3, -1.1, false) + meter(48, 32, 144, -4, -1.3, false);
+    s += `<rect x="90" y="32" width="382" height="144" rx="4" fill="${C.card}"/>`;
+    s += T(100, 52, 'IN-EARS', C.text, 15, "font-weight='700'") + T(100, 66, 'OUTPUT PAIR 2 · CEILING −1.0 dB', C.dim, 8.5, "font-weight='700'");
+    s += T(462, 52, 'LIMITED 3×', C.amber, 13, "text-anchor='end' font-weight='700'") + T(462, 66, 'THIS SONG', C.dim, 7.5, "text-anchor='end' font-weight='700'");
+    // gain reduction over the last 30 seconds
+    s += `<rect x="100" y="78" width="362" height="70" rx="3" fill="${C.bg}"/>` + T(106, 90, 'GAIN REDUCTION, LAST 30 SECONDS', C.label, 7, "font-weight='700'");
+    [[60, 5], [180, 9], [300, 3]].forEach(([x, d]) => { s += `<rect x="${100 + x}" y="96" width="10" height="${d * 4}" rx="1" fill="${C.amber}"/>`; });
+    s += `<line x1="100" y1="96" x2="462" y2="96" stroke="${C.gridS}"/>`;
+    s += T(100, 166, 'NOW', C.label, 7.5, "font-weight='700'") + `<rect x="130" y="160" width="200" height="6" rx="3" fill="${C.raised}"/>` + T(340, 166, '0.0 dB', C.text, 8.5, "font-weight='700'");
+    return page('LIMITER', 'BUILT IN   ON BY DEFAULT', [
+      { l: 'CEILING', v: '−1.0', vs: 14, f: .9, focus: true }, { l: 'RELEASE', v: '50 ms', vs: 13, f: .3 }, {}, {}, {}, {}, {}, {},
+    ], [{ l: 'ON', on: true }, null, null, null, null, null, null, { l: '‹ OUTPUT', on: true, col: C.violet }],
+    'PROTECTS EARS AND SPEAKERS: NOTHING LEAVES THIS PAIR ABOVE THE CEILING', s, C.teal);
+  }
+
+  // ---- EFFECTS of the vocal chain, with an insert taking MIDI ---------------------------------------------
+  function voxEffectsPage() {
+    const slots = [['VOCAL EQ', 'TONE +2.4 dB'], ['DE-ESSER', 'SQUASH 3.1 dB'], ['HARMONY', 'NOTES ← KEYS']];
+    let s = '';
+    slots.forEach(([n, w], k) => {
+      const x = 8 + k * 156, sel = k === 2;
+      s += `<rect x="${x}" y="32" width="150" height="60" rx="4" fill="${C.card}" ${sel ? `stroke="${C.violet}" stroke-width="1.5"` : ''}/>`;
+      s += T(x + 8, 46, `${k + 1}  ${n}`, sel ? C.text : C.label, 8, "font-weight='700'") + T(x + 75, 84, w, k === 2 ? C.amber : C.text, 8.5, "text-anchor='middle' font-weight='700'");
+    });
+    s += `<rect x="8" y="98" width="464" height="78" rx="4" fill="${C.card}"/>`;
+    s += T(18, 116, 'HARMONY TAKES ITS NOTES FROM', C.label, 8, "font-weight='700'") + T(18, 136, 'PART 1 · KEYS', C.amber, 15, "font-weight='700'");
+    s += T(18, 156, 'THE KEYS PLAY AM7: THE VOICE GETS A THIRD AND A FIFTH ABOVE', C.dim, 8, "font-weight='700'");
+    return page('EFFECTS', 'VOCALS   3 EFFECTS', [
+      { l: 'SLOT', v: '3 / 3', f: 1, focus: true }, { l: 'VOICES', v: '2', vs: 14 }, { l: 'KEY', v: 'FOLLOW', vs: 12 }, { l: 'SPREAD', v: '30%', f: .3 },
+      { l: 'NOTES', v: 'KEYS', vs: 13, vc: C.amber }, { l: 'MIX', v: '40%', f: .4 }, {}, {},
+    ], [{ l: '1 EQ', on: true }, { l: '2 DESS', on: true }, { l: '3 HARM', on: true }, null, null, null, null, null],
+    'PAD N: EFFECT N ON OR OFF   KNOB 5: WHOSE NOTES AN EFFECT HEARS', s, C.violet);
+  }
+
+  const vox = [voxInput(), voxEffectsPage()];
+  const gtr = [gtrInput(), tunerPage()];
+  document.getElementById('vox').innerHTML = vox.join('');
+  document.getElementById('gtr').innerHTML = gtr.join('');
+  const ref = [[vox[0], 'INPUT', 'a vocal input, muted as it opened'], [vox[1], 'EFFECTS', 'its chain; the harmoniser hears the keys'],
+               [gtr[0], 'INPUT', 'a guitar input, live, a slower path'], [gtr[1], 'TUNER', 'built in; the part silent while open'], [limiterPage(), 'LIMITER', 'built in, on every output pair']];
+  document.getElementById('ref').innerHTML = ref.map(([svg, n, d]) => `<figure>${svg}<figcaption><b>${n}</b>${d}</figcaption></figure>`).join('');
+</script>
+</body>
+</html>

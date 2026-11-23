@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoSTage: Build-mode tools, mockups</title>
+<!--
+  Mockups for docs/design/hostage-build-tools-design.md: the command palette ("Build mode", 7),
+  undo that covers everything ("Build mode", 1), drag to modulate and hold to compare ("Even more
+  ease of use", 2 and 5) from hostage-wider-not-a-daw.md. Static, invented data, in HoSTage's own
+  colours (--host-* in hostage-theme.css).
+-->
+<style>
+  :root {
+    --bg-deep: #101418; --bg: #1e2226; --surface: #171c21; --raised: #20272e; --hover: #27323b; --field: #12171b;
+    --line-soft: #2c353e; --line: #3b4652; --line-strong: #526170;
+    --text: #d9e0e6; --soft: #aab5be; --dim: #7f8b96; --faint: #65717c;
+    --accent: #5b9bd5; --accent-strong: #79b9ee; --accent-surface: #243746;
+    --active: #58a879; --active-surface: #20372a; --pending: #d7a44e; --pending-surface: #46371d;
+    --danger: #d98c8c; --danger-surface: #452529;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+    --sans: 'Archivo', 'Segoe UI', 'DejaVu Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-deep); color: var(--text); font: 13px/1.35 var(--sans); }
+  .frame { width: 1440px; padding: 28px 24px 36px; }
+  .frame + .frame { border-top: 1px solid var(--line-soft); }
+  .caption { margin: 0 0 14px; }
+  .caption h2 { margin: 0 0 4px; font: 600 17px var(--sans); }
+  .caption p { margin: 0; color: var(--soft); max-width: 1200px; }
+  .app { position: relative; height: 760px; border: 1px solid var(--line-soft); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+  .hdr { height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+  .logo { font: 700 15px var(--sans); } .logo i { color: var(--accent-strong); font-style: normal; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs span { padding: 5px 12px; border-radius: 3px; color: var(--soft); font-size: 12.5px; }
+  .tabs span.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .sp { flex: 1; }
+  .ib { min-width: 30px; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; white-space: nowrap; }
+  .ib.on { border-color: var(--accent); background: var(--accent-surface); color: var(--accent-strong); }
+  .ib.dis { opacity: .4; }
+  .ib.hold { border-color: var(--pending); background: var(--pending-surface); color: var(--pending); font-weight: 600; }
+  .stat { font: 11px var(--mono); color: var(--dim); }
+  .kbd { display: inline-block; padding: 0 5px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 3px; font: 10.5px/16px var(--mono); color: var(--soft); background: var(--raised); }
+
+  .body { flex: 1; display: flex; gap: 12px; padding: 10px 14px; min-height: 0; }
+  .rack { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .part { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 10px; background: var(--surface); border: 1px solid var(--line-soft); border-left: 4px solid var(--pc); border-radius: 4px; }
+  .part.focused { border-color: var(--accent); border-left-color: var(--pc); background: #1a2229; }
+  .part b { font-size: 13px; } .part small { color: var(--dim); font-size: 11.5px; }
+  .part .t { padding: 2px 7px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); font-size: 11px; color: var(--soft); }
+  .side { width: 380px; flex: none; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; }
+
+  .veil { position: absolute; inset: 0; background: rgba(8,11,14,.6); z-index: 10; }
+  .pal { position: absolute; z-index: 11; top: 70px; width: 640px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 7px; box-shadow: 0 22px 60px rgba(0,0,0,.65); overflow: hidden; }
+  .pin { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 16px; }
+  .pin .caret { display: inline-block; width: 2px; height: 18px; background: var(--accent-strong); vertical-align: -3px; margin-left: 1px; }
+  .pin .gl { color: var(--dim); }
+  .grp { padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
+  .grp h5 { margin: 2px 14px 4px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .res { display: flex; align-items: center; gap: 10px; padding: 7px 14px; font-size: 13px; }
+  .res.sel { background: var(--accent-surface); box-shadow: inset 3px 0 0 var(--accent); }
+  .res .ic { width: 24px; height: 24px; border-radius: 4px; background: var(--raised); border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--soft); flex: none; }
+  .res .tx { flex: 1; min-width: 0; }
+  .res .tx small { display: block; color: var(--dim); font-size: 11.5px; }
+  .res mark { background: none; color: var(--accent-strong); font-weight: 700; }
+  .pfoot { display: flex; gap: 14px; padding: 8px 14px; color: var(--faint); font-size: 11.5px; }
+
+  .hist { position: absolute; z-index: 11; top: 46px; right: 14px; width: 520px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 7px; box-shadow: 0 22px 60px rgba(0,0,0,.65); }
+  .hh { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .hh strong { font-size: 14px; }
+  .step { position: relative; display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 36px; font-size: 12.5px; border-bottom: 1px solid var(--line-soft); }
+  .step::before { content: ''; position: absolute; left: 17px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+  .step::after { content: ''; position: absolute; left: 13px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: var(--raised); border: 2px solid var(--line-strong); }
+  .step.undone { color: var(--faint); }
+  .step.undone::after { background: transparent; border-style: dashed; }
+  .step.now { background: var(--accent-surface); }
+  .step.now::after { background: var(--accent); border-color: var(--accent-strong); }
+  .step.new::after { border-color: var(--active); }
+  .step.hover { background: var(--hover); }
+  .step .tx { flex: 1; min-width: 0; }
+  .step .tx small { display: block; color: var(--dim); font-size: 11px; }
+  .step .when { font: 10.5px var(--mono); color: var(--faint); white-space: nowrap; }
+  .chip { padding: 1px 7px; border-radius: 9px; font: 600 10px/16px var(--sans); white-space: nowrap; border: 1px solid var(--line); color: var(--soft); background: var(--raised); }
+  .chip.green { border-color: var(--active); color: #8fd1a8; background: var(--active-surface); }
+  .chip.amber { border-color: var(--pending); color: var(--pending); background: var(--pending-surface); }
+  .chip.blue { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-surface); }
+  .hf { padding: 9px 14px; color: var(--dim); font-size: 11.5px; display: flex; flex-direction: column; gap: 4px; }
+  .btn { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .ghostb { padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--soft); font-size: 12px; white-space: nowrap; }
+
+  .dock { height: 470px; flex: none; border-top: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; position: relative; }
+  .dock.before { background: #241f16; }
+  .dtabs { display: flex; align-items: center; gap: 2px; padding: 5px 12px; border-bottom: 1px solid var(--line-soft); min-height: 40px; }
+  .dtabs span.tb { padding: 4px 11px; font-size: 12px; color: var(--soft); border-radius: 3px; }
+  .dtabs span.tb.on { background: var(--accent-surface); color: var(--accent-strong); font-weight: 600; }
+  .dtabs .subj { margin-left: 14px; font-weight: 600; }
+  .dbody { flex: 1; display: flex; gap: 14px; padding: 12px 14px; min-height: 0; }
+  .srcs { width: 210px; flex: none; display: flex; flex-direction: column; gap: 5px; }
+  .srcs h5, .conn h5 { margin: 0 0 4px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .src { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--raised); font-size: 12.5px; }
+  .src .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .src small { margin-left: auto; color: var(--faint); font-size: 10.5px; }
+  .src.lifted { opacity: .35; border-style: dashed; }
+  .knobs { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px 6px; align-content: start; }
+  .kn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 6px; border: 1px solid transparent; border-radius: 6px; position: relative; }
+  .kn.target { border: 1.5px dashed rgba(215,164,78,.55); }
+  .kn.hot { border: 1.5px solid var(--pending); background: var(--pending-surface); }
+  .kn .nm { font-size: 12px; color: var(--soft); }
+  .kn .vl { font: 600 12px var(--mono); }
+  .kn .vl s { color: var(--faint); font-weight: 400; margin-left: 4px; }
+  .kn .badge { position: absolute; top: 4px; right: 6px; }
+  .conn { width: 280px; flex: none; display: flex; flex-direction: column; gap: 5px; }
+  .crow { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid var(--line-soft); border-radius: 4px; font-size: 12px; background: var(--bg); }
+  .crow .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .crow .amt { margin-left: auto; font: 600 11.5px var(--mono); }
+  .drag { position: absolute; z-index: 20; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--raised); border: 1px solid var(--pending); border-radius: 4px; box-shadow: 0 10px 26px rgba(0,0,0,.55); font-size: 12.5px; transform: rotate(-1.5deg); }
+  .drag .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .cursor { position: absolute; z-index: 21; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 16px solid #fff; transform: rotate(-28deg); filter: drop-shadow(0 1px 2px #000); }
+  .tip { position: absolute; z-index: 19; background: var(--raised); border: 1px solid var(--pending); border-radius: 4px; padding: 5px 9px; font-size: 12px; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+  .banner { display: flex; align-items: center; gap: 12px; margin: 10px 14px 0; padding: 8px 12px; border: 1px solid var(--pending); border-radius: 5px; background: var(--pending-surface); color: #f1d3a0; font-size: 13px; }
+  .banner b { color: #ffd58a; }
+</style>
+</head>
+<body>
+
+<section class="frame" id="f1">
+  <div class="caption">
+    <h2>1 · The command palette</h2>
+    <p>Ctrl+K anywhere in Build. Type what you want in plain words and press Enter; the first result acts on the part you are on. It searches
+      every command HoSTage has, plus your parts, sounds, plug-ins and songs, and fills in a key, a name or a number from what you typed.
+      Each result shows its shortcut or the gesture that does the same, so the palette also teaches the screen. No AI: a fixed list of words,
+      offline.</p>
+  </div>
+  <div class="app" id="app1">
+    <div class="veil"></div>
+    <div class="pal" style="left:40px">
+      <div class="pin"><span class="gl">⌘</span><span>split at c3<span class="caret"></span></span></div>
+      <div class="grp"><h5>Do</h5>
+        <div class="res sel"><span class="ic">✂</span><span class="tx"><mark>Split</mark> Grand Piano <mark>at C3</mark><small>Grand Piano keeps C3–C7; C1–B2 becomes a new empty part for the sound you choose next</small></span><span class="kbd">Enter</span></div>
+        <div class="res"><span class="ic">✂</span><span class="tx"><mark>Split</mark> Warm Pad <mark>at C3</mark><small>Warm Pad already starts at C3: nothing to give up</small></span></div>
+        <div class="res"><span class="ic">◫</span><span class="tx">Set a part's keys <mark>at C3</mark> by playing it<small>press, then play C3</small></span></div>
+      </div>
+      <div class="grp"><h5>The same, by hand</h5>
+        <div class="res"><span class="ic">✋</span><span class="tx">Drop a sound on C3 of the keyboard<small>Rack · drag from Sounds</small></span></div>
+      </div>
+      <div class="pfoot"><span>↑ ↓ choose</span><span>Enter do</span><span>Tab fill in</span><span>Esc close</span><span class="sp"></span><span>Acts on: <b style="color:var(--text)">1 · Grand Piano</b></span></div>
+    </div>
+    <div class="pal" style="left:720px">
+      <div class="pin"><span class="gl">⌘</span><span>load diva<span class="caret"></span></span></div>
+      <div class="grp"><h5>Do</h5>
+        <div class="res sel"><span class="ic">⇩</span><span class="tx"><mark>Load Diva</mark> into 1 · Grand Piano<small>replaces Keyscape; undo brings it back</small></span><span class="kbd">Enter</span></div>
+        <div class="res"><span class="ic">＋</span><span class="tx"><mark>Load Diva</mark> as a new part<small>at the end of the rack, all keys</small></span><span class="kbd">Alt Enter</span></div>
+      </div>
+      <div class="grp"><h5>Sounds for Diva</h5>
+        <div class="res"><span class="ic" style="background:#c46a6a"></span><span class="tx">Moog Bass<small><mark>Diva</mark> · Bass · −14 LU</small></span></div>
+        <div class="res"><span class="ic" style="background:#b4854a"></span><span class="tx">Sync Lead<small><mark>Diva</mark> · Leads · −13 LU</small></span></div>
+        <div class="res"><span class="ic" style="background:#4aa88c"></span><span class="tx">Analog Strings<small><mark>Diva</mark> · Pads · −20 LU</small></span></div>
+      </div>
+      <div class="pfoot"><span>Also: add a reverb return · transpose +12 · tempo 96 · go to song 4 · mute strings</span></div>
+    </div>
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span>
+      <div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div>
+      <span class="sp"></span><span class="ib">▶</span><span class="ib">■</span><span class="stat">120 BPM</span><span class="ib">↶</span><span class="ib dis">↷</span><span class="ib">History</span></div>
+    <div class="body"><div class="rack" id="rack1"></div><div class="side"></div></div>
+  </div>
+</section>
+
+<section class="frame" id="f2">
+  <div class="caption">
+    <h2>2 · Undo that covers everything</h2>
+    <p>Loading a plug-in, a sound or a preset is now a step like any other, and so is what you change in a plug-in's own window: one step,
+      named after what changed, when you leave it. History lists the steps in words; click one to go back to it, and the steps after it stay
+      until you do something new. A hundred steps.</p>
+  </div>
+  <div class="app" id="app2">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span>
+      <div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div>
+      <span class="sp"></span><span class="ib">▶</span><span class="ib">■</span><span class="stat">120 BPM</span><span class="ib" title="Undo: Changed Diva's own settings">↶</span><span class="ib">↷</span><span class="ib on">History</span></div>
+    <div class="body"><div class="rack" id="rack2"></div><div class="side"></div></div>
+    <div class="hist">
+      <div class="hh"><strong>History</strong><span class="stat">Friday Set</span><span class="sp"></span><span class="chip">58 of 100 steps</span></div>
+      <div class="step undone"><span class="tx">Removed part 6 · Organ<small>undone · Ctrl+Shift+Z brings it back</small></span><span class="when">1 min</span></div>
+      <div class="step now"><span class="tx"><b>Changed Diva's own settings</b> on Moog Bass<small>Cutoff, Resonance and 3 more, in Diva's window</small></span><span class="chip green">new</span><span class="when">2 min</span></div>
+      <div class="step new hover"><span class="tx">Loaded Moog Bass into part 5<small>Diva, with its sound; undo puts the empty part back</small></span><span class="chip green">new</span><span class="ghostb">Go back to here</span></div>
+      <div class="step"><span class="tx">Split at C3<small>Grand Piano gave up C1–B2 to part 5</small></span><span class="when">4 min</span></div>
+      <div class="step"><span class="tx">Moved Valhalla Plate from Grand Piano to Strings</span><span class="when">6 min</span></div>
+      <div class="step"><span class="tx">Set 2 parts to channel 1<small>Grand Piano, Warm Pad</small></span><span class="when">7 min</span></div>
+      <div class="step new"><span class="tx">Loaded the preset Concert D Stage on Grand Piano</span><span class="chip green">new</span><span class="when">9 min</span></div>
+      <div class="step"><span class="tx">Swapped part 2 and part 3</span><span class="when">11 min</span></div>
+      <div class="step"><span class="tx">Opened Friday Set<small>where this history starts</small></span><span class="when">14 min</span></div>
+      <div class="hf"><span><span class="chip green">new</span> steps that start a new history today.</span>
+        <span>Not here: the library, controller profiles, and what a hardware synth keeps in its own memory.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f3">
+  <div class="caption">
+    <h2>3 · Drag to modulate</h2>
+    <p>The modulation sources sit beside the knobs. Drag one onto any knob: it outlines every knob it can reach, and the one under the pointer
+      says what it will do. Let go and the knob gets a coloured ring from its value to where the modulation takes it; drag on the ring to set the
+      depth, double-click it to remove. The Matrix stays, as the list of everything connected.</p>
+  </div>
+  <div class="app" id="app3">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span>
+      <div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div>
+      <span class="sp"></span><span class="ib">▶</span><span class="ib">■</span><span class="stat">120 BPM</span><span class="ib">↶</span><span class="ib dis">↷</span><span class="ib">History</span></div>
+    <div class="body" style="flex:none;height:220px"><div class="rack" id="rack3"></div></div>
+    <div class="dock">
+      <div class="dtabs"><span class="tb">Chain</span><span class="tb on">Params</span><span class="tb">Zone</span><span class="tb">Sounds</span><span class="subj">5 · Moog Bass · Diva</span><span class="sp"></span><span class="ghostb" style="margin-right:6px">Mark</span><span class="ib">◐ Hold to compare</span></div>
+      <div class="dbody">
+        <div class="srcs"><h5>Drag onto a knob</h5>
+          <div class="src"><span class="dot" style="background:#79b9ee"></span>Mod wheel<small>CC 1</small></div>
+          <div class="src"><span class="dot" style="background:#e3a8f0"></span>Velocity</div>
+          <div class="src"><span class="dot" style="background:#9ad0c2"></span>Aftertouch</div>
+          <div class="src"><span class="dot" style="background:#c9b27a"></span>Expression<small>pedal</small></div>
+          <div class="src"><span class="dot" style="background:#f0a070"></span>Macro · Brightness</div>
+          <div class="src lifted" id="lfo3"><span class="dot" style="background:#8fd1a8"></span>LFO 1 · slow sine<small>1 bar</small></div>
+          <div class="src"><span class="dot" style="background:#d98c8c"></span>Envelope 1</div>
+          <div class="src"><span class="dot" style="background:#aab5be"></span>Random</div>
+          <div class="ghostb" style="text-align:center;margin-top:4px">+ New LFO or envelope</div>
+        </div>
+        <div class="knobs" id="knobs3" style="margin-top:30px"></div>
+        <div class="conn"><h5>Connected · the Matrix</h5>
+          <div class="crow"><span class="dot" style="background:#79b9ee"></span>Mod wheel → Vibrato<span class="amt">+40 %</span></div>
+          <div class="crow"><span class="dot" style="background:#e3a8f0"></span>Velocity → Env amount<span class="amt">+25 %</span></div>
+          <div class="crow"><span class="dot" style="background:#f0a070"></span>Brightness → Cutoff, 3 parts<span class="amt">+30 %</span></div>
+          <div class="ghostb" style="text-align:center;margin-top:4px">Open the Matrix</div>
+        </div>
+      </div>
+      <div class="drag" id="drag3"><span class="dot" style="background:#8fd1a8"></span>LFO 1 · slow sine</div>
+      <div class="cursor" id="cur3"></div>
+      <div class="tip" id="tip3">LFO 1 → <b>Cutoff</b> · let go, then drag the ring for depth</div>
+    </div>
+  </div>
+</section>
+
+<section class="frame" id="f4">
+  <div class="caption">
+    <h2>4 · Hold to compare</h2>
+    <p>Press Mark when the part sounds the way you want to keep for reference. Then, while editing, hold the button or the ` key to hear the
+      part as it was at the Mark; let go to come back. The dock turns amber and every knob shows the value it had then, with today's value
+      struck through beside it. Nothing is changed by comparing. Until a Mark is set, the button says "Mark first".</p>
+  </div>
+  <div class="app" id="app4">
+    <div class="hdr"><span class="logo">Ho<i>ST</i>age</span>
+      <div class="tabs"><span class="on">Rack</span><span>Sounds</span><span>Performance</span><span>Mixer</span><span>Layers</span><span>Controller</span></div>
+      <span class="sp"></span><span class="ib">▶</span><span class="ib">■</span><span class="stat">120 BPM</span><span class="ib">↶</span><span class="ib dis">↷</span><span class="ib">History</span></div>
+    <div class="body" style="flex:none;height:220px"><div class="rack" id="rack4"></div></div>
+    <div class="dock before">
+      <div class="dtabs"><span class="tb">Chain</span><span class="tb on">Params</span><span class="tb">Zone</span><span class="tb">Sounds</span><span class="subj">5 · Moog Bass · Diva</span><span class="sp"></span>
+        <span class="stat" style="margin-right:8px">Mark set 14:32</span><span class="ghostb">Mark again</span><span class="ib hold" style="margin-left:6px">◐ Before (held)</span></div>
+      <div class="banner">◐ <span>Hearing <b>Moog Bass as it was at your Mark</b>, 6 changes ago. Let go to come back.</span><span class="sp"></span><span style="color:var(--dim)">the rest of the rig plays as it is now</span></div>
+      <div class="dbody">
+        <div class="knobs" id="knobs4" style="max-width:900px"></div>
+        <div class="conn"><h5>Changed since</h5>
+          <div class="crow">Cutoff<span class="amt">48 % → 62 %</span></div>
+          <div class="crow">Resonance<span class="amt">20 % → 35 %</span></div>
+          <div class="crow">Env amount<span class="amt">55 % → 70 %</span></div>
+          <div class="crow">Drive<span class="amt">0 % → 18 %</span></div>
+          <div class="crow">Glide<span class="amt">0 → 40 ms</span></div>
+          <div class="crow">Mod wheel → Vibrato<span class="amt">new</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const parts = [['Grand Piano','Keyscape · C3–C7','#3d81c4'],['Warm Pad','Pigments · C3–C7','#4aa88c'],['Juno-106','Hardware · ch 2','#b4854a'],['Strings','Kontakt · C3–C7','#9a6bbf'],['Moog Bass','Diva · C1–B2','#c46a6a']];
+  function rack(id, focus) {
+    document.getElementById(id).innerHTML = parts.map(([n, s, c], i) =>
+      `<div class="part${i === focus ? ' focused' : ''}" style="--pc:${c}"><b>${i + 1} · ${n}</b><small>${s}</small><span class="sp"></span><span class="t">Active</span><span class="t">Mute</span><span class="t">🎧</span></div>`).join('');
+  }
+  rack('rack1', 0); rack('rack2', 4); rack('rack3', 4); rack('rack4', 4);
+
+  // a knob: value 0..1, optional modulation [amount, colour], optional ghost (today's value)
+  function knob(v, mod, ghost, accent = '#79b9ee') {
+    const R = 24, cx = 30, cy = 30, a0 = -225, span = 270;
+    const pt = (deg, r = R) => { const t = deg * Math.PI / 180; return [cx + r * Math.cos(t), cy + r * Math.sin(t)]; };
+    const arc = (f0, f1, r, col, w) => { const d0 = a0 + span * f0, d1 = a0 + span * f1; const [x0, y0] = pt(d0, r), [x1, y1] = pt(d1, r);
+      const large = Math.abs(d1 - d0) > 180 ? 1 : 0, sweep = d1 > d0 ? 1 : 0; return `<path d="M${x0} ${y0} A${r} ${r} 0 ${large} ${sweep} ${x1} ${y1}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`; };
+    let s = arc(0, 1, R, '#2c353e', 4) + arc(0, Math.max(v, 0.001), R, accent, 4);
+    if (mod) { const end = Math.min(1, Math.max(0, v + mod[0])); s += arc(Math.min(v, end), Math.max(v, end), R + 6, mod[1], 3.5); }
+    if (ghost !== undefined) { const [gx, gy] = pt(a0 + span * ghost, R); s += `<circle cx="${gx}" cy="${gy}" r="3.5" fill="none" stroke="#aab5be" stroke-width="1.5" stroke-dasharray="2 2"/>`; }
+    const [px, py] = pt(a0 + span * v, R - 9);
+    s += `<circle cx="${cx}" cy="${cy}" r="17" fill="#20272e" stroke="#3b4652"/><line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" stroke="#d9e0e6" stroke-width="2.5" stroke-linecap="round"/>`;
+    return `<svg width="60" height="60" viewBox="0 0 60 60">${s}</svg>`;
+  }
+  const K = [['Cutoff', .62, '62 %'], ['Resonance', .35, '35 %'], ['Env amount', .70, '70 %'], ['Attack', .05, '4 ms'], ['Decay', .40, '420 ms'], ['Sustain', .60, '60 %'],
+             ['Release', .30, '280 ms'], ['Drive', .18, '18 %'], ['Vibrato', 0, '0 %'], ['Glide', .25, '40 ms'], ['Volume', .72, '−4 dB'], ['Pan', .5, 'C']];
+  // frame 3: LFO held over Cutoff; Resonance has the mod wheel; Env amount has velocity
+  document.getElementById('knobs3').innerHTML = K.map(([n, v, t], i) => {
+    const mod = n === 'Vibrato' ? [0.4, '#79b9ee'] : n === 'Env amount' ? [0.25, '#e3a8f0'] : n === 'Cutoff' ? [0.3, '#f0a070'] : null;
+    const cls = i === 0 ? 'kn hot' : 'kn target';
+    const badge = n === 'Vibrato' ? '<span class="badge chip blue">MW</span>' : n === 'Env amount' ? '<span class="badge chip" style="color:#e3a8f0;border-color:#e3a8f0">VEL</span>' : n === 'Cutoff' ? '<span class="badge chip" style="color:#f0a070;border-color:#f0a070">MAC</span>' : '';
+    return `<div class="${cls}" ${n === 'Vibrato' ? 'id="res3"' : ''}>${badge}${knob(v, mod)}<span class="nm">${n}</span><span class="vl">${t}</span></div>`; }).join('');
+  { const app = document.getElementById('app3'), a = app.getBoundingClientRect(), dock = app.querySelector('.dock').getBoundingClientRect();
+    const k = document.querySelector('#knobs3 .kn.hot').getBoundingClientRect();
+    const place = (id, x, y) => { const e = document.getElementById(id); e.style.left = x + 'px'; e.style.top = y + 'px'; };
+    place('cur3', k.left - dock.left + 38, k.top - dock.top + 34); place('drag3', k.left - dock.left + 52, k.top - dock.top + 44); place('tip3', k.left - dock.left + 10, k.top - dock.top - 32);
+    const r = document.getElementById('res3').getBoundingClientRect();
+    const t2 = document.createElement('div'); t2.className = 'tip'; t2.style.borderColor = '#5b9bd5'; t2.innerHTML = 'Mod wheel → Vibrato <b>+40 %</b> · drag the ring';
+    t2.style.left = (r.left - dock.left - 40) + 'px'; t2.style.top = (r.bottom - dock.top + 6) + 'px'; app.querySelector('.dock').appendChild(t2); }
+
+  // frame 4: the before values, today's struck through
+  const B = { Cutoff: [.48, '48 %'], Resonance: [.20, '20 %'], 'Env amount': [.55, '55 %'], Drive: [0, '0 %'], Glide: [0, '0 ms'] };
+  document.getElementById('knobs4').innerHTML = K.map(([n, v, t]) => {
+    const b = B[n]; if (!b) return `<div class="kn">${knob(v, null, undefined, '#7f8b96')}<span class="nm">${n}</span><span class="vl">${t}</span></div>`;
+    return `<div class="kn">${knob(b[0], null, v, '#d7a44e')}<span class="nm">${n}</span><span class="vl">${b[1]}<s>${t}</s></span></div>`; }).join('');
+</script>
+</body>
+</html>
