@@ -2,6 +2,8 @@
 
 #include <juce_core/juce_core.h>
 
+#include <unordered_map>
+
 namespace ceditor::device
 {
 struct ValidationMessage
@@ -306,6 +308,14 @@ private:
     juce::var profile;
     juce::Array<ValidationMessage> validationMessages;
 
+    // Parameters and message recipes by id, built once per load. A generated profile has one recipe
+    // per parameter, and a KRONOS drum kit has 20,352 of each: found by searching the list, validating
+    // that one profile compared some two hundred million ids, and every DeviceProfileService loads
+    // the whole library. The first entry with an id wins, as the search it replaces did.
+    std::unordered_map<juce::String, const juce::DynamicObject*> parametersById;
+    std::unordered_map<juce::String, const juce::DynamicObject*> recipesById;
+
+    void indexProfile();
     void validate();
     void addValidation (ValidationMessage::Level level,
                         const juce::String& path,

@@ -379,6 +379,7 @@ bool DeviceProfileEngine::loadFromJson (const juce::String& json, juce::String& 
     }
 
     profile = parsed;
+    indexProfile();
     validate();
 
     if (hasErrors())
@@ -1900,34 +1901,39 @@ const juce::DynamicObject* DeviceProfileEngine::profileObject() const
     return asObject (profile);
 }
 
+void DeviceProfileEngine::indexProfile()
+{
+    parametersById.clear();
+    recipesById.clear();
+
+    const auto index = [this] (const juce::Identifier& listName, auto& byId)
+    {
+        auto* root = profileObject();
+        auto* entries = root != nullptr ? asArray (root->getProperty (listName)) : nullptr;
+        if (entries == nullptr)
+            return;
+
+        static const juce::Identifier idProperty ("id");
+        byId.reserve ((size_t) entries->size());
+        for (const auto& entryValue : *entries)
+            if (auto* entry = asObject (entryValue))
+                byId.emplace (propString (*entry, idProperty), entry);   // emplace keeps the first
+    };
+
+    index ("parameters", parametersById);
+    index ("messageRecipes", recipesById);
+}
+
 const juce::DynamicObject* DeviceProfileEngine::findParameter (const juce::String& parameterId) const
 {
-    auto* root = profileObject();
-    auto* parameters = root != nullptr ? asArray (root->getProperty ("parameters")) : nullptr;
-    if (parameters == nullptr)
-        return nullptr;
-
-    for (const auto& parameterValue : *parameters)
-        if (auto* parameter = asObject (parameterValue))
-            if (propString (*parameter, "id") == parameterId)
-                return parameter;
-
-    return nullptr;
+    const auto found = parametersById.find (parameterId);
+    return found != parametersById.end() ? found->second : nullptr;
 }
 
 const juce::DynamicObject* DeviceProfileEngine::findMessageRecipe (const juce::String& recipeId) const
 {
-    auto* root = profileObject();
-    auto* recipes = root != nullptr ? asArray (root->getProperty ("messageRecipes")) : nullptr;
-    if (recipes == nullptr)
-        return nullptr;
-
-    for (const auto& recipeValue : *recipes)
-        if (auto* recipe = asObject (recipeValue))
-            if (propString (*recipe, "id") == recipeId)
-                return recipe;
-
-    return nullptr;
+    const auto found = recipesById.find (recipeId);
+    return found != recipesById.end() ? found->second : nullptr;
 }
 
 const juce::DynamicObject* DeviceProfileEngine::findDeviceRequest (const juce::String& requestId) const

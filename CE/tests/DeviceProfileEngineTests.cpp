@@ -7,6 +7,7 @@
 #include <juce_midi_ci/juce_midi_ci.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <deque>
 #include <map>
 #include <iostream>
@@ -4462,6 +4463,11 @@ int runProfileMiddleCTests (const juce::File& file)
 
 int main (int argc, char** argv)
 {
+    // Unbuffered, so a [PASS] on stdout and a [FAIL] on stderr reach the CTest log in the order they
+    // happened. Piped, stdout is otherwise held back in 4 KB blocks and a failure reads as if it came
+    // before the passes that preceded it.
+    std::setvbuf (stdout, nullptr, _IONBF, 0);
+
     if (argc == 4 && juce::String (argv[1]) == "--hold-request")
         return holdRequestAsAnotherProcess (juce::String (argv[2]), juce::File (juce::String (argv[3])));
 
@@ -4879,6 +4885,14 @@ int main (int argc, char** argv)
     failures += runDumpWhenTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
+
+    // The test above measures a cold load; from here on one service stays alive, as the app's does
+    // for its whole session. Services share a profile's engine while any of them holds it, so the
+    // dozen tests below that each build a service no longer parse the whole library again: some
+    // 400 MB of JSON, eight seconds apiece here, a minute and a half in all. It asks for nothing and
+    // listens to nothing, so the tests of who a shared input's reply belongs to never see it.
+    const ceditor::device::DeviceProfileService keepsEnginesShared;
+
     failures += runCatalogSummaryTests (root);
     failures += runMonitorClearTests();
     failures += runRealtimeMonitorTests();
