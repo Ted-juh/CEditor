@@ -1,6 +1,6 @@
 # Release checks: run by hand (Actions > Release checks > Run workflow), never on a push or a PR.
 #
-# Two checks too slow for every PR, each a path a user takes that ci.yml does not:
+# Three checks too slow for every PR, each a path a user takes that ci.yml does not:
 #
 #   compiled-handlers  A plug-in with a C++, a C# and a Java handler, exported the way an installed
 #                      CEditor exports one: the toolchains it provisions (the bundled MinGW clang,
@@ -21,9 +21,17 @@
 #   installer          tools/scripts/package-installer.ps1 end to end: the app and the player
 #                      templates built as shipped, staged, and packed by Inno Setup. The installer
 #                      is uploaded as an artifact.
+#   blender-layers     The Blender add-on (tools/blender/ceditor_layers.py) held to Blender's own
+#                      renders: tools/blender/test_ceditor_layers.py builds a knob and a fader, writes
+#                      them with the add-on, and checks the layers laid as CEditor lays them against
+#                      Blender rendering the same scene, turned, slid and recoloured. Ubuntu's
+#                      Blender 4.0.2, the version it was measured with; a few minutes on Linux. The
+#                      files it wrote are uploaded when it fails.
 #
 # Agreed with the repository owner in October 2026, as a workflow of its own so PR runs stay as
-# they are (CLAUDE.md: do not widen CI without asking); the engine probe was agreed the same way.
+# they are (CLAUDE.md: do not widen CI without asking); the engine probe was agreed the same way, and
+# the Blender check in November 2026 (the owner's "do the gaps", one of which was that it ran nowhere
+# but by hand).
 
 name: Release checks
 
@@ -38,6 +46,10 @@ on:
         description: How many times to run the webview engine probe both ways
         type: number
         default: 1
+      blender:
+        description: Also check the Blender add-on against Blender's renders (a few minutes, Linux)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -220,3 +232,30 @@ jobs:
           name: ceditor-installer
           path: build/package/installer/
           if-no-files-found: error
+
+  blender-layers:
+    if: ${{ inputs.blender }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      # Ubuntu's Blender carries numpy, which the add-on needs; -b runs it without a display.
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender
+          blender --version
+
+      - name: The add-on against Blender's renders
+        run: blender -b --factory-startup --python tools/blender/test_ceditor_layers.py -- "$RUNNER_TEMP/blender-layers"
+
+      - name: Upload what it wrote
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: blender-layers
+          path: |
+            ${{ runner.temp }}/blender-layers/*.psd
+            ${{ runner.temp }}/blender-layers/*.npz
+          if-no-files-found: ignore

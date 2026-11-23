@@ -64,7 +64,7 @@ test('a Screen Builder tab closes from its ×, and asks before throwing changes 
     activeEditorTab.set({ type: 'screen', id: edited.id });
     setScreenPageTitle(edited.id, 0, 'LEAD');
     assert.equal(closeScreenTab(edited.id), false, 'kept when the answer is no');
-    assert.match(asked[0], /cannot save/, 'the question says why it matters');
+    assert.match(asked[0], /has unsaved changes/, 'the question is the one every tab asks, now that a screen can be saved');
     assert.ok(get(screenDocuments).some((doc) => doc.id === edited.id));
 
     answer = true;
@@ -78,7 +78,7 @@ test('a Screen Builder tab closes from its ×, and asks before throwing changes 
   assert.match(source('editor/TabBar.svelte'), /tab\.tabType === 'screen'\) \{\s*closeScreenTab\(tab\.id\)/,
     'the ×, middle click and Close in the tab menu reach it');
   assert.match(source('sections/ScreenBuilderEditor.svelte'), /navigator\.clipboard\.writeText\(exportJson\)/,
-    'with no Save, the pages leave by Copy');
+    'beside Save, the assignment can still be copied');
 });
 
 test('Build product says what it needs before it is pressed', () => {

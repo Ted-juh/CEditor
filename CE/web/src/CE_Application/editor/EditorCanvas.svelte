@@ -69,6 +69,7 @@
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
+  import { pictureSurface } from '../stores/pictureExport.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -244,6 +245,14 @@
   let viewportEl = $state(null);
   let zoomContainerEl = $state(null);
   let panelSurfaceEl = $state(null);
+  // File → Export Picture takes the picture from the surface the canvas is showing
+  // (stores/pictureExport.js), in Edit or in Preview, so it is told which that is.
+  $effect(() => {
+    const element = panelSurfaceEl;
+    const panelId = canvasPanel?.id ?? null;
+    pictureSurface.set(element && panelId ? { element, panelId } : null);
+    return () => pictureSurface.update((current) => (current?.element === element ? null : current));
+  });
   let lastViewportPanelId = $state(null);
   let splitContainerEl = $state(null);
   let splitResizing = $state(false);

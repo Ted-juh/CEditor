@@ -1,0 +1,281 @@
+// Photoshop's Selective Color and Color Lookup adjustment layers, applied by the Photoshop component
+// import to the layers under them (utils/psdAdjustments.js). Selective Color moves each colour by
+// how far it is in each range; Color Lookup reads the .cube, .3dl or .look file the layer carries.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { writePsdUint8Array } from 'ag-psd';
+import { inflateSync } from 'node:zlib';
+import { adjustmentFunction, gradientRamp, inkAdjustmentFunction, labAdjustment, readLookupTable, unappliedAdjustment } from '../src/CE_Application/utils/psdAdjustments.js';
+import { planPsdComponentImport } from '../src/CE_Application/utils/psdComponentImport.js';
+
+const near = (actual, expected, tolerance, message) => {
+  actual.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) <= tolerance, `${message}: ${actual.map((x) => x.toFixed(1))} against ${expected}`));
+};
+const zero = { c: 0, m: 0, y: 0, k: 0 };
+const selective = (mode, ranges) => ({ type: 'selective color', mode, reds: zero, yellows: zero, greens: zero, cyans: zero, blues: zero, magentas: zero, whites: zero, neutrals: zero, blacks: zero, ...ranges });
+
+test('Selective Color: a range moves the colours in it, by how far they are in it, and nothing else', () => {
+  const report = new Set();
+  const lessCyanInReds = adjustmentFunction(selective('relative', { reds: { c: -100, m: 0, y: 0, k: 0 } }), report);
+  assert.deepEqual([...report], ['Selective Color'], 'listed as close to Photoshop\'s');
+  // A dull red is 0.63 in reds (red over the next channel): its red goes 0.63 of the way to full.
+  const [r, g, b] = lessCyanInReds([200, 40, 40]);
+  near([r, g, b], [200 + (255 - 200) * (160 / 255), 40, 40], 0.5, 'the red lifted, green and blue kept');
+  near(lessCyanInReds([40, 60, 220]), [40, 60, 220], 0, 'a blue is not in reds');
+  near(lessCyanInReds([255, 0, 0]), [255, 0, 0], 0, 'a full red has no cyan to take away');
+  near(lessCyanInReds([128, 128, 128]), [128, 128, 128], 0, 'a grey is in no colour range');
+});
+
+test('Selective Color: Relative scales by the ink already there, so it cannot tint white; Absolute can', () => {
+  const cyanInWhites = { whites: { c: 50, m: 0, y: 0, k: 0 } };
+  near(adjustmentFunction(selective('relative', cyanInWhites))([255, 255, 255]), [255, 255, 255], 0, 'relative leaves white');
+  near(adjustmentFunction(selective('absolute', cyanInWhites))([255, 255, 255]), [127.5, 255, 255], 0.5, 'absolute adds half the cyan ink');
+  // Black in neutrals darkens a mid grey, weighted 1 there and 0 at black and white.
+  const darker = adjustmentFunction(selective('absolute', { neutrals: { c: 0, m: 0, y: 0, k: 20 } }));
+  near(darker([128, 128, 128]), [128 - 51 * 0.996, 128 - 51 * 0.996, 128 - 51 * 0.996], 0.5, 'the grey, darker by a fifth');
+  near(darker([255, 255, 255]), [255, 255, 255], 0, 'white is not neutral');
+  near(darker([0, 0, 0]), [0, 0, 0], 0, 'nor is black');
+  // Relative black in blacks: the ink there (0.8) grows by half, -0.4, which is held at -0.2 (no
+  // channel goes below black), then weighted by how far the colour is in blacks, 0.6.
+  const deeper = adjustmentFunction(selective('relative', { blacks: { c: 0, m: 0, y: 0, k: 50 } }));
+  near(deeper([51, 51, 51]), [20.4, 20.4, 20.4], 0.5, 'a fifth-grey, 0.6 in blacks');
+  near(deeper([153, 153, 153]), [153, 153, 153], 0, 'a light grey is not in blacks');
+});
+
+const cube = (lines, size, extra = '') => `TITLE "test"\n# a comment\n${extra}LUT_3D_SIZE ${size}\n${lines.join('\n')}\n`;
+/** Size-2 table entries, red fastest, from `f([r, g, b]) => [r, g, b]` over 0..1. */
+const corners = (f, order = 'red') => {
+  const out = [];
+  for (let a = 0; a < 2; a += 1) for (let b = 0; b < 2; b += 1) for (let c = 0; c < 2; c += 1) out.push(f(order === 'red' ? [c, b, a] : [a, b, c]));
+  return out;
+};
+
+test('Color Lookup: a .cube table, interpolated between its points, over its domain', () => {
+  const invert = adjustmentFunction({ type: 'color lookup', lookupType: '3dlut', lutFormat: 'cube', lut3DFileData: new TextEncoder().encode(cube(corners(([r, g, b]) => [1 - r, 1 - g, 1 - b]).map((v) => v.join(' ')), 2)) });
+  near(invert([0, 128, 255]), [255, 127, 0], 0.01, 'inverted, in between too');
+  // Red and blue swapped: the order of the table matters.
+  const swap = adjustmentFunction({ type: 'color lookup', lut3DFileData: new TextEncoder().encode(cube(corners(([r, g, b]) => [b, g, r]).map((v) => v.join(' ')), 2)) });
+  near(swap([255, 100, 0]), [0, 100, 255], 0.01, 'red and blue swapped');
+  // A domain wider than 0..1: the input is placed in it first.
+  const half = readLookupTable(cube(corners(([r, g, b]) => [r, g, b]).map((v) => v.join(' ')), 2, 'DOMAIN_MIN 0 0 0\nDOMAIN_MAX 2 2 2\n'));
+  assert.deepEqual([half.lo, half.hi], [[0, 0, 0], [2, 2, 2]]);
+  const lifted = adjustmentFunction({ type: 'color lookup', lut3DFileData: new TextEncoder().encode(cube(corners(([r, g, b]) => [r, g, b]).map((v) => v.join(' ')), 2, 'DOMAIN_MIN 0 0 0\nDOMAIN_MAX 2 2 2\n')) });
+  near(lifted([255, 128, 0]), [127.5, 64, 0], 0.01, 'halved, as the domain says');
+  // A 1D table: each channel its own curve.
+  const gamma = adjustmentFunction({ type: 'color lookup', lut3DFileData: new TextEncoder().encode('LUT_1D_SIZE 3\n0 0 0\n0.25 0.5 0.75\n1 1 1\n') });
+  near(gamma([128, 128, 128]), [64, 128, 191], 1, 'the middle point of each');
+});
+
+test('Color Lookup: a .3dl table, blue fastest and twelve-bit, and an Iridas .look, little-endian floats in hex', () => {
+  const lines = ['3DMESH', 'Mesh 1 12', '0 1023', ...corners(([r, g, b]) => [b, g, r].map((v) => v * 4095), 'blue').map((v) => v.join(' ')), 'LUT8', 'gamma 1.0'];
+  const fromThreeDl = adjustmentFunction({ type: 'color lookup', lutFormat: '3dl', lut3DFileData: new TextEncoder().encode(lines.join('\n')) });
+  near(fromThreeDl([255, 100, 0]), [0, 100, 255], 0.01, 'red and blue swapped, from the .3dl');
+  const floats = Buffer.alloc(8 * 3 * 4);
+  corners(([r, g, b]) => [b, g, r]).flat().forEach((v, i) => floats.writeFloatLE(v, i * 4));
+  const look = `<?xml version="1.0" encoding="UTF-8"?>\n<look>\n  <LUT>\n    <size>"2"</size>\n    <data>"\n      ${floats.toString('hex').toUpperCase()}\n    "</data>\n  </LUT>\n</look>\n`;
+  const fromLook = adjustmentFunction({ type: 'color lookup', lutFormat: 'look', lut3DFileData: new TextEncoder().encode(look) });
+  near(fromLook([255, 100, 0]), [0, 100, 255], 0.01, 'red and blue swapped, from the .look');
+});
+
+test('Color Lookup through an ICC profile, or with a table it cannot read, is not applied and says which', () => {
+  const profile = { type: 'color lookup', lookupType: 'abstractProfile', profile: new Uint8Array(8) };
+  assert.equal(adjustmentFunction(profile), null);
+  assert.equal(unappliedAdjustment(profile), 'Color Lookup through an ICC profile');
+  const broken = { type: 'color lookup', lookupType: '3dlut', lutFormat: 'cube', lut3DFileName: 'Teal.cube', lut3DFileData: new TextEncoder().encode('LUT_3D_SIZE 4\n0 0 0\n') };
+  assert.equal(adjustmentFunction(broken), null);
+  assert.equal(unappliedAdjustment(broken), 'Color Lookup, its table (Teal.cube) not readable');
+  assert.equal(unappliedAdjustment({ type: 'curves' }), 'curves');
+});
+
+test('a Color Lookup with nothing chosen leaves colours alone; a Photo Filter\'s Density reads as a fraction or a percent', () => {
+  assert.deepEqual(adjustmentFunction({ type: 'color lookup' })([10, 20, 30]), [10, 20, 30]);
+  const filter = (density) => adjustmentFunction({ type: 'photo filter', color: { r: 255, g: 0, b: 0 }, density, preserveLuminosity: false });
+  const quarter = filter(0.25)([200, 200, 200]);
+  assert.ok(quarter[0] > quarter[1] && quarter[1] < 200, `${quarter}`);
+  near(filter(25)([200, 200, 200]), quarter, 0.01, 'the same Density as a percent');
+});
+
+// Photoshop's own numbers for these, as PhotoCraft measured them (storytold/photocraft, MIT OR
+// Apache-2.0, crates/compose: adjust/tone_tests.rs and tests.rs): an 8-bit grey ramp through each.
+const RAMP = [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255];
+const throughRamp = (fn, channel) => RAMP.map((x) => Math.round(fn([x, x, x])[channel]));
+const within = (got, want, tolerance, what) => got.forEach((v, i) => assert.ok(Math.abs(v - want[i]) <= tolerance, `${what} at ${RAMP[i] ?? i}: ${v} vs Photoshop's ${want[i]}`));
+
+test('Color Balance: each channel through one Levels the tones fold into, as Photoshop measures', () => {
+  const tone = (name, cyanRed, preserveLuminosity) => adjustmentFunction({ type: 'color balance', preserveLuminosity,
+    shadows: { cyanRed: 0, magentaGreen: 0, yellowBlue: 0 }, midtones: { cyanRed: 0, magentaGreen: 0, yellowBlue: 0 }, highlights: { cyanRed: 0, magentaGreen: 0, yellowBlue: 0 }, [name]: { cyanRed, magentaGreen: 0, yellowBlue: 0 } });
+  within(throughRamp(tone('midtones', 50, false), 0), [0, 36, 59, 78, 96, 112, 128, 142, 156, 170, 183, 196, 209, 221, 233, 244, 255], 1, 'midtones red +50');
+  within(throughRamp(tone('shadows', -100, false), 0), [0, 0, 0, 0, 0, 0, 0, 7, 23, 43, 67, 93, 122, 154, 186, 221, 255], 1, 'shadows red -100');
+  within(throughRamp(tone('highlights', 100, false), 0), [0, 51, 84, 111, 136, 160, 182, 202, 223, 242, 255, 255, 255, 255, 255, 255, 255], 1, 'highlights red +100');
+  // Preserve Luminosity: the other channels move the other way.
+  within(throughRamp(tone('shadows', 50, true), 1), [0, 0, 0, 0, 17, 37, 57, 77, 97, 117, 137, 157, 177, 197, 216, 236, 255], 1, 'shadows red +50, green');
+  within(throughRamp(tone('midtones', 100, true), 1), [0, 5, 14, 24, 36, 50, 64, 80, 97, 114, 132, 151, 171, 191, 212, 234, 255], 1, 'midtones red +100, green');
+  within(throughRamp(tone('highlights', -100, true), 1), [0, 26, 53, 79, 105, 132, 158, 184, 211, 237, 255, 255, 255, 255, 255, 255, 255], 1, 'highlights red -100, green');
+});
+
+test('Brightness/Contrast, the current one: Photoshop\'s measured curves', () => {
+  const xs = [0, 16, 32, 64, 96, 128, 160, 192, 224, 255];
+  const curve = (brightness, contrast) => { const fn = adjustmentFunction({ type: 'brightness/contrast', brightness, contrast }); return (x) => fn([x, x, x])[0]; };
+  const up = curve(50, 0); const down = curve(-50, 0);
+  xs.forEach((x, i) => {
+    assert.ok(Math.abs(up(x) - [0, 22, 44, 88, 132, 171, 203, 228, 246, 255][i]) <= 1.2, `+50 at ${x}: ${up(x)}`);
+    assert.ok(Math.abs(down(x) - [0, 12, 23, 47, 70, 93, 118, 148, 186, 255][i]) <= 1.2, `-50 at ${x}: ${down(x)}`);
+  });
+  // +25 with contrast +30 (PhotoCraft's corpus, rgb8 brightness-contrast.psd).
+  const both = curve(25, 30);
+  for (const [x, want] of [[8, 7], [24, 23], [48, 49], [72, 78], [88, 99], [104, 120], [128, 154], [144, 174], [160, 192], [176, 208], [192, 222], [216, 239], [248, 253]]) {
+    assert.ok(Math.abs(both(x) - want) <= 1.5, `+25/+30 at ${x}: ${both(x)} vs ${want}`);
+  }
+});
+
+test('Photo Filter, Vibrance, Black & White and Exposure as Photoshop draws them', () => {
+  // Photo Filter: the colour's XYZ multiplied in; Preserve Luminosity keeps the blend modes' luminosity.
+  const warm = adjustmentFunction({ type: 'photo filter', color: { r: 236, g: 138, b: 0 }, density: 0.25, preserveLuminosity: true });
+  const [r, g, b] = warm([128, 128, 128]);
+  assert.ok(r > g && g > b, `${[r, g, b]}`);
+  assert.ok(Math.abs(0.3 * r + 0.59 * g + 0.11 * b - 128) < 0.6);
+  assert.deepEqual(adjustmentFunction({ type: 'photo filter', color: { r: 236, g: 138, b: 0 }, density: 0, preserveLuminosity: false })([90, 40, 200]).map(Math.round), [90, 40, 200]);
+  // Vibrance's Saturation takes a colour toward the grey 0.288 R + 0.712 G in linear light: pure red
+  // to that grey at -100.
+  const grey = Math.round(255 * (1.055 * 0.288 ** (1 / 2.4) - 0.055));
+  assert.deepEqual(adjustmentFunction({ type: 'vibrance', vibrance: 0, saturation: -100 })([255, 0, 0]).map(Math.round), [grey, grey, grey]);
+  assert.deepEqual(adjustmentFunction({ type: 'vibrance', vibrance: 0, saturation: 0 })([200, 100, 50]).map(Math.round), [200, 100, 50]);
+  // Black & White: the smallest channel, plus the secondary part (middle − smallest) and the primary
+  // part (largest − middle) by their sliders.
+  const bw = adjustmentFunction({ type: 'black & white', reds: 40, yellows: 60, greens: 40, cyans: 60, blues: 20, magentas: 80 });
+  assert.equal(Math.round(bw([255, 0, 0])[0]), 102);
+  assert.equal(Math.round(bw([255, 255, 0])[0]), 153);
+  assert.equal(Math.round(bw([200, 120, 40])[0]), Math.round(40 + 80 * 0.6 + 80 * 0.4));
+  // Exposure in an RGB file through a plain 2.2 power: +1 stop on 128.
+  assert.equal(Math.round(adjustmentFunction({ type: 'exposure', exposure: 1, offset: 0, gamma: 1 })([128, 128, 128])[0]), Math.round(128 * 2 ** (1 / 2.2)));
+});
+
+function solid(name, left, top, w, h, rgba) {
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i += 1) data.set(rgba, i * 4);
+  return { name, left, top, right: left + w, bottom: top + h, imageData: { width: w, height: h, data } };
+}
+
+function firstPixel(dataUrl) {
+  const png = Buffer.from(String(dataUrl).split(',')[1], 'base64');
+  let off = 8; const idat = [];
+  while (off < png.length) {
+    const len = png.readUInt32BE(off);
+    if (png.toString('ascii', off + 4, off + 8) === 'IDAT') idat.push(png.subarray(off + 8, off + 8 + len));
+    off += 12 + len;
+  }
+  return [...inflateSync(Buffer.concat(idat)).subarray(1, 4)];
+}
+
+test('in a Photoshop file: the two layers change the pictures under them, as the file stores them', () => {
+  const swapCube = new TextEncoder().encode(cube(corners(([r, g, b]) => [b, g, r]).map((v) => v.join(' ')), 2));
+  const bytes = writePsdUint8Array({
+    width: 20,
+    height: 20,
+    children: [
+      solid('base', 0, 0, 20, 20, [200, 40, 40, 255]),
+      { name: 'Reds', adjustment: selective('relative', { reds: { c: -100, m: 0, y: 0, k: 0 } }) },
+      solid('swapped', 5, 5, 10, 10, [255, 100, 0, 255]),
+      { name: 'Teal', adjustment: { type: 'color lookup', lookupType: '3dlut', name: 'Teal', lutFormat: 'cube', lut3DFileName: 'Teal.cube', lut3DFileData: swapCube } },
+      { name: 'Look', adjustment: { type: 'color lookup', lookupType: 'abstractProfile', name: 'Look', profile: new Uint8Array(16) } },
+    ],
+  }, { noBackground: true, generateThumbnail: false });
+  const plan = planPsdComponentImport(bytes);
+  assert.equal(plan.ok, true, plan.error);
+  const p = plan.component._children.Parts._children;
+  // The base under both: its red lifted by Selective Color, then red and blue swapped.
+  near(firstPixel(p.base._children.Background._children.Fill.imageSrc), [40, 40, 235], 1, 'the base');
+  // Above Selective Color, under the lookup: only swapped.
+  near(firstPixel(p.swapped._children.Background._children.Fill.imageSrc), [0, 100, 255], 1, 'the square');
+  assert.ok(plan.warnings.some((line) => /close to Photoshop's: .*Selective Color/.test(line)), plan.warnings.join('\n'));
+  assert.ok(plan.warnings.some((line) => /not applied: Look \(Color Lookup through an ICC profile\)/.test(line)), plan.warnings.join('\n'));
+  assert.ok(!plan.warnings.some((line) => /Teal/.test(line)), 'the table is applied, not listed');
+});
+
+test('Brightness/Contrast: Legacy exactly as Photoshop draws it; the current one close to its pictures', () => {
+  const at = (adjustment, v) => adjustmentFunction({ type: 'brightness/contrast', ...adjustment })([v, v, v])[0];
+  // Read off Photoshop's own composites of psd-tools' test files (brightnesscontrast_legacy_*.psd).
+  const legacyDown = { brightness: -23, contrast: -26, useLegacy: true };
+  for (const [v, want] of [[4, 13], [124, 102], [184, 146]]) assert.ok(Math.abs(at(legacyDown, v) - want) <= 1, `legacy, contrast down: ${v} → ${at(legacyDown, v)}, not ${want}`);
+  const legacyUp = { brightness: 20, contrast: 57, useLegacy: true };
+  for (const [v, want] of [[72, 46], [108, 129], [144, 213]]) assert.ok(Math.abs(at(legacyUp, v) - want) <= 1.5, `legacy, contrast up: ${v} → ${at(legacyUp, v)}, not ${want}`);
+  // The current one (brightnesscontrast_rgb.psd): psd-tools' model, 3.5 levels off on average over
+  // the whole range (the first guess was 30 off, the curve fitted here after it 7).
+  const current = [
+    [{ brightness: -31, contrast: 47 }, [[64, 42], [128, 99], [192, 171]]],
+    [{ brightness: 23, contrast: 70 }, [[64, 57], [128, 157], [192, 229]]],
+    [{ brightness: 150, contrast: -21 }, [[64, 158], [128, 236], [224, 254]]],
+  ];
+  for (const [adjustment, points] of current) {
+    for (const [v, want] of points) assert.ok(Math.abs(at(adjustment, v) - want) <= 12, `${JSON.stringify(adjustment)}: ${v} → ${at(adjustment, v)}, not ${want}`);
+  }
+  // Black and white stay put, as in Photoshop.
+  assert.equal(at({ brightness: 40, contrast: 30 }, 0), 0);
+  assert.equal(at({ brightness: -40, contrast: 30 }, 255), 255);
+});
+
+test('Posterize, Levels and Curves draw as Photoshop draws them', () => {
+  // Read off Photoshop's own composites of psd-tools' test files (posterize_rgb, levels_rgb, curves_rgb).
+  const posterize = (levels, v) => adjustmentFunction({ type: 'posterize', levels })([v, v, v])[0];
+  assert.deepEqual([67, 87, 167, 187].map((v) => posterize(3, v)), [0, 127, 127, 255]);
+  assert.deepEqual([26, 60, 117, 193, 231].map((v) => posterize(7, v)), [0, 42, 127, 212, 255]);
+  // A channel's own levels first, then the RGB ones: 0 → red's 0 → RGB's 48.
+  const levels = adjustmentFunction({ type: 'levels',
+    rgb: { shadowInput: 0, highlightInput: 213, shadowOutput: 48, highlightOutput: 255, midtoneInput: 1.22 },
+    red: { shadowInput: 0, highlightInput: 255, shadowOutput: 0, highlightOutput: 194, midtoneInput: 0.47 } });
+  assert.deepEqual([0, 136, 250].map((v) => Math.round(levels([v, 0, 0])[0])), [48, 112, 233]);
+  // A channel's curve first, then the RGB one: 47 → red's 60 → RGB's ×1.275 = 76.
+  const curves = adjustmentFunction({ type: 'curves', rgb: [{ input: 0, output: 0 }, { input: 200, output: 255 }],
+    red: [{ input: 49, output: 60 }, { input: 94, output: 218 }, { input: 102, output: 0 }, { input: 185, output: 229 }, { input: 195, output: 36 }] });
+  assert.ok(Math.abs(curves([47, 0, 0])[0] - 76) <= 1, `${curves([47, 0, 0])[0]}`);
+});
+
+test('A Lab file\'s adjustments work on its stored L, a and b, as Photoshop works them there', () => {
+  // Stored as Photoshop stores Lab: L 0..255 for 0..100, a and b offset by 128. Each expected value is
+  // Photoshop's own, read from PhotoCraft's corpus (lab8: hue-saturation, -colorize, photo-filter).
+  const lab = (adjustment) => adjustmentFunction(adjustment, new Set(), { lab: true });
+  // Invert each channel; Threshold on L, to neutral; Levels' first channel record is L's.
+  assert.deepEqual(lab({ type: 'invert' })([138, 209, 198]), [117, 46, 57]);
+  assert.deepEqual(lab({ type: 'threshold', level: 128 })([143, 30, 220]), [255, 128, 128]);
+  near(lab({ type: 'levels', red: { shadowInput: 15, highlightInput: 230, shadowOutput: 10, highlightOutput: 245, midtoneInput: 1.3 } })([138, 209, 198]), [163, 209, 198], 1, 'Levels on L');
+  // Hue/Saturation turns a and b round a square (40° here) and scales the larger of |a| and |b| by
+  // 1 / (1 − 0.25), Lightness on L alone.
+  const hue = lab({ type: 'hue/saturation', master: { a: 0, b: 0, c: 25, d: 0, hue: 40, saturation: 25, lightness: -10 } });
+  near(hue([138, 209, 198]), [124, 155, 236], 1, 'turned');
+  near(hue([194, 155, 207]), [175, 72, 233], 2, 'turned');
+  near(hue([143, 128, 128]), [129, 128, 128], 1, 'a grey only darkened');
+  // Colorize sets a and b at its Saturation, at its Hue measured from the a = b corner.
+  const colorize = lab({ type: 'hue/saturation', master: { a: 256, b: -160, c: 40, d: 5 } });
+  near(colorize([138, 209, 198]), [144, 105, 88], 1, 'colorized');
+  // Photo Filter multiplies XYZ taken from L, a and b; Preserve Luminosity keeps L.
+  const filter = lab({ type: 'photo filter', color: { l: 67.19, a: 33.14, b: 72.79 }, density: 0.4, preserveLuminosity: true });
+  near(filter([143, 128, 128]), [143, 134, 135], 1, 'a grey warmed');
+  near(filter([138, 209, 198]), [138, 208, 194], 1, 'a red warmed');
+  // What Photoshop does not work on L, a and b is left to the RGB flattening.
+  assert.equal(labAdjustment({ type: 'channel mixer' }), false);
+  assert.equal(labAdjustment({ type: 'hue/saturation', master: { hue: 10 }, reds: { hue: 5 } }), false, 'colour ranges');
+});
+
+test('A CMYK file\'s Channel Mixer, Gradient Map, Selective Color and Colorize work on the four inks together', () => {
+  // Channel Mixer: each ink its percentages of the four, and its constant, in ink (inks 0..1).
+  const mixer = inkAdjustmentFunction({ type: 'channel mixer', inks: [[80, 30, -10, 0, 0], [10, 90, 0, 0, 5], [0, 20, 70, 0, 0], [0, 0, 0, 0, 0]] });
+  near(mixer([0.5, 0.2, 0.4, 0.3]), [0.42, 0.28, 0.32, 0], 1e-9, 'mixed');
+  // Gradient Map: along the inks' plain luma, the stops' four inks.
+  const map = inkAdjustmentFunction({ type: 'gradient map', colorStops: [{ location: 0, color: { c: 0, m: 0, y: 0, k: 100 } }, { location: 1, color: { c: 0, m: 0, y: 0, k: 0 } }], smoothness: 0 });
+  near(map([0, 0, 0, 0]), [0, 0, 0, 0], 1e-6, 'paper stays paper');
+  near(map([0, 0, 0, 1]), [0, 0, 0, 1], 1e-6, 'black stays black');
+  near(map([0, 0, 0, 0.5]), [0, 0, 0, 0.5], 0.01, 'half black, half way');
+  // Selective Color: a range's four percentages move the four inks, Relative by the ink there.
+  const selectiveInks = inkAdjustmentFunction(selective('relative', { reds: { c: -30, m: 10, y: 0, k: 0 } }));
+  near(selectiveInks([0, 1, 1, 0]), [0, 1, 1, 0], 1e-9, 'red: no cyan to take, magenta full');
+  near(selectiveInks([0.2, 0.8, 0.8, 0]), [0.2 - 0.06 * 0.6, 0.8 + 0.08 * 0.6, 0.8, 0], 1e-6, 'a red weighed in reds by 0.6');
+  // An adjustment without a rule on inks has none here.
+  assert.equal(inkAdjustmentFunction({ type: 'photo filter' }), null);
+});
+
+test('A gradient\'s Smoothness never takes a colour past either stop of its segment', () => {
+  // Three stops, the last two nearly alike: the spline through them would overshoot the last.
+  const ramp = gradientRamp({ smoothness: 1, colorStops: [
+    { location: 0, color: { r: 0, g: 0, b: 0 } }, { location: 0.5, color: { r: 200, g: 200, b: 200 } }, { location: 1, color: { r: 205, g: 205, b: 205 } }] });
+  for (let t = 0.5; t <= 1; t += 0.05) assert.ok(ramp(t)[0] <= 205 + 1e-9 && ramp(t)[0] >= 200 - 1e-9, `${t}: ${ramp(t)[0]}`);
+});

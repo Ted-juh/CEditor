@@ -312,6 +312,16 @@
         <PropertyCell label="Default" span={4} hint="Initial value for this non-numeric channel.">
           <input class="val" type="text" value={selected.defaultValue ?? ''} onchange={(event) => set('defaultValue', event.target.value)} />
         </PropertyCell>
+        {#if ['bool', 'boolean'].includes(String(selected.type ?? ''))}
+          <!-- An on/off value follows too: on once its source is half way along (sourcedCustomValues). -->
+          <PropertyCell label="Value From" span={4} path={`ValueChannels.${selectedName}.valueSource`} hint="Where this on/off value is taken from: its own, or another value of this component or a knob or slider on the panel, on once that is past half way.">
+            <select class="val" value={String(selected.valueSource ?? '')} onchange={(event) => set('valueSource', event.target.value)}>
+              {#each sourceChoices as choice (choice.value)}
+                <option value={choice.value}>{choice.label}</option>
+              {/each}
+            </select>
+          </PropertyCell>
+        {/if}
       {/if}
       {#if String(selected.type ?? 'float') === 'enum'}
         <PropertyCell label="Values" span={4} hint="Comma-separated enum values used by cycle/switch controls.">

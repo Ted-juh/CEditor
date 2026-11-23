@@ -89,3 +89,12 @@ test('estimateFilmstripBake blocks strips that exceed safe canvas dimensions', (
   assert.equal(estimate.blocked, true);
   assert.equal(estimate.blockReason, `Max ${FILMSTRIP_BAKE_MAX_DIMENSION}px per side`);
 });
+
+test('a part\'s blend mode is the canvas\'s: normal is source-over, plus-lighter is lighter, the rest by name', async () => {
+  const { canvasBlendMode } = await import('../src/CE_Application/utils/customComponentFilmstripBaker.js');
+  assert.equal(canvasBlendMode('normal'), 'source-over');
+  assert.equal(canvasBlendMode(undefined), 'source-over');
+  assert.equal(canvasBlendMode('plus-lighter'), 'lighter', 'light added, as the Blender add-on draws it');
+  for (const mode of ['multiply', 'screen', 'color-dodge', 'overlay', 'luminosity']) assert.equal(canvasBlendMode(mode), mode);
+  assert.equal(canvasBlendMode('plus-darker'), 'source-over', 'a mode a canvas has not, as normal');
+});

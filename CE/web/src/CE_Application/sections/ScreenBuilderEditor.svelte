@@ -12,6 +12,7 @@
     removeScreenPage,
     setScreenDocumentField,
     exportAssignment,
+    saveScreenDocument,
   } from '../stores/screenBuilder.js';
   import { createScreenPreview } from '../screen/screenPreview.js';
 
@@ -107,6 +108,12 @@
         <input value={doc?.profilePath ?? ''} onfocus={selectAll}
                oninput={(e) => setScreenDocumentField(documentId, 'profilePath', e.target.value)} />
       </label>
+      <!-- Saved as the .assignment.json the native bridge loads (stores/screenBuilder.js), so the
+           file is both the screen and what the keyboard runs. Ctrl+S and File → Save do the same. -->
+      <button type="button" onclick={() => saveScreenDocument(documentId)}
+              title={doc?.filePath ? `Save to ${doc.filePath}` : 'Save as a .assignment.json file'}
+              data-testid="screen-save">Save{doc?.modified ? ' •' : ''}</button>
+      <button type="button" onclick={() => saveScreenDocument(documentId, { saveAs: true })}>Save As…</button>
       <button type="button" class:active={showExport} onclick={() => (showExport = !showExport)}>Export</button>
     </div>
   </header>
@@ -169,8 +176,8 @@
   </div>
 
   <div class="sb-export" style:display={showExport ? 'block' : 'none'}>
-    <!-- The Screen Builder has no Save, so this text is the only way the pages leave it: Copy puts
-         it on the clipboard instead of asking for a select-all that a read-only box makes fiddly. -->
+    <!-- The same text Save writes, to read or to copy somewhere a file cannot go: Copy puts it on
+         the clipboard instead of asking for a select-all that a read-only box makes fiddly. -->
     <div class="sb-export-head">
       <span>Assignment JSON (save as a <code>.assignment.json</code> for the native host)</span>
       <button type="button" onclick={copyExport}>{copied ? 'Copied' : 'Copy'}</button>

@@ -1,6 +1,7 @@
 #pragma once
 #include "NativeFileAccess.h"
 #include "ScriptFileDialog.h"
+#include "QuitGate.h"
 
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_gui_extra/juce_gui_extra.h>
@@ -55,6 +56,10 @@ public:
 
     /** Bind the bridge to a WebBrowserComponent (needed to push events to JS). */
     void connectToWebView (juce::WebBrowserComponent* webView);
+
+    /** The program wants to quit: the page is asked first, and `quitNow` runs when it agrees, or
+        when it does not answer (QuitGate.h). Without a page it runs at once. */
+    void requestQuit (std::function<void()> quitNow) { quitGate.request (std::move (quitNow)); }
 
     /** Bind to a ValueTree. Replaces any previous binding. */
     void bindToTree (juce::ValueTree newTree);
@@ -130,9 +135,24 @@ private:
     // Build the dot-notation path for a property change
     juce::String buildPath (const juce::ValueTree& node, const juce::Identifier& prop) const;
 
+    // The answer to a "...TypedDocument" request (a document of the page's own kind saved or opened).
+    void emitTypedDocumentResult (const juce::String& requestId, bool ok, bool cancelled,
+                                  const juce::File& file, const juce::String& data);
+
     juce::ValueTree tree;
     juce::UndoManager undoManager;
     juce::WebBrowserComponent* browser = nullptr;
+    // Quitting asks the page first ("quitRequested" / "quitAnswer", QuitGate.h). After `browser`,
+    // which it reads.
+    ceditor::QuitGate quitGate {
+        [this]
+        {
+            if (browser == nullptr) return false;
+            browser->emitEventIfBrowserIsVisible ("quitRequested", juce::var());
+            return true;
+        },
+        [] (int milliseconds, std::function<void()> action) { juce::Timer::callAfterDelay (milliseconds, std::move (action)); }
+    };
     bool suppressOutgoing = false;
     bool perfDebugEnabled = false;
 

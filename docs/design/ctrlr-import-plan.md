@@ -1,10 +1,16 @@
 # Ctrlr import — design record
 
-> Status: **built, 2026-08-23** — all four stages, in `tools/ctrlr-import/` behind
-> `node tools/scripts/ctrlr-import.mjs`. **Never run on a real community panel:** nobody here has a
-> `.panel` or a `.bpanelz`, so every open question below is answered by refusing-and-reporting
-> rather than by a guess, and the first real file is what turns those refusals into knowledge. See
-> [What was built](#what-was-built) at the end.
+> Status: **built, 2026-08-23** — all four stages, now in `CE/web/src/CE_Application/ctrlrImport/`;
+> **in the editor's File menu since 2026-11-07** (New Panel from Ctrlr Panel..., see
+> [In the File menu](#in-the-file-menu)), and behind `node tools/scripts/ctrlr-import.mjs` for files
+> and corpora. **Run on real panels since 2026-11-08:** 482 distinct community panels, every one
+> read; 94.3% of the controls that send MIDI themselves become parameters; and every value of every
+> one of those parameters, 2.5 million in all, sends the same bytes Ctrlr sends. **Since the same day,
+> a control whose MIDI the panel's Lua sends is run and learned**: 5,414 of 18,971 such controls
+> become parameters, and real Ctrlr, run over the same panels, sends the same bytes for 4,233 of
+> the 4,238 it could be compared on ([Lua: learning what it sends](#lua-learning-what-it-sends)). The plan below is
+> kept as it was written, before anybody here had seen a panel; where the panels proved it wrong,
+> [What real panels showed](#what-real-panels-showed) says so.
 >
 > Originally written to answer one objection, because the objection is the reason this has never
 > been attempted: *"converting Ctrlr panels must be enormously hard — Ctrlr is JUCE C++ modules and
@@ -224,58 +230,361 @@ expensive to guess at now:
 ## What was built
 
 ```
-tools/ctrlr-import/xml.mjs          a small XML reader — no dependency, and a DOCTYPE is refused
-tools/ctrlr-import/read.mjs         S1: decode, parse, report. Converts nothing.
-tools/ctrlr-import/harvest.mjs      S2: modulators -> a .ceditor-device profile
-tools/ctrlr-import/reconstruct.mjs  S3: components -> a placement plan
-tools/scripts/ctrlr-import.mjs      the CLI, and S4's Lua triage report
+CE/web/src/CE_Application/ctrlrImport/xml.js          a small XML reader — no dependency, and a DOCTYPE is refused
+CE/web/src/CE_Application/ctrlrImport/binary.js       JUCE's binary tree, JUCE's base64, and the panel inside a program
+CE/web/src/CE_Application/ctrlrImport/read.js         S1: decode, parse, report. Converts nothing.
+CE/web/src/CE_Application/ctrlrImport/expression.js   Ctrlr's value formulas, read and run as Ctrlr runs them
+CE/web/src/CE_Application/ctrlrImport/harvest.js      S2: modulators -> a .ceditor-device profile
+CE/web/src/CE_Application/ctrlrImport/reconstruct.js  S3: components -> a placement plan
+CE/web/src/CE_Application/ctrlrImport/buildPanel.js   the plan as a panel (the CLI and the editor share it)
+CE/web/src/CE_Application/ctrlrImport/ctrlrLua.js     a stand-in for Ctrlr's Lua objects, and Lua 5.1 on 5.4
+CE/web/src/CE_Application/ctrlrImport/ctrlrDefaults.js  the property values Ctrlr's constructors set
+CE/web/src/CE_Application/ctrlrImport/learn.js        S4: a control's Lua run through its values, made a parameter
+CE/web/test/support/ctrlrReference.js                 the bytes Ctrlr sends, ported separately, to test against
+tools/scripts/ctrlr-import.mjs                        the CLI, the S4 Lua report, and --verify
+tools/scripts/ctrlr-corpus.mjs                        fetches the public panels below, outside the checkout
 ```
+
+(Moved from `tools/ctrlr-import/` when the File menu took them on: the editor bundles what it runs,
+and `read` decompresses with fflate rather than node:zlib so it runs in the page as well.)
 
 ```
 node tools/scripts/ctrlr-import.mjs panel.bpanelz                       # S1 only: report
 node tools/scripts/ctrlr-import.mjs panel.panel --profile out.json      # + S2
 node tools/scripts/ctrlr-import.mjs panel.panel --profile p --panel q   # + S3, + the S4 report
-node tools/scripts/ctrlr-import.mjs --corpus ./panels                   # every file, never stops
+node tools/scripts/ctrlr-import.mjs editor.exe --verify                 # a program's panel, bytes checked
+node tools/scripts/ctrlr-import.mjs --corpus ./panels --verify          # every file, never stops
 ```
-
-### What the open questions turned into
-
-None of them could be answered from here, so none of them was guessed at. Each became a refusal
-that reports itself, which is what makes the first real file informative rather than a debugging
-session:
-
-| Open question | What the code does instead |
-|---|---|
-| The exact `componentRectangle` format | Accepts space- or comma-separated, requires four positive numbers, and **skips the component with the string it could not read**. A control silently placed at 0,0 size 0 is invisible, and a panel full of those looks like the importer worked. |
-| `.bpanelz` compression | Tries gzip, zlib, raw deflate and plain, **reports which worked**, and refuses anything that decodes to something that is not a panel. |
-| The `uiSliderStyle` / `midiMessageType` vocabularies | Both are **histogrammed by S1**. Run the corpus and the vocabulary is a table rather than an assumption. |
-| How widely `modulatorValueExpression` is used | Only the identity is accepted; anything else is **flagged with the expression in the message**, and the corpus run prints the conversion rate. That number is the answer. |
-| `vstIndex` ordering for automation-slot compatibility | Carried through on each parameter as `ctrlr.vstIndex` and otherwise unused, so whoever needs it has it. |
 
 ### The one thing that had to be right, and nearly was not
 
 A parameter naming a `messageRecipe` the profile does not define makes `loadFromJson` reject the
 **whole** profile — silently, taking every other parameter with it. The first draft of the harvester
 emitted `messageRecipe: "cc"` with the controller on the parameter, which is not the schema: every
-harvest would have produced a file that looked right and loaded as nothing. It now emits one recipe
-per distinct CC / NRPN / SysEx shape and a test asserts that every parameter names one that exists,
-plus a round trip through the editor's own validator and compiler — a harvested `Filter Cutoff` on
-CC 74 compiles to `B0 4A 64`.
+harvest would have produced a file that looked right and loaded as nothing. It emits one recipe
+per distinct message shape, and a test asserts that every parameter names one that exists, plus a
+round trip through the editor's own validator and compiler. The corpus run validates all 482
+harvested profiles the same way.
 
 ### And the one the reconstruction had to get right
 
 A control bound to a parameter the harvest **flagged** would look connected in the editor and send
-nothing. `planReconstruction` takes the set of ids that actually exist and places anything else
-unbound, with a note saying how many and why.
+nothing. `planReconstruction` takes the harvest's map from each modulator to the parameter it
+became, binds by that, and places anything else unbound, listed by name with the reason.
+
+## What real panels showed
+
+The first version was written without a single real panel, and every open question was answered
+by refusing and reporting rather than guessing. That made the first real files informative, and
+the first one, `genesynth.panel`, converted **0 of 59** modulators. This section is what it took to
+go from there to the numbers at the top.
+
+### Where the panels came from
+
+`tools/scripts/ctrlr-corpus.mjs` clones the public repositories (49 on GitHub, 5 on GitLab,
+including the community index `ctrlr-panels/ctrlr-panels-list` and Damien Sellier's CtrlrX, the
+maintained fork, whose test panels exercise its extended SysEx codes) and lists the SourceForge
+projects to download by hand — twenty, most of them John Goodland's (dnaldoog, SourceForge user
+`zaniah`), who distributes his panels as programs Ctrlr exported rather than as panel files. None of
+it is in this repository: the panels belong to their authors.
+
+| | |
+|---|---|
+| Files found | 648 panels and programs; 147 identical copies counted once |
+| Read | **482 panels, none refused** (the other 19 were programs that are not Ctrlr exports) |
+| Forms | 269 XML `.panel`; 187 `.bpanelz` that are zlib-compressed binary trees; 1 `.bpanelz` that is compressed XML; 10 uncompressed binary `.bpanel`; 15 inside programs (Windows `.exe` and `.dll`, Linux `.so` inside `.vst3` bundles) |
+| Modulators | 66,931, of which 31,213 send MIDI themselves |
+| Not reached | about 60 entries of the community index live only on personal sites or the Internet Archive, which this environment's network refuses. They are untested. |
+
+### What the open questions turned out to be
+
+| Open question | What the panels said |
+|---|---|
+| `componentRectangle` | `x y w h`, space-separated, in all 66,931 components. The refusal for anything else stays, unused. |
+| `.bpanelz` compression | Not compressed XML, as assumed: **JUCE's binary `ValueTree`**, zlib-compressed — a name, then each property as a compressed integer for its name and a typed value. 187 of 188. A program Ctrlr exported carries the same tree as a zlib stream starting `panel\0`, and its pictures in a second stream, `resourceExportList`. |
+| `midiMessageType` | A number as text (`0` CC, `5` SysEx, `6` Multi, `9` None…); a few old panels write the name. None 22,697, SysEx 22,373, CC 4,451, Multi 4,413, program change 201, aftertouch 101, channel pressure 14, pitch wheel 8. |
+| `uiSliderStyle` | RotaryVerticalDrag 23,892, LinearVertical 5,002, Rotary 1,550, IncDecButtons 844, LinearHorizontal 676, LinearBar 183, and a misspelt `LinearVeritcal` that Ctrlr draws as a vertical slider. |
+| `modulatorValueExpression` use | **10,501 modulators are not the identity.** Accepting only the identity lost most SysEx panels: signed values are written as `modulatorValue - 64`, `lt(modulatorValue,0) …`, and so on. The formula reader is now a port of Ctrlr's own, with its functions, and 188 formulas remain that it refuses (they read another modulator or a global variable, or do not give whole numbers). |
+| `vstIndex` ordering | Unchanged: carried on each parameter as `ctrlr.vstIndex`. |
+
+And what nobody asked, because nobody had looked:
+
+- **The SysEx formula is a language.** CtrlrX's `sysExIdentifyToken` recognises some thirty codes,
+  in a fixed order: the value (`xx`, `MS LS`, `ms ls`, Roland's split `r1`–`r4`, `Q0`–`Q3`), the
+  channel (`yy`, `?y`), five checksums (Roland's `z`, ones' complement `O`, sum `w`, XOR `X`,
+  Technics `tc`), global variables (`k`, `p`, `n`, `o`), Lua (`u`) and a formula (`v`). 10,184 of the
+  22,062 SysEx formulas carry a checksum. A token that is none of these is `getHexValue32`, capped at
+  255; and two spaces in a row are a `00` byte, because JUCE's tokeniser keeps the empty token.
+  Panels rely on both.
+- **Lua carries the panels.** 456 of 482 have it: 13,705 methods. **18,971 controls send nothing of
+  their own**, and Lua sends for them when they change. Those are counted, not flagged: nothing is
+  wrong with them, and nothing here can run it.
+- **Layers are pages.** 116 panels have more than one; 459 layers start hidden and are shown from
+  Lua. The CTX81Z keeps sixteen, seven of them hidden, stacked over each other.
+- **Pictures are mostly there.** 4,163 resources are named; 1,756 are carried in the file, the rest
+  were on the author's computer. 14,169 controls draw from one — image sliders (frames in a strip),
+  image buttons (a frame per state) and plain images.
+- **One saved panel ends in a NUL** after `</panel>`. Ctrlr reads the text as a JUCE String, which
+  stops there; so does the reader now.
+
+### How the bytes were checked
+
+Not against expectations written by hand. `CE/web/test/support/ctrlrReference.js` is a separate port
+of the code in CtrlrX that builds the bytes — `getValueForMidiMessage`, `sysexMessageFromString`,
+the token identifier and its processor, the five checksums, the Multi list reader, JUCE's
+`controllerEvent`. For every parameter the harvest made, every value (all of them up to 600, else
+both ends and a spread of a few hundred) is compiled by the device-profile engine and compared byte
+for byte with what the reference says Ctrlr sends. The corpus: **2,502,717 values of 29,432
+parameters, none different.** `ctrlr-import.mjs --verify` runs it on any file; the unit tests run
+it on every value of the fixture.
+
+Two limits on what that proves. The reference and the importer share the formula evaluator and
+the value-list reader (each a port with tests of its own); everything about bytes is ported twice.
+And the reference is a port of Ctrlr, not Ctrlr: nobody has yet put these bytes on a synth.
+
+### What the profile format gained
+
+Three things the panels needed and profiles could not say, added to both engines
+(`DeviceProfileEngine.cpp` and `deviceProfileLocalEngine.js`) and held to the same fixture,
+`CE/profiles/test/test-transform-synth.ceditor-device.json` — eighteen value tests and a dump parse,
+run by the C++ tests and the node suite:
+
+- **`encoding.transform`** `{ scale, offset, negativeScale, negativeOffset }`: the wire value is
+  `trunc(scale × value + offset)`, with the negative pair for values below zero; reading back takes
+  the branch whose result is in range. That is an offset (`+64`), two's complement in 7 or 14 bits,
+  sign and magnitude, an inverted range, and a scaled one.
+- **`encoding.table`**: the wire value for each value, from `range.min` up — for lists whose values
+  follow no rule. It wins over a transform.
+- **The `ccSequence` recipe** `{ channel, messages: [{ controller, value }] }`, `value` a number or
+  `"$byteN"`: several controllers in one change, for a pair that is not an NRPN.
+
+### What does not convert, and why
+
+Of the 31,213 controls that send MIDI themselves, 1,781 do not become parameters. Each is named in
+the panel's **Ctrlr import** note with its reason. The corpus, by reason:
+
+| Controls | Reason |
+|---:|---|
+| 351 | A channel message written inside a SysEx formula (`B0 07 xx` and the like): the value split around other bytes, which a recipe cannot write |
+| 275 | Lua computes the byte (`u` codes, `luaModulatorGetValueForMIDI`) |
+| 229 | A Multi message that sends several SysEx messages |
+| 201 | A program change: it selects a patch, it is not a parameter value |
+| 152 | A value formula that reads another modulator or a global variable |
+| 109 | A range wider than the message can carry |
+| 123 | Aftertouch, channel pressure, pitch wheel |
+| 131 | A value, or a row of a list, the message cannot carry |
+| 52 | A byte of 0x80 or more inside the SysEx — again a channel message in a SysEx formula |
+| the rest | Empty or non-whole ranges, malformed formulas, two checksums in one message, a value written low nibble first |
+
+### The reconstruction, on real panels
+
+Five panels of different character were built and reopened in the editor: genesynth (59
+components, CC and Multi), the Korg A2 (270, groups inside groups), the Roland JV-1010 (126, 36 picture
+strips), the CTX81Z (688, 133 strips, sixteen layers) and the JD-990 Super Editor (1,657, 641
+strips, a background picture). Each is recognisably the panel it came from.
+
+| Ctrlr | CEditor |
+|---|---|
+| `uiSlider`, `uiFixedSlider` | Knob for the rotary styles, Slider for the linear ones, Number for IncDecButtons |
+| `uiImageSlider`, `uiFixedImageSlider` | A custom component drawing the panel's own strip, its frame following the value |
+| `uiImageButton` | A toggle button drawing a frame per state |
+| `uiButton`, `uiToggleButton` | Button, or ToggleButton when it toggles |
+| `uiCombo`, `uiListBox` | Combobox, Listbox — rows from the value list, `name=value` or by line |
+| `uiLabel`, `uiLCDLabel` | Label, LCD display |
+| `uiGroup`, `uiTabs` | Group, Tab container — the controls inside them placed inside, on their page |
+| `uiImage`, `uiMidiKeyboard`, `uiProgressBar` | Image, Keyboard, Progress bar |
+| `uiCustomComponent` | A placeholder: Lua drew it |
+| `uiArrow`, `uiHyperlink`, `uiXYSurface`, `uiFileListBox`, `uiWaveform` | A placeholder, named in the notes: 284 in the corpus |
+
+Captions take their band of the rectangle (`componentLabelHeight`) as a label attached to the
+control; layers become panel layers, hidden ones hidden; the panel's background colour and picture
+come across. One finding about size: the CTX81Z's 133 strips made a 6.4 MB file until identical
+strips were stored once (the document's shared drawings), which made it 2.6 MB.
 
 ### Still true
 
-- **No real panel has been through this.** The fixture is hand-built from Ctrlr's identifier table.
-- **No pixel fidelity**, and the reconstruction says so in its own notes rather than leaving it to
-  be discovered — including which components drew themselves with Lua (placed as plain boxes) and
-  which are image-strip controls (which CEditor renders natively and could match near-exactly once
-  resources are extracted).
-- **No Lua runs.** Methods are classified shimmable / port / paint and reported; nothing is
-  translated. The `ctrlr` compatibility shim stays unbuilt until a corpus histogram says it pays.
-- **No resource extraction yet**, so filmstrips are recognised and named but not unpacked.
-- **Nothing is bundled and nothing is fetched.** It converts a file the user already has.
+- **The Lua does not run in the converted panel.** What a control's Lua sends is learned at import
+  ([Lua: learning what it sends](#lua-learning-what-it-sends)); everything else it does is kept in
+  the panel's notes as text.
+- **Not pixel-exact.** Fonts, JUCE's look and feel and anything painted from Lua differ, and the
+  reconstruction's notes say so.
+- **Checked against a port of Ctrlr, not a synth**, as above.
+- **Nothing is bundled and nothing is fetched** by the editor or the importer. `ctrlr-corpus.mjs` is a
+  developer's tool, run by hand, into a directory outside the checkout.
+
+## Lua: learning what it sends
+
+The plan above says to quarantine the Lua, and the first corpus run made that the largest gap left:
+on many of the best panels a control has no MIDI of its own, and its `luaModulatorValueChange`
+method builds the message and sends it. Translating that code is the thing this record warns
+against. But what the importer needs from it is not the code — it is the **bytes**, for each value
+the control can take. So each such control is run, and what it sends is recorded.
+
+### The stand-in
+
+`ctrlrImport/ctrlrLua.js` is a stand-in for the Ctrlr a panel's Lua expects, written from CtrlrX's
+own bindings (`Source/Lua/CtrlrLuaManager.cpp`, `Source/MIDI/CtrlrMidiMessage.cpp`,
+`Source/Lua/JuceClasses/LMemory.cpp`, `Source/Lua/CtrlrLuaUtils.cpp`): the panel and its
+modulators and components, `CtrlrMidiMessage`, `MemoryBlock`, `BigInteger`, the timer, `utils`,
+JUCE's `File` (where no file exists). What a file leaves out, Ctrlr's constructors had set, and a
+panel's Lua reads those defaults as if they were in the file; `ctrlrDefaults.js` holds them,
+extracted from CtrlrX's constructors.
+
+What the stand-in draws but does not reproduce — a component's look, the canvas and its layers,
+the panel editor, a combo box's JUCE box — answers only to the names CtrlrX binds on it
+(`ctrlrBindings.js`, extracted from its luabind registrations). Those it absorbs: as drawing, or,
+when the method reads or moves a value (`setToggleState`, `setSelectedId`, a list box's selection),
+as something not reproduced, so the control is not learned. A name CtrlrX does not bind is nil, as
+it is in Ctrlr, and a call to it stops the method here where it stops there. Before the lists, the
+stand-in absorbed every name, and a panel that called something CtrlrX lacks ran on here and was
+learned while Ctrlr sent nothing (see "Real Ctrlr as the judge").
+
+Ctrlr also calls the panel's `luaPanelModulatorValueChanged` on every change, before the control's
+own method; some panels send from there by the control's name, and the stand-in calls it the same
+way.
+
+It runs in CEditor's own Lua — 5.4, where Ctrlr runs LuaJIT (5.1). The differences panels trip on
+are bridged in a prelude: `unpack`, `loadstring`, `module`, the `bit` library with LuaJIT's signed
+32-bit results, a number with a fraction truncated where 5.4 refuses one (`string.format("%02x",
+value / 128)` is everywhere), `table.insert` and `table.remove` that take any position as LuaJIT's
+do (5.4 stops with "position out of bounds"), `tonumber(10, 16)` reading the number as text, and a
+whole number written without ".0" by `tostring`, `string.format("%s")` and `table.concat`, as
+LuaJIT writes it. One difference no function reaches remains: a float joined into text with `..`
+is still written "32.0". A string escape 5.1 let through and 5.4 refuses (`"\I"`) is rewritten
+before the method is compiled.
+
+**It is a sandbox.** A panel's Lua is somebody else's code. It runs in WebAssembly (wasmoon), and
+inside that it gets no files, no processes and nothing loaded from disk: `io` and `os` (but its
+clocks) fail as a missing file fails, `require` finds only the standard libraries, `load` takes
+source text only, never a precompiled chunk, and every call is cut off after a fixed number of
+instructions.
+
+### What a control has to do to be learned
+
+Each control is run through every value it can take (up to 4,096 of them; a wider range is sampled
+and must then follow a straight rule), from the state the panel loads in: what one control's run
+changed — a mute switch, the active edit buffer, a table of flags — is put back before the next:
+every control's value, the panel's variables and properties, the Lua globals, and every plain
+table the globals reach, in place. The recorder notes
+everything the run touched, and the control is **not** learned if its Lua
+
+- stopped with an error, or used something the stand-in does not reproduce;
+- moved another control that sends MIDI of its own (Ctrlr would send that too);
+- sent for some values and not others, or messages of different shapes for different values.
+
+What it read is weighed, not refused. After every control has been learned, every other control
+and every panel variable is moved, and each control is run again at a few values: if what it sends
+did not change, it does not depend on what it read. If it did change, the control is learned **as
+the panel loads** — what it sends with those controls as they load — and the note names them.
+
+The channel is found the same way: the control is run again with the panel on another channel, and
+the bytes that moved are the channel's.
+
+### From bytes to a parameter
+
+What was sent is written down the way a Ctrlr panel writes down its own MIDI: a CC, a Multi list
+(four CCs that are an NRPN become an NRPN), or a SysEx formula in Ctrlr's codes — the value's bytes
+(`xx`, `MS LS`, nibbles), the channel (`yy`, `1y`), a checksum found by trying each kind over the
+bytes before it. That goes through the same `buildParameter` (harvest.js) as every modulator's own
+MIDI, so it gets the same encodings, transforms and tables. And then the standard: the device-profile
+engine compiles the parameter for **every value that was run**, and it must send exactly the bytes
+the Lua sent. One differing byte and the control is not learned.
+
+### What the collection showed
+
+Over the collection (`ctrlr-import.mjs --corpus --verify`), 18,971 controls are sent by their Lua:
+
+| Controls | |
+|---:|---|
+| **5,414** | became parameters (29%), each sending exactly what its Lua sent for every value run |
+| 1,428 | of those depend on nothing but their own value — or read other controls and sent the same bytes when every one of those was moved |
+| 3,986 | of those were learned as the panel loads: what they send changed when other controls moved |
+| 7,351 | send nothing when moved: page switches, displays, buttons that open a dialog, and controls that name a method the panel does not have (Ctrlr calls nothing for those) |
+| 6,206 | not learned, each named in the panel's notes with the reason |
+
+The reasons, most common first: the Lua stopped with an error (3,217 — in the state the panel loads
+in, often code that only works with another page or mode selected, which Ctrlr meets the same way);
+several messages with SysEx among them per move (694 — a D-20 sends its display text and the
+parameter); a SysEx without its F7 (430); no values to run (411); moving controls that send MIDI of
+their own (about 395); different shapes for different values (183); the value split around other
+bytes (129); a channel written some other way (55). The importer's own MIDI side is unchanged:
+29,432 parameters, 2,502,717 values, none different from Ctrlr.
+
+The first count, 7,269 learned, was made before the stand-in was held to real Ctrlr (below). Most
+of the difference is controls whose Lua Ctrlr stops before they send — something the stand-in
+absorbed that CtrlrX does not have — and that the stand-in had learned anyway.
+
+### Real Ctrlr as the judge
+
+The learned parameters are held to what the panel's Lua sent in the stand-in. Whether the stand-in
+sends what **Ctrlr** sends is a separate question, and Ctrlr's maintainer has built the instrument
+that answers it: CtrlrX's test suite runs the real Ctrlr engine headless — it loads a panel, moves a
+parameter, runs the Lua and captures every MIDI message on a mock device. It builds here (Ubuntu
+packages, LuaJIT, its own JUCE), and a recording harness added to a local copy of it (not in this
+repository) moves each Lua-driven control through up to seven of its values and writes down what
+Ctrlr sent, a marker message after each move saying where one move's messages end.
+
+It was run over the collection: 303 distinct panels with Lua-driven controls, 24,603 controls. That
+executes other people's Lua natively, so it ran in a sandbox of its own: read-only filesystem but
+for its output folder, no network, its own process space, and inside Ctrlr a Lua with the same
+`io`, `os` and `File` as the stand-in's — no file exists, no process runs, nothing native or
+precompiled loads.
+
+Getting the two to compare like with like took three passes, and each mistake is worth knowing:
+
+- **Order.** The first pass moved the controls one after another, and each one's Lua saw what the
+  ones before had left (a Triton's effect sizes clamp each other, a mode switch sends only when the
+  mode changes). The stand-in runs each control from the panel as it loads. The harness now puts
+  the panel back before each control — values set quietly, the Lua's globals and every plain table
+  they reach, the panel's variables and properties — and stops the timers the control before had
+  started.
+- **The sandbox itself.** Taking `io` away entirely, as the first lockdown did, made a panel that
+  looks for a settings file at load stop there, where Ctrlr finds no file and goes on; seven
+  Sequential editors sent nothing. `io` now answers as for a missing file, as the stand-in's does.
+- **Start-up.** The stand-in fires the timers a panel starts while loading before it runs a
+  control; the harness first waited one second, and a REV500 lifts its freeze after one and a
+  half. It waits four now.
+
+What it found in the stand-in is in "The stand-in" above: names it absorbed that CtrlrX does not
+have, Lua 5.4 where LuaJIT differs, the panel hook, missing methods, the panel's own tables. With
+those fixed:
+
+| | |
+|---:|---|
+| **4,233 of 4,238** | learned parameters send exactly what Ctrlr sends: 22,426 of 22,439 values, 13 differing in 5 parameters |
+| 1,195 of 1,198 | of the parameters that depend on nothing else |
+| 3,038 of 3,040 | of those learned as the panel loads |
+| 51,387 of 54,625 | values of every control the stand-in ran without error, learned or not, the same as Ctrlr's |
+
+Not compared: 14 panels CtrlrX here opens with no controls at all (CEditor reads them); 32 with no
+moves recorded (the 15-minute limit, or Lua that never returns — real Ctrlr has no instruction
+limit); 351 controls whose method is kept in a file beside the panel, which the stand-in is handed
+by name and Ctrlr looks for where the author's machine kept it; and 4,455 controls whose method
+Ctrlr had disabled by then, after an earlier control's error (Ctrlr disables a method for every
+control that uses it). The values of controls the stand-in did not learn differ in a few panels —
+Polymorph, a C-V50, an Emagic AMT, a CrumarBit, a 05RW, a JD-990 — and are not looked into yet;
+none of them became a parameter.
+
+### Still not done
+
+The Lua does not run in the converted panel. What it does besides sending a control's value —
+moving other controls, librarians, dialogs, drawing — needs the stand-in to run live against
+CEditor's script API (`ce.*`), with Ctrlr's hooks on CEditor's events. The stand-in is written so it
+can: the same Lua, the same objects, a different recorder.
+
+## In the File menu
+
+**File → New Panel from Ctrlr Panel...** (`stores/ctrlrImportActions.js`) runs S1–S4 on a file the
+author chooses, in the editor — a panel or a program Ctrlr exported:
+
+- S1's report goes to the Console, line for line as the CLI prints it.
+- S2's profile is saved into the engine as a **new** profile, which gets a file of its own in the
+  user's profiles folder on its first save (DeviceProfileService). A re-import takes the next free id
+  (`ctrlr.ts-1`, `ctrlr.ts-1-2`…) instead of writing over a profile the author may have edited since.
+- S3's panel opens in a tab, unsaved, every binding naming a parameter that profile has.
+- S4: each control whose MIDI the Lua sends is run through its values in the sandboxed stand-in,
+  and becomes a parameter where what it sent allows ([Lua: learning what it sends](#lua-learning-what-it-sends)).
+  Each Lua method's text also goes into the panel's notes (**Ctrlr Lua**), with its classification
+  and the hooks that call it, and everything flagged, not learned, left out or left unbound into a
+  **Ctrlr import** note. The notes travel with the panel, so what did not convert is still written
+  down when somebody opens it next month.

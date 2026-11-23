@@ -1,0 +1,487 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": "1.0.0",
+  "minCEditorVersion": "0.2.0",
+  "id": "test-transform-synth",
+  "name": "Test Transform Synth",
+  "manufacturer": "Test",
+  "family": "Test Transform Synth",
+  "status": "test",
+  "trust": "builtin",
+  "variables": {
+    "deviceId": 16,
+    "channel": 1
+  },
+  "timing": {
+    "minDelayBetweenMessagesMs": 0
+  },
+  "parameters": [
+    {
+      "id": "pan.offset",
+      "name": "Pan (value + 64)",
+      "group": "Transform",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": -64,
+        "max": 63
+      },
+      "encoding": {
+        "type": "u7",
+        "transform": {
+          "offset": 64
+        }
+      },
+      "messageRecipe": "cc10",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "dumpReadable": true
+      }
+    },
+    {
+      "id": "detune.signed14",
+      "name": "Detune (two's complement, 14 bits)",
+      "group": "Transform",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": -8192,
+        "max": 8191
+      },
+      "address": "02",
+      "encoding": {
+        "type": "u14",
+        "transform": {
+          "offset": 0,
+          "negativeOffset": 16384
+        }
+      },
+      "messageRecipe": "rolandWrite",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "dumpReadable": true
+      }
+    },
+    {
+      "id": "depth.inverted",
+      "name": "Depth (63 - value)",
+      "group": "Transform",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 63
+      },
+      "encoding": {
+        "type": "u7",
+        "transform": {
+          "scale": -1,
+          "offset": 63
+        }
+      },
+      "messageRecipe": "cc20",
+      "access": {
+        "canRead": true,
+        "canWrite": true
+      }
+    },
+    {
+      "id": "tune.signMagnitude",
+      "name": "Tune (sign and magnitude, 4 bits)",
+      "group": "Transform",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": -7,
+        "max": 7
+      },
+      "encoding": {
+        "type": "u7",
+        "transform": {
+          "negativeScale": -1,
+          "negativeOffset": 8
+        }
+      },
+      "messageRecipe": "cc21",
+      "access": {
+        "canRead": true,
+        "canWrite": true
+      }
+    },
+    {
+      "id": "level.scaled",
+      "name": "Level (value x 1.27, cut to a whole number)",
+      "group": "Transform",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 100
+      },
+      "encoding": {
+        "type": "u7",
+        "transform": {
+          "scale": 1.27
+        }
+      },
+      "messageRecipe": "cc22",
+      "access": {
+        "canRead": true,
+        "canWrite": true
+      }
+    },
+    {
+      "id": "cutoff.cc14",
+      "name": "Cutoff (14-bit CC pair 1/33)",
+      "group": "Sequence",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 16383
+      },
+      "encoding": {
+        "type": "u14"
+      },
+      "messageRecipe": "cc1pair",
+      "access": {
+        "canRead": false,
+        "canWrite": true
+      }
+    },
+    {
+      "id": "resonance.nrpnLsbFirst",
+      "name": "Resonance (NRPN 1/16, data LSB first)",
+      "group": "Sequence",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 16383
+      },
+      "encoding": {
+        "type": "u14"
+      },
+      "messageRecipe": "nrpn0110lsbFirst",
+      "access": {
+        "canRead": false,
+        "canWrite": true
+      }
+    },
+    {
+      "id": "mode.table",
+      "name": "Mode (a list: Off=0, 1=32, 2=65, 3=127)",
+      "group": "Table",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 3
+      },
+      "encoding": {
+        "type": "u7",
+        "table": [
+          0,
+          32,
+          65,
+          127
+        ]
+      },
+      "display": {
+        "mode": "number",
+        "table": [
+          "Off",
+          "1",
+          "2",
+          "3"
+        ]
+      },
+      "messageRecipe": "cc23",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "dumpReadable": true
+      }
+    },
+    {
+      "id": "offset.table14",
+      "name": "Offset (a branching formula, 14 bits)",
+      "group": "Table",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": -2,
+        "max": 2
+      },
+      "encoding": {
+        "type": "u14",
+        "table": [
+          16000,
+          16100,
+          0,
+          1,
+          8000
+        ]
+      },
+      "messageRecipe": "cc1pair",
+      "access": {
+        "canRead": false,
+        "canWrite": true
+      }
+    }
+  ],
+  "messageRecipes": [
+    {
+      "id": "cc10",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 10,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc20",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 20,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc21",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 21,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc22",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 22,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "rolandWrite",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "7D",
+        "$deviceId",
+        "01",
+        "$address",
+        "$encodedValue",
+        "$checksum",
+        "F7"
+      ],
+      "checksum": {
+        "type": "roland-7bit"
+      }
+    },
+    {
+      "id": "cc1pair",
+      "kind": "ccSequence",
+      "channel": "$channel",
+      "messages": [
+        {
+          "controller": 1,
+          "value": "$byte0"
+        },
+        {
+          "controller": 33,
+          "value": "$byte1"
+        }
+      ]
+    },
+    {
+      "id": "nrpn0110lsbFirst",
+      "kind": "ccSequence",
+      "channel": "$channel",
+      "messages": [
+        {
+          "controller": 99,
+          "value": 1
+        },
+        {
+          "controller": 98,
+          "value": 16
+        },
+        {
+          "controller": 38,
+          "value": "$byte1"
+        },
+        {
+          "controller": 6,
+          "value": "$byte0"
+        }
+      ]
+    },
+    {
+      "id": "cc23",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 23,
+      "value": "$encodedValue"
+    }
+  ],
+  "dumpDefinitions": [
+    {
+      "id": "transformDump",
+      "name": "Transform Dump",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "7D",
+          "$deviceId",
+          "05"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 4,
+        "size": 4
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 9
+      },
+      "mappings": [
+        {
+          "parameter": "detune.signed14",
+          "offset": 0
+        },
+        {
+          "parameter": "pan.offset",
+          "offset": 2
+        },
+        {
+          "parameter": "mode.table",
+          "offset": 3
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "name": "Offset: -64 goes out as 0",
+      "parameter": "pan.offset",
+      "value": -64,
+      "expectedHex": "B0 0A 00"
+    },
+    {
+      "name": "Offset: -6 goes out as 58",
+      "parameter": "pan.offset",
+      "value": -6,
+      "expectedHex": "B0 0A 3A"
+    },
+    {
+      "name": "Offset: 63 goes out as 127",
+      "parameter": "pan.offset",
+      "value": 63,
+      "expectedHex": "B0 0A 7F"
+    },
+    {
+      "name": "Two's complement: -1 is 3FFF, with its Roland checksum",
+      "parameter": "detune.signed14",
+      "value": -1,
+      "expectedHex": "F0 7D 10 01 02 7F 7F 00 F7"
+    },
+    {
+      "name": "Two's complement: 1 is 0001",
+      "parameter": "detune.signed14",
+      "value": 1,
+      "expectedHex": "F0 7D 10 01 02 00 01 7D F7"
+    },
+    {
+      "name": "Two's complement: -8192 is 2000",
+      "parameter": "detune.signed14",
+      "value": -8192,
+      "expectedHex": "F0 7D 10 01 02 40 00 3E F7"
+    },
+    {
+      "name": "Inverted: 0 goes out as 63",
+      "parameter": "depth.inverted",
+      "value": 0,
+      "expectedHex": "B0 14 3F"
+    },
+    {
+      "name": "Inverted: 63 goes out as 0",
+      "parameter": "depth.inverted",
+      "value": 63,
+      "expectedHex": "B0 14 00"
+    },
+    {
+      "name": "Sign and magnitude: -3 is 8 + 3",
+      "parameter": "tune.signMagnitude",
+      "value": -3,
+      "expectedHex": "B0 15 0B"
+    },
+    {
+      "name": "Sign and magnitude: 3 is 3",
+      "parameter": "tune.signMagnitude",
+      "value": 3,
+      "expectedHex": "B0 15 03"
+    },
+    {
+      "name": "Scale: 50 x 1.27 = 63.5, sent as 63",
+      "parameter": "level.scaled",
+      "value": 50,
+      "expectedHex": "B0 16 3F"
+    },
+    {
+      "name": "Scale: 100 x 1.27 = 127",
+      "parameter": "level.scaled",
+      "value": 100,
+      "expectedHex": "B0 16 7F"
+    },
+    {
+      "name": "14-bit CC pair: 1000 is 07 on CC 1 and 68 on CC 33",
+      "parameter": "cutoff.cc14",
+      "value": 1000,
+      "expectedHex": "B0 01 07\nB0 21 68"
+    },
+    {
+      "name": "NRPN with its data LSB first",
+      "parameter": "resonance.nrpnLsbFirst",
+      "value": 300,
+      "expectedHex": "B0 63 01\nB0 62 10\nB0 26 2C\nB0 06 02"
+    },
+    {
+      "name": "Table: position 2 sends 65",
+      "parameter": "mode.table",
+      "value": 2,
+      "expectedHex": "B0 17 41"
+    },
+    {
+      "name": "Table: position 3 sends 127",
+      "parameter": "mode.table",
+      "value": 3,
+      "expectedHex": "B0 17 7F"
+    },
+    {
+      "name": "Table on 14 bits: -2 sends 16000 as 7D 00",
+      "parameter": "offset.table14",
+      "value": -2,
+      "expectedHex": "B0 01 7D\nB0 21 00"
+    },
+    {
+      "name": "Table on 14 bits: 2 sends 8000 as 3E 40",
+      "parameter": "offset.table14",
+      "value": 2,
+      "expectedHex": "B0 01 3E\nB0 21 40"
+    },
+    {
+      "name": "Dump: two's complement, offset and table values read back",
+      "kind": "dumpParse",
+      "inputHex": "F0 7D 10 05 7F 7F 3A 41 F7",
+      "expectedValues": {
+        "detune.signed14": -1,
+        "pan.offset": -6,
+        "mode.table": 2
+      }
+    }
+  ]
+}

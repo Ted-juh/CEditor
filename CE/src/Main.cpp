@@ -21,12 +21,24 @@ public:
         settings = nullptr;
     }
 
+    // The close button, Alt+F4 and File → Close Program all arrive here. The page is asked first,
+    // so unsaved work can be saved or knowingly left (QuitGate.h); the quit runs on its answer, or
+    // when it does not answer in time.
     void systemRequestedQuit() override
     {
-        if (mainWindow != nullptr)
-            mainWindow->saveAndClose();
+        if (mainWindow == nullptr)
+        {
+            quit();
+            return;
+        }
 
-        quit();
+        mainWindow->requestQuit ([this]
+        {
+            if (mainWindow != nullptr)
+                mainWindow->saveAndClose();
+
+            quit();
+        });
     }
 
 private:

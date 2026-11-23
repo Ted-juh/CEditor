@@ -8,6 +8,7 @@
   import { onDestroy, setContext, untrack, tick } from 'svelte';
   import { choiceKeyIndex } from '../utils/choiceKeyboard.js';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
+  import { PANEL_SURFACE_CONTEXT_KEY } from '../utils/linearEdges.js';
   import { resolveControlFamily, resolveControlForSet } from '../models/controlSetFamilies.js';
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
@@ -16,6 +17,7 @@
   import GuideLines from './GuideLines.svelte';
   import { isDisplayOnly } from '../utils/displayMode.js';
   import { needsImageRole, resolveAriaLabel, resolveTooltip } from '../utils/coreAccessibility.js';
+  import { captionsByOwner, spokenName } from '../utils/accessibilityCheck.js';
   import { isMeterFamily, isRibbonFamily } from '../models/componentFamilies.js';
   import {
     RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
@@ -352,6 +354,7 @@
   // than the editor's store because the Player renders a document the editor's panel list has
   // never seen — CanvasControl prefers this when present (stores/controlSets.js).
   setContext(CONTROL_SET_CONTEXT_KEY, () => controlSetForPanel(panel));
+  setContext(PANEL_SURFACE_CONTEXT_KEY, () => panel);
   // A set pinned to one control is looked up among the panel's own sets too (the Player has no
   // library: a set the panel uses is carried in the document).
   const panelSetSources = () => ({ document: panel?.controlSets ?? [] });
@@ -422,6 +425,9 @@
 
   // The plan, with each ground's held controls drawn immediately after it — above the rest of that
   // ground and below every live control on the layer, which is where the fold guarantees they fit.
+  // Each control's caption (a Label attached to it, printing its own words): what a screen reader
+  // calls the control when its author wrote no Screen-reader text (utils/accessibilityCheck.js).
+  let spokenCaptions = $derived(captionsByOwner(panel?.controls ?? []));
   let allRenderItems = $derived.by(() => {
     if (groundHolds.size === 0) return previewPlan.items;
     const out = [];
@@ -9438,7 +9444,11 @@
     const resolvedPreview = resolvedPreviewFor(control);
     const behavior = getBehavior(control);
     const session = sessionFor(control);
-    const coreName = control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Control';
+    // What a screen reader calls it when the author wrote nothing: the caption attached to it, a
+    // button's own text, or its name made readable (utils/accessibilityCheck.js — the dock's Access
+    // tool reports the same names). It used to be "<name> preview": in the exported plug-in, "Knob_3
+    // preview".
+    const spoken = spokenName(control, spokenCaptions).name;
     return {
       resolvedControlOverride: resolvedPreview?.control ?? control,
       interactionRuntimeOverride: resolvedPreview?.runtime ?? null,
@@ -9452,7 +9462,7 @@
       // The author's screen-reader text wins over the generated "<name> preview". That generated
       // string was being written over the top of whatever they had typed, which is the same defect
       // as a field nothing reads and takes longer to find.
-      previewAriaLabel: resolveAriaLabel(control, `${coreName} preview`),
+      previewAriaLabel: resolveAriaLabel(control, spoken),
       previewAriaDisabled: isDisabled(control),
       previewAriaChecked: previewAriaCheckedFor(control),
       previewAriaExpanded: isComboboxControl(control) ? openComboboxControlId === getControlId(control) : undefined,
@@ -9469,7 +9479,7 @@
         disabled: isDisabled(control),
         readOnly: isReadOnly(control) || behavior?.keyboardEnabled === false,
         inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
-        ariaLabel: resolveAriaLabel(control, `${coreName} value`),
+        ariaLabel: resolveAriaLabel(control, `${spoken} value`),
         tabIndex: -1,
       } : null,
       previewEditableFields: { ...spinnerEditableFields(control), ...numericEditableFields(control) },
@@ -9521,6 +9531,7 @@
 <div
   class="panel-surface preview-surface"
   style="width: {panel.width}px; height: {panel.height}px; transform: scale({scale}); transform-origin: 0 0;"
+  data-mount-pending={mountedCount < allRenderItems.length ? '' : undefined}
   use:bindSurface
 >
   {#if panelLit}

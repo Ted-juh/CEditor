@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build",
     "check": "svelte-check --config ./svelte.config.js --tsconfig ./jsconfig.json",
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",
@@ -68,9 +68,11 @@
     "lucide-svelte": "^1.0.1",
     "paper": "^0.12.18",
     "paperjs-offset": "^2.2.1",
+    "pdfjs-dist": "^6.4.299",
     "quickjs-emscripten-core": "0.32.0",
     "rbush": "^4.0.1",
     "ses": "2.3.0",
+    "three": "^0.186.1",
     "wasmoon": "^1.16.0",
     "woff2-encoder": "^2.0.0"
   }

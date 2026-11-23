@@ -7,6 +7,8 @@ import { numberOr, clamp } from './primitives.js';
 import { rotationCoverScale } from './backgroundCSS.js';
 
 import { deepClone } from './deepClone.js';
+import { isFramesImage, imageFrameLayers } from './imageFrames.js';
+import { pictureColourSources, withColourFollows, withPictureColourSources } from './pictureRecolour.js';
 export const FILMSTRIP_BAKE_WARN_PIXELS = 32_000_000;
 export const FILMSTRIP_BAKE_MAX_PIXELS = 96_000_000;
 export const FILMSTRIP_BAKE_MAX_DIMENSION = 32_767;
@@ -36,10 +38,22 @@ function cssFilterFor(filters) {
   return parts.length ? parts.join(' ') : 'none';
 }
 
+const CANVAS_BLENDS = new Set(['multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity']);
+
+/**
+ * A CSS blend mode as a canvas compositing operation: the same name, but `normal` is the canvas's
+ * `source-over` (a canvas ignores "normal" and keeps whatever was set before) and `plus-lighter`,
+ * the add they draw light with (the Blender add-on's highlights), is its `lighter`. Anything else
+ * draws as normal.
+ */
+export function canvasBlendMode(mode) {
+  const blend = String(mode ?? 'normal').trim().toLowerCase();
+  if (blend === 'plus-lighter' || blend === 'linear-dodge') return 'lighter';
+  return CANVAS_BLENDS.has(blend) ? blend : 'source-over';
+}
+
 function applyBlendMode(ctx, mode) {
-  const blend = String(mode ?? 'normal');
-  const supported = new Set(['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity']);
-  ctx.globalCompositeOperation = supported.has(blend) ? blend : 'source-over';
+  ctx.globalCompositeOperation = canvasBlendMode(mode);
 }
 
 function section(control, name) {
@@ -493,7 +507,35 @@ function loadImage(source) {
   return promise;
 }
 
+/** A part that is one of several pictures (utils/imageFrames.js): the one chosen, or two mixed by adding. */
+async function drawImageFrames(ctx, layers, frame) {
+  const place = (target, image, { x = 0, y = 0, width = 100, height = 100 }) => target.drawImage(image,
+    (frame.width * numberOr(x, 0)) / 100, (frame.height * numberOr(y, 0)) / 100,
+    (frame.width * numberOr(width, 100)) / 100, (frame.height * numberOr(height, 100)) / 100);
+  const images = await Promise.all(layers.map((layer) => loadImage(layer.frame.source).catch(() => null)));
+  if (layers.length === 1) {
+    if (images[0]) place(ctx, images[0], layers[0].frame);
+    return;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.ceil(frame.width));
+  canvas.height = Math.max(1, Math.ceil(frame.height));
+  const mix = canvas.getContext('2d');
+  layers.forEach((layer, i) => {
+    if (!images[i]) return;
+    mix.globalAlpha = layer.opacity;
+    mix.globalCompositeOperation = i ? 'lighter' : 'source-over';
+    place(mix, images[i], layer.frame);
+  });
+  ctx.drawImage(canvas, 0, 0, frame.width, frame.height);
+}
+
 async function drawImageSection(ctx, imageSection, frame) {
+  if (isFramesImage(imageSection)) {
+    const frameLayers = imageFrameLayers(imageSection);
+    if (frameLayers.length) await drawImageFrames(ctx, frameLayers, frame);
+    return;
+  }
   const source = String(imageSection?.source ?? '');
   if (!source) return;
   const image = await loadImage(source);
@@ -568,6 +610,30 @@ function drawText(ctx, part, frame) {
 
 async function drawPart(ctx, part, width, height) {
   if (!part || part.visible === false) return;
+  // A part with a blend mode of its own (Effects › Blend: the Blender add-on's shading multiplies,
+  // its light adds) is drawn on its own and laid onto what is under it in that mode, as CSS lays it
+  // (mix-blend-mode). Drawn straight on, each multiply and add went on as normal paint: a Blender
+  // knob baked dark and flat.
+  const blend = canvasBlendMode(part?._children?.Effects?._children?.Blend?.mode);
+  if (blend !== 'source-over') {
+    const at = ctx.getTransform();
+    const own = document.createElement('canvas');
+    own.width = Math.max(1, Math.ceil(width * at.a));
+    own.height = Math.max(1, Math.ceil(height * at.d));
+    const ownCtx = own.getContext('2d');
+    ownCtx.scale(at.a, at.d);
+    await drawPartContent(ownCtx, part, width, height);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, at.e, at.f);
+    ctx.globalCompositeOperation = blend;
+    ctx.drawImage(own, 0, 0);
+    ctx.restore();
+    return;
+  }
+  await drawPartContent(ctx, part, width, height);
+}
+
+async function drawPartContent(ctx, part, width, height) {
   const frame = partFrame(part, width, height);
   if (frame.width <= 0 || frame.height <= 0) return;
   const layout = part?._children?.Layout ?? {};
@@ -687,11 +753,15 @@ export async function bakeCustomComponentFilmstrip(control, options = {}) {
       .filter(([, part]) => part?.visible !== false)
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0));
 
+    // Pictures in their colours (utils/pictureRecolour.js), a metal's highlights following it.
+    const followed = withColourFollows(parts, new Map(Object.entries(resolvedControl?._children?.Parts?._children ?? {})));
+    const coloured = withPictureColourSources(followed, await pictureColourSources(followed));
+
     ctx.save();
     ctx.translate(frameX, frameY);
     ctx.clearRect(0, 0, normalized.outputFrameWidth, normalized.outputFrameHeight);
     ctx.scale(normalized.outputScale, normalized.outputScale);
-    for (const [, part] of parts) {
+    for (const [, part] of coloured) {
       await drawPart(ctx, part, normalized.frameWidth, normalized.frameHeight);
     }
     ctx.restore();

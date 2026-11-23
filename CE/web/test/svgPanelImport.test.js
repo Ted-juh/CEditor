@@ -19,7 +19,7 @@ import {
   buildSvgImportControls, colourRole, describeSvgImport, documentFrame, parseLength, parseTransform,
   planSvgPanelImport, roleFromName,
 } from '../src/CE_Application/utils/svgPanelImport.js';
-import { parseXml } from '../../../tools/ctrlr-import/xml.mjs';
+import { parseXml } from '../src/CE_Application/ctrlrImport/xml.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name) => readFileSync(resolve(here, 'fixtures', name), 'utf8');

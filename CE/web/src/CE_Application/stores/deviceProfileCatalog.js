@@ -72,7 +72,10 @@ function createBlankProfileSource(id, name) {
   };
 }
 
-export function createDeviceProfileDraft({ id = '', name = 'Untitled Device Profile' } = {}) {
+// `discover`: the draft is for File → Discover Device, so the Designer opens it on Detect devices
+// with nothing to edit until a device is picked. Any other draft starts as a profile to edit
+// (editor/dpd/dpdNewProfile.js).
+export function createDeviceProfileDraft({ id = '', name = 'Untitled Device Profile', discover = false } = {}) {
   const profileId = String(id || uniqueDraftProfileId()).trim();
   const profileName = String(name || 'Untitled Device Profile').trim();
   const source = createBlankProfileSource(profileId, profileName);
@@ -88,6 +91,7 @@ export function createDeviceProfileDraft({ id = '', name = 'Untitled Device Prof
       trust: 'local',
       source: '',
       localDraft: true,
+      discover: discover === true,
     },
   ]);
 

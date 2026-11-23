@@ -18,6 +18,35 @@
 
 namespace
 {
+// The kinds of document the page may save and open as files of their own (the "...TypedDocument"
+// listeners): what the dialogs call it, what they show, and the ending its files carry.
+struct TypedDocumentKind
+{
+    const char* title;
+    const char* pattern;
+    const char* suffix;
+};
+
+const TypedDocumentKind* typedDocumentKind (const juce::String& kind)
+{
+    // A CTRL49 screen is saved as the assignment the native bridge loads (Ctrl49Bridge.exe
+    // my.assignment.json): one file is both the document and what the keyboard runs.
+    static const TypedDocumentKind ctrl49Screen { "CTRL49 Screen", "*.assignment.json", ".assignment.json" };
+    if (kind == "ctrl49Screen") return &ctrl49Screen;
+    return nullptr;
+}
+
+/** `file` ending in the kind's suffix: "Lead" and "Lead.json" both become "Lead.assignment.json". */
+juce::File withTypedSuffix (const juce::File& file, const TypedDocumentKind& kind)
+{
+    const juce::String suffix (kind.suffix);
+    auto name = file.getFileName();
+    if (name.endsWithIgnoreCase (suffix)) return file;
+    const auto lastPart = suffix.fromLastOccurrenceOf (".", true, false);
+    if (lastPart != suffix && name.endsWithIgnoreCase (lastPart)) name = name.dropLastCharacters (lastPart.length());
+    return file.getSiblingFile (name + suffix);
+}
+
 juce::String perfFileLabel (const juce::String& path)
 {
     return juce::File (path).getFileName().isNotEmpty() ? juce::File (path).getFileName() : path;
@@ -374,6 +403,22 @@ void ValueTreeBridge::runToolchainJob (const juce::var& payload, const juce::Str
     toolchainJob = std::make_unique<ToolchainJob> (browser, command);
 }
 
+void ValueTreeBridge::emitTypedDocumentResult (const juce::String& requestId, bool ok, bool cancelled,
+                                               const juce::File& file, const juce::String& data)
+{
+    if (browser == nullptr)
+        return;
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("requestId", requestId);
+    obj->setProperty ("ok", ok);
+    obj->setProperty ("cancelled", cancelled);
+    obj->setProperty ("filePath", file == juce::File() ? juce::String() : file.getFullPathName());
+    obj->setProperty ("name", file == juce::File() ? juce::String() : file.getFileName());
+    if (data.isNotEmpty())
+        obj->setProperty ("data", data);
+    browser->emitEventIfBrowserIsVisible ("typedDocumentResult", juce::var (obj));
+}
+
 juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::WebBrowserComponent::Options& base)
 {
     // Point the Node toolchain scripts at a per-user, writable provisioning dir before any node spawn.
@@ -456,6 +501,13 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
             {
                 juce::JUCEApplication::getInstance()->systemRequestedQuit();
             });
+        })
+        // The page's answer to "quitRequested" (QuitGate.h, stores/quitGuard.js): "asking" while it
+        // asks the person about unsaved work, then "quit" or "stay".
+        .withEventListener ("quitAnswer", [this] (const juce::var& payload)
+        {
+            const auto answer = payload.getProperty ("answer", "").toString();
+            juce::MessageManager::callAsync ([this, answer]() { quitGate.answer (answer); });
         })
         .withEventListener ("savePanelAs", [this] (const juce::var& payload)
         {
@@ -670,6 +722,142 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                         obj->setProperty ("ok", ceditor::writeTextAtomically (file, jsonData));
 
                         browser->emitEventIfBrowserIsVisible ("panelPackageSaved", juce::var (obj));
+                    });
+            });
+        })
+        // File → Export Picture (stores/pictureExport.js): a PNG the page drew of the panel, the
+        // selection or a filmstrip, as base64, and the name to offer. A save dialog for .png and the
+        // write, nothing more; the answer says where, or that it could not, because "saved" is what
+        // the author will go and look for.
+        .withEventListener ("savePictureAs", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto suggestedName = juce::File::createLegalFileName (payloadObj->getProperty ("suggestedName").toString());
+                auto bytes = std::make_shared<juce::MemoryBlock>();
+                {
+                    juce::MemoryOutputStream stream (*bytes, false);
+                    if (! juce::Base64::convertFromBase64 (stream, payloadObj->getProperty ("data").toString()))
+                        bytes->reset();
+                }
+
+                auto answer = [this] (bool ok, bool cancelled, const juce::String& path)
+                {
+                    auto* obj = new juce::DynamicObject();
+                    obj->setProperty ("ok", ok);
+                    obj->setProperty ("cancelled", cancelled);
+                    obj->setProperty ("filePath", path);
+                    if (browser != nullptr)
+                        browser->emitEventIfBrowserIsVisible ("pictureSaved", juce::var (obj));
+                };
+
+                if (bytes->getSize() == 0)
+                {
+                    answer (false, false, {});
+                    return;
+                }
+
+                auto startIn = juce::File::getSpecialLocation (juce::File::userPicturesDirectory);
+                if (! startIn.isDirectory())
+                    startIn = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+                startIn = startIn.getChildFile (suggestedName.isNotEmpty() ? suggestedName : juce::String ("Panel.png"));
+
+                fileChooser = std::make_unique<juce::FileChooser> ("Save Picture As", startIn, "*.png");
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                    [bytes, answer] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+                        if (result == juce::File())
+                        {
+                            answer (false, true, {});
+                            return;
+                        }
+                        auto file = result.withFileExtension ("png");
+                        answer (ceditor::writeBytesAtomically (file, bytes->getData(), bytes->getSize()), false, file.getFullPathName());
+                    });
+            });
+        })
+        // Documents the page keeps as text files of their own kind (stores/typedDocuments.js): a
+        // save dialog, a save to the file it came from, and an open dialog. The page names a KIND,
+        // never a pattern or a folder, and only the kinds typedDocumentKind lists exist. Every
+        // answer is "typedDocumentResult" with the request's id: { ok, cancelled, filePath, name,
+        // data } — `ok` false with a path is a write that failed, which the page must not call saved.
+        .withEventListener ("saveTypedDocumentAs", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                const auto requestId = payload.getProperty ("requestId", "").toString();
+                const auto* kind = typedDocumentKind (payload.getProperty ("kind", "").toString());
+                if (kind == nullptr) { emitTypedDocumentResult (requestId, false, false, {}, {}); return; }
+                const auto data = payload.getProperty ("data", "").toString();
+                const auto suggested = juce::File::createLegalFileName (payload.getProperty ("suggestedName", "").toString());
+
+                auto startIn = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+                if (suggested.isNotEmpty())
+                    startIn = withTypedSuffix (startIn.getChildFile (suggested), *kind);
+
+                fileChooser = std::make_unique<juce::FileChooser> (juce::String ("Save ") + kind->title + " As", startIn, kind->pattern);
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                    [this, requestId, kind, data] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+                        if (result == juce::File()) { emitTypedDocumentResult (requestId, false, true, {}, {}); return; }
+                        auto file = withTypedSuffix (result, *kind);
+                        emitTypedDocumentResult (requestId, ceditor::writeTextAtomically (file, data), false, file, {});
+                    });
+            });
+        })
+        .withEventListener ("saveTypedDocument", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                const auto requestId = payload.getProperty ("requestId", "").toString();
+                const auto* kind = typedDocumentKind (payload.getProperty ("kind", "").toString());
+                const juce::File file (payload.getProperty ("filePath", "").toString());
+                // Only back to a file of the kind's own type: this is "Save", not a way to write
+                // anywhere the page names.
+                if (kind == nullptr || ! juce::File::isAbsolutePath (file.getFullPathName())
+                    || ! file.getFileName().endsWithIgnoreCase (kind->suffix))
+                {
+                    emitTypedDocumentResult (requestId, false, false, {}, {});
+                    return;
+                }
+                emitTypedDocumentResult (requestId, ceditor::writeTextAtomically (file, payload.getProperty ("data", "").toString()), false, file, {});
+            });
+        })
+        .withEventListener ("openTypedDocument", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                const auto requestId = payload.getProperty ("requestId", "").toString();
+                const auto* kind = typedDocumentKind (payload.getProperty ("kind", "").toString());
+                if (kind == nullptr) { emitTypedDocumentResult (requestId, false, false, {}, {}); return; }
+
+                fileChooser = std::make_unique<juce::FileChooser> (juce::String ("Open ") + kind->title,
+                    juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), kind->pattern);
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                    [this, requestId] (const juce::FileChooser& fc)
+                    {
+                        auto file = fc.getResult();
+                        if (file == juce::File()) { emitTypedDocumentResult (requestId, false, true, {}, {}); return; }
+                        // A document is a page of text, not a library: a few megabytes is plenty, and
+                        // anything bigger is not one of these.
+                        if (! file.existsAsFile() || file.getSize() > 8 * 1024 * 1024)
+                        {
+                            emitTypedDocumentResult (requestId, false, false, file, {});
+                            return;
+                        }
+                        emitTypedDocumentResult (requestId, true, false, file, file.loadFileAsString());
                     });
             });
         })

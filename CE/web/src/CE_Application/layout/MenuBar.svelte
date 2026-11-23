@@ -46,12 +46,16 @@
   import { runUpdateCheck } from '../stores/updateChannel.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
+  import { openPictureExport } from '../stores/pictureExport.js';
+  import { newPanelFromCtrlrPanel } from '../stores/ctrlrImportActions.js';
+  import { createScreenDocument, openScreenDocumentFromFile } from '../stores/screenBuilder.js';
   import { clearSelection } from '../stores/panels.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
   import { newPanelFromSvgArtwork, updatePanelFromSvgArtwork } from '../stores/svgPanelImportActions.js';
   import { newPanelFromPsdArtwork, updatePanelFromPsdArtwork } from '../stores/psdPanelImportActions.js';
   import { newComponentFromSvgArtwork, newComponentFromPsdArtwork } from '../stores/artworkComponentActions.js';
+  import { newComponentFrom3dModel } from '../stores/scene3dActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
   import { floating } from '../utils/floatingUi.js';
 
@@ -62,7 +66,7 @@
   const hasPanel = () => !!get(activePanel);
   const hasSelection = () => get(selectedComponentIds).size > 0;
   // A component open on its own is saved by exporting it (stores/componentExport.js): Save opens Export.
-  const canSave = () => ['script', 'component'].includes(get(activeEditorTab)?.type) || hasPanel();
+  const canSave = () => ['script', 'component', 'screen'].includes(get(activeEditorTab)?.type) || hasPanel();
   const saveFromMenu = (options = {}) => {
     if (get(activeEditorTab)?.type === 'component') openComponentExport();
     else saveActiveEditorDocument(options);
@@ -101,6 +105,16 @@
     picker = 'component';
   }
 
+  function newCtrl49Screen() {
+    const document = createScreenDocument();
+    if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
+  }
+
+  async function openCtrl49Screen() {
+    const document = await openScreenDocumentFromFile();
+    if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
+  }
+
   function newDeviceProfile() {
     const profile = createDeviceProfileDraft();
     openStandaloneDeviceProfileTab(profile);
@@ -109,7 +123,7 @@
   // Open a fresh device-profile draft; with no model yet, the Designer shows its Detect screen for
   // MIDI-CI discovery (scan -> pick a device -> its drafted profile seeds the editor).
   function discoverDeviceProfile() {
-    const profile = createDeviceProfileDraft({ name: 'MIDI-CI Device' });
+    const profile = createDeviceProfileDraft({ name: 'MIDI-CI Device', discover: true });
     openStandaloneDeviceProfileTab(profile);
   }
 
@@ -196,12 +210,16 @@
       // onto a screen was to place and bind every control by hand.
       { type: 'submenu', label: 'New Panel from Device Profile', items: generateFromProfileItems },
       // Panel artwork is drawn in a vector editor; the placeholders in its "components" layer say
-      // where every control goes. utils/svgPanelImport.js has the convention.
-      { label: 'New Panel from SVG Artwork...', action: () => newPanelFromSvgArtwork() },
-      { label: 'Update Panel from SVG Artwork...', enabled: hasPanel, action: () => updatePanelFromSvgArtwork() },
+      // where every control goes. utils/svgPanelImport.js has the convention. Vector artwork is an SVG,
+      // a PDF, or an Illustrator file read through its PDF part (utils/pdfArtwork.js).
+      { label: 'New Panel from Vector Artwork...', action: () => newPanelFromSvgArtwork() },
+      { label: 'Update Panel from Vector Artwork...', enabled: hasPanel, action: () => updatePanelFromSvgArtwork() },
       // The same convention from a Photoshop file: a "components" layer group (utils/psdPanelImport.js).
       { label: 'New Panel from Photoshop Artwork...', action: () => newPanelFromPsdArtwork() },
       { label: 'Update Panel from Photoshop Artwork...', enabled: hasPanel, action: () => updatePanelFromPsdArtwork() },
+      // Somebody else's Ctrlr panel: its MIDI map as a device profile, its controls on a new panel,
+      // its Lua kept in the notes to port (stores/ctrlrImportActions.js; what does not convert is said).
+      { label: 'New Panel from Ctrlr Panel...', action: () => newPanelFromCtrlrPanel() },
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },
@@ -210,8 +228,10 @@
       { label: 'Import Component...', action: () => importComponentFromFile() },
       // A drawing made the control itself: every shape or layer a layer of a new component, still
       // editable, and the layers named pointer, fader or lamp wired to move (utils/artworkComponent.js).
-      { label: 'New Component from SVG Artwork...', action: () => newComponentFromSvgArtwork() },
+      { label: 'New Component from Vector Artwork...', action: () => newComponentFromSvgArtwork() },
       { label: 'New Component from Photoshop Artwork...', action: () => newComponentFromPsdArtwork() },
+      // A glTF model as a 3D part: its objects rendered by CEditor, each changeable (stores/scene3dActions.js).
+      { label: 'New Component from 3D Model...', action: () => newComponentFrom3dModel() },
       { label: 'Open Component from Library...', action: () => openSavedCustomComponent() },
       { type: 'separator' },
       { label: 'New Device Profile', action: () => newDeviceProfile() },
@@ -221,6 +241,11 @@
       { type: 'separator' },
       { label: 'New Script Workspace', action: () => newScriptWorkspace() },
       { label: 'Open Script Workspace', action: () => openScriptWorkspaceFromFile() },
+      // The CTRL49 keyboard's screens: pages of encoder assignments, saved as the .assignment.json
+      // the native bridge loads (stores/screenBuilder.js). Reachable only from the start screen
+      // before, and only while no document was open.
+      { label: 'New CTRL49 Screen', action: () => newCtrl49Screen() },
+      { label: 'Open CTRL49 Screen...', action: () => openCtrl49Screen() },
       { type: 'separator' },
       { label: 'Save',       shortcut: 'Ctrl+S', enabled: canSave, action: () => saveFromMenu() },
       { label: 'Save As...', shortcut: 'Ctrl+Shift+S', enabled: canSave, action: () => saveFromMenu({ saveAs: true }) },
@@ -231,6 +256,9 @@
       // the distinction the user has to make.
       { label: 'Share Panel...', enabled: hasPanel, action: () => sharePanelToFile() },
       { label: 'Open Shared Panel...', action: () => openSharedPanelFromFile() },
+      // The design as a picture: the panel, the selection or a filmstrip of one control, as a PNG
+      // drawn by the canvas's own renderer (stores/pictureExport.js).
+      { label: 'Export Picture...', enabled: hasPanel, action: () => openPictureExport() },
       { type: 'separator' },
       { label: 'Close Tab', shortcut: 'Ctrl+W', action: () => closeActiveEditorTab() },
       { label: 'Hostage...', action: () => openInstrumentHostTab() },

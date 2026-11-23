@@ -10,6 +10,8 @@ import { inflateSync } from 'node:zlib';
 import { planSvgComponentImport } from '../src/CE_Application/utils/svgComponentImport.js';
 import { planPsdComponentImport } from '../src/CE_Application/utils/psdComponentImport.js';
 import { artworkRole, describeArtworkComponent, nameWords } from '../src/CE_Application/utils/artworkComponent.js';
+import { applyCustomBindings } from '../src/CE_Application/utils/interactionRuntime.js';
+import { imageFrameLayers, imageFrameLayerStyle } from '../src/CE_Application/utils/imageFrames.js';
 import { parsePathData, modelBounds } from '../src/CE_Application/utils/bezierPath.js';
 
 const parts = (plan) => plan.component._children.Parts._children;
@@ -172,12 +174,225 @@ test('a Photoshop knob: every layer a picture layer, its blend mode, opacity and
   assert.equal(p.shade.opacity, 0.502);
   assert.equal(p.glint._children.Effects._children.Blend.mode, 'overlay', 'the nearest mode the editor has');
   assert.ok(plan.warnings.some((line) => /nearest/.test(line) && /glint/.test(line)));
-  assert.equal(p.lamp_on.visible, false, 'hidden in Photoshop, hidden here');
+  // A lamp on a dial lights with a value of its own, Lamp; hidden in Photoshop, it starts off.
+  const lamp = plan.component._children.ValueChannels._children.lamp;
+  assert.deepEqual([lamp.type, lamp.defaultValue], ['bool', false]);
+  assert.equal(p.lamp_on.opacity, 0, 'hidden in Photoshop, off here');
+  const lampAt = (on) => {
+    const control = structuredClone(plan.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': 0.5, 'channel.lamp.normalized': on ? 1 : 0 } });
+    const part = control._children.Parts._children.lamp_on;
+    return part.visible !== false ? part.opacity : 0;
+  };
+  assert.deepEqual([lampAt(false), lampAt(true)], [0, 1]);
+  assert.match(describeArtworkComponent(plan, plan.layers), /lamp on lights with a value of its own, Lamp\.$/);
   // The pointer turns about the body's centre, not the backdrop's.
   const layout = p.Pointer._children.Layout;
   assert.ok(Math.abs(layout.x + (layout.pivotX / 100) * layout.width - 50) < 0.01);
   assert.ok(Math.abs(layout.y + (layout.pivotY / 100) * layout.height - 50) < 0.01);
   assert.equal(bindings(plan)[0].target, 'Parts.Pointer.Layout.rotation');
+});
+
+test('a pivot named after a turning layer is that layer\'s own: a shadow turns about a point beside the axis', () => {
+  // The Blender add-on writes "pointer shadow pivot": the shadow of a pointer lit from one side turns
+  // about a point half its reach from the axis, so it stays on the side away from the light.
+  const bytes = writePsdUint8Array({
+    width: 100,
+    height: 100,
+    children: [
+      solid('body', 10, 10, 80, 80, [120, 120, 120, 255]),
+      solid('pointer shadow', 50, 14, 6, 30, [0, 0, 0, 128]),
+      solid('pointer', 47, 12, 6, 30, [230, 230, 230, 255]),
+      solid('pivot', 49, 49, 2, 2, [255, 255, 255, 255], { hidden: true }),
+      solid('pointer shadow pivot', 51, 50, 2, 2, [255, 255, 255, 255], { hidden: true }),
+      solid('knob axis', 0, 0, 2, 2, [255, 255, 255, 255], { hidden: true }),
+    ],
+  }, { noBackground: true, generateThumbnail: false });
+  const plan = planPsdComponentImport(bytes);
+  assert.equal(plan.ok, true, plan.error);
+  const p = parts(plan);
+  const about = (name) => {
+    const { x, y, width, height, pivotX, pivotY } = p[name]._children.Layout;
+    return [Math.round((x + (pivotX / 100) * width) * 100) / 100, Math.round((y + (pivotY / 100) * height) * 100) / 100];
+  };
+  assert.deepEqual(about('pointer'), [50, 50], 'the shared pivot');
+  assert.deepEqual(about('pointer_shadow'), [52, 51], 'its own');
+  assert.deepEqual(bindings(plan).map((b) => b.target).sort(), ['Parts.pointer.Layout.rotation', 'Parts.pointer_shadow.Layout.rotation']);
+  // Named after nothing that turns ("knob axis"), a pivot is a shared one, and the first shared one
+  // ("pivot") is used; every pivot is a mark, hidden.
+  for (const name of ['pivot', 'pointer_shadow_pivot', 'knob_axis']) assert.equal(p[name].visible, false, name);
+});
+
+test('a turning picture drawn at several angles is one part of frames, mixed from one to the next as it turns', () => {
+  // The Blender add-on writes a pointer's reflection in a metal cap as it is at each of several angles
+  // ("pointer reflection at 27"), each turned back to rest, those away from rest hidden; one that drew
+  // nothing it leaves out (here, 54).
+  const bytes = writePsdUint8Array({
+    width: 100,
+    height: 100,
+    children: [
+      solid('body', 10, 10, 80, 80, [120, 120, 120, 255]),
+      solid('pointer reflection at -27', 40, 30, 20, 20, [200, 200, 200, 255], { hidden: true }),
+      solid('pointer reflection at 0', 40, 30, 20, 20, [210, 210, 210, 255]),
+      solid('pointer reflection at 27', 42, 28, 16, 24, [220, 220, 220, 255], { hidden: true }),
+      solid('pointer reflection at 81', 40, 30, 20, 20, [230, 230, 230, 255], { hidden: true }),
+      solid('pointer', 47, 12, 6, 30, [230, 230, 230, 255]),
+    ],
+  }, { noBackground: true, generateThumbnail: false });
+  const plan = planPsdComponentImport(bytes);
+  assert.equal(plan.ok, true, plan.error);
+  const p = parts(plan);
+  assert.deepEqual(Object.keys(p), ['body', 'pointer_reflection', 'pointer']);
+  const part = p.pointer_reflection;
+  assert.equal(part.visible, true);
+  const image = part._children.Image;
+  assert.equal(image.mode, 'frames');
+  assert.equal(image.blendFrames, true);
+  // A frame each 27 degrees over the dial's travel, -135 to 135: those drawn, and nothing elsewhere.
+  assert.deepEqual(image.frames.map((frame) => Boolean(frame.source)), [false, false, false, false, true, true, true, false, true, false, false]);
+  // Each frame where it was drawn, in % of the part (the one at 27 is taller and narrower).
+  const layout = part._children.Layout;
+  assert.deepEqual([layout.x, layout.y, layout.width, layout.height], [40, 28, 20, 24]);
+  assert.deepEqual(['x', 'y', 'width', 'height'].map((k) => Math.round(image.frames[6][k] * 10) / 10), [10, 0, 80, 100]);
+  assert.deepEqual(['x', 'y', 'width', 'height'].map((k) => Math.round(image.frames[5][k] * 10) / 10), [0, 8.3, 100, 83.3]);
+  assert.ok(bindings(plan).some((b) => b.target === 'Parts.pointer_reflection.Layout.rotation'), 'it turns');
+  // Which frames show at an angle, and how much, as the component draws it: the value 0 to 1 is -135
+  // to 135 degrees.
+  const sharesAt = (degrees) => {
+    const control = structuredClone(plan.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': (degrees + 135) / 270 } });
+    const drawn = control._children.Parts._children.pointer_reflection._children.Image;
+    return Object.fromEntries(imageFrameLayers(drawn).map(({ frame, opacity }) => [
+      [-27, 0, 27, 81][[4, 5, 6, 8].indexOf(drawn.frames.indexOf(frame))], Math.round(opacity * 1000) / 1000]));
+  };
+  assert.deepEqual(imageFrameLayers(image).map(({ frame }) => frame), [image.frames[5]], 'as imported: the one drawn at rest');
+  assert.deepEqual(sharesAt(0), { 0: 1 }, 'at rest, the one drawn at rest');
+  assert.deepEqual(sharesAt(13.5), { 0: 0.5, 27: 0.5 }, 'half way, half each');
+  assert.deepEqual(sharesAt(-27), { '-27': 1 });
+  assert.deepEqual(sharesAt(-135), {}, 'beyond the first by a step and more: none');
+  // Where none was drawn (54) nothing stands in, and half way to the next, half of it.
+  assert.deepEqual(sharesAt(54), {});
+  assert.deepEqual(sharesAt(67.5), { 81: 0.5 });
+  // Angles off one step (drawn by hand at -20, 0 and 50): the frames as they are, the value moving
+  // from one to the next over the gap between them.
+  const uneven = planPsdComponentImport(writePsdUint8Array({ width: 40, height: 40, children: [
+    solid('body', 0, 0, 40, 40, [120, 120, 120, 255]),
+    ...[-20, 0, 50].map((angle, i) => solid(`needle glint at ${angle}`, 18, 2, 4, 18, [200 + i * 20, 200, 200, 255])),
+  ] }, { noBackground: true, generateThumbnail: false }));
+  const glint = (degrees) => {
+    const control = structuredClone(uneven.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': (degrees + 135) / 270 } });
+    return Math.round(control._children.Parts._children.needle_glint._children.Image.frameIndex * 1000) / 1000;
+  };
+  assert.equal(parts(uneven).needle_glint._children.Image.frames.length, 3);
+  assert.deepEqual([-90, -20, -10, 0, 25, 50, 120].map(glint), [0, 0, 0.5, 1, 1.5, 2, 2]);
+  // A single layer "at" an angle is just a turning layer.
+  const single = planPsdComponentImport(writePsdUint8Array({ width: 40, height: 40, children: [
+    solid('body', 0, 0, 40, 40, [120, 120, 120, 255]), solid('needle at 10', 18, 2, 4, 18, [250, 250, 250, 255]),
+  ] }, { noBackground: true, generateThumbnail: false }));
+  assert.deepEqual(bindings(single).map((b) => b.target), ['Parts.needle_at_10.Layout.rotation']);
+});
+
+test('an SVG drawn at several angles is one part of frames too: each a picture of itself, as the file draws it', () => {
+  // Illustrator's layer names (data-name); the shadow blurred by a filter and multiplied, the one at
+  // 27 switched off as a PDF's hidden layer comes in (utils/pdfArtwork.js).
+  const shadow = (angle, extra = '') => `<g id="s${angle + 100}" data-name="pointer shadow at ${angle}" style="mix-blend-mode:multiply" opacity="0.6"${extra}>`
+    + `<rect x="48" y="14" width="4" height="30" filter="url(#soft)" transform="rotate(${angle} 50 50)"/></g>`;
+  const plan = planSvgComponentImport(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <defs><filter id="soft"><feGaussianBlur stdDeviation="2"/></filter></defs>
+  <circle id="body" cx="50" cy="50" r="40" fill="#555"/>
+  <g id="pointer" fill="#123456">
+    ${shadow(-27)}${shadow(0)}${shadow(27, ' display="none" data-ceditor-hidden="true"')}
+    <rect data-name="needle" x="48.5" y="12" width="3" height="30" fill="#fff"/>
+  </g></svg>`, { fileName: 'knob.svg' });
+  assert.equal(plan.ok, true, plan.error);
+  const p = parts(plan);
+  assert.deepEqual(Object.keys(p), ['body', 'pointer_shadow', 'needle'], 'the three shadows one part, in the place of the lowest');
+  const part = p.pointer_shadow;
+  assert.equal(part.visible, true);
+  assert.equal(part._children.Effects._children.Blend.mode, 'multiply', 'the blend mode the layers had');
+  const image = part._children.Image;
+  assert.equal(image.mode, 'frames');
+  assert.deepEqual(image.frames.map((frame) => Boolean(frame.source)), [false, false, false, false, true, true, true, false, false, false, false]);
+  // Each frame the element as the file has it: its own transform, opacity and filter, the paint its
+  // group hands down, the filter's definition, and the hidden one shown.
+  const [atMinus, atRest, atPlus] = [4, 5, 6].map((i) => svgOf(image.frames[i].source));
+  assert.match(atMinus, /rotate\(-27 50 50\)/);
+  assert.match(atRest, /<filter id="soft">/);
+  assert.match(atRest, /filter="url\(#soft\)"/);
+  assert.match(atRest, /fill="#123456"/);
+  assert.match(atRest, /opacity="0.6"/);
+  assert.doesNotMatch(atPlus, /display="none"/);
+  // The blur's room round the shapes: the box is wider than the 4 px bar.
+  assert.ok(part._children.Layout.width > 20, `the frames' box: ${part._children.Layout.width}`);
+  // It turns, and its frame follows the value; nothing faded.
+  assert.ok(bindings(plan).some((b) => b.target === 'Parts.pointer_shadow.Layout.rotation'));
+  assert.ok(bindings(plan).some((b) => b.target === 'Parts.pointer_shadow.Image.frameIndex'));
+  assert.ok(!bindings(plan).some((b) => /Fade/.test(b.name ?? '')), 'no layers faded against each other');
+  // The needle, drawn once, stays a vector.
+  assert.equal(p.needle.kind, 'path');
+  // One drawn at a single angle is a vector as before.
+  const single = planSvgComponentImport('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect id="needle at 10" x="18" y="2" width="4" height="18" fill="#fff"/></svg>');
+  assert.equal(parts(single).needle_at_10.kind, 'path');
+});
+
+test('a fader drawn at places along its travel is one part of frames that slides, its frame following the value', () => {
+  // The Blender add-on writes a sliding part as it is at each place ("fader at 40%"), moved back to
+  // where it was modelled, the one nearest that shown; its shadow larger than the cap.
+  const places = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+  const bytes = writePsdUint8Array({
+    width: 40,
+    height: 120,
+    children: [
+      solid('slot', 15, 10, 10, 100, [20, 20, 22, 255]),
+      ...places.map((place) => solid(`fader shadow at ${place}%`, 3, 58, 34, 26, [0, 0, 0, 120], { hidden: place !== 50 })),
+      ...places.map((place) => solid(`fader at ${place}%`, 5, 60, 30, 20, [150 + place, 150, 150, 255], { hidden: place !== 50 })),
+    ],
+  }, { noBackground: true, generateThumbnail: false });
+  const plan = planPsdComponentImport(bytes, { fileName: 'fader.psd' });
+  assert.equal(plan.ok, true, plan.error);
+  assert.equal(plan.kind, 'fader');
+  const p = parts(plan);
+  assert.deepEqual(Object.keys(p), ['slot', 'fader_shadow', 'fader']);
+  for (const name of ['fader', 'fader_shadow']) {
+    const image = p[name]._children.Image;
+    assert.equal(image.mode, 'frames', name);
+    assert.equal(image.frames.length, 11, name);
+    assert.equal(image.frameIndex, 0, `${name}: at the value it starts at, 0, the place 0 %`);
+    assert.equal(p[name].visible, true);
+  }
+  // Every layer that slides goes as far as the cap: its shadow too, though its box is larger.
+  const by = Object.fromEntries(bindings(plan).map((b) => [b.name, b]));
+  for (const name of ['fader', 'fader_shadow']) {
+    const move = by[`${name}Move`];
+    assert.equal(move.target, `Parts.${name}.Layout.offsetY`);
+    assert.deepEqual([move.outputMin, move.outputMax], [30, -50], `${name}: from the cap at the slot's bottom to its top`);
+  }
+  // Its frame follows the value: 0 to 1 is 0 to 100 % of the travel.
+  const frameAt = (value) => {
+    const control = structuredClone(plan.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': value } });
+    return ['fader', 'fader_shadow'].map((name) => Math.round(control._children.Parts._children[name]._children.Image.frameIndex * 100) / 100);
+  };
+  assert.deepEqual(frameAt(0), [0, 0]);
+  assert.deepEqual(frameAt(0.45), [4.5, 4.5]);
+  assert.deepEqual(frameAt(1), [10, 10]);
+});
+
+test('frames are mixed by adding their shares inside the part, so a shadow or a multiply between two is their mix', () => {
+  const frames = [{ source: 'a.png' }, { source: '' }, { source: 'c.png', x: 10, y: 0, width: 80, height: 100 }];
+  const at = (frameIndex, blendFrames = true) => imageFrameLayers({ mode: 'frames', frames, frameIndex, blendFrames })
+    .map(({ frame, opacity }) => [frame.source, Math.round(opacity * 1000) / 1000]);
+  assert.deepEqual(at(0), [['a.png', 1]]);
+  assert.deepEqual(at(0.25), [['a.png', 0.75]], 'the frame of nothing draws nothing, the other its share');
+  assert.deepEqual(at(1.6), [['c.png', 0.6]]);
+  assert.deepEqual(at(5), [['c.png', 1]], 'past the last, the last');
+  assert.deepEqual(at(0.4, false), [['a.png', 1]], 'without blending, the nearest');
+  const style = imageFrameLayerStyle({ frame: frames[2], opacity: 0.6 }, { mixed: true });
+  assert.match(style, /left:10%; top:0%; width:80%; height:100%/);
+  assert.match(style, /opacity:0\.6/);
+  assert.match(style, /mix-blend-mode:plus-lighter/);
+  assert.doesNotMatch(imageFrameLayerStyle({ frame: frames[0], opacity: 1 }), /mix-blend-mode/);
 });
 
 test('a Photoshop layer\'s mask is its own; its clipped layers are in its picture; its styles drawn', () => {
@@ -208,7 +423,7 @@ test('a Photoshop layer\'s mask is its own; its clipped layers are in its pictur
 
 test('the commands are in the File menu and open the component in the Component Designer', () => {
   const menu = readFileSync(new URL('../src/CE_Application/layout/MenuBar.svelte', import.meta.url), 'utf8');
-  assert.match(menu, /label: 'New Component from SVG Artwork\.\.\.', action: \(\) => newComponentFromSvgArtwork\(\)/);
+  assert.match(menu, /label: 'New Component from Vector Artwork\.\.\.', action: \(\) => newComponentFromSvgArtwork\(\)/);
   assert.match(menu, /label: 'New Component from Photoshop Artwork\.\.\.', action: \(\) => newComponentFromPsdArtwork\(\)/);
   const actions = readFileSync(new URL('../src/CE_Application/stores/artworkComponentActions.js', import.meta.url), 'utf8');
   assert.match(actions, /createComponentDocument\(\{ control: plan\.component, name: plan\.name \}\)/);

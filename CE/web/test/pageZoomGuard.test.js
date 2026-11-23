@@ -134,7 +134,7 @@ test('in the designer the status bar shows and drives the surface\'s grid, snap 
   assert.match(bar, /designer \? requestSurfaceZoom\('fit-to-window'\) : requestFitToWindow\(\)/);
   assert.match(bar, /\{zoomPercent\}%/);
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
-  assert.match(designer, /controlId: core\?\.id \?\? '', fill: selectedFill\?\.colour \?\? '', zoom: surfaceZoom, snapEnabled, snapSize: numberOr\(snapSize, 10\),/,
+  assert.match(designer, /controlId: core\?\.id \?\? '', fill: selectedLookFill\(\), zoom: surfaceZoom, snapEnabled, snapSize: numberOr\(snapSize, 10\),/,
     'the designer reports its own zoom and snap');
 });
 

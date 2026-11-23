@@ -30,3 +30,21 @@ test('a value follows a knob or slider on the panel, or another value of the com
   const inner = component({ Level: { type: 'float', valueSource: 'channel:Drive' }, Drive: { type: 'float', label: 'Drive' } });
   assert.equal(describeValueSource(inner, 'Level', []), 'follows Drive, a value of this component');
 });
+
+test('an on/off value follows too: on once its source is past half way', async () => {
+  const { sourcedCustomValues, normalizeCustomChannelValue } = await import('../src/CE_Application/utils/customComponentInteraction.js');
+  const comp = component({
+    lamp: { name: 'lamp', type: 'bool', min: 0, max: 1, defaultValue: true, valueSource: 'k1' },
+    near: { name: 'near', type: 'bool', min: 0, max: 1, valueSource: 'channel:Drive' },
+    Drive: { name: 'Drive', type: 'float', label: 'Drive', min: 0, max: 10 },
+  });
+  assert.equal(describeValueSource(comp, 'lamp', [knob]), 'on when Cutoff, a knob on the panel, is past half way');
+  assert.equal(describeValueSource(comp, 'near', []), 'on when Drive, a value of this component, is past half way');
+  const at = (value) => sourcedCustomValues(comp, { Drive: value }, () => ({ value, min: 0, max: 10 }));
+  assert.deepEqual([at(2).lamp, at(5).lamp, at(9).lamp], [false, true, true], 'off below half way, on from it');
+  assert.deepEqual([at(4.9).near, at(5).near], [false, true]);
+  // And read as on and off, as a value the panel sets is: a fraction read as off whatever it was.
+  assert.deepEqual([normalizeCustomChannelValue(comp._children.ValueChannels._children.lamp, at(9).lamp), normalizeCustomChannelValue(comp._children.ValueChannels._children.lamp, at(2).lamp)], [1, 0]);
+  // On/off values follow; they are not offered as a source themselves.
+  assert.ok(!valueSourceChoices(comp, 'Drive', [knob]).some((choice) => choice.value === 'channel:lamp'));
+});

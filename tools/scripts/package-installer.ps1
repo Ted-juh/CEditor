@@ -319,7 +319,22 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     New-Item -ItemType Directory -Path $tcDst -Force | Out-Null
     Get-ChildItem (Join-Path $toolsSrc "toolchains") -File | Copy-Item -Destination $tcDst -Force
 
-    Write-Host "Staged export pipeline + toolchain scripts -> $toolsDst"
+    # The Blender add-on, installed in Blender from this file (Edit > Preferences > Add-ons > Install):
+    # it writes a knob's objects as a layered PSD for File > New Component from Photoshop Artwork. Its
+    # test (test_ceditor_layers.py) is for the repository, not for an installed CEditor.
+    $blenderDst = Join-Path $toolsDst "blender"
+    New-Item -ItemType Directory -Path $blenderDst -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "blender\ceditor_layers.py") -Destination $blenderDst -Force
+
+    # The Figma plugin, imported in Figma from its manifest (Plugins > Development > Import plugin from
+    # manifest): it saves a frame as an SVG for File > New Component from Vector Artwork.
+    $figmaDst = Join-Path $toolsDst "figma-plugin"
+    New-Item -ItemType Directory -Path $figmaDst -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "figma-plugin\manifest.json") -Destination $figmaDst -Force
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "figma-plugin\code.js") -Destination $figmaDst -Force
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "figma-plugin\ui.html") -Destination $figmaDst -Force
+
+    Write-Host "Staged export pipeline + toolchain scripts + Blender add-on + Figma plugin -> $toolsDst"
 }
 
 function Stage-NodeRuntime([string]$StageDir) {

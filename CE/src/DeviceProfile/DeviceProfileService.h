@@ -28,6 +28,11 @@ public:
 
     juce::var listProfiles();
     juce::var loadProfileFromFile (const juce::File& file);
+
+    /** Profiles made in the editor (File → New Device Profile, saved from the Designer) have no file
+        until their first save, which puts one in this folder, named by the profile's id; they are
+        read from here with the bundled ones from then on. */
+    static juce::File defaultUserProfilesFolder();
     juce::var getProfileSource (const juce::var& payload);
     juce::var validateProfileSource (const juce::var& payload);
     juce::var saveProfileSource (const juce::var& payload);
@@ -339,6 +344,9 @@ private:
     // `force` skips the rescan throttle, for the cold paths that must see a profile written a moment
     // ago (the profile list behind the settings dropdown, and validating a newly chosen profile id).
     void loadInternalTestProfiles (bool force = false);
+    // Where profiles made in the editor live (defaultUserProfilesFolder, public). A member so the
+    // tests can point it at a folder of their own.
+    juce::File userProfilesFolder = defaultUserProfilesFolder();
     bool isLoadedProfileCurrent (const juce::File& file) const;
     bool loadProfileFile (const juce::File& file, juce::String& error);
     DeviceProfileEngine* resolveEngine (const juce::String& profileId, const juce::String& deviceRole);

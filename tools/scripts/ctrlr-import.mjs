@@ -1,180 +1,378 @@
 // ctrlr-import.mjs — read a Ctrlr panel, harvest a device profile, rebuild the panel.
 //
-//   node tools/scripts/ctrlr-import.mjs <file.panel|file.bpanelz> [--profile out.json] [--panel out.cepanel]
-//   node tools/scripts/ctrlr-import.mjs --corpus <directory>
+//   node tools/scripts/ctrlr-import.mjs <file> [--profile out.json] [--panel out.cepanel] [--verify] [--no-lua]
+//   node tools/scripts/ctrlr-import.mjs --corpus <directory> [--verify] [--no-lua]
 //
-// The stages are `tools/ctrlr-import/` and each is useful alone — the plan says stop after any of
-// them, and this exposes them that way. With no output flags it does S1 only: read the file and
-// report what is in it, converting nothing. That is the cheapest possible way to be wrong early,
-// and running it over a corpus answers questions about the corpus that no amount of reasoning here
-// can.
+// <file> is anything the editor's File > New > From Ctrlr Panel… opens: a `.panel` (XML), a
+// `.bpanelz` or `.bpanel` (JUCE's binary tree, compressed or not), or a program Ctrlr exported —
+// an `.exe`, `.dll`, `.vst3`, `.so` or `.dylib` with the panel inside it.
 //
-// NOTHING IS BUNDLED AND NOTHING IS FETCHED. This converts a file the user already has.
+// The stages are `CE/web/src/CE_Application/ctrlrImport/` (the editor's File menu runs the same
+// ones) and each is useful alone. With no output flags this reads the file and reports what is in
+// it, converting nothing.
+//
+// --verify holds the harvested profile to Ctrlr itself: for every parameter, every value (or, for
+// a wide range, a spread of a few hundred including both ends) is compiled by the device-profile
+// engine and compared byte for byte with what Ctrlr sends for the same value — computed by
+// `CE/web/test/support/ctrlrReference.js`, a separate port of CtrlrX's byte-building code. A
+// mismatch means the profile would send something the panel's author never sent.
+//
+// A control whose MIDI the panel's Lua sends is LEARNED, as File > New > From Ctrlr Panel… does:
+// its Lua is run, in Lua 5.4 against a stand-in for Ctrlr (ctrlrImport/learn.js), and what it sent
+// becomes a parameter where the bytes follow from its value — checked against what the Lua sent,
+// for every value run. A method kept in a file beside the panel (luaMethodSourcePath) is looked for
+// there by its name. --no-lua leaves the Lua alone.
+//
+// --corpus walks a directory (recursively), reads every panel and program in it once (identical
+// files are counted once), and prints one line per file and the totals. Every throw is caught: a
+// converter that dies on panel 40 of 300 is the failure mode to design against.
+// `tools/scripts/ctrlr-corpus.mjs` fetches the public panels this was measured on.
+//
+// NOTHING IS BUNDLED AND NOTHING IS FETCHED HERE. This converts files the user already has.
 // Redistributing other people's panels is their decision, not the program's.
 //
 // LICENSING, since it always comes up: Ctrlr is GPLv3 and CEditor is AGPL-3.0 — compatible, and in
 // the permissive direction. File formats are not copyrightable and this reimplements a reader
 // rather than lifting code. A user-run converter distributes nothing.
 
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
-import { formatReport, readCtrlrPanel } from '../ctrlr-import/read.mjs';
-import { harvestProfile } from '../ctrlr-import/harvest.mjs';
-import { planReconstruction } from '../ctrlr-import/reconstruct.mjs';
+import { createRequire } from 'node:module';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
+const WEB = path.join(REPO, 'CE/web');
+const APP = path.join(WEB, 'src/CE_Application');
 
-const APP = path.join(REPO, 'CE/web/src/CE_Application');
+// pathToFileURL, not a bare path: `await import('C:\\...')` is not a valid specifier on Windows,
+// and this is a tool that has to run wherever the packaging does.
+const load = (...parts) => import(pathToFileURL(path.join(...parts)).href);
+const webRequire = createRequire(path.join(WEB, 'package.json'));
+
+const PANEL_FILE = /\.(panel|bpanel|bpanelz)$/i;
+const PROGRAM_FILE = /\.(exe|dll|vst3|so|dylib|clap)$/i;
 
 function parseArgs(argv) {
-  const args = { file: '', profile: '', panel: '', corpus: '' };
+  const args = { file: '', profile: '', panel: '', corpus: '', verify: false, lua: true };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--profile') { args.profile = argv[++i] ?? ''; continue; }
     if (arg === '--panel') { args.panel = argv[++i] ?? ''; continue; }
     if (arg === '--corpus') { args.corpus = argv[++i] ?? ''; continue; }
+    if (arg === '--verify') { args.verify = true; continue; }
+    if (arg === '--no-lua') { args.lua = false; continue; }
     if (!arg.startsWith('--') && !args.file) { args.file = arg; continue; }
   }
   return args;
 }
 
-/**
- * Build a `.cepanel` from a reconstruction plan.
- *
- * The component factory is imported HERE rather than in `reconstruct.mjs`, so that module stays a
- * pure translation of the source document and can be tested without standing the editor's model up.
- */
-async function buildPanel(plan, { name, width, height, profileId }) {
-  // pathToFileURL, not a bare path: `await import('C:\\...')` is not a valid specifier on Windows,
-  // and this is a tool that has to run wherever the packaging does.
-  const load = (rel) => import(pathToFileURL(path.join(APP, rel)).href);
-  const { createControl } = await load('models/componentTypes.js');
-  const { createPanel, serializePanel } = await load('stores/panelModel.js');
-
-  const panel = createPanel(name);
-  panel.width = Math.max(320, width || 0);
-  panel.height = Math.max(240, height || 0);
-  panel.requiredProfiles = profileId ? [{ role: 'primary', profileId, version: '*' }] : [];
-
-  panel.controls = plan.placed.map((entry, index) => {
-    const id = `ctrlr_${index}_${(entry.name || entry.type).replace(/\W+/g, '_').toLowerCase()}`;
-    const overrides = {
-      Core: { id, name: id, description: `${entry.name} — imported (${entry.reason})` },
-      Transform: {
-        x: entry.rect.x, y: entry.rect.y, width: entry.rect.width, height: entry.rect.height,
-        opacity: Number.isFinite(entry.alpha) ? entry.alpha : 1,
-      },
-    };
-    if (entry.colours.background) {
-      overrides.Background = { _children: { Fill: { colour: entry.colours.background } } };
-    }
-    if (entry.parameterId && entry.profileId) {
-      overrides.DeviceBindings = {
-        bindings: [{
-          kind: 'deviceParameter',
-          port: entry.type === 'ToggleButton' ? 'state' : (entry.type === 'Combobox' ? 'selectedChoice' : 'value'),
-          deviceRole: entry.deviceRole,
-          parameterId: entry.parameterId,
-          adoptMetadata: true,
-          dryRun: false,
-          feedback: { receiveUpdates: true, ignoreOwnEchoes: true, echoWindowMs: 250 },
-        }],
-      };
-    }
-    const control = createControl(entry.type, overrides);
-    if (entry.items.length && control._children.Value) {
-      control._children.Value.rows = entry.items.map((label, row) => ({
-        id: `row_${row}`, displayText: label, internalValue: label,
-        sendValue: row, receiveValue: row, selectedByDefault: row === 0, enabled: true, visualOverrides: {},
-      }));
-    }
-    if (entry.type === 'Label' && control._children.Text) control._children.Text.content = entry.name;
-    return control;
-  });
-
-  return serializePanel(panel);
+async function stages() {
+  const [read, harvest, reconstruct] = await Promise.all([
+    load(APP, 'ctrlrImport/read.js'),
+    load(APP, 'ctrlrImport/harvest.js'),
+    load(APP, 'ctrlrImport/reconstruct.js'),
+  ]);
+  return { ...read, ...harvest, ...reconstruct };
 }
 
-function reportCorpus(directory) {
-  const files = readdirSync(directory)
-    .filter((f) => /\.(panel|bpanelz)$/i.test(f))
-    .map((f) => path.join(directory, f))
-    .filter((f) => statSync(f).isFile());
+/** The values a parameter is checked at: all of them up to 600, else both ends and a spread. */
+function samples(min, max) {
+  if (max - min <= 600) return Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  const set = new Set([min, max, 0, 1, -1, -2]);
+  for (let i = 0; i < 60; i += 1) { set.add(min + i); set.add(max - i); }
+  for (let i = 0; i < 200; i += 1) set.add(min + Math.floor((((i * 7919) % 10007) / 10007) * (max - min)));
+  return [...set].filter((v) => v >= min && v <= max).sort((a, b) => a - b);
+}
 
+const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+
+/**
+ * Every parameter of the harvested profile against Ctrlr's own bytes. Returns counts and the first
+ * mismatch of each parameter that has one.
+ */
+async function verifyHarvest(read, harvest) {
+  const { localCompileParameter, validateLocalProfileSource } = await load(APP, 'stores/deviceProfileLocalEngine.js');
+  const { ctrlrMessages } = await load(WEB, 'test/support/ctrlrReference.js');
+  const { componentValueList } = await load(APP, 'ctrlrImport/harvest.js');
+
+  const result = { parameters: 0, values: 0, mismatches: [], invalid: '' };
+  const { profile } = harvest;
+  if (!profile.parameters.length) return result;
+  // Learned parameters were checked against what their Lua sent when they were learned; the
+  // reference reproduces Ctrlr's own MIDI, which those controls do not have.
+  const validation = validateLocalProfileSource(profile.id, JSON.stringify(profile));
+  if (!validation.ok) result.invalid = JSON.stringify(validation.validation ?? validation.error).slice(0, 300);
+
+  const modulatorOf = new Map([...harvest.parameterIdOf].map(([node, id]) => [id, node]));
+  for (const parameter of profile.parameters) {
+    if (parameter.ctrlr?.messageType === 'Lua') continue;
+    result.parameters += 1;
+    const modulator = modulatorOf.get(parameter.id);
+    const component = (modulator.children ?? []).find((c) => c.name === 'component' || c.name === 'uiComponent');
+    const listed = componentValueList(component).length;
+    // A choice is checked at each choice; the Ctrlr control's value is its position in the list,
+    // or, for a choice made from a plain range, the number itself.
+    const pairs = parameter.type === 'choice'
+      ? parameter.choices.map((choice, index) => [choice.id, listed ? index : Number(choice.label)])
+      : samples(parameter.range.min, parameter.range.max)
+        .filter((v) => !parameter.ui?.step || (v - parameter.range.min) % parameter.ui.step === 0)
+        .map((v) => [v, v]);
+    for (const [engineValue, ctrlrValue] of pairs) {
+      result.values += 1;
+      const compiled = localCompileParameter(profile, { parameterId: parameter.id, value: engineValue });
+      const got = compiled.ok ? compiled.transaction.messages.flatMap((m) => m.bytes) : null;
+      const want = ctrlrMessages(modulator, read.panel, ctrlrValue).flat();
+      if (!got || got.join(',') !== want.join(',')) {
+        result.mismatches.push({
+          parameter: parameter.id,
+          value: engineValue,
+          got: got ? hex(got) : `does not compile: ${compiled.error}`,
+          want: hex(want),
+        });
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+function printVerify(check, indent = '') {
+  console.log(`${indent}verify: ${check.values} value(s) of ${check.parameters} parameter(s) against Ctrlr's bytes, `
+    + `${check.mismatches.length ? `${check.mismatches.length} parameter(s) DIFFER` : 'all identical'}`);
+  if (check.invalid) console.log(`${indent}  the profile does not validate: ${check.invalid}`);
+  for (const miss of check.mismatches) {
+    console.log(`${indent}  ${miss.parameter} at ${miss.value}: profile sends ${miss.got}; Ctrlr sends ${miss.want}`);
+  }
+}
+
+
+/** A Lua method kept in a file beside the panel: looked for there, and below, by its file name. */
+function methodFinder(panelFile) {
+  const dir = path.dirname(path.resolve(panelFile));
+  const find = (base, d = dir, depth = 0) => {
+    if (depth > 3) return null;
+    let entries;
+    try { entries = readdirSync(d, { withFileTypes: true }); } catch { return null; }
+    for (const e of entries) if (e.isFile() && e.name === base) return path.join(d, e.name);
+    for (const e of entries) {
+      if (e.isDirectory() && e.name !== '.git' && e.name !== 'node_modules') {
+        const found = find(base, path.join(d, e.name), depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return (method) => {
+    const found = find(String(method.file ?? '').split(/[\\/]/).pop());
+    return found ? readFileSync(found, 'utf8') : null;
+  };
+}
+
+/** Learn what the panel's Lua sends (ctrlrImport/learn.js), into the harvest. */
+async function learnLua(read, harvest, file) {
+  if (!harvest.report.sendsFromLua.length) return null;
+  const { learnFromLua } = await load(APP, 'ctrlrImport/learn.js');
+  const { LuaFactory } = webRequire('wasmoon');
+  return learnFromLua(read, harvest, { createEngine: () => new LuaFactory().createEngine(), methodSource: methodFinder(file) });
+}
+
+/**
+ * Build a `.cepanel` from a reconstruction plan, with the builder the editor's File menu uses
+ * (ctrlrImport/buildPanel.js), so the command line and the app make the same panel from one file.
+ */
+async function buildPanel(plan, options) {
+  const { buildCtrlrPanel } = await load(APP, 'ctrlrImport/buildPanel.js');
+  const { serializePanel } = await load(APP, 'stores/panelModel.js');
+  return serializePanel(buildCtrlrPanel(plan, options));
+}
+
+function listFiles(directory, out = []) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) listFiles(full, out);
+    else if (entry.isFile() && (PANEL_FILE.test(entry.name) || PROGRAM_FILE.test(entry.name))) out.push(full);
+  }
+  return out;
+}
+
+async function reportCorpus(directory, { verify, lua }) {
+  const { readCtrlrPanel, formatReport, harvestProfile } = await stages();
+  const files = listFiles(directory).sort();
   if (files.length === 0) {
-    console.log(`No .panel or .bpanelz files in ${directory}`);
+    console.log(`No Ctrlr panels or programs in ${directory}`);
     return 0;
   }
 
-  // The failure mode to design against is not a bad conversion — it is a converter that dies on
-  // panel 40 of 300. So every file is attempted, every throw is caught, and the run always finishes.
-  let read = 0;
-  let failed = 0;
-  const modulators = { total: 0, converted: 0 };
-  const luaClasses = {};
+  const seen = new Set();
+  const t = {
+    files: 0, duplicates: 0, read: 0, refused: 0, programsWithout: 0, threw: 0,
+    sending: 0, converted: 0, luaDriven: 0, silent: 0, parameters: 0, values: 0, differ: 0, invalid: 0,
+    learned: 0, learnedAsLoaded: 0, notLearned: 0, luaSilent: 0,
+  };
+  const reasons = new Map();
+  const luaReasons = new Map();
 
   for (const file of files) {
-    let result;
-    try {
-      result = readCtrlrPanel(readFileSync(file));
-    } catch (error) {
-      result = { ok: false, error: `threw: ${error.message}` };
-    }
-    console.log(formatReport(result, path.basename(file)));
+    const label = path.relative(directory, file);
+    let bytes;
+    try { bytes = new Uint8Array(readFileSync(file)); } catch (error) { console.log(`${label}: unreadable — ${error.message}`); continue; }
+    const digest = createHash('sha1').update(bytes).digest('hex');
+    if (seen.has(digest)) { t.duplicates += 1; continue; }
+    seen.add(digest);
+    t.files += 1;
 
-    if (!result.ok) { failed += 1; continue; }
-    read += 1;
-    for (const [kind, count] of Object.entries(result.histograms.luaClass)) {
-      luaClasses[kind] = (luaClasses[kind] ?? 0) + count;
-    }
+    let read;
     try {
-      const harvest = harvestProfile(result);
-      if (harvest.ok) {
-        modulators.total += harvest.report.modulators;
-        modulators.converted += harvest.report.converted;
-      }
+      read = readCtrlrPanel(bytes);
     } catch (error) {
-      console.log(`    harvest threw: ${error.message}`);
+      t.threw += 1;
+      console.log(`${label}: THREW while reading — ${error.message}`);
+      continue;
     }
-    console.log('');
+    if (!read.ok) {
+      // A program that is not a Ctrlr export is not a failure of the reader.
+      if (PROGRAM_FILE.test(file)) { t.programsWithout += 1; continue; }
+      t.refused += 1;
+      console.log(formatReport(read, label));
+      continue;
+    }
+    t.read += 1;
+
+    let harvest;
+    try {
+      harvest = harvestProfile(read);
+    } catch (error) {
+      t.threw += 1;
+      console.log(`${label}: THREW while harvesting — ${error.message}`);
+      continue;
+    }
+    const { report } = harvest;
+    t.sending += report.sending;
+    t.converted += report.converted;
+    t.luaDriven += report.sendsFromLua.length;
+    t.silent += report.silent;
+    for (const flag of report.flagged) {
+      const reason = flag.reason.replace(/"[^"]*"/g, '"…"').replace(/\d+/g, 'N');
+      reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+    }
+    let line = `${label}: ${report.converted}/${report.sending} sending controls converted`
+      + `${report.sendsFromLua.length ? `, ${report.sendsFromLua.length} sent by Lua` : ''}`;
+    if (lua && report.sendsFromLua.length) {
+      try {
+        const learned = await learnLua(read, harvest, file);
+        if (learned?.ok) {
+          t.learned += learned.learned.length;
+          t.learnedAsLoaded += learned.learned.filter((l) => l.reads).length;
+          t.notLearned += learned.notLearned.length;
+          t.luaSilent += learned.silent;
+          for (const miss of learned.notLearned) {
+            const reason = miss.reason.replace(/"[^"]*"/g, '"…"').replace(/\d+/g, 'N').replace(/: .*$/, ': …');
+            luaReasons.set(reason, (luaReasons.get(reason) ?? 0) + 1);
+          }
+          line += ` (${learned.learned.length} learned from their Lua)`;
+        }
+      } catch (error) {
+        t.threw += 1;
+        console.log(`${label}: THREW while learning its Lua — ${error.message}`);
+      }
+    }
+    if (verify) {
+      try {
+        const check = await verifyHarvest(read, harvest);
+        t.parameters += check.parameters;
+        t.values += check.values;
+        t.differ += check.mismatches.length;
+        if (check.invalid) t.invalid += 1;
+        if (check.values && !check.mismatches.length && !check.invalid) line += `, ${check.values} values identical`;
+        console.log(line);
+        if (check.mismatches.length || check.invalid) printVerify(check, '    ');
+        continue;
+      } catch (error) {
+        t.threw += 1;
+        console.log(`${line}\n    THREW while verifying — ${error.message}`);
+        continue;
+      }
+    }
+    console.log(line);
   }
 
-  const coverage = modulators.total ? (100 * modulators.converted / modulators.total).toFixed(1) : '0.0';
-  console.log(`--- ${files.length} file(s): ${read} read, ${failed} refused`);
-  console.log(`--- modulators: ${modulators.converted}/${modulators.total} convert without a human (${coverage}%)`);
-  console.log(`--- Lua: ${Object.entries(luaClasses).map(([k, v]) => `${k}×${v}`).join(', ') || 'none'}`);
-  return failed > 0 ? 1 : 0;
+  const share = (a, b) => (b ? `${((100 * a) / b).toFixed(1)}%` : '—');
+  console.log('');
+  console.log(`--- ${t.files} file(s) (${t.duplicates} duplicate(s) skipped): ${t.read} read, ${t.refused} refused, `
+    + `${t.programsWithout} program(s) with no panel inside, ${t.threw} threw`);
+  console.log(`--- ${t.converted} of ${t.sending} controls that send MIDI themselves became parameters (${share(t.converted, t.sending)}); `
+    + `${t.luaDriven} more are sent by Lua; ${t.silent} send nothing`);
+  if (lua) {
+    console.log(`--- Lua: ${t.learned} of the ${t.luaDriven} controls the Lua sends for became parameters (${share(t.learned, t.luaDriven)}), `
+      + `${t.learnedAsLoaded} of them as the panel loads; ${t.luaSilent} send nothing when moved; ${t.notLearned} not learned`);
+  }
+  if (verify) {
+    console.log(`--- verify: ${t.values} value(s) of ${t.parameters} parameter(s); ${t.differ} parameter(s) differ from Ctrlr; `
+      + `${t.invalid} profile(s) do not validate`);
+  }
+  if (luaReasons.size) {
+    console.log('--- not learned from Lua, most common reasons:');
+    for (const [reason, count] of [...luaReasons].sort((a, b) => b[1] - a[1]).slice(0, 25)) {
+      console.log(`  ${String(count).padStart(6)}  ${reason}`);
+    }
+  }
+  if (reasons.size) {
+    console.log('--- not converted, most common reasons:');
+    for (const [reason, count] of [...reasons].sort((a, b) => b[1] - a[1]).slice(0, 25)) {
+      console.log(`  ${String(count).padStart(6)}  ${reason}`);
+    }
+  }
+  return t.refused || t.threw || t.differ || t.invalid ? 1 : 0;
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
-  if (args.corpus) return reportCorpus(args.corpus);
+  if (args.corpus) return reportCorpus(args.corpus, args);
 
   if (!args.file) {
-    console.error('usage: ctrlr-import.mjs <file.panel|file.bpanelz> [--profile out.json] [--panel out.cepanel]');
-    console.error('       ctrlr-import.mjs --corpus <directory>');
+    console.error('usage: ctrlr-import.mjs <file> [--profile out.json] [--panel out.cepanel] [--verify] [--no-lua]');
+    console.error('       ctrlr-import.mjs --corpus <directory> [--verify] [--no-lua]');
     return 2;
   }
 
-  const read = readCtrlrPanel(readFileSync(args.file));
+  const { readCtrlrPanel, formatReport, harvestProfile, planReconstruction } = await stages();
+  const read = readCtrlrPanel(new Uint8Array(readFileSync(args.file)));
   console.log(formatReport(read, path.basename(args.file)));
   if (!read.ok) return 1;
 
-  if (!args.profile && !args.panel) {
-    console.log('\n(no --profile or --panel given, so nothing was converted)');
+  if (!args.profile && !args.panel && !args.verify) {
+    console.log('\n(no --profile, --panel or --verify given, so nothing was converted)');
     return 0;
   }
 
   const harvest = harvestProfile(read);
-  if (!harvest.ok) { console.error(harvest.error); return 1; }
+  const { report } = harvest;
+  console.log(`\nharvest: ${report.converted} of the ${report.sending} controls that send MIDI themselves became parameters`);
+  for (const flag of report.flagged) console.log(`  not converted  ${flag.name || flag.id}: ${flag.reason}`);
+  for (const note of report.notes) console.log(`  note  ${note}`);
+  if (report.sendsFromLua.length) {
+    if (!args.lua) console.log(`  ${report.sendsFromLua.length} control(s) are sent by Lua (--no-lua: not learned)`);
+    else {
+      const learned = await learnLua(read, harvest, args.file);
+      console.log(`\nlua: ${learned.learned.length} of the ${report.sendsFromLua.length} controls the Lua sends for became parameters, `
+        + `each sending exactly what its Lua sent; ${learned.silent} send nothing when moved`);
+      for (const l of learned.learned.filter((x) => x.reads)) console.log(`  as loaded     ${l.name}: reads ${l.reads.join(', ')}`);
+      for (const miss of learned.notLearned) console.log(`  not learned   ${miss.name}: ${miss.reason}`);
+      for (const error of learned.load.errors) console.log(`  load          ${error}`);
+      if (learned.load.notRead.length) console.log(`  not read      ${learned.load.notRead.join(', ')} (kept in files that were not found)`);
+    }
+  }
 
-  const { converted, modulators, flagged } = harvest.report;
-  console.log(`\nharvest: ${converted}/${modulators} modulators became parameters`);
-  for (const flag of flagged) console.log(`  flagged  ${flag.name || flag.id}: ${flag.reason}`);
+  let status = 0;
+  if (args.verify) {
+    const check = await verifyHarvest(read, harvest);
+    printVerify(check);
+    if (check.mismatches.length || check.invalid) status = 1;
+  }
 
   if (args.profile) {
     mkdirSync(path.dirname(path.resolve(args.profile)), { recursive: true });
@@ -183,39 +381,41 @@ async function main() {
   }
 
   if (args.panel) {
+    const hasProfile = harvest.profile.parameters.length > 0;
     const plan = planReconstruction(read, {
-      profileId: harvest.profile.id,
-      parameterIds: new Set(harvest.profile.parameters.map((p) => p.id)),
+      profileId: hasProfile ? harvest.profile.id : '',
+      parameterIdOf: hasProfile ? harvest.parameterIdOf : null,
+      profile: hasProfile ? harvest.profile : null,
     });
     if (!plan.ok) { console.error(plan.error); return 1; }
-    console.log(`\nreconstruct: ${plan.placed.length} placed, ${plan.skipped.length} skipped`);
-    for (const skip of plan.skipped) console.log(`  skipped  ${skip.name}: ${skip.reason}`);
-    for (const loose of plan.unbound) console.log(`  unbound  ${loose.name}: ${loose.reason}`);
-    for (const note of plan.notes) console.log(`  note     ${note}`);
+    console.log(`\nreconstruct: ${plan.placed.length} placed, ${plan.skipped.length} left out, ${plan.unbound.length} not bound`);
+    for (const skip of plan.skipped) console.log(`  left out   ${skip.name}: ${skip.reason}`);
+    for (const loose of plan.unbound) console.log(`  not bound  ${loose.name}: ${loose.reason}`);
+    for (const note of plan.notes) console.log(`  note       ${note}`);
 
     const text = await buildPanel(plan, {
-      name: `${read.panel.name || 'Imported'} (Ctrlr)`,
+      name: `${read.panel.name || path.basename(args.file).replace(/\.[^.]+$/, '')} (Ctrlr)`,
       width: read.panel.width,
       height: read.panel.height,
-      profileId: harvest.profile.id,
+      profileId: hasProfile ? harvest.profile.id : '',
     });
     mkdirSync(path.dirname(path.resolve(args.panel)), { recursive: true });
     writeFileSync(args.panel, text, 'utf8');
     console.log(`wrote ${args.panel}`);
   }
 
-  // S4, reported rather than translated. The rule the plan states and this obeys: never silently
-  // half-translate a script. A converted panel that looks right and behaves subtly wrong is worse
-  // than one that says plainly which methods are not running.
+  // Reported rather than translated: never silently half-translate a script. A converted panel
+  // that looks right and behaves subtly wrong is worse than one that says plainly which methods
+  // are not running.
   if (read.luaMethods.length) {
-    console.log(`\nlua: ${read.luaMethods.length} method(s) imported as reference text, none running`);
+    console.log(`\nlua: ${read.luaMethods.length} method(s), kept in the panel's notes as text (none of them runs in the panel)`);
     for (const method of read.luaMethods) {
-      console.log(`  ${method.classification.padEnd(10)} ${method.name || '(unnamed)'}`
-        + `${method.hooks.length ? `  [${method.hooks.join(', ')}]` : ''}`);
+      const uses = Object.entries(method.uses ?? {}).map(([hook, n]) => (n > 1 ? `${hook}×${n}` : hook));
+      console.log(`  ${method.classification.padEnd(10)} ${method.name || '(unnamed)'}${uses.length ? `  [${uses.join(', ')}]` : ''}`);
     }
   }
 
-  return 0;
+  return status;
 }
 
 main().then((code) => { process.exitCode = code; }, (error) => {

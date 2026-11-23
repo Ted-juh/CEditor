@@ -216,6 +216,7 @@
 <div
   class="panel-surface"
   class:device-drop-background={$deviceParameterDrag}
+  data-mount-pending={mountedCount < heldItems.length ? '' : undefined}
   style="width: {panel.width}px; height: {panel.height}px; transform: scale({scale}); transform-origin: 0 0;"
   use:bindSurface
   onclick={onclick}

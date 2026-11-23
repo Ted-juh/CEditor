@@ -19,7 +19,8 @@ commercial license is purchased:
   distributed under those terms while linking AGPL JUCE.
 
 Other dependencies are permissive (Lua/sol2 MIT, WebView2 SDK proprietary-but-redistributable,
-Svelte/Vite MIT, QuickJS via juce_javascript MIT) — JUCE is the only gating one.
+Svelte/Vite MIT, QuickJS via juce_javascript MIT; in the editor only, pdf.js Apache-2.0 for PDF and
+Illustrator artwork and three.js MIT for 3D parts) — JUCE is the only gating one.
 
 ## Options
 

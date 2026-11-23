@@ -15,6 +15,48 @@ export function closeApplication() {
   window.__JUCE__.backend.emitEvent('closeApplication', {});
 }
 
+// --- Quitting (QuitGate.h, stores/quitGuard.js) ---
+// The program asks before it quits: 'quitRequested' comes in, and the page answers "asking" at
+// once, then "quit" or "stay". Without an answer in a few seconds the program quits anyway.
+
+/** Listen for 'quitRequested'. */
+export function onQuitRequested(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('quitRequested', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+// --- Documents of the page's own kinds (stores/typedDocuments.js) ---
+// Saved and opened as text files by kind ('ctrl49Screen'); C++ answers every request with
+// 'typedDocumentResult' { requestId, ok, cancelled, filePath, name, data }.
+
+export function saveTypedDocumentAs(requestId, kind, suggestedName, data) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('saveTypedDocumentAs', { requestId, kind, suggestedName, data });
+}
+
+export function saveTypedDocument(requestId, kind, filePath, data) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('saveTypedDocument', { requestId, kind, filePath, data });
+}
+
+export function openTypedDocument(requestId, kind) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('openTypedDocument', { requestId, kind });
+}
+
+export function onTypedDocumentResult(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('typedDocumentResult', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Answer a quit request: 'asking' | 'quit' | 'stay'. */
+export function answerQuit(answer) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('quitAnswer', { answer });
+}
+
 // --- Panel file operations ---
 
 /** Request a "Save As" dialog for a panel. C++ will emit 'panelSaved' on success. */
@@ -803,6 +845,26 @@ export function savePanelPackageAs(suggestedName, data) {
     return;
   }
   window.__JUCE__.backend.emitEvent('savePanelPackageAs', { suggestedName, data });
+}
+
+// --- Pictures (File → Export Picture, stores/pictureExport.js) ---
+// The PNG goes out as base64 with the name to offer; C++ shows a save dialog for .png files and
+// writes the bytes there, and answers with where (or that it could not).
+
+/** Request a "Save Picture As" dialog. C++ emits 'pictureSaved' with { ok, filePath, cancelled }. */
+export function savePictureAs(suggestedName, base64) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — savePictureAs ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('savePictureAs', { suggestedName, data: base64 });
+}
+
+/** Listen for 'pictureSaved'. Callback receives { ok, filePath, cancelled }. */
+export function onPictureSaved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('pictureSaved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
 /** Request an "Open Shared Panel" dialog. C++ emits 'panelPackageOpened' with { filePath, name }. */

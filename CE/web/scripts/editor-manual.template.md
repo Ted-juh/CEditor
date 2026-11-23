@@ -123,8 +123,10 @@ With nothing open, the canvas offers buttons to start: **New Panel**, **Open Pan
 Component**, **New Device Profile**, **New Script Workspace**, **New Screen (CTRL49)** and **Import
 Device Profile**.
 
-**New Screen (CTRL49)** opens the Screen Builder, an early prototype for putting knob pages for a
-hardware synth on the screen of an M-Audio CTRL49 keyboard. It cannot save, and it cannot send pages to
+**New Screen (CTRL49)** (also **File → New CTRL49 Screen**) opens the Screen Builder, an early
+prototype for putting knob pages for a hardware synth on the screen of an M-Audio CTRL49 keyboard.
+**Save** (Ctrl+S) and **Save As…** write the screen as a `.assignment.json` file, which is also the file
+CEditor's CTRL49 bridge loads; **File → Open CTRL49 Screen...** opens one again. It cannot send pages to
 the keyboard itself. To put your own pages on a CTRL49, use the control pages in HoSTage
 ([chapter 13](#13-hostage-the-instrument-host)).
 
@@ -165,7 +167,7 @@ Choose **File → New Panel** (Ctrl+N). The **New Panel** dialog asks for:
 Press **Create Panel**. You can change the size later on the panel's **Core** tab.
 
 There are other ways to start. **File → New Panel from Device Profile** makes a panel with one
-control for every parameter of a synth, already bound. **New Panel from SVG Artwork...** and **New
+control for every parameter of a synth, already bound. **New Panel from Vector Artwork...** and **New
 Panel from Photoshop Artwork...** build a panel from a drawing (see
 [Importing artwork](#importing-artwork)).
 
@@ -553,6 +555,38 @@ The dock's **Text** tool has every text setting of the selected control: font, s
 alignment, how text wraps, its colour or fill, and effects. **Follow selection** switches to whichever
 control you select; **Pinned** keeps it on one.
 
+#### Text styles
+
+A panel with twelve section headings should not need twelve edits to change them. A **text style**
+is a text's type under a name — *Section heading*, *Caption*, *Readout* — and every text that uses it
+follows it. The **Style** list in the Text tool's top row, and the buttons beside it, hold them:
+
+- **New...** makes a style from the selected text as it is now, under a name you type, and links
+  that text to it.
+- **Style** chooses the style a text uses. Choosing one gives the text the style's look at once;
+  with **Follow selection** on and several controls selected, it gives it to all of them. The list
+  says how many texts use each style. **None** unlinks the text and leaves it looking as it does.
+- **Changed** appears when you have changed a text by hand after giving it its style. **Update
+  style** makes the style what this text is now, and every other text using it follows. **Reset**
+  puts this one text back to the style.
+- **Rename...** renames the style; the texts stay linked. **Delete** removes it; the texts that used
+  it keep their look and stop following anything.
+
+Each of these is a single step of undo, however many texts it reaches.
+
+A style holds the type, not the layout: the font, weight, size, letter and word spacing, case,
+underline, strikethrough and overline, the colour, and the line height. Alignment, wrapping, effects
+and the words themselves stay each text's own. A colour that comes from the colour roles (such as
+`{text.primary}`) stays linked to them in the style.
+
+Where a text still has the typeface its control set gives it, the style leaves that to the set: a
+heading in the *Graphite* set keeps drawing in its set's lettering, every text you give the style
+does the same, and switching the panel to another set changes them all. Choose a typeface yourself,
+and that typeface becomes part of the style.
+
+Styles are kept in the panel file. The values are written into each text as well, so the preview,
+the player and an exported plugin show the same panel with or without them.
+
 ### Fonts and icons
 
 CEditor has a set of fonts built in. You can add your own in **Settings → Fonts**, in two ways:
@@ -650,12 +684,59 @@ If you design your panel in a drawing program, CEditor can build it from the dra
    ellipse wherever a control should go. Name each one after what it should become — knob, slider,
    button, toggle, led, label, display, meter or menu — or give it a colour that stands for one.
 2. Everything else in the drawing becomes the panel's background picture.
-3. Choose **File → New Panel from SVG Artwork...** (or **from Photoshop Artwork...**).
+3. Choose **File → New Panel from Vector Artwork...** (or **from Photoshop Artwork...**). Vector
+   artwork is an SVG, a PDF, or an Illustrator file saved with **Create PDF Compatible File**
+   (Illustrator's default).
 
 The Console lists what CEditor guessed and what it skipped. When the drawing changes, **Update Panel
-from SVG Artwork...** moves the controls whose placeholders moved and adds new ones; it never removes
-controls, and it shows you what will change first. Photoshop layer styles, masks and adjustment layers
-are not drawn.
+from Vector Artwork...** moves the controls whose placeholders moved and adds new ones; it never
+removes controls, and it shows you what will change first. Photoshop layer styles, masks and
+adjustment layers are not drawn.
+
+A PDF or an Illustrator file keeps the names of its top-level layers and nothing below them, so put
+the placeholders in a top-level layer called **components** and give each its colour: CEditor types
+them by colour and shape, and you rename the controls afterwards. A file with several artboards asks
+which one to read.
+
+### A panel made in Ctrlr
+
+**File → New Panel from Ctrlr Panel...** opens a panel made in Ctrlr as a new CEditor panel. It reads
+every form a Ctrlr panel comes in: a `.panel`, a `.bpanelz` or `.bpanel`, and a program or plug-in
+Ctrlr exported (an `.exe`, `.dll`, `.vst3`, `.so` or `.dylib`), which carries its panel inside it.
+The panel comes across in three parts:
+
+- Its **MIDI map** becomes a new device profile, one parameter for each control that sends a message
+  of its own: a CC, an NRPN, a pair of CCs, or a SysEx message — with its address, its channel and its
+  checksum, of whichever kind Ctrlr writes. A value that goes through a formula
+  (an offset, a signed value, a list whose rows send their own numbers) is worked out the way Ctrlr
+  works it out. Each parameter sends the bytes the Ctrlr panel sent, value for value. The profile is
+  saved with your other profiles, under the Ctrlr panel's name; importing the same panel again makes a
+  second profile rather than replacing the first.
+- Its **controls** are placed where they were, at their size and in their colours, each bound to its
+  parameter: knobs, sliders, buttons, switches, lists, labels, LCD displays and keyboards. Controls
+  inside a group or on a tab page are placed inside it, on their page; captions become labels
+  attached to their control; Ctrlr's layers become the panel's layers, and the ones that started
+  hidden start hidden. Knobs, sliders and buttons drawn from a strip of pictures draw from the same
+  pictures, and the panel keeps its background picture — when the file carries them.
+- Many panels send a control's MIDI from **Lua** rather than from the control itself. For each such
+  control, the import runs its Lua, in CEditor's own Lua against a stand-in for Ctrlr, through every
+  value the control can take, and records what it sends. Where those bytes follow from the control's
+  value, it becomes a parameter of the profile like any other, checked to send exactly what the Lua
+  sent, value for value. A control whose Lua also reads other controls (a mode switch, a mute) is
+  learned with those as the panel loads, and the note says which it reads. The panel's Lua runs in a
+  sandbox while it is learned: it cannot reach your files, start programs or load anything from disk.
+- The rest of the **Lua** does not run in the new panel. Each method is kept, as text, in the panel's
+  notes (**Ctrlr Lua**), with the hooks that call it, marked by what porting it takes: value and MIDI
+  logic that maps onto CEditor's scripting, panel logic, or drawing, which has no counterpart.
+
+Not everything converts, and what does not is listed, by name and with the reason, in the Console
+and in the note **Ctrlr import**: a control whose Lua moves other controls or sends something
+different depending on the rest of the panel, a program change, a message that sends several SysEx
+messages at once, a picture the file does not carry. Such a control is placed, and sends nothing
+until you give it a script or a parameter. Some panels keep their Lua in files beside the panel
+rather than in it; the import is given only the panel, so those methods are listed as not read. Fonts, the look of the controls and anything
+Ctrlr drew with Lua will look different: the aim is a panel that works and that you can restyle,
+not a copy of the original's look. The new panel is not saved until you save it.
 
 ### Importing a control you drew
 
@@ -666,12 +747,18 @@ part of the drawing still a layer you can change.
    the value; **fader** (or thumb, handle) slides along the layer called **track**; **lamp** (or led,
    light, on) shows when the value is on, **off** when it is off, and **pressed** while it is held.
    A layer named **pivot** marks where a pointer turns; without one, it turns about the middle of
-   the knob it sits on. A name counts inside a group's name too.
-2. Choose **File → New Component from SVG Artwork...** or **New Component from Photoshop Artwork...**.
+   the knob it sits on. A pivot named after a turning layer as well (**pointer shadow pivot**) marks
+   where that one layer turns. Pictures of a turning layer drawn as it looks turned, named with
+   their angle (**pointer reflection at 27**, **at -27**), become one layer of frames: it shows the
+   one for the knob's angle, mixed into the next as the knob turns. A name counts inside a group's
+   name too.
+2. Choose **File → New Component from Vector Artwork...** or **New Component from Photoshop Artwork...**.
+   From a PDF or an Illustrator file, name the moving parts as top-level layers (**pointer**,
+   **cap**, **lamp on**): those are the names the file keeps.
 
 The control opens in the Component Designer, ready to use and to change:
 
-- **From SVG** (Illustrator, Inkscape, Affinity Designer, Figma, Sketch), every shape is a vector
+- **From SVG, PDF or Illustrator** (Illustrator, Inkscape, Affinity Designer, Figma, Sketch), every shape is a vector
   layer, with its colours, gradient (on its fill and its outline), pattern, outline and opacity. Text
   stays text. A shape cut by a clip path is cut for good and stays a vector; a mask, or a clip on
   text, a picture or an outlined shape, becomes the layer's own mask. Pictures linked from the SVG
@@ -681,8 +768,116 @@ The control opens in the Component Designer, ready to use and to change:
   fill and stroke editable. Layer masks and vector masks stay masks, on or off as they were. Drop
   shadows and outer glows stay shadows you can change; a shape layer's other styles become its own
   fill, outline, inner shadows and bevel, and a picture's are drawn into it, close to Photoshop's.
-  Adjustment layers are applied to the layers under them. Change a picture layer's colour with its
-  tint. Text layers stay text where the file says their size and colour.
+  Adjustment layers are applied to the layers under them. Text layers stay text where the file says
+  their size and colour.
+
+**A picture layer's colour.** Select a picture layer and the look bar shows its **Colour**; the
+dock's **Colors** tab opens on it (**Editing: skirt › Colour**). The colour the picture was drawn in
+becomes the one you pick, and every other pixel keeps its proportion to it, so its shading, a
+highlight painted into it or a printed scale stays as drawn. A part made with the Blender add-on is
+worked out again in the new colour, with its shading and highlights, as Blender would light it. A colour from the control set's roles
+links it to the set, as for a fill. Beside the picker, **Drawn** is the colour it was drawn in and
+**Now** the one it has; **Pick from the picture** shows the picture to click the colour that is to
+change (for a picture of more than one colour, which then changes as a whole), and **Back to as
+drawn** gives it its own colours again. A layer of frames changes all its frames together. Light
+(a layer that multiplies, adds or dodges, or one named shading, highlights, shadow, reflection or
+shine) has no colour of its own: the look bar and the dock say so and offer **Edit skirt's colour**
+for the layer it lights. The **Layers** list marks each layer **Picture**, **Frames** or **Light**.
+
+### A 3D part
+
+A **3D part** is a knob CEditor renders itself, with no other program: a small scene of objects,
+each with a shape, a material and a motion, lit by the control set's lamp and seen from straight above.
+
+1. Choose **3D** in the tool strip under the canvas and drag a square on the canvas (a click places
+   one 64 pixels across). It starts as a knob: a skirt that stays put, a body and a knurled metal top
+   that turn, and a pointer.
+2. The **Layers** list shows the 3D part with its objects under it, each with what it does: **stays**,
+   **turns · round** (a turned body: its ridges turn and its light stays where the lamp is) or
+   **turns** (anything else, rendered every 27 degrees). Click one to edit it in the dock's **3D** tab.
+3. In the **3D** tab: its **Name**; **With the Value** (Stays, Turns or Lamp); its **Shape**: a
+   **Turned Body** (Side smooth, knurled or fluted, Ridges, Depth, Diameter, Height, where it Stands,
+   Taper, a Top flat, inset, domed or dished), a **Block** (Width, Length, Corner, Height) or a
+   **Pointer** (a line, a bar, a dot or a chicken-head); and its **Material**: Finish (spun, brushed or
+   polished metal, gloss or satin plastic, rubber), **Colour** and Roughness. **Add Object** copies the
+   one selected; **Remove** takes it away.
+
+A change of shape, finish or motion renders the part again: about a second with a graphics card,
+several without one (the status line in the 3D tab says how long, and the picture there until then
+stays). A **colour** changes at once, picked in the **Colors** dock: the part is worked out again in
+the new colour, lit as it was, as a knob modelled in Blender is. Moving the 3D part moves what it made;
+resizing it renders it again. The component's value turns it; in a new component it gets a grab area
+to turn it by. What it makes is ordinary layers, so the Player and an exported plug-in draw it with
+no 3D at all. It draws as Blender's real-time renderer does, not as its ray tracer: no light bounces
+from one part onto another.
+
+**From a model.** **File → New Component from 3D Model...** opens a glTF file (`.glb`, or a `.gltf`
+with the files it names beside it), which Blender writes with **File → Export → glTF 2.0** and most 3D
+programs can too. It makes a component whose 3D part is the model's objects: each moves by its name,
+as everywhere else (**pointer** turns, **lamp** lights, everything else stays put), and takes its
+colour, metalness and roughness from the file; the 3D tab changes them, and its motion, but not its
+shape. An object named **panel** (or ground, floor, backdrop) is the surface it stands on: the panel
+the control is placed on stands in for it. The file's camera and lights are not used, nor its
+textures. **Replace Model...** in the 3D tab reads a new version of the file and keeps what was set on
+each object of the same name. For a knob that must look exactly as Blender's own renderer draws it,
+use the add-on below instead.
+
+### A control drawn in Figma
+
+The **CEditor Export** plugin saves a Figma frame as an SVG with every layer's name kept. It comes
+with CEditor, in `tools/figma-plugin` beside the program; in Figma choose **Plugins → Development →
+Import plugin from manifest...** and pick `manifest.json` there, once.
+
+1. Select the frame, component or component set that is the control, and run **CEditor Export**.
+   Its window lists each layer and what it will do in CEditor (turns with the value, shown when on,
+   stays put), and warns about a layer with Figma's own name (**Ellipse 12**) and about effects.
+2. With **Variants as states** on, a component set's variants become the control's looks: the one
+   whose property says on (**State=On**, **On=true**) is shown when on, off when off, pressed while
+   held. **Keep text as text** keeps text editable. **Flatten effects into pictures** keeps drop
+   shadows and blurs, which CEditor does not draw from an SVG, by saving each layer that has one as a
+   picture of it.
+3. Choose **Save SVG for CEditor**, then in CEditor **File → New Component from Vector Artwork...**
+   (or **New Panel from Vector Artwork...** for a frame with a **components** layer).
+
+### A knob modelled in Blender
+
+A knob, a fader or a switch modelled in Blender comes in the same way, every part a layer, through a
+small add-on that comes with CEditor.
+
+1. Install it once. In Blender (3.0 or later, from blender.org), choose **Edit → Preferences →
+   Add-ons → Install...** and pick `tools\blender\ceditor_layers.py` in CEditor's folder.
+2. Name the objects as for a drawing: **pointer** turns with the value (model it pointing straight
+   up, the middle of its travel); **rotor** is a round cap whose grip turns while its light stays;
+   **lamp** lights; **fader** slides. Everything else stays still. The object the control sits on
+   is the **panel** (or ground, floor, backdrop); without one, a plane is put under the control
+   while it renders, to catch its shadow.
+3. Choose **File → Export → CEditor Layers (.psd)**, or **Export for CEditor...** on the CEditor
+   tab of the 3D Viewport's sidebar, which also lists what each object will do. Then, in CEditor,
+   **File → New Component from Photoshop Artwork...**.
+
+Each object comes in as its colour, with its shading multiplied over it and its highlights added:
+change a part's colour (see [Importing a control you drew](#importing-a-control-you-drew)) and it is
+lit as Blender would light it in that colour, its edge included: the add-on writes the light on each
+part beside it, and CEditor works the part's shading and highlights out again with the new colour. A
+metal's reflections are its colour: a metal cap's glint, and the pointer's reflection in it, take its
+new colour. So does the light a part that stays put throws on what is beside it: a red skirt casts
+red on the panel by it, and a brass cap a warm light on the skirt under its rim. The shadow
+on the panel is a layer. The pointer is rendered turned every 27 degrees, and so are its shadow and its
+reflection in the parts under it: each comes in as one layer of frames that turns with the value
+and shows the frame for the pointer's angle, the two either side mixed, so the side of the pointer
+towards the light stays lit, and a metal cap mirrors it, as it turns. The shadow turns about a point of its own beside the axis, so it stays on the
+side away from the light whichever way the pointer points. Blender's camera looks straight down
+(the scene's own, when it is orthographic).
+
+A lamp's glow is a layer of its own, and so is its light on the panel; in a switch or a button they
+show when the switch is on, and on a knob they light with a value of their own, **Lamp**, which the
+panel sets with a binding or a script. The **Interact** card lists it under **Set by the panel**,
+with the layers it shows and whether it starts on or off; its **Value From** can make it follow a
+knob or slider on the panel instead, on once that is past half way. Light on the panel brightens whatever panel the control is
+put on in proportion, as light does, a little on a dark panel and a lot on a light one. And CEditor
+mixes the knob's outline with the colour under it as Blender does, so it looks right on a panel of
+any colour, or on a plate filled with one. **For this panel** in the export (on by default) lights a
+lit lamp's outermost pixels as on the scene's own panel.
 
 ### Layer masks
 
@@ -899,14 +1094,22 @@ Device Profile**. Its screens are listed on the left:
   library, which can be exported as JSON or a `.syx` file.
 - **Detect devices** — finds synths that can describe themselves over MIDI 2.0 (MIDI-CI).
 
-**Save to engine** saves your changes to the profile; **Export portable profile** saves a copy.
+**Save to engine** saves your changes to the profile; **Export portable profile** saves a copy. Closing
+the profile's tab with unsaved changes asks first, as every tab does.
 
-> **Not finished yet:** the Device Profile Designer can only show and edit the three profiles it was
-> built with — Generic MIDI CC, Roland GAIA SH-01 and Yamaha AN1x — and profiles found over MIDI-CI. A
-> new profile (**File → New Device Profile**) opens on **Detect devices** only, and saving a new profile
-> does not work yet. Apart from lists of choices, a parameter can only be edited as text on the
-> **Advanced** screen. The **Capture** screen, meant to learn a parameter by moving it on the synth,
-> does not work yet. The preset library is kept on this computer only.
+A new profile (**File → New Device Profile**) starts as a copy of **Generic MIDI CC**: the standard
+controllers every synth answers (modulation, volume, pan, expression, filter and envelope CCs). It is a
+working profile from the start: rename it, delete what your synth does not have and add its own
+parameters. The first **Save to engine** gives it a file of its own, in a `profiles` folder in your
+CEditor settings folder, and from then on it is loaded with the others every time CEditor starts.
+**File → Discover Device (MIDI-CI)...** opens a new profile on **Detect devices** instead, to start from
+what the device says about itself.
+
+> **Not finished yet:** the Device Profile Designer can show and edit the three profiles it was built
+> with — Generic MIDI CC, Roland GAIA SH-01 and Yamaha AN1x — profiles found over MIDI-CI and new ones,
+> but not other profiles you import. Apart from lists of choices, a parameter can only be edited as text
+> on the **Advanced** screen. The **Capture** screen, meant to learn a parameter by moving it on the
+> synth, does not work yet. The preset library is kept on this computer only.
 
 ## 7. Testing your panel
 
@@ -949,6 +1152,27 @@ saved in the panel file. Capture them in Preview.
 
 The dock's **Preview** tool tests one selected control on its own — its look in every state and its
 value — without sending MIDI.
+
+### Can everyone use it?
+
+The dock's **Access** tool checks two things about the panel in front.
+
+**Names.** In Preview, the player and the exported plug-in, a screen reader announces each control
+somebody operates by a name and what it is: "Cutoff, slider, 64". That name is the control's
+**Screen-reader text** (on its **Core** tab) when you wrote one; else the caption attached to it (a
+Label beside it that prints its own words); else a button's own text; else its name in the tree,
+read out as words ("tone1_lfo_shape" is read "tone1 lfo shape"). The tool lists the controls whose name
+is only an id or a type ("Knob 9", a button still called "Button") — type what the control does into
+the field beside each, which becomes its Screen-reader text — and the names several controls share,
+grouped ("FADER" on nine buttons), which a listener cannot tell apart. Click a name to select it on the
+canvas.
+
+**Text contrast.** Press **Check** and every text on the panel is measured against what is drawn behind
+it — the control's plate, a gradient, the panel's picture — as the canvas draws it. Text that reaches
+less than the WCAG AA standard is listed with its contrast and what it needs: 4.5:1, or 3:1 for large
+text (24 pixels, or 19 pixels and bold). Where most of the text's background is fine and a small part
+is not, the text passes; where a gradient runs into the text's own colour, it does not. Text painted
+with a gradient or a picture has no single colour, so it is listed to check by eye.
 
 ## 8. States and animations
 
@@ -1201,8 +1425,9 @@ counter window by the zone the reading is in, stepped or blended, and blended as
 them even where the part is see-through. A bar meter on a track you can see through shows its fill
 through a mask as wide as the reading. A meter
 that shows another control's value keeps showing it: the knob that came into the component with it,
-or the control that stayed on the panel. The **Interact** card says what such a value follows, and
-**Value From** in the value's **Definition** (Advanced) changes it: its own value, another value of
+or the control that stayed on the panel. The **Interact** card lists a value no grab area moves under
+**Set by the panel**, with what it changes and what it follows; **Value From** there, or in the
+value's **Definition** (Advanced), changes it: its own value, another value of
 the component, or a knob or slider on the panel. A control drawn in a classic design (**Core › Control
 design**: Flat disc, Moulded pebble, Studio needle and the rest) comes in as layers that draw that design in its
 own colours: a knob as the drawing itself, shape by shape, its pointer or cap turning with the value;
@@ -1303,6 +1528,40 @@ name and version, but with a different design, is kept as it is, and you are tol
 **Open Recent** in the File menu lists your recent panels, components, device profiles and script
 workspaces.
 
+### Pictures of the design
+
+**File → Export Picture...** saves a PNG of what you designed, for a mock-up, a product page, a
+manual, or another program. The picture is drawn by the same code that draws the canvas, so it is
+what you see there, without what only the editor shows: the grid, guides, rulers, the selection and
+its handles, the dashed "component" outlines and hidden controls. Choose:
+
+- **The whole panel**, as the canvas shows it now. In Preview that means the values the controls show
+  there, so you can set them first.
+- **The selection**, cropped to what the selected controls draw (a knob's scale can reach outside
+  its box). Tick **Only the selected controls, on a transparent background** to leave out the panel
+  and whatever is behind them, including the plate of a container they sit in. **Margin** adds room
+  around them.
+- **A filmstrip of the selected control**: the control at every position, one frame after another
+  in one picture. This is how JUCE's LookAndFeel, HISE and KnobMan read a knob, a fader or a switch.
+  A knob, a slider, a meter or a component with a number for its value gets as many **Frames** as you
+  ask for (64 is usual), from its lowest value to its highest, evenly along its travel. A switch gets
+  two (off and on), a button two (up and pressed), and a component whose value is a list one for each
+  entry. **Frames down** puts them one under another, which is what most programs expect; **Frames
+  across** puts them side by side. The frames are drawn as Preview draws the control, and nothing in
+  the panel changes.
+
+**Size** is 1× to 4×: at 2× every panel pixel is two pixels across, and text and shapes are drawn
+again at that size, not enlarged from a smaller picture. The window shows the size in pixels before
+you export. The file says its size in inches too (96 panel pixels to the inch), so a document or a
+page layout places a 2× picture at the panel's own size, only sharper.
+
+If an image or font the panel uses could not be read, the picture is drawn without it and a notice
+says so, with the details in the Console.
+
+The picture is a PNG. There is no SVG or PDF export: the controls are drawn from styles, effects and
+text the way a web page is, not as vector shapes, so an SVG or PDF of them would only be a PNG inside
+another file.
+
 ### Reading and editing the file as text
 
 The script editor can show the panel's file as text, one item at a time, and you can edit it there.
@@ -1362,9 +1621,22 @@ changes, every 20 seconds by default, so that after a crash CEditor can offer to
 Save to a file when you want your work kept. The options are in **Settings → General**: **Enable
 Autosave**, **Autosave Delay**, **Restore Unsaved Work** and **Reopen Last Session**.
 
-> **Not finished yet:** closing a single tab asks about unsaved changes, but **File → Close Program**
-> (Alt+F4) quits without asking. Only the recovery copy is kept. Device profile tabs also close without
-> asking.
+### Quitting
+
+When you quit CEditor — **File → Close Program**, Alt+F4 or the window's close button — and something
+has unsaved changes, CEditor lists it and asks: panels, script workspaces, components, CTRL49 screens
+and device profiles in the Designer. Choose:
+
+- **Save and quit** saves everything that already has a file, waits until each is written, and then
+  quits. Something that was never saved, or a component (saved with **Export**), cannot be saved
+  without a dialog, so the window stays open and lists what is left: **Cancel**, save those yourself,
+  and quit again.
+- **Quit without saving** keeps the recovery copy of your open panels first, so **Restore Unsaved Work**
+  can offer it next time, and quits.
+- **Cancel** goes back to CEditor.
+
+With nothing unsaved CEditor quits at once. If the window is not answering at all, CEditor still quits
+after a few seconds, so it can always be closed.
 
 ## 12. Exporting a plugin
 
@@ -1497,15 +1769,14 @@ CEditor is a beta. Things to know before you rely on it:
 - **Licence.** CEditor is AGPL-3.0, and exported plugins include JUCE, so they carry the AGPL too: if
   you give an exported plugin to others, you must offer its source. Your `.cepanel` designs are your
   own.
-- **Quitting does not ask.** **Close Program** (Alt+F4) does not ask about unsaved work. Save first.
-- **The Device Profile Designer is partly built.** It edits only the profiles it was built with, new
-  profiles cannot be saved yet, and Capture does not work. See [chapter 6](#6-describing-a-synth-device-profiles).
+- **The Device Profile Designer is partly built.** It edits the profiles it was built with, new ones
+  and ones found over MIDI-CI, not other imported profiles, and Capture does not work. See
+  [chapter 6](#6-describing-a-synth-device-profiles).
 - **One device for some tools.** The Device tool, Detect devices and Presets work only with the device
   called **mainSynth**.
 - **Some tools are partly built.** The dock's **Designer** draws the contents of the Step Sequencer,
-  the Envelope and the Turing Modulator only. The CTRL49 Screen Builder cannot save: closing its tab
-  asks first, then its pages are gone. It can only be opened from the start screen, with no documents
-  open.
+  the Envelope and the Turing Modulator only. The CTRL49 Screen Builder cannot send its pages to the
+  keyboard itself.
 
 [Known issues](known-issues.md) lists the open problems in detail, and the
 [release notes](../RELEASE-NOTES.md) say what this version is.
@@ -1523,30 +1794,35 @@ CEditor is a beta. Things to know before you rely on it:
 | **New Panel** | Ctrl+N | Opens the New Panel dialog: name, starting template and size. |
 | **Open Panel** | Ctrl+O | Opens a `.cepanel` file. |
 | **New Panel from Device Profile** | | Creates a panel with a control for each parameter of a loaded device profile. |
-| **New Panel from SVG Artwork...** | | Builds a panel from an SVG drawing; see [Importing artwork](#importing-artwork). |
-| **Update Panel from SVG Artwork...** | | Applies a revised SVG to the open panel, after showing what will change. |
+| **New Panel from Vector Artwork...** | | Builds a panel from an SVG, PDF or Illustrator drawing; see [Importing artwork](#importing-artwork). |
+| **Update Panel from Vector Artwork...** | | Applies a revised drawing to the open panel, after showing what will change. |
 | **New Panel from Photoshop Artwork...** | | The same from a Photoshop file. |
+| **New Panel from Ctrlr Panel...** | | Opens a Ctrlr panel (`.panel`, `.bpanelz`, `.bpanel`, or a program Ctrlr exported) as a new panel, its MIDI map as a new device profile. See [A panel made in Ctrlr](#a-panel-made-in-ctrlr). |
 | **Update Panel from Photoshop Artwork...** | | The same update from a Photoshop file. |
 | **Open Recent** | | Recently used panels, components, device profiles and script workspaces. |
 | **New Custom Component** | | Opens an empty custom component in its own tab. |
 | **Import Component...** | | Brings in a `.ceditor-component.json` (or library) file and opens a single component. Dropping the file on the window does the same. |
-| **New Component from SVG Artwork...** | | Makes a control from an SVG drawing, every shape a layer; see [Importing a control you drew](#importing-a-control-you-drew). |
-| **New Component from Photoshop Artwork...** | | The same from a Photoshop file, every layer a layer. |
+| **New Component from Vector Artwork...** | | Makes a control from an SVG, PDF or Illustrator drawing, every shape a layer; see [Importing a control you drew](#importing-a-control-you-drew). |
+| **New Component from Photoshop Artwork...** | | The same from a Photoshop file, every layer a layer; a knob modelled in Blender comes in this way too, see [A knob modelled in Blender](#a-knob-modelled-in-blender). |
+| **New Component from 3D Model...** | | Makes a control of a glTF model's objects, rendered by CEditor; see [A 3D part](#a-3d-part). |
 | **Open Component from Library...** | | Opens a component from your library in its own tab. |
-| **New Device Profile** | | Starts a new device profile in the Device Profile Designer. |
+| **New Device Profile** | | Starts a new device profile in the Device Profile Designer, from the standard MIDI controllers. |
 | **Open Device Profile** | | Opens a loaded device profile in the designer. |
 | **Import Device Profile...** | | Loads a device profile from a file. |
 | **Discover Device (MIDI-CI)...** | | Starts a new profile by asking a connected MIDI 2.0 device to describe itself. |
 | **New Script Workspace** | | Opens the scripts of the active panel in the Behavior Designer. |
 | **Open Script Workspace** | | Opens a saved script workspace file. |
-| **Save** | Ctrl+S | Saves the panel (or the script workspace in front); with a component's own tab in front, opens **Export**. |
+| **New CTRL49 Screen** | | Opens a new screen in the Screen Builder. |
+| **Open CTRL49 Screen...** | | Opens a saved screen (a `.assignment.json` file). |
+| **Save** | Ctrl+S | Saves the panel (or the script workspace or CTRL49 screen in front); with a component's own tab in front, opens **Export**. |
 | **Save As...** | Ctrl+Shift+S | Saves under a new name. |
 | **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts, icons and library components inside, for another computer. |
 | **Open Shared Panel...** | | Opens a `.cepanelpkg`. |
+| **Export Picture...** | | Saves a PNG of the panel, the selection, or a filmstrip of the selected control, at 1× to 4×. See [Pictures of the design](#pictures-of-the-design). |
 | **Close Tab** | Ctrl+W | Closes the tab in front, asking first if it has unsaved changes. |
 | **Hostage...** | | Opens HoSTage, the instrument host. |
 | **Settings...** | Ctrl+, | Opens the Settings page. |
-| **Close Program** | Alt+F4 | Quits CEditor — without asking about unsaved work. |
+| **Close Program** | Alt+F4 | Quits CEditor, asking first when something has unsaved changes; see [Quitting](#quitting). |
 
 ### Edit
 
@@ -1633,6 +1909,7 @@ an open panel the items are greyed out.
 | **Routes** | Links between controls, as a list or as patch cords. |
 | **Snapshots** | Saves the values of the whole panel, and recalls, compares, blends and randomises them. |
 | **Preview** | Tries out one selected control on its own. |
+| **Access** | What screen readers will call each control, and whether every text can be read against what is behind it; see [Can everyone use it?](#can-everyone-use-it). |
 | **Console** | Messages from the program: build output, update checks, MIDI errors. |
 
 ## Components

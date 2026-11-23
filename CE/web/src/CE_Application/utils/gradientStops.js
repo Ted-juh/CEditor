@@ -75,9 +75,13 @@ export function svgGradientStops(grad) {
         ? raw
         : parseFloat(String(raw ?? '0').replace('%', ''));
       const position = Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : 0;
+      // A stop's colour may carry its own opacity (AARRGGBB): kept as `opacity`, for stop-opacity.
+      const hex = String(s?.color || 'FFFFFF').replace(/^#/, '');
+      const opacity = hex.length === 8 && /^[0-9a-f]{8}$/i.test(hex) ? parseInt(hex.slice(0, 2), 16) / 255 : 1;
       return {
-        color: String(s?.color || 'FFFFFF').slice(-6).toUpperCase(),
+        color: hex.slice(-6).toUpperCase(),
         position,
+        opacity: Math.round(opacity * 1000) / 1000,
       };
     })
     .sort((a, b) => a.position - b.position);

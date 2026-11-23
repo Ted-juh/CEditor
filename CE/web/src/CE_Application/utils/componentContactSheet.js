@@ -18,6 +18,7 @@ import { resolveStateScopedControl } from './interactionRuntime.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
 import { activeVariantOf, applyActiveVariant, applyVariantPatches } from './customComponentVariants.js';
 import { deepClone } from './deepClone.js';
+import { withColourFollows } from './pictureRecolour.js';
 import { numberOr } from './primitives.js';
 import { attachBooleanInputs, drawnPartEntries, isBooleanGroup } from './booleanGroups.js';
 
@@ -78,7 +79,8 @@ function visibleParts(materialized) {
 // What a cell draws: a combined shape (booleanGroups.js) in place of its operands.
 function drawnParts(materialized) {
   attachBooleanInputs(materialized?._children?.Parts?._children);
-  return drawnPartEntries(visibleParts(materialized));
+  // A metal's highlights in its colour (utils/pictureRecolour.js), as the canvas draws them.
+  return withColourFollows(drawnPartEntries(visibleParts(materialized)), new Map(Object.entries(materialized?._children?.Parts?._children ?? {})));
 }
 
 // What a cell is judged by: every real layout box — the operands, not the box a combined shape

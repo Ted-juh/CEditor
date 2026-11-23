@@ -205,6 +205,9 @@ test('the staged Windows exporter works away from the checkout with bundled Node
       Stage-NodeRuntime -StageDir $env:CEDITOR_TEST_STAGE
     `], { env: { ...process.env, CEDITOR_TEST_PACKAGER: packageScript, CEDITOR_TEST_REPO: repo, CEDITOR_TEST_STAGE: root }, stdio: 'pipe' });
     assert.equal(existsSync(path.join(root, 'CE')), false);
+    // The Blender add-on ships beside the exporter; its test stays in the repository.
+    assert.equal(existsSync(path.join(root, 'tools/blender/ceditor_layers.py')), true);
+    assert.equal(existsSync(path.join(root, 'tools/blender/test_ceditor_layers.py')), false);
     const panelFile = path.join(root, 'input.cepanel');
     writeFileSync(panelFile, JSON.stringify(scripted('lua', {
       exportSettings: { exportClap: false, exportLv2: false },

@@ -107,21 +107,29 @@ export function fitToCSS(fit, align, offsetX, offsetY, flipH, flipV, tileScale, 
  * Build the solid-fill background style (panel.bgSolid / panel.bgColour).
  * Returns '' when disabled.
  */
-export function buildSolidStyle(panel) {
-  if (!panel || panel.bgSolid === false) return '';
-  // A control set may ask for a panel colour (a black tolex, a grey billet). It gets it only
-  // while the panel still wears the colour it was created with — an author who picked a colour
-  // keeps it, the same rule a set's family patch follows for a control.
-  //
-  // One leading "#" is dropped, as every colour reader in the panel drops it: a colour property
-  // takes 6 or 8 hex digits with or without one, and set("panel.bgColour", "red") stores
-  // "#FF0000". Kept, it made "background: ##FF0000", which paints nothing.
+/**
+ * The panel's own colour, as its solid fill paints it: RRGGBB or AARRGGBB, no "#".
+ *
+ * A control set may ask for a panel colour (a black tolex, a grey billet). It gets it only while the
+ * panel still wears the colour it was created with — an author who picked a colour keeps it, the
+ * same rule a set's family patch follows for a control.
+ *
+ * One leading "#" is dropped, as every colour reader in the panel drops it: a colour property takes
+ * 6 or 8 hex digits with or without one, and set("panel.bgColour", "red") stores "#FF0000". Kept, it
+ * made "background: ##FF0000", which paints nothing.
+ */
+export function panelSolidColour(panel) {
   const bare = (colour) => String(colour).replace(/^#/, '').toUpperCase();
   const setColour = controlSetForPanel(panel)?.panel?.colour;
-  const authored = bare(panel.bgColour || DEFAULT_PANEL_COLOUR);
+  const authored = bare(panel?.bgColour || DEFAULT_PANEL_COLOUR);
   // `bgFollowsSet: false`: the author kept this colour when applying a set (utils/controlSetApply.js),
   // even if it is the default one.
-  const hex = setColour && authored === DEFAULT_PANEL_COLOUR && panel.bgFollowsSet !== false ? bare(setColour) : authored;
+  return setColour && authored === DEFAULT_PANEL_COLOUR && panel?.bgFollowsSet !== false ? bare(setColour) : authored;
+}
+
+export function buildSolidStyle(panel) {
+  if (!panel || panel.bgSolid === false) return '';
+  const hex = panelSolidColour(panel);
   if (hex.length === 8) {
     const a = parseInt(hex.slice(0, 2), 16) / 255;
     const rgb = hex.slice(2);

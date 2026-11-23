@@ -1,4 +1,5 @@
-// artworkComponentActions.js — File › New Component from SVG Artwork / from Photoshop Artwork.
+// artworkComponentActions.js — File › New Component from Vector Artwork (an SVG, a PDF or an
+// Illustrator file) / from Photoshop Artwork.
 //
 //   utils/svgComponentImport.js   an SVG's shapes as vector layers. Pure, tested in node.
 //   utils/psdComponentImport.js   a Photoshop file's layers as picture layers. Pure, tested in node.
@@ -9,7 +10,7 @@
 // change; saving or exporting it is as for any component. The file choosers are the panel
 // importers' (stores/svgPanelImportActions.js, stores/psdPanelImportActions.js).
 
-import { chooseSvg } from './svgPanelImportActions.js';
+import { chooseVectorArtwork, pdfOriginText } from './svgPanelImportActions.js';
 import { choosePsd } from './psdPanelImportActions.js';
 import { createComponentDocument } from './componentWorkspace.js';
 import { setActiveEditorTab } from './panels.js';
@@ -20,8 +21,12 @@ import { isJuceAvailable, onFileData, requestFileData } from '../bridge/bridge.j
 
 const baseName = (path, fallback) => String(path ?? '').split(/[\\/]/).pop() || fallback;
 
-/** Open a planned component in the Component Designer, and say what it is. Returns the document. */
-export function openArtworkComponent(plan, tag) {
+/**
+ * Open a planned component in the Component Designer, and say what it is. `origin`: where artwork
+ * read from a PDF came from (stores/svgPanelImportActions.js svgFromPdfBytes), said in the report with
+ * the layers its names came from. Returns the document.
+ */
+export function openArtworkComponent(plan, tag, origin = null) {
   if (!plan?.ok) {
     cerror(`[${tag}]`, plan?.error ?? 'nothing to import');
     notify(plan?.error ?? 'Nothing to import.', { kind: 'error', duration: 0 });
@@ -29,7 +34,8 @@ export function openArtworkComponent(plan, tag) {
   }
   const document = createComponentDocument({ control: plan.component, name: plan.name });
   if (document?.id) setActiveEditorTab({ type: 'component', id: document.id });
-  const summary = describeArtworkComponent(plan, plan.layers);
+  const named = origin?.layers?.length ? `; named from its top-level layers: ${origin.layers.map((layer) => layer.name).join(', ')}` : '';
+  const summary = `${describeArtworkComponent(plan, plan.layers)}${origin ? ` Read from ${pdfOriginText(origin)}${named}.` : ''}`;
   cinfo(`[${tag}] ✓ ${summary} Save or export it to keep it.`);
   for (const line of plan.warnings) cwarn(`[${tag}] ${line}`);
   notify(plan.warnings.length ? `${summary} Some of it is drawn differently: the Console says what.` : summary,
@@ -86,16 +92,19 @@ async function linkedPictures(text, svgPath) {
   return files;
 }
 
-/** Build and open a component from an SVG file's text. */
-export async function importSvgComponentText(text, filePath = '') {
+/** Build and open a component from an SVG file's text (or a PDF's, read as SVG: `origin` says where from). */
+export async function importSvgComponentText(text, filePath = '', origin = null) {
   const [{ planSvgComponentImport }, { loadGeometry }] = await Promise.all([
     import('../utils/svgComponentImport.js'),
     import('../utils/partOutlines.js'),
   ]);
   // Paper.js, to cut a clipped shape to its clip path; without it the clip is the layer's mask.
   const geometry = await loadGeometry().catch(() => null);
-  const files = await linkedPictures(text, filePath);
-  return openArtworkComponent(planSvgComponentImport(text, { fileName: baseName(filePath, 'Artwork.svg'), files, geometry }), 'svg component');
+  // A PDF's pictures are in it; an SVG's may be beside it.
+  const files = origin ? {} : await linkedPictures(text, filePath);
+  const plan = planSvgComponentImport(text, { fileName: baseName(filePath, 'Artwork.svg'), files, geometry });
+  if (plan.ok && origin) plan.warnings = [...(plan.warnings ?? []), ...origin.notes];
+  return openArtworkComponent(plan, origin ? 'pdf component' : 'svg component', origin);
 }
 
 /** Build and open a component from a Photoshop file's bytes. ag-psd loads on first use. */
@@ -109,9 +118,9 @@ export async function importPsdComponentBytes(bytes, filePath = '') {
   return openArtworkComponent(planPsdComponentImport(bytes, { fileName: baseName(filePath, 'Artwork.psd'), geometry }), 'psd component');
 }
 
-/** File › New Component from SVG Artwork. */
+/** File › New Component from Vector Artwork. */
 export function newComponentFromSvgArtwork() {
-  chooseSvg((text, filePath) => importSvgComponentText(text, filePath));
+  chooseVectorArtwork((text, filePath, origin) => importSvgComponentText(text, filePath, origin));
 }
 
 /** File › New Component from Photoshop Artwork. */

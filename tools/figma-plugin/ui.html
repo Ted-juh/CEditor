@@ -1,0 +1,85 @@
+<!-- CEditor Export's window in Figma: what each layer of the selection will do in CEditor, the
+     export's options, and Save. Drawn in Figma's own colours (themeColors), light or dark as Figma is.
+     code.js does the work; this only shows it and saves the file it is handed. -->
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; font: 11px/1.45 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--figma-color-text, #1e1e1e); background: var(--figma-color-bg, #fff); display: flex; flex-direction: column; height: 100vh; }
+  section { padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border, #e6e6e6); }
+  .label { font-size: 10px; font-weight: 600; color: var(--figma-color-text-secondary, #808080); margin-bottom: 6px; }
+  .rows { max-height: 220px; overflow-y: auto; }
+  .row { display: flex; gap: 8px; padding: 3px 0; align-items: baseline; }
+  .row .n { font-weight: 500; min-width: 96px; max-width: 140px; overflow-wrap: anywhere; }
+  .row .d { color: var(--figma-color-text-secondary, #808080); flex: 1; min-width: 0; }
+  .row.warn .d { color: var(--figma-color-text-warning, #b86200); }
+  .row.variant .n::before { content: "◆ "; color: var(--figma-color-icon-component, #9747ff); }
+  .note { color: var(--figma-color-text-warning, #b86200); margin-top: 6px; }
+  .message { color: var(--figma-color-text-secondary, #808080); }
+  label { display: flex; align-items: center; gap: 7px; padding: 2px 0; }
+  button { margin: 12px; margin-top: auto; border: 0; border-radius: 6px; padding: 9px; font: inherit; font-weight: 600; color: var(--figma-color-text-onbrand, #fff); background: var(--figma-color-bg-brand, #0d99ff); cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--figma-color-border-brand-strong, #0d99ff); outline-offset: 2px; }
+  .hint { margin: 0 12px 12px; color: var(--figma-color-text-secondary, #808080); font-size: 10.5px; }
+</style>
+
+<section>
+  <div class="label" id="selected">Selected: nothing</div>
+  <div class="rows" id="rows"></div>
+  <div id="notes"></div>
+</section>
+<section>
+  <div class="label">Export</div>
+  <label><input type="checkbox" id="text" checked> Keep text as text</label>
+  <label><input type="checkbox" id="variants" checked> Variants as states (on, off, pressed)</label>
+  <label><input type="checkbox" id="flatten"> Flatten effects into pictures</label>
+</section>
+<button id="save" disabled>Save SVG for CEditor</button>
+<p class="hint">Then in CEditor: File › New Component from Vector Artwork (or New Panel from Vector Artwork, for a frame with a components layer).</p>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const send = (message) => parent.postMessage({ pluginMessage: message }, '*');
+  const options = () => ({ text: $('text').checked, variants: $('variants').checked, flatten: $('flatten').checked });
+  for (const id of ['text', 'variants', 'flatten']) $(id).addEventListener('change', () => send({ type: 'options', options: options() }));
+  $('save').addEventListener('click', () => send({ type: 'export' }));
+
+  function row(entry) {
+    const div = document.createElement('div');
+    div.className = `row${entry.warn ? ' warn' : ''}${entry.variant ? ' variant' : ''}`;
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = entry.name;
+    const d = document.createElement('span'); d.className = 'd'; d.textContent = entry.does;
+    div.append(n, d);
+    return div;
+  }
+
+  window.onmessage = (event) => {
+    const message = event.data && event.data.pluginMessage;
+    if (!message) return;
+    if (message.type === 'selection') {
+      $('rows').replaceChildren();
+      $('notes').replaceChildren();
+      $('save').disabled = !message.ok;
+      if (!message.ok) {
+        $('selected').textContent = 'Selected: nothing to export';
+        const p = document.createElement('div'); p.className = 'message'; p.textContent = message.message;
+        $('rows').append(p);
+        return;
+      }
+      $('selected').textContent = `Selected: ${message.name} (${message.kind})`;
+      for (const entry of message.rows) $('rows').append(row(entry));
+      for (const text of message.notes) {
+        const p = document.createElement('div'); p.className = 'note'; p.textContent = text;
+        $('notes').append(p);
+      }
+    } else if (message.type === 'save') {
+      const url = URL.createObjectURL(new Blob([message.bytes], { type: 'image/svg+xml' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = message.fileName;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      send({ type: 'saved', fileName: message.fileName });
+    }
+  };
+</script>

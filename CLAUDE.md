@@ -79,13 +79,19 @@ Dropped outright: the old rules 3 and 4 (never push WIP to a branch with an open
 last). Both existed only to avoid paying for runs. Push work in progress and open a draft PR
 whenever it is useful — a draft still runs CI in full, and that is now a feature.
 
-**Release checks are run by hand.** `.github/workflows/release-checks.yml` holds the two checks too
-slow for every PR: a plug-in with C++, C# and Java handlers exported the way an installed CEditor
-exports one (its provisioned MinGW clang, JDK and .NET), loaded by pluginval and checked for every
-handler having run; and the installer packaged end to end, uploaded as an artifact. It has no push or
-PR trigger and must not get one (rule 6); start it from the Actions tab before a release, or after a
-change to the exporter, the native-handler loader or the packaging. The handler half runs locally
-too: `tools/scripts/nativeHandlers/probe-panel.mjs` says how.
+**Release checks are run by hand.** `.github/workflows/release-checks.yml` holds the three checks
+too slow for every PR: a plug-in with C++, C# and Java handlers exported the way an installed
+CEditor exports one (its provisioned MinGW clang, JDK and .NET), loaded by pluginval and checked for
+every handler having run; the installer packaged end to end, uploaded as an artifact; and the
+Blender add-on (`tools/blender/ceditor_layers.py`) held to Blender's own renders of a knob and a
+fader by `tools/blender/test_ceditor_layers.py`, on Linux with Ubuntu's Blender 4.0.2. It has no
+push or PR trigger and must not get one (rule 6); start it from the Actions tab before a release, or
+after a change to the exporter, the native-handler loader, the packaging or the add-on. The handler
+half runs locally too: `tools/scripts/nativeHandlers/probe-panel.mjs` says how. So does the Blender
+one, in two or three minutes: `apt-get install blender`, then
+`blender -b --factory-startup --python tools/blender/test_ceditor_layers.py -- <out-dir>`; add
+`--fixture` to regenerate the web suite's `CE/web/test/fixtures/blender-knob.psd` and its
+references after changing what the add-on writes.
 
 **Do check the premise if something feels off.** `visibility` on the repo API and
 `billable.*.total_ms` on a run's timing endpoint are the two facts this section rests on. They take

@@ -36,6 +36,8 @@
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
+  import { isFramesImage, imageFrameLayers, imageFrameLayerStyle } from '../utils/imageFrames.js';
+  import { pictureColour, recolourPicture, withRecolouredPicture } from '../utils/pictureRecolour.js';
 
   let {
     part = null,
@@ -102,11 +104,29 @@
     return `${transitionDeclaration(bucket, { target: 'part' })} ${colourTransitionVar(bucket?.colour ?? null)}`.trim();
   }
 
+  // A picture in a colour of its own (utils/pictureRecolour.js) that reaches here not yet recoloured
+  // (the Component Designer, the state sheets; on the canvas CanvasControl does it first): drawn as it
+  // is until its pixels are worked out, then in its colour.
+  let wantedColour = $derived(pictureColour(part));
+  let madeColour = $state(null);
+  $effect(() => {
+    const wanted = wantedColour;
+    if (!wanted) {
+      madeColour = null;
+      return undefined;
+    }
+    let live = true;
+    recolourPicture(wanted).then((made) => { if (live) madeColour = made; });
+    return () => { live = false; };
+  });
+  let colouredPart = $derived(madeColour ? withRecolouredPicture(part, madeColour) : part);
+
   let layout = $derived(part?._children?.Layout ?? null);
-  let background = $derived(part?._children?.Background ?? null);
-  let effects = $derived(part?._children?.Effects ?? null);
+  let background = $derived(colouredPart?._children?.Background ?? null);
+  // From the recoloured part: the panel's shadow, recoloured, is a multiply (withRecolouredPicture).
+  let effects = $derived(colouredPart?._children?.Effects ?? null);
   let text = $derived(part?._children?.Text ?? null);
-  let image = $derived(part?._children?.Image ?? null);
+  let image = $derived(colouredPart?._children?.Image ?? null);
   // A panel knob or slider carried by a component (utils/sliderControlPart.js): the panel's own
   // pipeline, fed the session the panel would hold for it, so it draws and animates the same way.
   let sliderControl = $derived(isSliderControlPart(part) ? part?.meta?.sliderControl ?? null : null);
@@ -468,6 +488,14 @@
       'pointer-events:auto',
     ].join('; ');
   });
+
+  // A part that is one of several pictures (utils/imageFrames.js): the one the value chooses, or the
+  // two it falls between, mixed inside the part before the part is laid on what is under it.
+  let frameLayers = $derived(image ? imageFrameLayers(image) : []);
+  let frameStyles = $derived(frameLayers.map((layer) => imageFrameLayerStyle(layer, {
+    mixed: frameLayers.length > 1,
+    smooth: String(image?.interpolation ?? 'nearest') !== 'nearest',
+  })));
 
   let imageStyle = $derived.by(() => {
     if (!image) return '';
@@ -1105,7 +1133,13 @@
       />
     {/if}
 
-    {#if image}
+    {#if isFramesImage(image)}
+      <div class="interactive-part-frames" style="position:absolute; inset:0; isolation:isolate; pointer-events:none">
+        {#each frameStyles as style}
+          <div style={style}></div>
+        {/each}
+      </div>
+    {:else if image}
       <div class="interactive-part-image" style={imageStyle}></div>
     {/if}
 

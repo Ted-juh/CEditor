@@ -54,3 +54,7 @@ build-installer.log
 # downloaded by hand for reading beside the firmware notes in tools/ctrl49/README.md. They are
 # ST's copyright and tens of megabytes: they stay on the machine that downloaded them.
 /docs/STM32F429/
+
+# Python bytecode (the Blender add-on and its test, run from the checkout)
+__pycache__/
+*.pyc

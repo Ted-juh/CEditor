@@ -494,6 +494,18 @@ should.
 - **Scripting toolchains** managed in-app (Settings → Scripting Toolchains). Lua, JavaScript and
   TypeScript need nothing. Python, C++, C# and Java download a toolchain on first use; C# and Java
   are large (~230 MB and ~195 MB) and entirely optional.
+- **Pictures of the design.** File → Export Picture... saves the panel or the selection as a PNG,
+  at 1× to 4×, or one control as a filmstrip of its values for other programs and plug-in
+  frameworks.
+- **Work is not lost on the way out.** Closing CEditor with unsaved panels, device profiles or
+  CTRL49 screens asks first. A new device profile is saved as a file of your own, and CTRL49
+  screens are saved and opened from the File menu.
+- **Accessibility checks.** The dock's **Access** tool lists controls a screen reader cannot tell
+  apart or names only by an id, with a field to name each, and measures every text's contrast
+  against what is drawn behind it, at WCAG AA. Preview, the player and the exported plug-in now
+  read out a control's caption instead of "<name> preview".
+- **Text styles.** Name a text's type once — *Section heading*, *Caption* — in the Text tool's Style
+  bar, and change it once for every text that uses it, in one undo step.
 
 ## Known limits, stated rather than discovered
 
@@ -525,16 +537,30 @@ should.
 
 ## Bringing a Ctrlr panel across
 
-`node tools/scripts/ctrlr-import.mjs <your.panel>` reads a Ctrlr `.panel` or `.bpanelz` and tells
-you what is in it. Add `--profile out.json` to harvest a device profile from its modulators, and
-`--panel out.cepanel` to rebuild the interface on top of that profile. It needs a source checkout —
-there is no in-app importer yet.
+**File → New Panel from Ctrlr Panel...** opens a Ctrlr panel as a new panel — a `.panel`, a
+`.bpanelz` or `.bpanel`, or a program Ctrlr exported, which carries its panel inside it. Its
+modulators become a new device profile, saved with your others, and its controls are placed where
+they were and bound to it: inside their groups and tabs, on their layers, with their captions, and
+drawn from the panel's own picture strips when the file carries them. The same is on the command
+line for a checkout, report only by default: `node tools/scripts/ctrlr-import.mjs <your.panel>`,
+with `--profile out.json`, `--panel out.cepanel` and `--verify`, or `--corpus <folder>`.
 
-It converts a file you already have and fetches nothing. Two things it will not do: guess at a MIDI
-message it cannot express (those modulators are flagged with the reason instead), and translate
-Lua (methods are imported as reference text with a note saying which of them could be ported and
-which drew the panel and cannot be). **No real community panel has been through it yet** — if you
-have one, the report alone is useful and worth sending.
+It has been run on 482 public community panels, John Goodland's among them: every one reads, 94% of
+the controls that send MIDI themselves become parameters, and each of those sends the bytes Ctrlr
+sends, checked value by value against a port of Ctrlr's own code — 2.5 million values, none
+different.
+
+Many panels send a control's MIDI from Lua. Each such control is run, in a sandbox (no files, no
+programs, nothing loaded from disk), through every value it can take, and what it sends becomes a
+parameter where the bytes follow from it — checked to send exactly what the Lua sent, value for
+value. Over the same panels that is 5,414 of 18,971 such controls; one whose Lua also reads other
+controls is learned with them as the panel loads, and the notes say which. Real Ctrlr was then run
+over the same panels, sandboxed, moving each of those controls: for 4,233 of the 4,238 learned
+parameters it could compare, Ctrlr sends exactly the same bytes. Two things it will not
+do: guess at a message it cannot express (those controls are named in the panel's notes with the
+reason), and translate Lua (the methods go into the notes as text; what they do besides sending a
+control's value does not run yet). The bytes have not yet been played to a synth; if you have one a
+panel was made for, that is the check worth sending.
 
 ## Reporting something
 

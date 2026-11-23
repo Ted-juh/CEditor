@@ -69,6 +69,22 @@ function scalePartChrome(part, scale) {
   if (arcTrack && numberOr(arcTrack.thickness, 0) > 0) {
     arcTrack.thickness = numberOr(arcTrack.thickness, 0) * scale.uniform;
   }
+  // A layer's shadows, blur and bevel are drawn in pixels too: a shadow cast 4 px down by a knob drawn
+  // twice the size is cast 8 px down, as the picture of the knob it was drawn from would show it.
+  const effects = part?._children?.Effects?._children;
+  for (const shadow of effects?.Shadows?.items ?? []) {
+    if (!shadow || typeof shadow !== 'object') continue;
+    shadow.offsetX = numberOr(shadow.offsetX, 0) * scale.sx;
+    shadow.offsetY = numberOr(shadow.offsetY, 0) * scale.sy;
+    shadow.blur = numberOr(shadow.blur, 0) * scale.uniform;
+    shadow.spread = numberOr(shadow.spread, 0) * scale.uniform;
+  }
+  if (effects?.Filters && numberOr(effects.Filters.blur, 0) > 0) {
+    effects.Filters.blur = numberOr(effects.Filters.blur, 0) * scale.uniform;
+  }
+  if (effects?.Bevel && numberOr(effects.Bevel.size, 0) > 0) {
+    effects.Bevel.size = numberOr(effects.Bevel.size, 0) * scale.uniform;
+  }
 }
 
 /**

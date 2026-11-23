@@ -20,7 +20,9 @@
   import { validateProfile } from '../generated/dpd/validate.mjs';
   import { buildLegacyProfile } from '../generated/dpd/emit-legacy-core.mjs';
   import { legacyToDpd } from '../generated/dpd/from-legacy-core.mjs';
-  import { saveProfileSource, requestProfileSource, latestProfileSourceSave, profileSources } from '../stores/deviceProfiles.js';
+  import { saveProfileSource, requestProfileSource, latestProfileSourceSave, profileSources, deviceProfiles } from '../stores/deviceProfiles.js';
+  import { newProfileModel } from './dpd/dpdNewProfile.js';
+  import { registerUnsavedEditor } from '../stores/unsavedEditors.js';
   import { familyLabel as familyLabelOf } from './dpd/dpdLabels.js';
   import { createDeviceProfileHistory, designerOwnsUndo } from './dpd/dpdHistory.js';
   import { activeEditorTab } from '../stores/panels.js';
@@ -56,7 +58,11 @@
     appliedSavedFor = null;
     saveStatus = '';
     const id = resolveDpdId(pid);
-    const opening = id ? deepClone(dpdLibrary[id]) : null;
+    // A profile made with File → New Device Profile has no model in the library: it starts as one
+    // of its own (dpd/dpdNewProfile.js). One made to discover a device opens on Detect devices.
+    const draft = id ? null : untrack(() => get(deviceProfiles).find((entry) => String(entry?.id ?? '') === String(pid)));
+    const opening = id ? deepClone(dpdLibrary[id])
+      : (draft?.localDraft && !draft.discover ? newProfileModel(dpdLibrary, { id: pid, name: draft.name }) : null);
     openingModelJson = opening ? JSON.stringify(opening) : null;
     convertedOpening = false;
     model = opening;
@@ -172,6 +178,18 @@
       document.removeEventListener('focusin', track, true);
     };
   });
+
+  // Unsaved changes here are not in any document store, so closing the tab and quitting the
+  // program ask this editor (stores/unsavedEditors.js, stores/quitGuard.js).
+  $effect(() => registerUnsavedEditor({
+    kind: 'deviceProfile',
+    get profileId() { return profileId; },
+    name: () => model?.label ?? profileId ?? 'Device profile',
+    isDirty: () => dirty,
+    canSave: () => !!model && !!profileId,
+    whyNot: () => (model ? 'no profile to save it to' : 'nothing to save yet'),
+    save: () => save(),
+  }));
 
   // One plain copy of the model per change, which everything below reads instead of the live proxy.
   // It is the deep read that makes them follow an edit five levels down. Not $state.snapshot: that

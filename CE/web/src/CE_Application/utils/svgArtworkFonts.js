@@ -18,7 +18,7 @@
  * A family nothing resolves stays as it was and is reported, with the fix: import the font, or turn
  * the text into outlines in the drawing program.
  */
-import { parseXml } from '../../../../../tools/ctrlr-import/xml.mjs';
+import { parseXml } from '../ctrlrImport/xml.js';
 import { fontFileBytes, resolveFont } from './fontSources.js';
 
 function styleValue(style, property) {

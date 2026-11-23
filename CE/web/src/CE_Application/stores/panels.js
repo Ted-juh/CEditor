@@ -33,7 +33,8 @@ import {
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { findControlById } from '../utils/containment.js';
 import { fileDataByteSize, fileDataText } from '../utils/fileDataPayload.js';
-import { confirmDiscardUnsaved, confirmDestructive } from '../utils/confirmDiscard.js';
+import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
+import { profileEditors } from './unsavedEditors.js';
 import { runWhenIdle } from '../utils/runWhenIdle.js';
 import { rememberRecentFile } from './recentFiles.js';
 import { equalityWritable } from '../utils/equalityStore.js';
@@ -67,6 +68,7 @@ import {
 } from './scriptWorkspace.js';
 import {
   closeScreenDocument,
+  saveScreenDocument,
   screenDocuments,
   setActiveScreenDocument,
 } from './screenBuilder.js';
@@ -797,8 +799,11 @@ function ensureDeviceProfileTab(id, name) {
   });
 }
 
-/** Close a device profile editor tab */
+/** Close a device profile editor tab. It asks first when its Designer has unsaved changes, as
+ *  every other tab does (stores/unsavedEditors.js); returns false when the user keeps it open. */
 export function closeDeviceProfileTab(id) {
+  const unsaved = profileEditors(id).find((entry) => { try { return entry.isDirty?.() === true; } catch { return false; } });
+  if (unsaved && !confirmDiscardUnsaved(unsaved.name?.() ?? get(deviceProfileTabs).find((tab) => tab.id === id)?.name)) return false;
   const closingActive = get(activeEditorTab)?.type === 'deviceProfile' && get(activeEditorTab)?.id === id;
   deviceProfileTabs.update((tabs) => tabs.filter((tab) => tab.id !== id));
   panelDesignerSplits.update((splits) => {
@@ -821,6 +826,7 @@ export function closeDeviceProfileTab(id) {
       activeEditorTab.set({ type: 'panel', id: null });
     }
   }
+  return true;
 }
 
 export function swapEditorSplit() {
@@ -898,14 +904,13 @@ export function openTabToSide(tab) {
   // its panel were never on screen together, whatever the script editor's comments said.
 }
 
-/** Close a CTRL49 Screen Builder tab. It asks first when the screen has changes: the Screen
- *  Builder cannot save, so closing one loses it — and Ctrl+W used to do that without a word, while
- *  the tab's × did nothing at all (the tab bar sent it to closePanel, which knows no screens).
- *  Returns false when the user keeps it open. */
+/** Close a CTRL49 Screen Builder tab. It asks first when the screen has unsaved changes, as a
+ *  panel's tab does (Ctrl+W used to close one without a word, while the tab's × did nothing at
+ *  all: the tab bar sent it to closePanel, which knows no screens). Returns false when the user
+ *  keeps it open. */
 export function closeScreenTab(id) {
   const closing = get(screenDocuments).find((doc) => doc.id === id);
-  if (closing?.modified && !confirmDestructive(
-    `"${closing.name}" has changes, and the Screen Builder cannot save them. Close it anyway?`)) return false;
+  if (closing?.modified && !confirmDiscardUnsaved(closing.name)) return false;
   closeScreenDocument(id);
   const active = get(activeEditorTab);
   if (active?.type === 'screen' && active?.id === id) {
@@ -1176,6 +1181,10 @@ export function saveActivePanelAs() {
 /** Save a bound script tab into its panel; an unbound workspace keeps its own file. */
 export function saveActiveEditorDocument({ saveAs = false } = {}) {
   const tab = get(activeEditorTab);
+  if (tab?.type === 'screen') {
+    saveScreenDocument(tab.id, { saveAs });
+    return;
+  }
   if (tab?.type === 'script') {
     const document = get(scriptDocuments).find((entry) => entry.id === tab.id);
     const panel = get(panels).find((entry) => String(entry.id) === String(document?.panelId));

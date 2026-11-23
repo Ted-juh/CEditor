@@ -39,7 +39,7 @@ export const outlineInsetKey = (depth) => String(round3(depth));
 
 /**
  * The bands to paint for a border along an outline:
- *   [{ from, to, colour, dasharray, linecap, facing: 'upLeft' | 'downRight' | null, dots: { radius, gap } | null }]
+ *   [{ from, to, colour, opacity, dasharray, linecap, facing: 'upLeft' | 'downRight' | null, dots: { radius, gap } | null }]
  * `from` / `to` are depths inward from the outline; a dotted band carries `dots` and is drawn on the
  * outline inset by `dots.depth` instead.
  */
@@ -48,7 +48,11 @@ export function outlineBorderBands(border) {
   if (!settings) return [];
   const thickness = Math.max(0, Number(settings.thickness) || 2);
   const style = settings.style ?? 'solid';
-  const colour = `#${String(settings.colour ?? 'FFFFFFFF').slice(-6)}`;
+  const raw = String(settings.colour ?? 'FFFFFFFF').replace(/^#/, '');
+  const colour = `#${raw.slice(-6)}`;
+  // The colour's own opacity (AARRGGBB), kept apart: the shades of an inset or a groove are worked out
+  // from the plain colour, and each band is painted at this opacity.
+  const opacity = /^[0-9a-f]{8}$/i.test(raw) ? Math.round((parseInt(raw.slice(0, 2), 16) / 255) * 1000) / 1000 : 1;
   const dotRadius = settings.dotRadius || 2;
   const rings = [0];
   if (style === 'double') rings.push(settings.doubleGap ?? 2);
@@ -63,6 +67,7 @@ export function outlineBorderBands(border) {
         from: ringOffset,
         to: ringOffset + layer.thick,
         colour,
+        opacity,
         dasharray: layer.dasharray,
         linecap: 'round',
         facing: null,
@@ -73,8 +78,8 @@ export function outlineBorderBands(border) {
     if (style === 'inset' || style === 'outset') {
       const upLeft = resolveStroke(style, thickness, colour, 'top', dotRadius).layers[0];
       const downRight = resolveStroke(style, thickness, colour, 'bottom', dotRadius).layers[0];
-      bands.push({ from: ringOffset, to: ringOffset + thickness, colour: upLeft.colour, dasharray: 'none', linecap: 'butt', facing: 'upLeft', dots: null });
-      bands.push({ from: ringOffset, to: ringOffset + thickness, colour: downRight.colour, dasharray: 'none', linecap: 'butt', facing: 'downRight', dots: null });
+      bands.push({ from: ringOffset, to: ringOffset + thickness, colour: upLeft.colour, opacity, dasharray: 'none', linecap: 'butt', facing: 'upLeft', dots: null });
+      bands.push({ from: ringOffset, to: ringOffset + thickness, colour: downRight.colour, opacity, dasharray: 'none', linecap: 'butt', facing: 'downRight', dots: null });
       continue;
     }
     const resolved = resolveStroke(style === 'double' ? 'solid' : style, thickness, colour, 'top', dotRadius);
@@ -86,6 +91,7 @@ export function outlineBorderBands(border) {
         from: ringOffset + Math.max(0, middle - layer.thick / 2),
         to: ringOffset + middle + layer.thick / 2,
         colour: layer.colour,
+        opacity,
         dasharray: layer.dasharray,
         linecap: layer.linecap || 'butt',
         facing: null,
