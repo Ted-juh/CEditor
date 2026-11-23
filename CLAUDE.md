@@ -183,14 +183,21 @@ cmake -S . -B build/native -G "Visual Studio 17 2022" -A x64 -DCEDITOR_SCRIPTING
 ```bash
 cmake --preset native
 cmake --build --preset native-release -- -k 0
-ctest --test-dir build/native -C Release --output-on-failure
+ctest --test-dir build/native -C Release --output-on-failure -j 8
 ```
 
 `CEDITOR_BUILD_APP` defaults to **OFF** on non-Windows, so a bare `--preset native` configures the
 test executables and nothing else — no WebView2, no `juceaide`, no plugin bundles. Most of the test
 targets are plain executables over `juce_core` with `JUCE_USE_CURL=0` and `JUCE_WEB_BROWSER=0`,
 which is why they need no GTK or WebKit development packages. From cold this is roughly six minutes
-of build and a fraction of a second of tests.
+of build.
+
+`-j 8` runs the test programs side by side, and the run takes as long as its longest test: the
+device-profile engine's, about 40 seconds, since it loads the whole profile library (some 400 MB of
+JSON) three times. On Windows with the app on, all 46 tests took 45 s that way and 103 s one after
+another (2026-11-23), and pass both ways. The same command is the Windows one, in the Developer
+shell above. If `DeviceProfileEngine` ever takes minutes again, look for a linear search in the
+engine before anything else: one that compared every parameter with every recipe made it 13.
 
 **The `-- -k 0` matters.** Two targets pull JUCE modules that need system development headers:
 
@@ -225,7 +232,7 @@ in this file, and is not: it is a stale configure. `rm -rf` the build directory 
 If you genuinely cannot install them, exclude the two by name and know what you gave up:
 
 ```bash
-ctest --test-dir build/native -C Release --output-on-failure -E "DeviceProfileEngine|PanelParameters"
+ctest --test-dir build/native -C Release --output-on-failure -j 8 -E "DeviceProfileEngine|PanelParameters"
 ```
 
 That leaves the device-profile engine and the panel-parameter model unverified. If your change

@@ -288,8 +288,11 @@ jobs:
       - name: Build (Release, all targets)
         run: cmake --build --preset native-release
 
+      # Side by side, one per core: two tests (DeviceProfileEngine, InstrumentHostService) take most of
+      # the time, so the step lasts as long as the longer of them. On a 32-core machine on 2026-11-23,
+      # all 46 passed both ways: 45 s side by side, 103 s one after another.
       - name: C++ tests (CTest)
-        run: ctest --test-dir build/native -C Release --output-on-failure
+        run: ctest --test-dir build/native -C Release --output-on-failure -j $env:NUMBER_OF_PROCESSORS
 
       # Compiled-at-export handlers, end to end, built as an export builds them: C++ through the flat
       # ABI and through the real loader, and Java and C# through their shims with two instances of a
