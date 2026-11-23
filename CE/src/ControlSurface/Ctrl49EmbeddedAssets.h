@@ -13,6 +13,8 @@ extern const unsigned char kKnobPageLua[];        extern const unsigned int kKno
 extern const unsigned char kHostagePageLua[];     extern const unsigned int kHostagePageLuaSize;
 extern const unsigned char kPresetListLua[];      extern const unsigned int kPresetListLuaSize;
 extern const unsigned char kKnobStripPng[];       extern const unsigned int kKnobStripPngSize;
+extern const unsigned char kLiveKnobsPng[];       extern const unsigned int kLiveKnobsPngSize;
+extern const unsigned char kHostageIconSvg[];     extern const unsigned int kHostageIconSvgSize;
 extern const unsigned char kHostageLogoPng[];     extern const unsigned int kHostageLogoPngSize;
 extern const unsigned char kDefaultAssignment[];  extern const unsigned int kDefaultAssignmentSize;
 extern const unsigned char kDefaultPresetBank[];  extern const unsigned int kDefaultPresetBankSize;

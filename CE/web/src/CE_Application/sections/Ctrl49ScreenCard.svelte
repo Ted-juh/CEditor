@@ -21,16 +21,19 @@
    * harness serving only CE/web) loses this card and nothing else.
    */
   import { onDestroy } from 'svelte';
+  import skinNames from '../../../../../tools/ctrl49/live_skin_names.json';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Settings from 'lucide-svelte/icons/settings';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import { ctrl49Screen, hostSurface, hostState, surfaceInput, setControlSlotValue, surfaceStatusText,
-           layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface,
-           metersOnSurface, liveOnSurface } from '../stores/instrumentHost.js';
+           showControlPage, renameControlPage, showSurfaceStagePage, layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface,
+           metersOnSurface, liveOnSurface, setControlScreenSkin } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
   import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload,
            readMetersPayload, readLivePayload, readRackStateExtension, ARP_MODE_NAMES } from '../screen/ctrl49Payloads.js';
 
-  const KIND = { control: 'Controls', performance: 'Performance', browse: 'Sound browser',
+  const KIND = { presets: 'Presets', rack: 'Rack', control: 'Controls', performance: 'Performance', browse: 'Sound browser',
                  layers: 'Layers', soundcheck: 'Soundcheck', discover: 'Discover', cue: 'Cue', changes: 'Changes',
                  meters: 'Meters', live: 'Live' };
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -48,13 +51,14 @@
     let cancelled = false;
     let made = null;
     (async () => {
-      const [lua, strip, logo] = await Promise.all([
+      const [lua, strip, logo, skins] = await Promise.all([
         import('../../../../../tools/ctrl49/Hostage_MultiKnob.lua?raw'),
         import('../../../../../tools/ctrl49/knob_strip.png?url'),
         import('../../../../../tools/ctrl49/hostage_logo.png?url'),
+        import('../../../../../tools/ctrl49/live_knobs.png?url'),
       ]);
       // The object ids the broker uploads them under before binding the page.
-      return createCtrl49Screen(canvas, { lua: lua.default, assets: { 0x0200: strip.default, 0x0210: logo.default },
+      return createCtrl49Screen(canvas, { lua: lua.default, assets: { 0x0200: strip.default, 0x0210: logo.default, 0x0220: skins.default },
                                           redrawOnAsk: true });
     })()
       .then((s) => { if (cancelled) s.dispose(); else { made = s; runtime = s; } })
@@ -77,6 +81,7 @@
     if (!runtime) return;
     try {
       runtime.call('init', []);
+      runtime.call('set_skin', [$hostState.surfacePages?.skin ?? 0]);
       if (showSplash) {
         runtime.call('set_mode', [0]);
       } else {
@@ -100,6 +105,7 @@
   // left blank, and its steppers off.
   function stageSlots({ pageKind, payload }) {
     const unused = { label: '', text: '', unused: true };
+    if (pageKind === 'presets' || pageKind === 'rack') return Array.from({ length: 8 }, () => unused);
     if (pageKind === 'layers') {
       const view = readLayersPayload(payload);
       const part = view.parts.find((p) => p.index === view.focused);
@@ -328,15 +334,45 @@
                                                         meters: false, live: false });
   // The pads do nothing on LAYERS and SOUNDCHECK; on DISCOVER each auditions the row beside it,
   // and on CUE pad 1 goes to the song E1 picked.
+  const live = $derived($ctrl49Screen.pageKind === 'live' ? readLivePayload($ctrl49Screen.payload) : null);
+  const firstStep = $derived(live && live.cursor >= 8 ? 8 : 0);
+  const rowLabel = $derived(live ? 'Sequencer steps' : 'Performance pads');
   const cuePick = $derived($ctrl49Screen.pageKind === 'cue' && readCuePayload($ctrl49Screen.payload).pickedSong !== '');
   const padIdle = (index) => stage && !($ctrl49Screen.pageKind === 'discover' || $ctrl49Screen.pageKind === 'live'
                                        || (cuePick && index === 0));
   const setlists = $derived(($hostState.licence?.features ?? [])
     .find((f) => f.feature === 'scenesAndSetlists')?.allowed !== false);
+  const pages = $derived($hostState.rack?.pages ?? []);
+  const kind = $derived($ctrl49Screen.pageKind);
+  const activePage = $derived(kind === 'control' ? pages.find(p => p.pageId === $ctrl49Screen.pageId) : null);
+  let strip = $state();
+  let editingPage = $state('');
+  let draft = $state('');
+  let managing = $state(false);
+  $effect(() => {
+    const id = activePage?.pageId;
+    if (!strip || !id) return;
+    const button = [...strip.children].find(el => el.dataset.page === id);
+    if (button) {
+      const rect = button.getBoundingClientRect(), view = strip.getBoundingClientRect();
+      if (rect.left < view.left) strip.scrollLeft += rect.left - view.left;
+      else if (rect.right > view.right) strip.scrollLeft += rect.right - view.right;
+    }
+  });
+  function finishRename() {
+    const page = pages.find(p => p.pageId === editingPage);
+    editingPage = '';
+    if (page && draft.trim() && draft.trim() !== page.name) renameControlPage(page.pageId, draft.trim());
+  }
+  const enablePage = { cue: cueOnSurface, live: liveOnSurface, layers: layersOnSurface, meters: metersOnSurface,
+                       soundcheck: soundcheckOnSurface, discover: discoverOnSurface, changes: changesOnSurface };
+  const optionalKinds = ['cue', 'live', 'layers', 'meters', 'soundcheck', 'discover', 'changes'];
   const HINT = {
+    presets: 'Scroll with the big dial or Up/Down. Press the dial to open a group or load a preset. Browse opens the menu. Left goes back one level.',
+    rack: 'Use the cursor or big dial to highlight a rack part. Press the dial to select it. Control returns to your last control page.',
     layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
     soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',
-    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. Pad N turns a step of the cursor\'s half on or off; Shift + pad N ends the pattern at that step (Shift-click here).',
+    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. Blue B1–B8 below the faders toggle steps. The drum pads play their rack assignments. Shift-click a step to set the pattern length.',
     meters: 'Encoders 1–5 are the faders of the parts shown, 6 the master; 7 shows the next parts when there are more than five.',
     cue: 'Encoder 1 picks a song; pad 1 goes to it. Shift + Page steps the set from any page.',
     changes: 'Encoder 1 listens between the save and now, 2 picks a change, 3 puts it back (the other way takes it back), 4 walks back through the saves.',
@@ -347,6 +383,12 @@
 <section class="ctrl49-screen" data-testid="ctrl49-screen-card" aria-label="CTRL49 screen">
   <div class="head">
     <strong>CTRL49 screen</strong>
+    <label>Control page skin
+      <select value={$hostState.surfacePages?.skin ?? 0}
+              onchange={(e) => setControlScreenSkin(Number(e.currentTarget.value))}>
+        {#each skinNames as name, index}<option value={index}>{name}</option>{/each}
+      </select>
+    </label>
     <span class="status" class:live={$hostSurface.state === 'connected'} data-testid="ctrl49-screen-status">{status}</span>
   </div>
 
@@ -368,15 +410,43 @@
         <button type="button" title="Page Left" aria-label="Page Left" data-testid="ctrl49-page-left"
                 onclick={() => surfaceInput(39, 127)}><ChevronLeft size={16} /></button>
         <span class="page" data-testid="ctrl49-page">
-          <b>{$ctrl49Screen.pageIndex + 1}</b> / {$ctrl49Screen.pageCount}
-          <em>{KIND[$ctrl49Screen.pageKind]}</em>
+          {#if activePage}<b>{$ctrl49Screen.pageIndex + 1} / {pages.length}</b> <em>{activePage.name}</em>
+          {:else}{kind === 'presets' ? 'Browse' : KIND[kind]}{/if}
         </span>
         <button type="button" title="Page Right" aria-label="Page Right" data-testid="ctrl49-page-right"
                 onclick={() => surfaceInput(40, 127)}><ChevronRight size={16} /></button>
+        {#if pages.length}
+        <div class="page-strip" bind:this={strip} role="group" aria-label="Control pages">
+          {#each pages as p (p.pageId)}
+            <button data-page={p.pageId} aria-pressed={activePage?.pageId === p.pageId}
+                    onclick={() => showControlPage(p.pageId)}>{p.name}</button>
+          {/each}
+        </div>
+          {#if editingPage}
+            <input aria-label="Control page name" bind:value={draft} use:focusAndSelect onblur={finishRename}
+                   onkeydown={(e) => { if (e.key === 'Enter') finishRename(); if (e.key === 'Escape') editingPage = ''; }} />
+          {:else if activePage && !$hostState.player && !$hostState.stageLocked}
+            <button aria-label="Rename selected control page" title="Rename selected control page"
+                    onclick={() => { editingPage = activePage.pageId; draft = activePage.name; }}><Pencil size={14} /></button>
+          {/if}
+        {/if}
       </div>
 
-      <div class="stage-pages" role="group" aria-label="Stage pages on the keyboard">
+      <div class="page-tools" role="group" aria-label="Stage pages">
+        <button aria-pressed={kind === 'performance'} onclick={() => showSurfaceStagePage('performance')}>Performance</button>
         <span class="group-label">After Performance</span>
+        <button aria-pressed={kind === 'rack'} onclick={() => surfaceInput(35, 127)}>Rack</button>
+        <button aria-pressed={kind === 'presets'} onclick={() => surfaceInput(36, 127)}>Browse</button>
+        {#each optionalKinds as k}
+          <button aria-pressed={kind === k} disabled={(k === 'cue' || k === 'soundcheck') && !setlists && !pagesOn[k]}
+                  onclick={() => pagesOn[k] ? showSurfaceStagePage(k) : enablePage[k](true)}>{KIND[k]}</button>
+        {/each}
+        <button title="Manage pages" aria-label="Manage pages" aria-expanded={managing}
+                onclick={() => managing = !managing}><Settings size={14} /></button>
+      </div>
+      {#if managing}
+      <div class="stage-pages" role="group" aria-label="Manage pages">
+        <span class="group-label">Show on keyboard</span>
         <button type="button" aria-pressed={pagesOn.cue} class:on={pagesOn.cue} data-testid="ctrl49-cue-toggle"
                 disabled={!setlists && !pagesOn.cue}
                 title={setlists ? 'The setlist read mid-show: the song, its section, its clock, what is next' : 'Needs scenes and setlists'}
@@ -401,6 +471,8 @@
                 title="The focused part's sound against its saves: what moved, heard and put back"
                 onclick={() => changesOnSurface(!pagesOn.changes)}>Changes</button>
       </div>
+
+      {/if}
 
       <div class="encoders" role="group" aria-label="Encoders">
         {#each slots as s, slot}
@@ -437,16 +509,26 @@
         {/each}
       </div>
 
-      <span class="group-label">Pads</span>
-      <div class="pads" role="group" aria-label="Pads">
+      <span class="group-label">{rowLabel}</span>
+      <div class="pads" role="group" aria-label={rowLabel}>
         {#each Array(8) as _, index}
-          <button type="button" class="pad" disabled={padIdle(index)}
+          {@const step = live?.steps[firstStep + index]}
+          {@const enabled = step && step.velocity > 0}
+          <button type="button" class="pad" disabled={padIdle(index) || (live && !live.zones.length)}
+                  class:step-on={live && enabled}
+                  aria-pressed={live && step ? enabled : undefined}
                   title={padIdle(index) ? 'The pads do nothing on this page'
                          : $ctrl49Screen.pageKind === 'discover' ? `Audition row ${index + 1}`
                          : $ctrl49Screen.pageKind === 'cue' ? 'Go to the song encoder 1 picked'
                          : $ctrl49Screen.pageKind === 'live' ? 'Click: this step on or off. Shift-click: the pattern ends here'
                          : `Pad ${index + 1}`}
-                  onclick={(event) => pad(index, event.shiftKey)}>{index + 1}</button>
+                  onclick={(event) => pad(index, event.shiftKey)}>
+            {#if live}
+              {firstStep + index + 1} · {step ? (enabled ? 'On' : 'Off') : 'Outside pattern'}
+            {:else}
+              {index + 1}
+            {/if}
+          </button>
         {/each}
       </div>
 
@@ -474,7 +556,18 @@
     border: 1px solid var(--host-line, #2d343e); border-radius: var(--host-radius-panel, 8px);
     background: var(--host-surface, #171b21); color: var(--host-text, #d7dde6);
   }
-  .head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .head label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+  .ctrl49-screen .head select {
+    appearance: none;
+    box-sizing: border-box;
+    min-height: 0;
+    height: 22px;
+    padding: 0 22px 0 6px;
+    font: inherit;
+    color: var(--host-text, #d9e0e6);
+    background: var(--host-field, #12171b) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='m1 1 4 4 4-4' fill='none' stroke='%23aab5be' stroke-width='1.5'/%3E%3C/svg%3E") right 6px center / 10px 6px no-repeat;
+  }
   .head strong { font-size: 13px; }
   .status { font-size: 12px; color: var(--host-text-dim, #8791a0); }
   .status.live { color: #8fd0a4; }
@@ -517,6 +610,24 @@
   span.value:focus-visible { outline: 2px solid var(--host-accent, #ff9408); outline-offset: 1px; }
   .group-label { font-size: 11px; color: var(--host-text-dim, #8791a0); margin-bottom: -4px; }
   .pad { min-height: 34px; padding: 0; }
+  .ctrl49-screen .pads button.step-on {
+    --host-surface-raised: #245783;
+    --host-surface-hover: #306b9b;
+    --host-line: #75b8eb;
+    --host-text: #fff;
+    background: var(--host-surface-raised); color: var(--host-text); border-color: var(--host-line);
+  }
+  .page-tools, .page-strip { display: flex; align-items: center; gap: 6px; }
+  .page-tools { flex-wrap: wrap; }
+  .page-tools .group-label { margin: 0; }
+  .page-strip { overflow-x: auto; min-width: 0; }
+  .pager > button, .pager > .page { flex: none; }
+  .pager input { min-width: 4em; width: 9em; }
+  .page-strip button { flex: none; white-space: nowrap; }
+  .ctrl49-screen .page-strip button[aria-pressed="true"], .ctrl49-screen .page-tools button[aria-pressed="true"] {
+    box-shadow: inset 0 -2px #ed9e4b;
+    border-color: var(--host-accent, #ff9408); background: var(--host-accent-surface, #2a2116);
+  }
   .stage-pages { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .stage-pages .group-label { margin: 0 4px 0 0; }
   /* A light on each switch, lit when the page is on the keyboard. */

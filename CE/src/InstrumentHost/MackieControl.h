@@ -23,6 +23,7 @@ struct Event
     int index = -1;       // fader 0..8, button 0..7, transport 0..4 (rewind, forward, stop, play, record)
     int step = 0;         // bank: -1 or +1
     float value = 0.0f;   // fader position 0..1
+    bool ctrl49Blue = false;
     bool down = false;    // button, bank, transport: pressed rather than released
 };
 
@@ -32,6 +33,11 @@ enum Transport { rewind = 0, forward = 1, stop = 2, play = 3, record = 4 };
     CTRL49's is "CTRL49 Mackie/HUI". */
 inline bool isMackiePort (const juce::String& deviceName)
 {
+   #if JUCE_LINUX
+    // ALSA names the CTRL49's Mackie endpoint by port number.
+    if (deviceName.trimEnd() == "CTRL49 MIDI 4")
+        return true;
+   #endif
     return deviceName.containsIgnoreCase ("mackie") || deviceName.containsIgnoreCase ("HUI");
 }
 

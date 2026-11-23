@@ -13,11 +13,23 @@ Ctrl49SurfaceBroker::Ctrl49SurfaceBroker (host::InstrumentHostService& serviceTo
                                           Options optionsToUse)
     : service (serviceToDrive), options (std::move (optionsToUse))
 {
+    service.onCtrl49BlueButton = [this] (int strip, bool down)
+    {
+        if (currentState != State::connected || ! endpoints || ! endpoints->setBlueButtonLight
+            || reducer.page() != pages().live)
+            return false;
+        // The keyboard also changes its own light. Reassert even an out-of-lane rest.
+        blueLights[(std::size_t) strip] = -1;
+        if (down)
+            applyLiveTurns ({}, (liveCursor < 8 ? 0 : 8) + strip, 0);
+        return true;
+    };
     emitStatus();
 }
 
 Ctrl49SurfaceBroker::~Ctrl49SurfaceBroker()
 {
+    service.onCtrl49BlueButton = {};
     joinWorker();
 
     if (session != nullptr)
@@ -300,6 +312,9 @@ void Ctrl49SurfaceBroker::tick()
                     return;
                 }
 
+               #if JUCE_LINUX
+                service.reopenCtrl49PlayingInputs();
+               #endif
                 endpoints = std::move (found);
                 deviceError.clear();
                 deviceRefusals = 0;
@@ -359,6 +374,7 @@ void Ctrl49SurfaceBroker::tick()
             lastLabels.clear();
             lastState.clear();
             lastStage.clear();
+            lastSkin = 0; // freshly uploaded Lua starts in Classic
             forgetPadState();
             enter (State::connected, endpoints->description);
             lastDisplayMs = 0.0;   // paint immediately
@@ -443,8 +459,35 @@ Ctrl49SurfaceBroker::Pages Ctrl49SurfaceBroker::pages() const
     layout.discover = service.discoverOnSurface() ? next++ : -1;
     layout.changes = service.changesOnSurface() ? next++ : -1;
     layout.browse = service.browsingOnSurface() ? next++ : -1;
+    layout.rack = next++;
     layout.count = next;
     return layout;
+}
+
+void Ctrl49SurfaceBroker::openPartPresets()
+{
+    browsingPartPresets = true;
+    const auto& performance = service.getRackHost().getPerformance();
+    presetPartId = performance.focusedPartId;
+    const auto* part = performance.findPart (presetPartId);
+    presetBrowser.open (service.surfacePartPresets (presetPartId),
+                       part ? part->lastPresetRecordId : juce::String(), presetRoutes[presetPartId]);
+}
+
+int Ctrl49SurfaceBroker::rackCursorIndex() const
+{
+    const auto& rack = service.getRackHost().getPerformance();
+    for (int i = 0; i < rack.parts.size(); ++i)
+        if (rack.parts.getReference (i).partId == rackCursorPart)
+            return i;
+    return livePart();
+}
+
+juce::String Ctrl49SurfaceBroker::rackPadPage() const
+{
+    const auto& rack = service.getRackHost().getPerformance();
+    if (rack.findPage (lastControlPage) != nullptr) return lastControlPage;
+    return rack.pages.isEmpty() ? juce::String() : rack.pages.getReference (0).pageId;
 }
 
 void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
@@ -453,8 +496,18 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     const auto layout = pages();
     const auto controlPages = layout.control;
     const auto performancePage = layout.performance;
+    if (reducer.page() < controlPages)
+        lastControlPage = performance.pages.getReference (reducer.page()).pageId;
     const auto pageBeforeCountChange = reducer.page();
     reducer.setPageCount (layout.count);
+    // Rack stays last as optional pages appear or disappear. Closing a stage page
+    // still falls back to the preceding page, as it did before Rack was added.
+    if (previousRackPage >= 0 && previousRackPage != layout.rack)
+    {
+        if (pageBeforeCountChange == previousRackPage) reducer.setPage (layout.rack);
+        else if (pageBeforeCountChange >= layout.rack) reducer.setPage (layout.rack - 1);
+    }
+    previousRackPage = layout.rack;
     if (pageBeforeCountChange != reducer.page())
         emitStatus();
     // Listening on CHANGES is only while the page is up: off it, the part plays as it is.
@@ -475,6 +528,8 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         for (int i = 0; i < controlPages; ++i)
             if (performance.pages.getReference (i).pageId == requested)
             {
+                browsingPartPresets = false;
+                lastControlPage = requested;
                 if (reducer.setPage (i))
                 {
                     lastLabels.clear();
@@ -491,9 +546,11 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         const auto target = shown == "cue" ? layout.cue : shown == "live" ? layout.live
                           : shown == "layers" ? layout.layers : shown == "meters" ? layout.meters
                           : shown == "soundcheck" ? layout.soundcheck : shown == "discover" ? layout.discover
-                          : shown == "changes" ? layout.changes : -1;
+                          : shown == "changes" ? layout.changes : shown == "performance" ? layout.performance
+                          : shown == "browse" ? layout.browse : -1;
         if (target >= 0 && reducer.setPage (target))
         {
+            browsingPartPresets = false;
             lastLabels.clear();
             lastState.clear();
             lastStage.clear();
@@ -517,9 +574,7 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     std::array<int, 8> liveTurns {};
     int livePad = -1, liveEnd = 0;
 
-    // One reading for both sources: the app's screen sends what the cable sends, so nothing
-    // below knows or cares which it was.
-    const auto handle = [&] (const std::uint8_t* data, std::size_t size)
+    const auto handle = [&] (const std::uint8_t* data, std::size_t size, bool physical)
     {
         // The keyboard answers every display command. A refusal used to be dropped with the
         // rest of the SysEx here, which is how a page it would not draw became a black screen
@@ -536,7 +591,76 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         const auto previousPage = reducer.page();
         const auto previousSlot = reducer.activeSlot();
         const auto previousBank = reducer.padBank();
-        const auto action = reducer.process (data, size);
+        std::optional<Ctrl49Action> action;
+        if (size == 3 && (data[0] & 0xf0) == 0xb0)
+        {
+            const int cc = data[1], value = data[2];
+            const bool inRack = previousPage == layout.rack;
+            if (cc == 36 && value == 127)
+            {
+                if (inRack && browsingPartPresets && presetPartId == performance.focusedPartId)
+                    presetBrowser.show ({});
+                else
+                    openPartPresets();
+                reducer.setPage (layout.rack);
+                action.emplace();
+            }
+            else if (inRack && browsingPartPresets && cc == 33 && value == 127)
+            {
+                const auto id = presetBrowser.select();
+                if (id.isNotEmpty())
+                {
+                    presetRoutes[presetPartId] = presetBrowser.path;
+                    service.loadSurfacePartPreset (presetPartId, id);
+                }
+                return;
+            }
+            else if (inRack && browsingPartPresets && cc == 29 && value == 127)
+            {
+                if (presetBrowser.back()) return;
+                browsingPartPresets = false;
+                rackCursorPart = presetPartId;
+                return;
+            }
+            const bool choose = inRack && ! browsingPartPresets && cc == 33 && value == 127;
+            if ((cc == 35 || cc == 37 || choose) && value == 127)
+            {
+                browsingPartPresets = false;
+                int target = layout.rack;
+                if (cc == 35)
+                    rackCursorPart = performance.focusedPartId;
+                else
+                {
+                    if (choose && rackCursorIndex() >= 0)
+                    {
+                        auto* cmd = new juce::DynamicObject();
+                        cmd->setProperty ("cmd", "focusPart");
+                        cmd->setProperty ("partId", performance.parts.getReference (rackCursorIndex()).partId);
+                        service.handleCommand (juce::var (cmd));
+                    }
+                    target = controlPages ? 0 : layout.performance;
+                    for (int i = 0; i < controlPages; ++i)
+                        if (performance.pages.getReference (i).pageId == lastControlPage)
+                            target = i;
+                }
+                reducer.setPage (target);
+                action.emplace();
+            }
+            else if (inRack && (cc == 34 || ((cc == 30 || cc == 32) && value == 127)))
+            {
+                const int delta = cc == 32 ? -1 : cc == 30 ? 1 : value < 64 ? value : value - 128;
+                if (browsingPartPresets)
+                {
+                    if (presetBrowser.size() > 0)
+                        presetBrowser.cursor = juce::jlimit (0, presetBrowser.size() - 1, presetBrowser.cursor + delta);
+                }
+                else if (! performance.parts.isEmpty())
+                    rackCursorPart = performance.parts.getReference (
+                        juce::jlimit (0, performance.parts.size() - 1, rackCursorIndex() + delta)).partId;
+                return;
+            }
+        }
+        if (! action) action = reducer.process (data, size);
         if (! action)
             return;
 
@@ -564,6 +688,11 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
 
         if (previousPage != reducer.page())
         {
+            if (reducer.page() != layout.rack) browsingPartPresets = false;
+            if (reducer.page() == layout.rack)
+                rackCursorPart = performance.focusedPartId;
+            if (reducer.page() < controlPages)
+                lastControlPage = performance.pages.getReference (reducer.page()).pageId;
             service.noteSurfacePage (reducer.page() < controlPages
                 ? performance.pages.getReference (reducer.page()).pageId : juce::String());
             switchDownAt.fill (-1.0);   // a hold does not carry over to another page's pads
@@ -581,6 +710,26 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
             const auto slot = (std::size_t) action->switchSlot;
             switchDownAt[slot] = action->switchDown ? options.now() : -1.0;
             switchFired[slot] = false;
+        }
+
+        // Physical LIVE pads play the last rack control page, including its layers and chord bank.
+        // Remember the press target so leaving that page while a pad is held releases the same slot.
+        if (physical && action->padChanged && juce::isPositiveAndBelow (action->pad - 1, 8))
+        {
+            auto& held = heldRackPadPages[(std::size_t) (action->pad - 1)];
+            if (action->velocity == 0 && held.isNotEmpty())
+            {
+                service.pressSurfacePad (std::exchange (held, juce::String()), action->pad, false, 0, reducer.padBank());
+                return;
+            }
+            if (reducer.page() < controlPages || reducer.page() == layout.live)
+            {
+                const auto pageId = reducer.page() < controlPages
+                    ? performance.pages.getReference (reducer.page()).pageId : rackPadPage();
+                if (action->velocity > 0) held = pageId;
+                service.pressSurfacePad (pageId, action->pad, action->velocity > 0, action->velocity, reducer.padBank());
+                return;
+            }
         }
 
         if (reducer.page() == performancePage)
@@ -782,8 +931,8 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         else if (reducer.page() == layout.live)
         {
             // E1 picks the step, E2-E5 turn its velocity, octave, ratchets and chance, E6-E8 the
-            // arp's gate, rate and mode; pad N turns step N of the half the cursor is in on or off.
-            // Shift + pad N ends the lane at that step instead, so it loops over fewer than sixteen:
+            // arp's gate, rate and mode; screen button N turns step N of the half the cursor is in on or off.
+            // Shift-click on screen button N ends the lane at that step instead, so it loops over fewer than sixteen:
             // a pad alone can only rest a step, which is not a shorter pattern (the owner at the
             // keyboard, 2026-10-08, wanting four steps round and round).
             if (action->encoderMoved && action->encoderSlot == 0)
@@ -839,11 +988,11 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     };
 
     for (const auto& message : service.consumeVirtualSurfaceInput())
-        handle (message.data(), message.size());
+        handle (message.data(), message.size(), false);
 
     if (fromHardware)
         for (auto message = endpoints->dequeueInput(); message; message = endpoints->dequeueInput())
-            handle (message->data(), message->size());
+            handle (message->data(), message->size(), true);
 
     if (reducer.page() == layout.layers && layersPart >= 0 && layersPart < performance.parts.size()
         && std::any_of (zoneTurns.begin(), zoneTurns.end(), [] (int turn) { return turn != 0; }))
@@ -1019,6 +1168,7 @@ void Ctrl49SurfaceBroker::forgetPadState()
     switchDownAt.fill (-1.0);
     switchFired.fill (false);
     paintedPads.fill (-1);
+    blueLights.fill (-1);
 }
 
 void Ctrl49SurfaceBroker::paintPads()
@@ -1037,22 +1187,26 @@ void Ctrl49SurfaceBroker::paintPads()
     const auto onControlPage = page < layout.control;
     const auto discoverRows = juce::jmin (kDiscoverRows, discoverRead.sounds.size()
                                                          - discoverFirstRow (discoverRead.sounds.size(), discoverSelected));
-    // LIVE: each pad is a step of the half of the lane the cursor is in, lit when it plays.
+    // Only the blue strip buttons mirror the selected half of the LIVE lane.
     std::vector<LiveStep> liveSteps;
     if (page == layout.live && livePart() >= 0)
         liveSteps = liveLaneOf (performance.parts.getReference (livePart()).arp);
+    const auto padPage = onControlPage ? performance.pages.getReference (page).pageId : rackPadPage();
+    const bool paintBlue = page == layout.live && service.mackieSectionEnabled() && endpoints->setBlueButtonLight;
+    if (! paintBlue) blueLights.fill (-1);
     for (int pad = 1; pad <= 8; ++pad)
     {
         const auto liveStep = (liveCursor < 8 ? 0 : 8) + pad - 1;
-        const auto rgb = page == layout.live ? (liveStep < (int) liveSteps.size()
-                                                  && liveSteps[(std::size_t) liveStep].velocity > 0 ? 0xFFA500 : 0)
-                       : onControlPage ? service.padLight (performance.pages.getReference (page).pageId, pad,
-                                                           reducer.padBank())
+        const bool stepOn = liveStep < (int) liveSteps.size() && liveSteps[(std::size_t) liveStep].velocity > 0;
+        const auto rgb = (onControlPage || page == layout.live) ? service.padLight (padPage, pad, reducer.padBank())
                        : page == layout.layers || page == layout.meters || page == layout.soundcheck
                          || page == layout.changes ? 0
                        : page == layout.cue ? (pad == 1 && cuePicked >= 0 ? 0xFFA500 : 0)
                        : page == layout.discover ? (pad <= discoverRows ? 0xFFA500 : 0)
                                                  : 0xFFA500;
+        auto& blue = blueLights[(std::size_t) (pad - 1)];
+        if (paintBlue && blue != int (stepOn) && endpoints->setBlueButtonLight (pad - 1, stepOn))
+            blue = int (stepOn);
         auto& painted = paintedPads[(std::size_t) (pad - 1)];
         if (painted == rgb)
             continue;
@@ -1091,7 +1245,8 @@ void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state,
     obj->setProperty ("payload", toArray (stage));
     obj->setProperty ("pageIndex", reducer.page());
     obj->setProperty ("pageCount", layout.count);
-    obj->setProperty ("pageKind", reducer.page() == layout.browse        ? "browse"
+    obj->setProperty ("pageKind", reducer.page() == layout.rack          ? (browsingPartPresets ? "presets" : "rack")
+                                : reducer.page() == layout.browse        ? "browse"
                                 : reducer.page() == layout.performance   ? "performance"
                                 : reducer.page() == layout.layers        ? "layers"
                                 : reducer.page() == layout.meters        ? "meters"
@@ -1121,7 +1276,54 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     Bytes labels, state, stage;
     std::string stageCall;
 
-    if (reducer.page() == layout.live)
+    if (reducer.page() == layout.rack && browsingPartPresets)
+    {
+        const auto* part = performance.findPart (presetPartId);
+        const int total = part ? presetBrowser.size() : 0;
+        const int presetCursor = presetBrowser.cursor;
+        int number = 0;
+        for (const auto& candidate : performance.parts)
+        {
+            ++number;
+            if (candidate.partId == presetPartId) break;
+        }
+        const auto& path = presetBrowser.path;
+        juce::StringArray breadcrumb;
+        for (const auto& element : path)
+            if (element.isNotEmpty()) breadcrumb.add (element);
+        const auto title = part ? juce::String (number).paddedLeft ('0', 2) + " "
+                                  + (part->hardware ? part->midiOutputName : part->pluginName) : "No part";
+        const int first = juce::jlimit (0, juce::jmax (0, total - 5), presetCursor - 2);
+        std::vector<std::pair<std::string, std::string>> rows;
+        for (int i = first; i < juce::jmin (first + 5, total); ++i)
+        {
+            const auto& row = presetBrowser.rows[i];
+            const auto detail = row.id.isEmpty() ? juce::String (row.count) : juce::String (row.id == part->lastPresetRecordId ? "Loaded" : "");
+            rows.emplace_back (row.label.toStdString(), detail.toStdString());
+        }
+        stage = buildRackListPayload (title.toStdString(), total ? presetCursor : -1, total, first, rows, true,
+                                      path.empty() ? "Browse menu" : breadcrumb.joinIntoString (" > ").toStdString());
+        stageCall = "set_presets";
+    }
+    else if (reducer.page() == layout.rack)
+    {
+        const auto& parts = performance.parts;
+        const int cursor = rackCursorIndex();
+        const int first = juce::jlimit (0, juce::jmax (0, parts.size() - 5), cursor - 2);
+        std::vector<std::pair<std::string, std::string>> rows;
+        for (int i = first; i < juce::jmin (first + 5, parts.size()); ++i)
+        {
+            const auto& part = parts.getReference (i);
+            const auto instrument = part.pluginName.isNotEmpty() ? part.pluginName
+                                  : part.hardware ? part.midiOutputName : juce::String ("Empty");
+            const auto label = juce::String (i + 1).paddedLeft ('0', 2) + "  " + instrument;
+            const auto preset = part.hardware ? part.hardwarePatchName : part.lastPresetName;
+            rows.emplace_back (label.toStdString(), preset.toStdString());
+        }
+        stage = buildRackListPayload (performance.name.toStdString(), cursor, parts.size(), first, rows);
+        stageCall = "set_rack";
+    }
+    else if (reducer.page() == layout.live)
     {
         // The keys as they are played, and the focused part's arp lane with its playhead.
         const auto& parts = performance.parts;
@@ -1443,6 +1645,12 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     // Only bytes that changed travel — the display link is slow and redraws flicker.
     if (toHardware && session != nullptr)
     {
+        const auto skin = service.controlScreenSkin();
+        if (skin != lastSkin)
+        {
+            session->callLua ("set_skin", { static_cast<std::uint8_t> (skin) }, true);
+            lastSkin = skin;
+        }
         if (! stage.empty())
         {
             if (stage != lastStage || stageCall != lastStageCall)

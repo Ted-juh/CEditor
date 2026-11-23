@@ -63,33 +63,7 @@ function Find-InnoCompiler {
     return $null
 }
 
-function Find-VcRedist {
-    $vsWhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-    if (-not (Test-Path $vsWhere)) {
-        return $null
-    }
-
-    $installPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-    if (-not $installPath) {
-        return $null
-    }
-
-    $redistRoot = Join-Path $installPath "VC\Redist\MSVC"
-    if (-not (Test-Path $redistRoot)) {
-        return $null
-    }
-
-    $redist = Get-ChildItem $redistRoot -Directory |
-        Sort-Object Name -Descending |
-        ForEach-Object { Get-ChildItem $_.FullName -Recurse -Filter vc_redist.x64.exe -ErrorAction SilentlyContinue } |
-        Select-Object -First 1
-
-    if ($redist) {
-        return $redist.FullName
-    }
-
-    return $null
-}
+. (Join-Path $PSScriptRoot "Find-VcRedist.ps1")
 
 function Reset-Directory([string]$Path) {
     $resolved = [System.IO.Path]::GetFullPath($Path)
@@ -335,6 +309,9 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     $installerDst = Join-Path $toolsDst "installer"
     New-Item -ItemType Directory -Path $installerDst -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $toolsSrc "installer\HostProductTemplate.iss") -Destination $installerDst -Force
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "installer\hostage.ico") -Destination $installerDst -Force
+
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "installer\hostage.svg") -Destination $installerDst -Force
 
     # Toolchain provisioning scripts only: the top-level files (manifest.json, *.mjs, provision.cmd/.sh,
     # *.cmake, README). Get-ChildItem -File skips the provisioned binary subdirs (llvm-mingw/, dotnet/, ...).

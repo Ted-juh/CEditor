@@ -168,36 +168,38 @@ inline juce::Array<juce::File> vendorPresetRoots (const PluginCatalog& catalog,
                         if (location.isDirectory()) add (location.getChildFile ("Contents/Resources/Factory Presets"));
                     }
         }
-        else if (plugin.name.equalsIgnoreCase ("Zebra3") && plugin.vendor.equalsIgnoreCase ("u-he"))
+        else if ((plugin.name.equalsIgnoreCase ("Zebra3") || plugin.name.equalsIgnoreCase ("TyrellN6"))
+                 && plugin.vendor.equalsIgnoreCase ("u-he"))
         {
+            const auto synth = plugin.name.equalsIgnoreCase ("Zebra3") ? juce::String ("Zebra3") : juce::String ("TyrellN6");
             const auto addData = [&] (const juce::File& data)
             {
-                add (data.getChildFile ("Presets/Zebra3"));
-                add (data.getChildFile ("UserPresets/Zebra3"));
+                add (data.getChildFile ("Presets/" + synth));
+                add (data.getChildFile ("UserPresets/" + synth));
             };
-            addData (documents.getChildFile ("u-he/Zebra3.data"));
+            addData (documents.getChildFile ("u-he/" + synth + ".data"));
            #if JUCE_WINDOWS
             // The installer permits a custom data location independently of the VST3 DLL.
             for (const auto* hive : { "HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE" })
             {
                 const auto location = juce::WindowsRegistry::getValue (
-                    juce::String (hive) + "\\SOFTWARE\\U-HE\\Zebra3\\DataPath");
+                    juce::String (hive) + "\\SOFTWARE\\U-HE\\" + synth + "\\DataPath");
                 if (juce::File::isAbsolutePath (location)) addData (juce::File (location));
             }
            #elif JUCE_MAC
-            add (juce::File ("/Library/Audio/Presets/u-he/Zebra3"));
+            add (juce::File ("/Library/Audio/Presets/u-he/" + synth));
             add (juce::File::getSpecialLocation (juce::File::userHomeDirectory)
-                .getChildFile ("Library/Audio/Presets/u-he/Zebra3"));
+                .getChildFile ("Library/Audio/Presets/u-he/" + synth));
            #elif JUCE_LINUX
-            addData (juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile (".u-he/Zebra3"));
+            addData (juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile (".u-he/" + synth));
            #endif
             for (const auto& module : catalog.allModules())
                 for (const auto& candidate : module.classes)
                     if (candidate.ceId == plugin.ceId)
                     {
                         const auto parent = juce::File (module.path).getParentDirectory();
-                        addData (parent.getChildFile ("Zebra3.data"));
-                        addData (parent.getParentDirectory().getChildFile ("Zebra3.data"));
+                        addData (parent.getChildFile (synth + ".data"));
+                        addData (parent.getParentDirectory().getChildFile (synth + ".data"));
                     }
         }
     }

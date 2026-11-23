@@ -330,7 +330,7 @@ export function emptySurfaceScreen() {
 
 // A stage page is one call with one payload instead of a knob page's set_labels + set_values.
 // Only these two: the name is a function the page runs, so nothing else is let through.
-export const SURFACE_STAGE_CALLS = { layers: 'set_layers', soundcheck: 'set_check', discover: 'set_discover', cue: 'set_cue',
+export const SURFACE_STAGE_CALLS = { presets: 'set_presets', rack: 'set_rack', layers: 'set_layers', soundcheck: 'set_check', discover: 'set_discover', cue: 'set_cue',
                                      changes: 'set_changes', meters: 'set_meters', live: 'set_live' };
 
 export function normalizeSurfaceScreen(payload) {
@@ -344,7 +344,7 @@ export function normalizeSurfaceScreen(payload) {
     payload: bytes(payload?.payload),
     pageIndex: Math.max(0, Math.min(count - 1, Math.trunc(Number(payload?.pageIndex ?? 0) || 0))),
     pageCount: count,
-    pageKind: ['control', 'performance', 'browse', 'layers', 'soundcheck', 'discover', 'cue', 'changes', 'meters', 'live']
+    pageKind: ['presets', 'rack', 'control', 'performance', 'browse', 'layers', 'soundcheck', 'discover', 'cue', 'changes', 'meters', 'live']
       .includes(payload?.pageKind)
       ? payload.pageKind : 'control',
     pageId: String(payload?.pageId ?? ''),
@@ -360,6 +360,7 @@ export const hostSurfaceScreen = writable(emptySurfaceScreen());
     1-8 pads). The broker cannot tell these from the real keyboard, which is the point. */
 /** Shows a control page: the keyboard (or its screen card) moves there, the drawing follows,
     and knobs learned on several pages drive this one. */
+export const showSurfaceStagePage = (kind) => send({ cmd: 'showSurfaceStagePage', kind });
 export const showControlPage = (pageId) => send({ cmd: 'showControlPage', pageId });
 
 /** Ties a page to the preset `partId` has loaded now, so loading that preset shows it; with no
@@ -2824,6 +2825,7 @@ export const finishSoundcheck = () => send({ cmd: 'finishSoundcheck' });
 /** The CTRL49's two stage pages, off until asked for like browsing on the controller: the set's
     soundcheck (turning it on checks the set, so the page opens on fresh results) and every
     part's zone over the keys. `on` omitted flips the page. */
+export const setControlScreenSkin = (skin) => send({ cmd: 'setControlScreenSkin', skin });
 export const soundcheckOnSurface = (on) =>
   send(on === undefined ? { cmd: 'soundcheckOnSurface' } : { cmd: 'soundcheckOnSurface', on });
 export const layersOnSurface = (on) =>
@@ -4762,7 +4764,7 @@ export function normalizeHostState(payload) {
     product: normalizeProduct(p.product),
     reliability: normalizeReliability(p.reliability),
     soundcheck: normalizeSoundcheck(p.soundcheck),
-    surfacePages: { soundcheck: p.surfacePages?.soundcheck === true, layers: p.surfacePages?.layers === true,
+    surfacePages: { skin: Number(p.surfacePages?.skin ?? 0), soundcheck: p.surfacePages?.soundcheck === true, layers: p.surfacePages?.layers === true,
                     discover: p.surfacePages?.discover === true, cue: p.surfacePages?.cue === true,
                     changes: p.surfacePages?.changes === true, meters: p.surfacePages?.meters === true,
                     live: p.surfacePages?.live === true },
@@ -6100,6 +6102,10 @@ export function applyMockCommand(state, payload) {
         if (payload[key] !== undefined) target[key] = payload[key];
     return next;
   }
+  if (cmd === 'setControlScreenSkin') {
+    next.surfacePages.skin = payload.skin;
+    return next;
+  }
   if (cmd === 'soundcheckOnSurface' || cmd === 'layersOnSurface' || cmd === 'discoverOnSurface' || cmd === 'cueOnSurface'
       || cmd === 'changesOnSurface' || cmd === 'metersOnSurface' || cmd === 'liveOnSurface') {
     const key = { soundcheckOnSurface: 'soundcheck', layersOnSurface: 'layers', discoverOnSurface: 'discover',
@@ -6900,7 +6906,7 @@ export function applyMockCommand(state, payload) {
     const pageId = nextMockId('mock-page');
     next.rack.pages.push(normalizeHostState({ rack: { pages: [{
       pageId,
-      name: payload.name || `Page ${next.rack.pages.length + 1}`,
+      name: payload.name || `Surface - ${next.rack.pages.length + 1}`,
       slots: Array.from({ length: 8 }, (_, i) => ({ slotId: `s${i + 1}` })),
     }] } }).rack.pages[0]);
     return next;
@@ -7036,7 +7042,7 @@ export function applyMockCommand(state, payload) {
     // page-add returns a NEW state, so everything after works on whichever holds the page.
     let working = next;
     if (!payload.pageId && working.rack.pages.length === 0)
-      working = applyMockCommand(working, { cmd: 'addControlPage', name: 'Surface' });
+      working = applyMockCommand(working, { cmd: 'addControlPage' });
     const page = working.rack.pages.find((p) => p.pageId === payload.pageId)
       ?? (payload.pageId ? null : working.rack.pages[0]);
     if (!page) return working;
@@ -8726,6 +8732,13 @@ function send(payload) {
       mockSurfaceInput(payload.data);
       return;
     }
+    if (payload?.cmd === 'showSurfaceStagePage') {
+      const state = get(hostState);
+      const index = mockStagePages(state).indexOf(payload.kind);
+      if (index >= 0 || payload.kind === 'performance')
+        mockSurfaceCursor.update((c) => ({ ...c, page: state.rack.pages.length + index + 1, active: 0 }));
+      return;
+    }
     if (payload?.cmd === 'showControlPage') {
       const index = (get(hostState)?.rack?.pages ?? []).findIndex((p) => p.pageId === payload.pageId);
       if (index >= 0) mockSurfaceCursor.update((c) => ({ ...c, page: index, active: 0 }));
@@ -9443,6 +9456,20 @@ function send(payload) {
       hostLibrary.set(mockHostLibrary(mockLibraryView));
       return;
     }
+    if (payload?.cmd === 'renameSavedRack' || payload?.cmd === 'duplicateSavedRack') {
+      const lib = get(hostLibrary);
+      const source = lib.records.find(r => r.recordId === payload.recordId && r.type === 'rack' && !r.factory);
+      const name = payload.name?.trim();
+      if (!source || !name) { hostLastError.set('Select a saved rack and enter a name.'); return; }
+      if (payload.cmd === 'renameSavedRack') {
+        hostLibrary.set({ ...lib, records: lib.records.map(r => r === source ? { ...r, name } : r) });
+      } else {
+        hostLibrary.set({ ...lib, records: [...lib.records, { ...source, recordId: nextMockId('lib-user'), name }],
+          counts: { ...lib.counts, racks: lib.counts.racks + 1, total: lib.counts.total + 1 } });
+        showLibrarySaved({ name });
+      }
+      return;
+    }
     if (payload?.cmd === 'removeLibraryRecord') {
       hostLibrary.update((lib) => ({
         ...lib,
@@ -10092,6 +10119,8 @@ export const browseStateFolder = (ceId) => send({ cmd: 'browseStateFolder', ceId
 export const addStateFolder = (path, ceId) => send({ cmd: 'addStateFolder', path, ceId });
 export const removeStateFolder = (path) => send({ cmd: 'removeStateFolder', path });
 export const saveUserPreset = (partId, name) => send({ cmd: 'saveUserPreset', partId, name });
+export const renameSavedRack = (recordId, name) => send({ cmd: 'renameSavedRack', recordId, name });
+export const duplicateSavedRack = (recordId, name) => send({ cmd: 'duplicateSavedRack', recordId, name });
 export const saveRackToLibrary = (name) => send({ cmd: 'saveRackToLibrary', name });
 export const requestSurfaceLayout = (profileId) =>
   send(profileId ? { cmd: 'getSurfaceLayout', profileId } : { cmd: 'getSurfaceLayout' });

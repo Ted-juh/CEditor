@@ -75,6 +75,7 @@ struct Ctrl49SurfaceEndpoints
 {
     std::unique_ptr<IControllerOutput> output;
     std::function<std::optional<Bytes>()> dequeueInput;
+    std::function<bool (int, bool)> setBlueButtonLight; // zero-based strip, steady on/off
     std::function<bool()> inputRunning;
     std::function<std::string()> inputFailure;
     std::function<void()> closeInput;         // idempotent; called on loss and destruction
@@ -146,6 +147,7 @@ public:
     struct Pages
     {
         int control = 0;       // pages [0, control)
+        int rack = -1;
         int performance = 0;
         int cue = -1;          // -1 when the page is off
         int live = -1;
@@ -213,6 +215,7 @@ private:
     // set_labels + set_values. Sending one kind clears the other's cache: the page on the
     // keyboard switches kind on the call, so a knob page left unchanged while a stage page was
     // up still has to be sent whole when it comes back.
+    int lastSkin = 0;
     Bytes lastStage, shownStage;
     std::string lastStageCall;
     // The stage pages' own cursors: the song SOUNDCHECK shows in full and the part LAYERS edits.
@@ -221,7 +224,19 @@ private:
     int layersPart = -1;
     double lastCheckMs = -1.0e12;            // E8 on SOUNDCHECK re-checks, at most once a second
     // LIVE: the step of the focused part's arp lane that E2-E5 edit.
+    juce::String rackPadPage() const;
+    juce::String lastControlPage;
+    juce::String rackCursorPart;
+    int previousRackPage = -1;
+    int rackCursorIndex() const;
+    void openPartPresets();
+    bool browsingPartPresets = false;
+    juce::String presetPartId;
+    PresetBrowser presetBrowser;
+    std::map<juce::String, PresetBrowser::Path> presetRoutes;
+    std::array<juce::String, 8> heldRackPadPages;
     int liveCursor = 0;
+    std::array<int, 8> blueLights { -1, -1, -1, -1, -1, -1, -1, -1 };
     // METERS: the first part on a strip (E7) and the strip whose encoder turned last.
     int metersFirst = 0;
     int metersTouched = -1;

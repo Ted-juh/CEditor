@@ -52,9 +52,11 @@
 
 {#snippet levelControl(id, label, accessibleLabel, value, change)}
   <div class="level-control">
-    <input class="fader" type="range" min="0" max="2" step="0.01" {value}
+    <div class="fader-slot">
+      <input class="fader" aria-orientation="vertical" type="range" min="0" max="2" step="0.01" {value}
       aria-label={accessibleLabel} ondblclick={() => change(1)}
-      oninput={(e) => change(Number(e.currentTarget.value))} />
+        oninput={(e) => change(Number(e.currentTarget.value))} />
+    </div>
     <HostStereoMeter {id} {label} reading={$hostMeters.channels[id]} />
   </div>
   <span class="db">Gain {db(value)} dB</span>
@@ -230,9 +232,13 @@
   .pan small { min-width: 26px; }
   .sends { display: flex; flex-direction: column; gap: 4px; width: 100%; }
   .send { display: flex; height: 28px; align-items: center; gap: 6px; font-size: 11px; color: #96a2ad; }
-  /* The one vertical control in the app: a real fader. Chromium (which WebView2 is)
-     renders a range vertically from writing-mode alone; rtl puts loud at the top. */
-  .fader { writing-mode: vertical-lr; direction: rtl; width: 22px; height: var(--mixer-meter-height); margin: 0; }
+  /* Rotate a horizontal range so WebKitGTK and WebView2 use the same thumb travel
+     and pointer hit area. Increasing the value moves the cap upwards. */
+  .fader-slot { position: relative; width: 26px; height: var(--mixer-meter-height); }
+  .fader-slot .fader {
+    position: absolute; left: 50%; top: 50%; width: var(--mixer-meter-height); height: 26px;
+    margin: 0; direction: ltr; transform: translate(-50%, -50%) rotate(-90deg);
+  }
   .db { font-size: 12px; color: #b1bbc3; font-variant-numeric: tabular-nums; }
   .switches { display: flex; gap: 4px; }
   .switches .toggle { min-width: 30px; font-size: 11px; padding: 3px 7px; background: var(--host-surface-raised); color: var(--host-text-soft);

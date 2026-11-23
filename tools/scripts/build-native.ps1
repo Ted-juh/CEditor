@@ -5,7 +5,8 @@ param(
     # ships whatever bundle was last built — which is how a pulled UI fix "did not show up"
     # after a green native build. The bundle is rebuilt here by default; -SkipWeb is for the
     # case where you just built it yourself and know it.
-    [switch]$SkipWeb
+    [switch]$SkipWeb,
+    [switch]$HoSTageOnly
 )
 
 Set-StrictMode -Version Latest
@@ -47,6 +48,13 @@ Write-Host "Using vcvars: $vcvars"
 
 $repoRoot = Get-RepoRoot
 
+if ($HoSTageOnly) {
+    if ($PSBoundParameters.ContainsKey("Configuration") -and $Configuration -ne "Release") {
+        throw "The standalone HoSTage preset builds Release."
+    }
+    $Configuration = "Release"
+}
+
 if (-not $SkipWeb) {
     $webRoot = Join-Path $repoRoot "CE\web"
     Push-Location $webRoot
@@ -67,7 +75,9 @@ if (-not $SkipWeb) {
 
 Push-Location $repoRoot
 try {
-    $cmd = "`"$vcvars`" && cmake --preset native && cmake --build --preset native-$($Configuration.ToLowerInvariant())"
+    $configurePreset = if ($HoSTageOnly) { "hostage-windows" } else { "native" }
+    $buildPreset = "$configurePreset-$($Configuration.ToLowerInvariant())"
+    $cmd = "`"$vcvars`" && cmake --preset $configurePreset && cmake --build --preset $buildPreset"
     cmd /c $cmd
 }
 finally {
@@ -82,6 +92,10 @@ $sha = "unknown"
 try { $sha = (& git -C $repoRoot rev-parse --short HEAD) } catch { }
 Write-Host ""
 Write-Host "Native build succeeded ($Configuration, source $sha)."
+if ($HoSTageOnly) {
+    Write-Host "HoSTage and its helpers: $repoRoot\build\hostage-windows\CEHostStandalone_artefacts\Release"
+    return
+}
 Write-Host "Editor:  $repoRoot\build\native\CEditor_artefacts\$Configuration\CEditor.exe"
 Write-Host "Hostage: $repoRoot\build\native\CEHostStandalone_artefacts\$Configuration\Hostage.exe"
 Write-Host "Help > About in either should read build $sha."

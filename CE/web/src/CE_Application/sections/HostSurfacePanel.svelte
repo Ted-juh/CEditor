@@ -278,9 +278,8 @@
   // rune assigned above its own declaration is a class that never appears and no error.
   let hoveredId = $state('');
 
-  function dropOn(event, control) {
+  function attachDraggedParameter(control) {
     if (player || !addressable(control) || !$hostParamDrag.parameterId) return;
-    event.preventDefault();
     // By control, not by slot: a fader or a pad has no slot until this very drop. And by
     // page if there is one — with none, the drop mints it, so the drawing works from the
     // first minute rather than after a trip to the pages list.
@@ -289,6 +288,58 @@
     selectedControlId = control.controlId;
     clearArmed = false;
     hostParamDrag.set({ partId: '', parameterId: '', name: '' });
+  }
+
+  // Keep drags within the embedded view. Native GTK drag-and-drop can hand the
+  // pointer to the parent window before the encoder gets a browser drop event.
+  const usePointerDrag = (globalThis.window?.__JUCE__?.initialisationData?.__juce__platform?.[0]
+    ?? globalThis.navigator?.platform ?? '').toLowerCase().includes('linux');
+  let pointerDrag = null;
+
+  function beginNativeDrag(event, source) {
+    hostParamDrag.set(source);
+    event.dataTransfer.setData('text/plain', source.name || source.parameterId);
+    event.dataTransfer.effectAllowed = 'copy';
+  }
+
+  function clearDragSource() {
+    hostParamDrag.set({ partId: '', parameterId: '', name: '' });
+  }
+
+  function beginPointerDrag(event, source) {
+    if (!usePointerDrag || !event.isPrimary || event.button !== 0) return;
+    pointerDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, source, active: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function controlUnderPointer(event) {
+    const hit = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-surface-control]');
+    return layout.controls.find((control) => control.controlId === hit?.dataset.surfaceControl);
+  }
+
+  function movePointerDrag(event) {
+    if (event.pointerId !== pointerDrag?.id) return;
+    if (!pointerDrag.active) {
+      if (Math.hypot(event.clientX - pointerDrag.x, event.clientY - pointerDrag.y) < 4) return;
+      pointerDrag.active = true;
+      hostParamDrag.set(pointerDrag.source);
+    }
+    const control = controlUnderPointer(event);
+    hoveredId = control && addressable(control) ? control.controlId : '';
+  }
+
+  function cancelPointerDrag() {
+    if (pointerDrag?.active) clearDragSource();
+    pointerDrag = null;
+  }
+
+  function endPointerDrag(event) {
+    if (event.pointerId !== pointerDrag?.id) return;
+    if (pointerDrag.active) {
+      const control = controlUnderPointer(event);
+      if (control) attachDraggedParameter(control);
+    }
+    cancelPointerDrag();
   }
 
   function dragOver(event, control) {
@@ -381,11 +432,14 @@
   }
 
   onDestroy(() => {
+    cancelPointerDrag();
     clearTimeout(clearTimer);
     clearTimeout(litTimer);
   });
 </script>
-<svelte:window onkeydown={(event) => { if (event.key === 'Escape') { clearTimeout(clearTimer); clearArmed = false; } }} />
+<svelte:window onpointermove={movePointerDrag} onpointerup={endPointerDrag}
+  onpointercancel={(event) => { if (event.pointerId === pointerDrag?.id) cancelPointerDrag(); }}
+  onblur={cancelPointerDrag} onkeydown={(event) => { if (event.key === 'Escape') { cancelPointerDrag(); clearTimeout(clearTimer); clearArmed = false; } }} />
 
 <div class="surface" data-testid="host-surface-panel">
   <div class="workspace-title">
@@ -564,19 +618,15 @@
           </div>
           <div class="param-scroll">
             {#each parameters as parameter (parameter.id)}
-              <button type="button" class="param-chip" draggable="true"
+              {@const source = { partId: focusedPart.partId, parameterId: parameter.id, name: parameter.name }}
+              <button type="button" class="param-chip" draggable={!usePointerDrag}
                    class:dragging={$hostParamDrag.parameterId === parameter.id}
                    class:selected={selectedParameterId === parameter.id}
                    data-testid="surface-param"
                    title={`${parameter.name || parameter.id} — select or drag onto a control`}
                    onclick={() => { selectedParameterId = parameter.id; selectedMacroId = ''; }}
-                   ondragstart={(e) => {
-                     hostParamDrag.set({ partId: focusedPart.partId, parameterId: parameter.id,
-                                         name: parameter.name });
-                     e.dataTransfer?.setData('text/plain', parameter.name);
-                     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
-                   }}
-                   ondragend={() => hostParamDrag.set({ partId: '', parameterId: '', name: '' })}>
+                   ondragstart={(e) => beginNativeDrag(e, source)} ondragend={clearDragSource}
+                   onpointerdown={(e) => beginPointerDrag(e, source)}>
                 <!-- A plug-in that reports no name for a parameter still has one to drag: its
                      id, which is at least the thing the plug-in itself calls it. -->
                 <GripVertical size={13} /><span>{parameter.name || parameter.id || `#${parameter.index}`}</span>
@@ -594,17 +644,14 @@
           <div class="panel-heading macro-heading"><strong>Macros</strong><span>{macros.length}</span></div>
           <div class="param-scroll macro-list" data-testid="surface-macros">
             {#each macros as macro (macro.macroId)}
-              <button type="button" class="param-chip" draggable="true"
+              {@const source = { partId: macro.macroId, parameterId: '@macro', name: macro.name || 'Macro' }}
+              <button type="button" class="param-chip" draggable={!usePointerDrag}
                    class:selected={selectedMacroId === macro.macroId}
                    data-testid="surface-macro"
                    title={`${macro.name || 'Macro'} — one knob for everything this macro targets, on any part`}
                    onclick={() => { selectedMacroId = macro.macroId; selectedParameterId = ''; }}
-                   ondragstart={(e) => {
-                     hostParamDrag.set({ partId: macro.macroId, parameterId: '@macro', name: macro.name || 'Macro' });
-                     e.dataTransfer?.setData('text/plain', macro.name || 'Macro');
-                     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
-                   }}
-                   ondragend={() => hostParamDrag.set({ partId: '', parameterId: '', name: '' })}>
+                   ondragstart={(e) => beginNativeDrag(e, source)} ondragend={clearDragSource}
+                   onpointerdown={(e) => beginPointerDrag(e, source)}>
                 <GripVertical size={13} /><span>{macro.name || 'Macro'}</span>
               </button>
             {/each}
@@ -648,7 +695,8 @@
                     || control.x >= region.x + region.w || control.y >= region.y + region.h) ? -1 : 0}
                   class:latched={slot?.toggle && slot?.latched}
                   ondragover={(e) => dragOver(e, control)}
-                  ondrop={(e) => dropOn(e, control)}
+                  data-surface-control={control.controlId}
+                  ondrop={(e) => { e.preventDefault(); attachDraggedParameter(control); }}
                   onclick={() => {
                     selectedControlId = control.controlId;
                     clearArmed = false;
@@ -997,6 +1045,8 @@
     color: var(--host-text-soft);
     font-size: 12px;
     cursor: grab;
+    user-select: none;
+    touch-action: pan-y;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1043,6 +1093,8 @@
   .ctl.target { outline: 2px solid #5b9bd5; outline-offset: 1px; }
   .ctl.lit { outline: 2px solid #e0c060; outline-offset: 1px; }
   .ctl.selected { outline: 3px solid #79b9ee; outline-offset: 2px; z-index: 2; }
+  .ctl.fader.selected.assigned { outline-color: #5fcf8c; }
+  .ctl.fader.selected.assigned.unresolved { outline-color: #e06868; }
   .ctl.learning { animation: learn-pulse 0.75s ease-in-out infinite alternate; }
   @keyframes learn-pulse { from { box-shadow: 0 0 0 0 #e0b65e66; } to { box-shadow: 0 0 0 7px #e0b65e22; } }
   /* The label has to be readable at BOTH sizes, and the two differ by a factor of eight: a
@@ -1346,6 +1398,8 @@
     .page-picker select { min-width: 0; max-width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .ctl.learning { animation: none; outline: 2px solid #dfc18e; }
+    .ctl.fader.selected.assigned { outline-color: #5fcf8c; }
+  .ctl.fader.selected.assigned.unresolved { outline-color: #e06868; }
+  .ctl.learning { animation: none; outline: 2px solid #dfc18e; }
   }
 </style>

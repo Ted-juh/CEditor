@@ -76,6 +76,50 @@ npm install
 cd ../..
 ```
 
+### Build standalone HoSTage for Windows x64
+
+Run `build-hostage.cmd` from the repository root to update the current branch,
+run the HoSTage web and packaging tests, rebuild the standalone app and both
+helpers, and create `build/package/installer/HoSTage-Setup-<version>.exe`.
+The version comes from `tools/installer/hostage-windows.json`. The build log
+is `build/build-hostage.log`. The script uses Inno Setup 6, the Visual Studio
+x64 redistributable and the WebView2 offline installer in `tools/installer/thirdparty`.
+
+From PowerShell at the repository root, run:
+
+```powershell
+.\tools\scripts\build-native.ps1 -HoSTageOnly
+```
+
+This builds the production web UI, then the Release standalone and its two plug-in
+helpers with MSVC and Ninja. The program is in
+`build/hostage-windows/CEHostStandalone_artefacts/Release/HoSTage.exe`.
+Keep `CEditorPluginScanner.exe` and `CEditorPluginWorker.exe` beside it.
+
+To stage the official Windows installer inputs after that build, run from the repository root:
+
+```powershell
+node tools/scripts/build-host-product.mjs --stage-only --project tools/installer/hostage-windows.json --build-dir build/hostage-windows --out build/hostage-windows-package
+```
+
+The assembler writes the standalone program, its two helpers and an editor-role
+`hostage.json` under `build/hostage-windows-package/stage/Standalone`. Private
+crash symbols go in a sibling directory. Keep the product manifest's `appId`
+stable across releases so upgrades and per-user product data keep the same identity.
+The Windows preset reads the product name, publisher and version from this same
+manifest when compiling the executable.
+
+To compile the installer, install Inno Setup 6 and place the Microsoft x64
+VC++ redistributable from your build toolchain (`vc_redist.x64.exe`) and the
+Evergreen offline installer (`MicrosoftEdgeWebView2RuntimeInstallerX64.exe`)
+in `build/hostage-windows-package/prerequisites`. Then run:
+
+```powershell
+node tools/scripts/build-host-product.mjs --project tools/installer/hostage-windows.json --build-dir build/hostage-windows --out build/hostage-windows-package --prerequisites-dir build/hostage-windows-package/prerequisites
+```
+
+The setup executable is written to `build/hostage-windows-package/installer`.
+
 ### Running in Development
 
 You need two things running side by side: the Vite dev server (serves the Svelte UI with hot reload) and the JUCE application (the native window with WebView).

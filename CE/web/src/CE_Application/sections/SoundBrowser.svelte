@@ -25,6 +25,7 @@
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
   import { presetWindow } from '../utils/soundBrowserLayout.js';
   import { sounds } from './sounds/soundsBrowser.svelte.js';
+  import RackLibraryActions from './sounds/RackLibraryActions.svelte';
   import SoundsRail from './sounds/SoundsRail.svelte';
   import SoundsInspector from './sounds/SoundsInspector.svelte';
   import SoundsMap from './sounds/SoundsMap.svelte';
@@ -253,6 +254,7 @@
       <button type="button" class="toggle" class:on={detailsOpen} aria-expanded={detailsOpen}
               data-testid="browser-details" onclick={() => (detailsOpen = !detailsOpen)}>Details</button>
     {/if}
+    <RackLibraryActions rack={selected?.type === 'rack' && !selected.factory && selection.size <= 1 ? selected : null} />
   </div>
 
   {#if sounds.selection.length > 1}

@@ -4820,6 +4820,9 @@ void testCtrl49AppScreen()
     using ceditor::ctrl49::Ctrl49SurfaceBroker;
 
     const auto dir = freshDataDir ("surface-app-screen");
+    const auto programsBefore = ceditor::test::StubSynthProcessor::factoryPrograms;
+    const juce::ScopeGuard restorePrograms { [&] { ceditor::test::StubSynthProcessor::factoryPrograms = programsBefore; } };
+    ceditor::test::StubSynthProcessor::factoryPrograms = { { "Init", 0.5f }, { "Bright", 0.9f } };
     seedCatalog (dir);
     Harness h (dir);
     h.cmd ("getState");
@@ -4860,13 +4863,20 @@ void testCtrl49AppScreen()
     const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
     check (screen != nullptr
              && ! (bool) screen->getProperty ("onKeyboard", true)
-             && (int) screen->getProperty ("pageCount", 0) == 6
+             && (int) screen->getProperty ("pageCount", 0) == 7
              && screen->getProperty ("pageKind", {}).toString() == "control"
              && screen->getProperty ("values", {}).size() >= 14 + 8
              && (int) screen->getProperty ("values", {})[12] == 1
              && screen->getProperty ("labels", {}).size() > 9,
            "the app is still sent the page, in the bytes the keyboard would get: a control page's "
            "nine bytes, then which page it is and each knob's value as the plug-in writes it");
+
+    h.cmd ("showSurfaceStagePage", { { "kind", "performance" } });
+    tickPast();
+    check (broker.currentPage() == broker.pages().performance, "picker jumps directly to Performance");
+    h.cmd ("showControlPage", { { "pageId", firstPage } });
+    tickPast();
+    check (broker.currentPage() == 0, "picker returns to the selected control page by ID");
 
     const auto cutoffBefore = synth->cutoff->get();
     for (int i = 0; i < 10; ++i)
@@ -4887,6 +4897,62 @@ void testCtrl49AppScreen()
     check (h.emits.last ("instrumentHostSurfaceScreen") == nullptr,
            "an unchanged screen is not sent again");
 
+    h.cmd ("addPart");
+    const auto& rackState = h.service->getRackHost().getPerformance();
+    h.cmd ("focusPart", { { "partId", rackState.parts.getReference (0).partId } });
+    press (35, 127);
+    tickPast();
+    check (broker.currentPage() == broker.pages().rack
+           && h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("call", {}).toString() == "set_rack",
+           "Main displays the rack list");
+    press (30, 127);
+    press (34, 127);
+    press (34, 1);
+    tickPast();
+    check (rackState.focusedPartId == rackState.parts.getReference (0).partId, "scrolling preserves focus until selection");
+    press (33, 127);
+    tickPast();
+    check (rackState.focusedPartId == rackState.parts.getReference (1).partId && broker.currentPage() == 4,
+           "dial press selects the highlighted part and recalls the last control page");
+    press (35, 127);
+    press (32, 127);
+    press (37, 127);
+    tickPast();
+    check (broker.currentPage() == 4 && rackState.focusedPartId == rackState.parts.getReference (1).partId,
+           "Control returns without committing a highlighted part");
+
+    const auto secondId = rackState.parts.getReference (1).partId;
+    h.cmd ("loadInstrument", { { "partId", secondId }, { "ceId", "VST3-good-synth" } });
+    const auto firstPreset = rackState.parts.getReference (0).lastPresetRecordId;
+    const auto secondPreset = rackState.parts.getReference (1).lastPresetRecordId;
+    press (36, 127);
+    tickPast();
+    check (h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("pageKind", {}).toString() == "presets",
+           "Browse opens the focused part's presets");
+    press (34, 1);
+    tickPast();
+    check (rackState.parts.getReference (0).lastPresetRecordId == firstPreset
+           && rackState.parts.getReference (1).lastPresetRecordId == secondPreset, "browsing leaves both sounds intact");
+    press (33, 127);
+    tickPast();
+    check (rackState.parts.getReference (1).lastPresetName == "Bright"
+           && rackState.parts.getReference (0).lastPresetRecordId == firstPreset, "dial loads Bright only on part two");
+    press (36, 127);
+    tickPast();
+    const auto menuPayload = h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("payload", {});
+    check ((int) menuPayload[0] == 0, "second Browse opens the group menu");
+    press (37, 127);
+    press (36, 127);
+    tickPast();
+    const auto presetPayload = h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("payload", {});
+    check ((int) presetPayload[0] == 1, "reopening highlights the loaded preset");
+    press (29, 127);
+    press (29, 127);
+    tickPast();
+    check (h.emits.last ("instrumentHostSurfaceScreen")->getProperty ("pageKind", {}).toString() == "rack",
+           "cursor left returns to the rack without loading");
+    press (37, 127);
+    tickPast();
     press (40, 127);                            // past the last control page
     tickPast();
     screen = h.emits.last ("instrumentHostSurfaceScreen");
@@ -4987,14 +5053,14 @@ void testCtrl49StagePages()
 
     tickPast();
     check (broker.pages().layers < 0 && broker.pages().soundcheck < 0
-             && broker.pages().count == broker.pages().performance + 1,
+             && broker.pages().count == broker.pages().performance + 2,
            "neither page is on the surface until it is asked for");
 
     h.cmd ("layersOnSurface", { { "on", true } });
     h.cmd ("soundcheckOnSurface", { { "on", true } });
     const auto layout = broker.pages();
     check (layout.layers == layout.performance + 1 && layout.soundcheck == layout.performance + 2
-             && layout.count == layout.performance + 3,
+             && layout.count == layout.performance + 4,
            "asked for, they follow the performance page: LAYERS, then SOUNDCHECK");
     const auto surfacePages = h.emits.lastState()->getProperty ("surfacePages", {});
     check ((bool) surfacePages.getProperty ("layers", false) && (bool) surfacePages.getProperty ("soundcheck", false),
@@ -6146,6 +6212,9 @@ void testCtrl49StagePagesRemembered()
         h.cmd ("getState");
         check (! h.service->metersOnSurface() && ! h.service->cueOnSurface() && ! h.service->layersOnSurface(),
                "a first session has no stage pages until they are asked for");
+        h.cmd ("setControlScreenSkin", { { "skin", 13.0 } });
+        h.cmd ("setControlScreenSkin", { { "skin", 15 } });
+        check (h.service->controlScreenSkin() == 13, "a valid skin survives an out-of-range selection");
         h.cmd ("metersOnSurface", { { "on", true } });
         h.cmd ("cueOnSurface", { { "on", true } });
         h.cmd ("layersOnSurface", { { "on", true } });
@@ -6162,6 +6231,8 @@ void testCtrl49StagePagesRemembered()
                "a page switched off again, or never on, stays off");
         check (! h.service->browsingOnSurface(), "the browser is not remembered: every start shows the pages");
         const auto pages = h.emits.lastState()->getProperty ("surfacePages", {});
+        check (h.service->controlScreenSkin() == 13 && (int) pages.getProperty ("skin", -1) == 13,
+               "the keyboard and app recover the same control page skin after restarting");
         check ((bool) pages.getProperty ("meters", false) && (bool) pages.getProperty ("cue", false)
                  && ! (bool) pages.getProperty ("layers", true),
                "and the app's state says so from the start");
@@ -6218,7 +6289,7 @@ void testCtrl49Meters()
     h.cmd ("layersOnSurface", { { "on", true } });
     h.cmd ("metersOnSurface", { { "on", true } });
     const auto layout = broker.pages();
-    check (layout.meters == layout.layers + 1 && layout.count == layout.meters + 1,
+    check (layout.meters == layout.layers + 1 && layout.count == layout.meters + 2,
            "asked for, it follows LAYERS: the pages read on stage first");
     check ((bool) h.emits.lastState()->getProperty ("surfacePages", {}).getProperty ("meters", false),
            "and the app's state says it is on");
@@ -6272,9 +6343,20 @@ void testCtrl49Live()
     h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
     h.cmd ("addPart");
 
+    h.cmd ("addControlPage", { { "name", "Controls" } });
     double fakeNow = 0.0;
     Ctrl49SurfaceBroker::Options options;
-    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    FakeSurface fake;
+    std::array<int, 8> blueLights;
+    blueLights.fill (-1);
+    options.discover = [&]
+    {
+        auto ends = fake.makeEndpoints();
+        ends->setBlueButtonLight = [&] (int strip, bool on) { blueLights[(size_t) strip] = on; return true; };
+        return ends;
+    };
+    options.sessionSleep = [] (int) {};
+    options.loadingMilliseconds = 0;
     options.emit = [&h] (const juce::String& name, const juce::var& payload)
     {
         h.emits.entries.push_back ({ name, payload });
@@ -6309,11 +6391,17 @@ void testCtrl49Live()
         return performance.parts.getReference (0).arp;
     };
 
-    tickPast();
+    for (int i = 0; i < 400 && broker.state() != Ctrl49SurfaceBroker::State::connected; ++i)
+    {
+        tickPast();
+        std::this_thread::sleep_for (std::chrono::milliseconds (2));
+    }
+    check (broker.state() == Ctrl49SurfaceBroker::State::connected, "connected for blue step feedback");
     check (broker.pages().live < 0, "LIVE is not on the surface until it is asked for");
     h.cmd ("cueOnSurface", { { "on", true } });
-    h.cmd ("liveOnSurface", { { "on", true } });
     h.cmd ("layersOnSurface", { { "on", true } });
+    h.cmd ("liveOnSurface", { { "on", true } });
+    tickPast();
     const auto layout = broker.pages();
     check (layout.live == layout.cue + 1 && layout.layers == layout.live + 1,
            "asked for, it comes between CUE and LAYERS");
@@ -6332,6 +6420,40 @@ void testCtrl49Live()
            "a fresh part: arp off, no lane drawn, sixteen plain steps, both parts' zones");
     check (at (bytes, 12) == 100 && at (bytes, 13) == 2 && at (bytes, 14) == 1 && at (bytes, 15) == 100,
            "a plain step: velocity 100, no octave, one hit, always");
+
+    auto bluePress = [&] (int strip)
+    {
+        const auto msg = juce::MidiMessage::noteOn (1, 16 + strip, (juce::uint8) 127);
+        h.service->noteMidiActivity ("CTRL49 Mackie/HUI", msg);
+        h.service->noteMidiActivity ("CTRL49 Mackie/HUI", juce::MidiMessage::noteOff (1, 16 + strip));
+        h.service->drainParameterEvents();
+        tickPast();
+    };
+    for (int strip = 0; strip < 8; ++strip)
+    {
+        check (blueLights[(size_t) strip] == 1, "entry paints the enabled step blue");
+        bluePress (strip);
+        check (focusedArp().velocityPattern[strip] == 0 && blueLights[(size_t) strip] == 0,
+               "blue press and release rest one step and extinguish its light");
+        bluePress (strip);
+        check (focusedArp().velocityPattern[strip] == 100 && blueLights[(size_t) strip] == 1,
+               "the next press enables the step and lights it again");
+    }
+
+    const auto padPage = performance.pages.getReference (0).pageId;
+    const auto partId = h.firstPartId();
+    h.cmd ("assignSurfaceControl", { { "pageId", padPage }, { "kind", "pad" }, { "index", 1 },
+                                     { "partId", partId }, { "parameterId", "@gain" } });
+    bluePress (0);
+    fake.feed (0xB0, 1, 95);
+    tickPast();
+    check (performance.findPart (partId)->volume == 2.0f && focusedArp().velocityPattern[0] == 0
+           && blueLights[0] == 0, "LIVE drum pad press drives rack gain while blue step one stays off");
+    fake.feed (0xB0, 1, 0);
+    tickPast();
+    check (performance.findPart (partId)->volume == 0.0f && focusedArp().velocityPattern[0] == 0,
+           "the physical pad releases its rack assignment without toggling the step");
+    bluePress (0);
 
     press (12, 2);                                   // E2: the first step's velocity up two detents
     press (18, 1);                                   // E8: the arp on, up
@@ -6404,6 +6526,10 @@ void testCtrl49Live()
              && arp.octavePattern[11] == 1 && arp.chancePattern[11] == 95,
            "a longer lane goes on as the short one was sounding: its steps round again");
     check (at (payload(), 4) == 12, "and the page shows twelve");
+    bluePress (0);
+    check (focusedArp().velocityPattern[8] == 0 && focusedArp().velocityPattern[0] == 108
+           && blueLights[0] == 0 && blueLights[4] == 0,
+           "in the second half blue B1 toggles step nine and missing steps stay dark");
 
     press (11, 127);                                 // E1 back into the first half
     press (11, 127);
@@ -7157,7 +7283,7 @@ void testCtrl49Broker()
         const auto pageId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
                               .getProperty ("pageId", {}).toString();
         const auto partId = h.firstPartId();
-        fake.feed (0xB0, 0x23, 0x7F);          // Main: the first control page
+        h.cmd ("showControlPage", { { "pageId", pageId } });
         broker.tick();
         check (broker.currentPage() == 0 && broker.pages().control > 0, "the keys are on a control page");
 
@@ -7732,6 +7858,40 @@ void testScan (const juce::File& stubWorker)
 // VST3 is the demanding one: the DAW owns the session (persistSession=false, state through
 // capture/restore vars), announces its own rate, and destroys/recreates the editor window at
 // will. Each of those contracts is asserted here so the wrappers stay thin glue.
+void testStandaloneRackClose()
+{
+    const auto dir = freshDataDir ("standalone-close");
+    seedCatalog (dir);
+    const auto standalone = [] (InstrumentHostService::Options& o) { o.confirmRackChangesOnClose = true; };
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        check (! h.service->rackChangedForClose(), "untouched rack closes without a prompt");
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+        h.lastStub->patch = 7;
+        check (h.service->rackChangedForClose(), "rack edits trigger the close prompt");
+        check (h.service->finishRackClose (true).wasOk(), "Yes saves the live rack for startup");
+    }
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        check (h.lastStub != nullptr && h.lastStub->patch == 7, "startup recalls the saved plug-in edit");
+        check (! h.service->rackChangedForClose(), "freshly restored rack is clean");
+        h.lastStub->patch = 9;
+        check (h.service->rackChangedForClose(), "plug-in-only edit triggers the close prompt");
+        h.cmd ("addPart");
+        check (h.service->finishRackClose (false).wasOk(), "No rolls back even after autosave");
+    }
+    {
+        Harness h (dir, {}, standalone);
+        h.cmd ("getState");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        check (parts.size() == 1 && h.lastStub != nullptr && h.lastStub->patch == 7,
+               "startup after No recalls the opening rack and plug-in state");
+    }
+}
+
 void testWrapperContext()
 {
     std::cout << "\nwrapper context (the generated targets)" << std::endl;
@@ -10976,7 +11136,7 @@ void testPadsAndFaders()
         h.cmd ("assignSurfaceControl", { { "pageId", "" }, { "kind", "pad" }, { "index", 0 },
                                          { "partId", partId }, { "parameterId", "cutoff" } });
         const auto pages = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
-        check (pages.size() == 1 && pages[0].getProperty ("name", {}).toString() == "Surface",
+        check (pages.size() == 1 && pages[0].getProperty ("name", {}).toString() == "Surface - 1",
                "the first drop on the drawing mints a page named for it");
         bool landed = false;
         if (pages.size() == 1)
@@ -11284,7 +11444,13 @@ void testMackieSection()
         check ((int) faderLayers().getProperty ("count", 0) == 2, "the faders can be given two layers");
         h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 0 }, { "layer", 1 },
                                          { "partId", partId }, { "parameterId", "@pan" } });
+       #if JUCE_LINUX
+        for (const auto* port : { "CTRL49 MIDI 1", "CTRL49 MIDI 2", "CTRL49 MIDI 3", "Other MIDI 4" })
+            check (! mackie::isMackiePort (port), "only the CTRL49 Mackie endpoint is intercepted");
+        send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 127), "CTRL49 MIDI 4");
+       #else
         send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 127));
+       #endif
         send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 0));
         check ((int) faderLayers().getProperty ("active", -1) == 1, "Bank ▶ steps the faders to their next layer");
         const auto panBefore = pan();
@@ -13635,7 +13801,7 @@ void testSavedLibraryAndLoadResults()
     const auto dir = freshDataDir ("library-load-results");
     seedCatalog (dir);
     const auto file = dir.getChildFile ("Fixture.h2p");
-    file.replaceWithText ("fixture");
+    file.replaceWithText ("/*@Meta\nBank:\n'Factory 1'\nCategories:\n'Pads:Synth, Keys:Synth, Pads:Airy'\n*/");
     Library library;
     LibraryRecord record;
     record.type = "preset"; record.sourceType = "h2p"; record.sourceLocator = file.getFullPathName();
@@ -13668,6 +13834,23 @@ void testSavedLibraryAndLoadResults()
     check (result != nullptr && result->getProperty ("recordId", {}).toString() == second
            && result->getProperty ("phase", {}).toString() == "loaded",
            "a late result cannot overwrite feedback for the newer preset selection");
+    const auto sounds = h.service->surfacePartPresets (h.firstPartId());
+    ceditor::ctrl49::PresetBrowser browser;
+    browser.open (sounds, second, {});
+    check (browser.path == ceditor::ctrl49::PresetBrowser::Path { "Categories", "Pads", "Synth" }
+           && browser.rows.at (browser.cursor).id == second, "H2P opens on the loaded sound's first category");
+    browser.show ({});
+    check (browser.size() == 4 && browser.rows[0].count == 2 && browser.rows[1].count == 1,
+           "browser counts categories and banks independently of folder names");
+    browser.select();
+    check (browser.size() == 2 && browser.rows[0].count == 2 && browser.rows[1].count == 2,
+           "presets with multiple tags in one category count once");
+    browser.show ({ "Banks", "Factory 1" });
+    check (browser.size() == 2, "bank contains both fixture presets");
+    browser.open (sounds, second, { "Categories", "Keys", "Synth" });
+    check (browser.path[1] == "Keys" && browser.select() == second,
+           "reopening remembers an alternate route to the same loaded sound");
+
 }
 
 void testBuildEditHistory()
@@ -14155,6 +14338,20 @@ void testLibrary()
             if (r.getProperty ("type", {}).toString() == "rack")
                 rackId = r.getProperty ("recordId", {}).toString();
         check (rackId.isNotEmpty(), "the whole rack captures as one record");
+
+        h.cmd ("renameSavedRack", { { "recordId", rackId }, { "name", "Renamed Rig" } });
+        h.cmd ("duplicateSavedRack", { { "recordId", rackId }, { "name", "Rig copy" } });
+        juce::String copyId;
+        bool keptOriginalId = false;
+        const auto rows = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {});
+        for (const auto& r : *rows.getArray())
+        {
+            if (r["name"].toString() == "Rig copy") copyId = r["recordId"].toString();
+            if (r["name"].toString() == "Renamed Rig") keptOriginalId = r["recordId"].toString() == rackId;
+        }
+        check (keptOriginalId && copyId.isNotEmpty() && copyId != rackId,
+               "renaming keeps the rack identity and duplicating creates an independent record");
+        h.cmd ("removeLibraryRecord", { { "recordId", copyId } });
 
         // A show-level Setlist row can point at that complete capture. Once the current row
         // is established, the next rack is constructed and prepared without replacing what
@@ -16414,6 +16611,7 @@ int main (int argc, char* argv[])
     testStateFolders();
     testSectionsMigration();
     testScan (stubWorker);
+    testStandaloneRackClose();
     testWrapperContext();
     testParameterModel();
     testControlPages();

@@ -241,7 +241,7 @@ test('LIVE draws the lane with its playhead, the zones, the held keys and the ar
   assert.ok(texts.includes('+1') && texts.includes('60%'), 'an octave and a chance that are not the plain ones');
   assert.ok(texts.includes('3 / 16') && texts.includes('+1') && texts.includes('UP') && texts.includes('50%'),
     'the cells: the step picked, its octave, the mode and the gate');
-  assert.ok(texts.includes('PADS: STEPS 1-8 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'),
+  assert.ok(texts.includes('BLUE B1-B8: STEPS 1-8     DRUM PADS: RACK ASSIGNMENTS'),
     'with a lane drawn, which steps the pads are and how the lane is made shorter');
   const ORANGE = 0xFFFF9408, TEAL = 0xFF2DD4BF;
   const rects = calls.filter((c) => c.kind === 'rect');
@@ -275,7 +275,7 @@ test('LIVE draws a lane shorter than sixteen: the places past its end empty, the
     'and a bar after the fourth step: where the lane ends and goes round');
   assert.deepEqual(rects.filter((c) => c.y === 121 && c.h === 2).map((c) => [c.x, c.w]), [[8, 230]],
     'a line under the first eight: the steps the pads are');
-  assert.ok(texts.includes('PADS: STEPS 1-8 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'));
+  assert.ok(texts.includes('BLUE B1-B8: STEPS 1-8     DRUM PADS: RACK ASSIGNMENTS'));
   assert.ok(texts.includes('100') && texts.includes('x1'), 'the cells of a step that is there');
 
   ({ texts, rects } = drawn(10));         // E1 has walked past the end, into the second half
@@ -284,7 +284,51 @@ test('LIVE draws a lane shorter than sixteen: the places past its end empty, the
     'there is no step there: its four cells are dashes');
   assert.deepEqual(rects.filter((c) => c.y === 121 && c.h === 2).map((c) => [c.x, c.w]), [[8 + 8 * 29, 230]],
     'and the line is under the second eight');
-  assert.ok(texts.includes('PADS: STEPS 9-16 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'));
+  assert.ok(texts.includes('BLUE B1-B8: STEPS 9-16     DRUM PADS: RACK ASSIGNMENTS'));
   assert.ok(rects.some((c) => c.x === 8 + 10 * 29 && c.y === 30 && c.w === 27 && c.h === 90), 'the cursor\'s place is still lit');
   p.close();
+});
+
+test('all live skins retain real control values and switching back restores Classic', async () => {
+  const names = JSON.parse(fs.readFileSync(new URL('../../../tools/ctrl49/live_skin_names.json', import.meta.url)));
+  const p = await page();
+  try {
+    p.call('set_labels', rackLabelPayload('Filter', SLOTS));
+    p.call('set_values', rackStatePayload(0, SLOTS, { number: 2, count: 5 }));
+    for (let id = 1; id < names.length; id++) {
+      p.call('set_skin', [id]);
+      const calls = p.draw();
+      assert.ok(said(calls).includes('Cutoff   2.40 kHz'), names[id]);
+      assert.ok(said(calls).includes('PAGE 2 / 5'), names[id]);
+      const knob = calls.find(c => c.id === 0x0221);
+      assert.equal(knob.sy, (id - 1) * 44);
+      assert.equal(knob.sx, Math.round(88 * 15 / 127) * 44);
+    }
+    p.call('set_skin', [0]);
+    assert.equal(frameOf(p.draw(), 0), 88);
+    assert.equal(p.asked(), 0);
+  } finally {
+    p.close();
+  }
+});
+
+test('rack screen draws separate rows and presets for two instances of the same instrument', async () => {
+  const p = await page();
+  try {
+    const strings = ['RACK', '2 / 2', '01  TyrellN6', 'Lifeform Lead', '02  TyrellN6', 'Bass'];
+    p.call('set_rack', [1, 2, ...strings.flatMap(s => [s.length, ...Buffer.from(s)])]);
+    const texts = said(p.draw());
+    for (const value of strings) assert.ok(texts.includes(value));
+  } finally { p.close(); }
+});
+
+test('preset screen identifies the part and distinguishes loaded from highlighted', async () => {
+  const p = await page();
+  try {
+    const strings = ['PRESETS  02  TyrellN6', '2 / 2', '80s Polypad', 'Loaded', 'Lifeform Lead', '', 'Categories > Keys > Synth'];
+    p.call('set_presets', [1, 2, ...strings.flatMap(s => [s.length, ...Buffer.from(s)])]);
+    const texts = said(p.draw());
+    for (const value of strings.filter(Boolean)) assert.ok(texts.includes(value));
+    assert.ok(texts.some(s => s.includes('BROWSE: MENU')));
+  } finally { p.close(); }
 });

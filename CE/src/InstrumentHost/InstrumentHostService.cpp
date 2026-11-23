@@ -189,7 +189,7 @@ namespace
             "startPerformanceRecording", "finishPerformanceRecording",
             "cancelPerformanceRecording", "removePerformanceTake",
             "replayPerformanceTake", "stopPerformanceReplay", "surfacePerformanceEncoder",
-            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage",
+            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage", "showSurfaceStagePage",
             "chordPad", "chordStep", "retryFailedProcessor", "dismissFailoverEvent",
 
             // Escape/cancellation actions must never be trapped behind the lock. Closing a
@@ -910,6 +910,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         emitState();
         return;
     }
+    if (cmd == "showSurfaceStagePage")
+    {
+        requestedSurfaceStagePage = payload.getProperty ("kind", {}).toString();
+        requestedSurfacePageId.clear();
+        return;
+    }
     if (cmd == "showControlPage")
     {
         // One shown page for everything: the keyboard (or its screen card) moves to it, the
@@ -917,6 +923,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         const auto pageId = payload.getProperty ("pageId", {}).toString();
         if (rack.getPerformance().findPage (pageId) == nullptr)
             return;
+        requestedSurfaceStagePage.clear();
         currentSurfacePageId = pageId;
         requestedSurfacePageId = pageId;
         requestedSurfacePageForSong = false;
@@ -1322,8 +1329,35 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "setMidiInputEnabled")
     {
-        deviceManager.setMidiInputDeviceEnabled (payload.getProperty ("id", {}).toString(),
-                                                 (bool) payload.getProperty ("enabled", true));
+        const auto id = payload.getProperty ("id", {}).toString();
+        const bool enabled = payload.getProperty ("enabled", true);
+        deviceManager.setMidiInputDeviceEnabled (id, enabled);
+        for (const auto& device : juce::MidiInput::getAvailableDevices())
+            if (device.identifier == id)
+            {
+               #if JUCE_LINUX
+                if (isCtrl49PlayingInput (device.name))
+                {
+                    if (enabled)
+                    {
+                        disabledCtrl49Inputs.removeString (device.name);
+                        openedCtrl49Inputs.addIfNotAlreadyThere (id);
+                    }
+                    else
+                    {
+                        disabledCtrl49Inputs.addIfNotAlreadyThere (device.name);
+                        openedCtrl49Inputs.removeString (id);
+                    }
+                }
+               #endif
+                if (! enabled)
+                {
+                    const std::scoped_lock lock (midiActivityLock);
+                    if (auto found = midiInputHealth.find (device.name); found != midiInputHealth.end())
+                        found->second.heldNotes.clear();
+                }
+                break;
+            }
         emitAudioDevices();
         return;
     }
@@ -1962,7 +1996,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         const auto name = payload.getProperty ("name", {}).toString().trim();
         rack.addControlPage (name.isNotEmpty() ? name
-                                               : "Page " + juce::String (rack.getPerformance().pages.size() + 1));
+                                               : "Surface - " + juce::String (rack.getPerformance().pages.size() + 1));
         savePerformance();
         emitState();
         return;
@@ -2031,7 +2065,6 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         {
             auto* mint = new juce::DynamicObject();
             mint->setProperty ("cmd", "addControlPage");
-            mint->setProperty ("name", "Surface");
             handleCommand (juce::var (mint));
         }
         if (pageId.isEmpty() && ! rack.getPerformance().pages.isEmpty())
@@ -6434,6 +6467,18 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "setControlScreenSkin")
+    {
+        const auto id = payload.getProperty ("skin", -1);
+        if ((! id.isInt() && ! id.isInt64() && ! id.isDouble())
+            || ! juce::isPositiveAndBelow ((double) id, (double) numControlSkins)
+            || (double) id != (int) id) return;
+        surfaceSkin = (int) id;
+        if (! saveSurfacePages()) emitError ("Could not save the CTRL49 control page skin.");
+        emitState();
+        return;
+    }
+
     if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface" || cmd == "discoverOnSurface"
         || cmd == "cueOnSurface" || cmd == "changesOnSurface" || cmd == "metersOnSurface"
         || cmd == "liveOnSurface")
@@ -7603,6 +7648,45 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "renameSavedRack" || cmd == "duplicateSavedRack")
+    {
+        ensureLibrary();
+        const auto id = payload.getProperty ("recordId", {}).toString();
+        const auto* source = library.find (id);
+        const auto name = payload.getProperty ("name", {}).toString().trim();
+        if (source == nullptr || source->type != "rack" || source->factory)
+        {
+            emitError ("Select a saved rack in the sound library.");
+            return;
+        }
+        if (name.isEmpty())
+        {
+            emitError ("Enter a rack name.");
+            return;
+        }
+
+        if (cmd == "renameSavedRack")
+        {
+            library.edit (id, LibraryChanges::identity)->name = name;
+            saveLibrary();
+        }
+        else
+        {
+            LibraryRecord copy;
+            copy.type = "rack";
+            copy.sourceType = "rackCapture";
+            copy.name = name;
+            copy.rackManifestJson = source->rackManifestJson;
+            copy.fingerprint = source->fingerprint;
+            copy.parts = source->parts;
+            copy.user = source->user;
+            if (saveCapturedLibraryRecord (std::move (copy)).isEmpty())
+                return;
+        }
+        emitLibrary (libraryView);
+        return;
+    }
+
     if (cmd == "saveRackToLibrary")
     {
         ensureLibrary();
@@ -7613,7 +7697,14 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (record.name.isEmpty())
             record.name = rack.getPerformance().name.isNotEmpty() ? rack.getPerformance().name
                                                                   : juce::String ("Rack capture");
-        record.rackManifestJson = juce::JSON::toString (rack.captureState().toVar());
+        juce::String captureError;
+        const auto captured = rack.captureState (&captureError);
+        if (captureError.isNotEmpty())
+        {
+            emitError ("Rack was not saved: " + captureError);
+            return;
+        }
+        record.rackManifestJson = juce::JSON::toString (captured.toVar());
         record.fingerprint = juce::String::toHexString (record.rackManifestJson.hashCode64());
 
         // What each part sounded like, harvested from the library record it was playing. This
@@ -8159,28 +8250,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         // A hardware part walks the patches captured from the same synth — the front-panel
         // prev/next VIP had for plug-ins, on a box that never had a preset browser at all.
-        const auto target = part->hardware ? hardwarePatchTarget (*part) : part->pluginCeId;
-        juce::Array<const LibraryRecord*> candidates;
-        for (const auto& record : library.allRecords())
-            if (record.type == "preset" && ! record.missing
-                && record.targetCeId == target
-                && (record.sourceType == "hardwarePatch") == part->hardware)
-                candidates.add (&record);
-
-        const auto rankOf = [] (const LibraryRecord& r)
-        { return r.sourceType == "programList" ? 0 : isVendorPresetSource (r.sourceType) ? 1 : 2; };
-        const auto indexOf = [] (const LibraryRecord& r)
-        { return r.sourceLocator.fromLastOccurrenceOf ("/", false, false).getIntValue(); };
-        std::sort (candidates.begin(), candidates.end(),
-                   [&] (const LibraryRecord* a, const LibraryRecord* b)
-                   {
-                       if (rankOf (*a) != rankOf (*b)) return rankOf (*a) < rankOf (*b);
-                       if (rankOf (*a) == 0 && indexOf (*a) != indexOf (*b))
-                           return indexOf (*a) < indexOf (*b);
-                       const auto byName = a->name.compareIgnoreCase (b->name);
-                       if (byName != 0) return byName < 0;
-                       return a->recordId < b->recordId;
-                   });
+        const auto candidates = orderedPartPresets (*part);
 
         if (candidates.isEmpty())
         {
@@ -8211,6 +8281,99 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     }
 
     emitError ("Unknown instrument-host command: " + cmd);
+}
+
+juce::Array<const LibraryRecord*> InstrumentHostService::orderedPartPresets (const RackPart& part)
+{
+    const auto target = part.hardware ? hardwarePatchTarget (part) : part.pluginCeId;
+    juce::Array<const LibraryRecord*> candidates;
+    for (const auto& record : library.allRecords())
+        if (record.type == "preset" && ! record.missing
+            && record.targetCeId == target
+            && (record.sourceType == "hardwarePatch") == part.hardware)
+            candidates.add (&record);
+
+    const auto rankOf = [] (const LibraryRecord& r)
+    { return r.sourceType == "programList" ? 0 : isVendorPresetSource (r.sourceType) ? 1 : 2; };
+    const auto indexOf = [] (const LibraryRecord& r)
+    { return r.sourceLocator.fromLastOccurrenceOf ("/", false, false).getIntValue(); };
+    std::sort (candidates.begin(), candidates.end(),
+               [&] (const LibraryRecord* a, const LibraryRecord* b)
+               {
+                   if (rankOf (*a) != rankOf (*b)) return rankOf (*a) < rankOf (*b);
+                   if (rankOf (*a) == 0 && indexOf (*a) != indexOf (*b))
+                       return indexOf (*a) < indexOf (*b);
+                   const auto byName = a->name.compareIgnoreCase (b->name);
+                   if (byName != 0) return byName < 0;
+                   return a->recordId < b->recordId;
+               });
+    return candidates;
+}
+
+std::vector<InstrumentHostService::SurfacePreset> InstrumentHostService::surfacePartPresets (const juce::String& partId)
+{
+    ensureLibrary();
+    std::vector<SurfacePreset> result;
+    if (const auto* part = rack.getPerformance().findPart (partId))
+        for (const auto* record : orderedPartPresets (*part))
+            if (! record->hidden)
+            {
+                SurfacePreset sound { record->recordId, record->name, {}, {}, {} };
+                if (juce::File::isAbsolutePath (record->sourceLocator))
+                    sound.folder = juce::File (record->sourceLocator).getParentDirectory().getFileName();
+                if (record->sourceType == "h2p")
+                {
+                    auto& groups = surfaceH2pGroups[record->recordId];
+                    if (groups.fingerprint != record->fingerprint || groups.fingerprint.isEmpty())
+                    {
+                        groups = {};
+                        juce::FileInputStream input { juce::File (record->sourceLocator) };
+                        juce::MemoryBlock header;
+                        if (input.openedOk()) input.readIntoMemoryBlock (header, 16384);
+                        const auto text = header.toString();
+                        if (text.trimStart().startsWith ("/*@Meta") && text.contains ("*/"))
+                        {
+                            const auto lines = juce::StringArray::fromLines (text.upToFirstOccurrenceOf ("*/", false, false));
+                            for (int i = 1; i < lines.size(); ++i)
+                            {
+                                const auto value = lines[i].trim().unquoted().trim();
+                                if (lines[i - 1].trim() == "Bank:") groups.bank = value;
+                                if (lines[i - 1].trim() != "Categories:") continue;
+                                for (const auto& tag : juce::StringArray::fromTokens (value, ",", ""))
+                                {
+                                    auto levels = juce::StringArray::fromTokens (tag, ":", "");
+                                    levels.trim();
+                                    levels.removeEmptyStrings();
+                                    if (! levels.isEmpty()) groups.categories.push_back (levels);
+                                }
+                            }
+                        }
+                        if (input.openedOk()) groups.fingerprint = record->fingerprint;
+                    }
+                    sound.bank = groups.bank;
+                    sound.categories = groups.categories;
+                }
+                else if (record->category.isNotEmpty() && record->category != sound.folder)
+                    sound.categories.push_back ({ record->category });
+                result.push_back (std::move (sound));
+            }
+    return result;
+}
+
+void InstrumentHostService::loadSurfacePartPreset (const juce::String& partId, const juce::String& recordId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    const auto* record = library.find (recordId);
+    if (! part || ! record || record->type != "preset" || record->hidden || record->missing
+        || record->targetCeId != (part->hardware ? hardwarePatchTarget (*part) : part->pluginCeId)
+        || (record->sourceType == "hardwarePatch") != part->hardware)
+        return;
+    auto* cmd = new juce::DynamicObject();
+    cmd->setProperty ("cmd", "loadLibraryRecord");
+    cmd->setProperty ("action", "replace");
+    cmd->setProperty ("partId", partId);
+    cmd->setProperty ("recordId", recordId);
+    handleCommand (juce::var (cmd));
 }
 
 void InstrumentHostService::restoreSession()
@@ -8318,8 +8481,13 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
         const auto sourceText = performanceSource == performanceFile()
                                   ? performanceBaselineText : performanceSource.loadFileAsString();
         Performance restored;
-        if (Performance::fromVar (juce::JSON::parse (sourceText), restored))
+        const auto document = juce::JSON::parse (sourceText);
+        if (Performance::fromVar (document, restored))
+        {
+            if (options.confirmRackChangesOnClose)
+                openingRackDocument = document;
             applyPerformance (std::move (restored));
+        }
         else
         {
             if (performanceSource == performanceFile())
@@ -8334,6 +8502,13 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
     // A product's very first start, with no session yet: the show it was built with.
     if (includePerformance && performanceSource == juce::File())
         openFirstBuiltInShow();
+
+    if (options.confirmRackChangesOnClose)
+    {
+        if (! openingRackDocument.isObject())
+            openingRackDocument = rack.getPerformance().toVar().clone();
+        openingRackComparison = juce::JSON::toString (rack.captureState().toVar());
+    }
 
     checkStateDigests();
 
@@ -8750,6 +8925,19 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             // browser only knows if it is told, and emitState does not carry the library.
             if (ingestProgramList (partId))
                 emitLibrary (libraryView);
+            if (info.name.equalsIgnoreCase ("TyrellN6") && info.vendor.equalsIgnoreCase ("u-he"))
+            {
+                syncTyrellPresetName (partId);
+                if (! checkedTyrellPresetLibrary && options.includeDefaultScanRoots)
+                {
+                    checkedTyrellPresetLibrary = true;
+                    bool hasFiles = false;
+                    for (const auto& record : library.allRecords())
+                        if (record.targetCeId == info.ceId && record.sourceType == "h2p" && ! record.missing)
+                        { hasFiles = true; break; }
+                    if (! hasFiles) scanVstPresets();
+                }
+            }
             if (const auto* loadedPart = rack.getPerformance().findPart (partId);
                 loadedPart != nullptr && loadedPart->microtuningEnabled
                     && rack.getPerformance().microtuning.enabled)
@@ -9078,6 +9266,30 @@ int InstrumentHostService::neededInputChannels() const
     return needed;
 }
 
+#if JUCE_LINUX
+bool InstrumentHostService::isCtrl49PlayingInput (const juce::String& name)
+{
+    return name == "CTRL49 MIDI 1" || name == "CTRL49 MIDI 2" || name == "CTRL49 MIDI 4";
+}
+
+void InstrumentHostService::reopenCtrl49PlayingInputs()
+{
+    if (! audioRunning) return;
+
+    // ALSA tears down subscriptions on unplug. JUCE can still report the old
+    // input enabled, even when the returning device gets the very same address.
+    for (const auto& id : openedCtrl49Inputs)
+        deviceManager.setMidiInputDeviceEnabled (id, false);
+    openedCtrl49Inputs.clear();
+    for (const auto& device : juce::MidiInput::getAvailableDevices())
+        if (isCtrl49PlayingInput (device.name) && ! disabledCtrl49Inputs.contains (device.name))
+        {
+            deviceManager.setMidiInputDeviceEnabled (device.identifier, true);
+            openedCtrl49Inputs.add (device.identifier);
+        }
+}
+#endif
+
 void InstrumentHostService::startAudio()
 {
     // The simplest honest Preview Runtime: default output (inputs only where a hardware
@@ -9097,7 +9309,15 @@ void InstrumentHostService::startAudio()
     deviceManager.addMidiInputDeviceCallback ({}, &playerGate);
     deviceManager.addMidiInputDeviceCallback ({}, &midiObserver);
     for (const auto& input : juce::MidiInput::getAvailableDevices())
+    {
+       #if JUCE_LINUX
+        // The surface broker reads the VIP controls and screen replies on USB cable 2.
+        if (input.name == "CTRL49 MIDI 3" || disabledCtrl49Inputs.contains (input.name))
+            continue;
+        if (isCtrl49PlayingInput (input.name)) openedCtrl49Inputs.addIfNotAlreadyThere (input.identifier);
+       #endif
         deviceManager.setMidiInputDeviceEnabled (input.identifier, true);
+    }
 
     audioRunning = true;
 
@@ -12578,7 +12798,7 @@ void InstrumentHostService::scanVstPresets()
             juce::StringArray slots;
             for (const auto& record : library.allRecords())
                 if (record.sourceType == "programList"
-                    && isZebra3ProgramSlot (record.instrument, record.manufacturer, record.name))
+                    && isUheProgramSlot (record.instrument, record.manufacturer, record.name))
                     slots.add (record.recordId);
             for (const auto& id : slots) library.removeRecord (id);
             saveLibrary();
@@ -12601,6 +12821,8 @@ void InstrumentHostService::scanCataloguePrograms (
         refreshScanReportCounts();
         libraryScanBusy = false;
         libraryScanFinished = true;
+        for (const auto& part : rack.getPerformance().parts)
+            if (syncTyrellPresetName (part.partId)) emitState();
         emitLibrary (libraryView);
         return;
     }
@@ -12623,7 +12845,7 @@ void InstrumentHostService::scanCataloguePrograms (
         int unnamedPrograms = 0;
         if (processor != nullptr)
             for (int i = 0; i < processor->getNumPrograms(); ++i)
-                if (isZebra3ProgramSlot (plugin.name, plugin.vendor, processor->getProgramName (i))) ++unnamedPrograms;
+                if (isUheProgramSlot (plugin.name, plugin.vendor, processor->getProgramName (i))) ++unnamedPrograms;
         if (processor != nullptr) ingestProcessorPrograms (*processor, plugin);
         processor.reset(); // Release this isolated instance before starting the next one.
         int count = 0, files = 0, programs = 0, unavailable = 0;
@@ -12659,6 +12881,46 @@ void InstrumentHostService::scanCataloguePrograms (
         finish (nullptr, refusal.isNotEmpty() ? refusal : "Program discovery is unavailable in this build");
     else
         options.instantiate (plugin.descriptionXml, options.sampleRate, options.blockSize, std::move (finish));
+}
+
+bool InstrumentHostService::syncTyrellPresetName (const juce::String& partId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr || ! part->pluginName.equalsIgnoreCase ("TyrellN6")
+        || ! part->pluginVendor.equalsIgnoreCase ("u-he")) return false;
+    // Preserve user-named HoSTage snapshots. Native preset selections are identified
+    // by the filename in the live component state, never by a MIDI slot number.
+    const auto* previous = library.find (part->lastPresetRecordId);
+    if (previous != nullptr && previous->sourceType != "programList" && previous->sourceType != "h2p")
+        return false;
+    auto* processor = rack.getInstrument (partId);
+    if (processor == nullptr) return false;
+    juce::MemoryBlock state;
+    if (auto* worker = dynamic_cast<PluginWorkerBoundary*> (processor))
+    {
+        juce::String error;
+        if (! worker->readFreshState (state, error)) return false;
+    }
+    else processor->getStateInformation (state);
+    const auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    auto* component = xml != nullptr ? xml->getChildByName ("IComponent") : nullptr;
+    juce::MemoryBlock native;
+    if (! component || ! native.fromBase64Encoding (component->getAllSubText())) return false;
+    const auto header = native.toString().upToFirstOccurrenceOf ("\n", false, false).trim();
+    if (! header.startsWith ("#pgm=") || ! header.endsWithIgnoreCase (".h2p")) return false;
+    const auto name = header.substring (5).dropLastCharacters (4);
+    if (name.isEmpty()) return false;
+    if (previous != nullptr && previous->sourceType == "h2p" && previous->name == name) return false;
+    juce::String id;
+    for (const auto& record : library.allRecords())
+        if (record.targetCeId == part->pluginCeId && record.sourceType == "h2p"
+            && ! record.missing && record.name == name)
+        {
+            if (id.isNotEmpty()) { id.clear(); break; } // duplicate filenames in different banks
+            id = record.recordId;
+        }
+    return (part->lastPresetName != name || part->lastPresetRecordId != id)
+        && rack.setPartLastPreset (partId, id, name);
 }
 
 bool InstrumentHostService::ingestProgramList (const juce::String& partId)
@@ -12701,7 +12963,7 @@ bool InstrumentHostService::ingestProcessorPrograms (juce::AudioProcessor& proce
         const auto lower = name.trim().toLowerCase();
         return lower.isEmpty() || lower == "empty" || lower == "(empty)" || lower == "<empty>"
             || lower == "[empty]" || lower.containsOnly ("-_.…")
-            || isZebra3ProgramSlot (plugin.name, plugin.vendor, name);
+            || isUheProgramSlot (plugin.name, plugin.vendor, name);
     };
 
     ensureLibrary();
@@ -14532,6 +14794,8 @@ void InstrumentHostService::loadSurfacePages()
 void InstrumentHostService::applySurfacePagesVar (const juce::var& stored)
 {
     const auto on = [&stored] (const char* key) { return (bool) stored.getProperty (key, false); };
+    const int skin = stored.getProperty ("skin", 0);
+    surfaceSkin = juce::isPositiveAndBelow (skin, numControlSkins) ? skin : 0;
     surfaceSoundcheckPage = on ("soundcheck");
     surfaceLayersPage     = on ("layers");
     surfaceDiscoverPage   = on ("discover");
@@ -14549,6 +14813,7 @@ bool InstrumentHostService::saveSurfacePages() const
 juce::var InstrumentHostService::surfacePagesVar() const
 {
     auto* root = new juce::DynamicObject();
+    root->setProperty ("skin", surfaceSkin);
     root->setProperty ("soundcheck", surfaceSoundcheckPage);
     root->setProperty ("layers",     surfaceLayersPage);
     root->setProperty ("discover",   surfaceDiscoverPage);
@@ -14580,6 +14845,8 @@ void InstrumentHostService::drainMackieEvents()
                 moved = moveSurfaceFader (pageId, event.index, event.value, queued.minimum, queued.maximum) || moved;
                 break;
             case mackie::Event::Kind::button:
+                if (event.ctrl49Blue && onCtrl49BlueButton && onCtrl49BlueButton (event.index, event.down))
+                    break;
                 pressSurfaceControl (pageId, "button", event.index, event.down);
                 break;
             case mackie::Event::Kind::bank:
@@ -17101,7 +17368,10 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     // else — not the recent-play ring, not MIDI learn, not the activity readout's notes.
     if (mackieSection.load() && mackie::isMackiePort (deviceName))
     {
-        const auto event = mackie::decode (message);
+        auto event = mackie::decode (message);
+        event.ctrl49Blue = event.kind == mackie::Event::Kind::button && message.getChannel() == 1
+                         && juce::isPositiveAndBelow (message.getNoteNumber() - 16, 8)
+                         && deviceName.containsIgnoreCase ("CTRL49");
         if (event.kind == mackie::Event::Kind::none)
             return;
         const std::scoped_lock lock (midiActivityLock);
@@ -17169,6 +17439,7 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
 
         if (message.isNoteOn())
         {
+            keyboardAttacksSinceDrain.set (static_cast<size_t> (message.getNoteNumber()));
             health.heldNotes[(channel << 8) | message.getNoteNumber()] = nowMs;
             health.heldVelocities[(channel << 8) | message.getNoteNumber()] = message.getVelocity();
         }
@@ -18196,6 +18467,22 @@ void InstrumentHostService::drainParameterEvents()
             channels.add (juce::var (channel));
         }
         auto* packet = new juce::DynamicObject();
+        // Hardware feedback is display-only. Include attacks since the previous
+        // tick so a tap shorter than a UI frame still lights the key once.
+        std::bitset<128> lit;
+        {
+            const std::scoped_lock lock (midiActivityLock);
+            for (const auto& [device, health] : midiInputHealth)
+                if (! health.listed || lastPresentInputs.contains (device))
+                    for (const auto& entry : health.heldNotes)
+                        lit.set (static_cast<size_t> (entry.first & 127));
+            lit |= keyboardAttacksSinceDrain;
+            keyboardAttacksSinceDrain.reset();
+        }
+        juce::Array<juce::var> keyboardNotes;
+        for (int note = 0; note < 128; ++note)
+            if (lit.test (static_cast<size_t> (note))) keyboardNotes.add (note);
+        packet->setProperty ("keyboardNotes", keyboardNotes);
         packet->setProperty ("channels", juce::var (channels));
         options.emit ("instrumentHostMeters", juce::var (packet));
     }
@@ -18365,12 +18652,22 @@ void InstrumentHostService::drainParameterEvents()
 
         juce::SortedSet<int> changed;
         juce::Array<PartParameterSync::Gesture> gestures;
+        if (part.presetNameCheckDue > 0 && juce::Time::getMillisecondCounterHiRes() >= part.presetNameCheckDue)
+        {
+            part.presetNameCheckDue = 0;
+            if (syncTyrellPresetName (partId)) emitState();
+        }
         if (! part.sync->drain (changed, gestures))
             continue;
 
         auto* processor = targetProcessor (partId);
         if (processor == nullptr)
             continue;
+
+        if (changed.size() > 1 && processor->getName().equalsIgnoreCase ("TyrellN6")
+            && (editorTargetIds.contains (partId) || floatingEditorIds.contains (partId))
+            && part.presetNameCheckDue == 0)
+            part.presetNameCheckDue = juce::Time::getMillisecondCounterHiRes() + 250;
 
         const auto& processorParams = processor->getParameters();
         const auto idFor = [&part] (int index) -> juce::String
@@ -19357,17 +19654,7 @@ juce::var InstrumentHostService::buildStatePayload()
     }());
     root->setProperty ("performance", performancePayload());
     root->setProperty ("soundcheck", soundcheckPayload());
-    {
-        auto* surfacePages = new juce::DynamicObject();
-        surfacePages->setProperty ("soundcheck", surfaceSoundcheckPage);
-        surfacePages->setProperty ("layers", surfaceLayersPage);
-        surfacePages->setProperty ("discover", surfaceDiscoverPage);
-        surfacePages->setProperty ("cue", surfaceCuePage);
-        surfacePages->setProperty ("changes", surfaceChangesPage);
-        surfacePages->setProperty ("meters", surfaceMetersPage);
-        surfacePages->setProperty ("live", surfaceLivePage);
-        root->setProperty ("surfacePages", juce::var (surfacePages));
-    }
+    root->setProperty ("surfacePages", surfacePagesVar());
     // Which program the page is drawing: the editor, or a player (installed as one, or the
     // editor trying its show as one). The page hides what a player lacks; the refusal above is
     // what makes it true.
@@ -22261,6 +22548,42 @@ juce::var InstrumentHostService::performancePayload() const
     return juce::var (root);
 }
 
+bool InstrumentHostService::rackChangedForClose()
+{
+    if (! openingRackDocument.isObject())
+        return false;
+    juce::String error;
+    const auto live = rack.captureState (&error);
+    return historyPendingLoads > 0 || error.isNotEmpty()
+        || juce::JSON::toString (live.toVar()) != openingRackComparison;
+}
+
+juce::Result InstrumentHostService::finishRackClose (bool keepChanges)
+{
+    if (openingRackDocument.isObject())
+    {
+        auto document = openingRackDocument;
+        if (keepChanges)
+        {
+            if (historyPendingLoads > 0)
+                return juce::Result::fail ("A plug-in is still loading. Close the rack again once it finishes.");
+            juce::String error;
+            document = rack.captureState (&error).toVar();
+            if (error.isNotEmpty())
+                return juce::Result::fail (error);
+        }
+
+        if ((keepChanges || sessionWrittenThisRun) && ! writePerformanceDocument (document))
+            return juce::Result::fail ("Could not write the startup rack. Check the session error in HoSTage.");
+    }
+
+    // An earlier autosave may still be queued on the message thread.
+    ++performanceSaveGeneration;
+    performanceSavePending.store (false);
+    options.persistSession = false;
+    return juce::Result::ok();
+}
+
 void InstrumentHostService::savePerformance()
 {
     noteShowChanged();
@@ -22368,6 +22691,7 @@ bool InstrumentHostService::writePerformanceDocument (const juce::var& document)
         performanceBaselineKnown = true;
         performanceBaselineExisted = true;
         performanceBaselineText = text;
+        sessionWrittenThisRun = true;
         performanceWriteErrorReported = false;
         return true;
     }

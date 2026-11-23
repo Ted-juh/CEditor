@@ -80,7 +80,14 @@ Ctrl49Session::buildStartupSequence (const Bytes& rawLua, const std::vector<PngA
     sequence.push_back ({ buildIdentityQuery(), 2 });
 
     for (std::size_t index = 1; index < objectFrames.size(); ++index)
+    {
         sequence.push_back ({ objectFrames[index], 2 });
+       #if defined (__linux__)
+        // ALSA paces the Lua upload too; keep the device watchdog fed throughout it.
+        if (keepaliveEveryUploadFrames > 0 && index % static_cast<size_t> (keepaliveEveryUploadFrames) == 0)
+            sequence.push_back ({ buildKeepalive(), 2 });
+       #endif
+    }
 
     // Upload PNG assets before bind/init so the page's decode_image calls succeed.
     int sinceKeepalive = 0;

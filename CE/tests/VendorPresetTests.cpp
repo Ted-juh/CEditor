@@ -214,9 +214,9 @@ void testZebra3Presets()
     renamed.replaceWithText (patch.replace ("#Vers=1", "#Vers=99"));
     check (! readVendorPreset (renamed), "unknown H2P versions are refused");
     for (const auto* name : { "Program 0", "Program 127", "preset01", "Preset 002", "Slot #3" })
-        check (isZebra3ProgramSlot ("Zebra3", "u-he", name), "known Zebra3 numbered slots are not named presets");
-    check (! isZebra3ProgramSlot ("Zebra3", "u-he", "Program Change Pad")
-           && ! isZebra3ProgramSlot ("Other Synth", "Other", "Program 1")
+        check (isUheProgramSlot ("Zebra3", "u-he", name), "known Zebra3 numbered slots are not named presets");
+    check (! isUheProgramSlot ("Zebra3", "u-he", "Program Change Pad")
+           && ! isUheProgramSlot ("Other Synth", "Other", "Program 1")
            && isVendorPresetSource ("h2p"), "real named programs survive and H2P uses the file loader");
     root.deleteRecursively();
 }

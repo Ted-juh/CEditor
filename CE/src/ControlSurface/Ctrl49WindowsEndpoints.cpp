@@ -1,4 +1,4 @@
-#include "Ctrl49WindowsEndpoints.h"
+#include "Ctrl49Endpoints.h"
 
 #ifdef _WIN32
 
@@ -159,7 +159,7 @@ namespace
     };
 } // namespace
 
-std::unique_ptr<Ctrl49SurfaceEndpoints> discoverCtrl49WindowsEndpoints()
+std::unique_ptr<Ctrl49SurfaceEndpoints> discoverCtrl49Endpoints()
 {
     // Each way this can fail says something different to the person at the keyboard, so each
     // gets its own reason (Ctrl49DiscoveryProblem). They all used to come back as null, which
@@ -234,11 +234,11 @@ std::unique_ptr<Ctrl49SurfaceEndpoints> discoverCtrl49WindowsEndpoints()
 
 } // namespace ceditor::ctrl49
 
-#else
+#elif ! JUCE_LINUX
 
 namespace ceditor::ctrl49
 {
-std::unique_ptr<Ctrl49SurfaceEndpoints> discoverCtrl49WindowsEndpoints() { return nullptr; }
+std::unique_ptr<Ctrl49SurfaceEndpoints> discoverCtrl49Endpoints() { return nullptr; }
 } // namespace ceditor::ctrl49
 
 #endif // _WIN32

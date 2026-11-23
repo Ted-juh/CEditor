@@ -507,8 +507,8 @@ test('isolated state restore and capture keep the proxy parameter mirror coheren
     'MIDI-only effects must use delayed pass-through while sidechain instruments fail silent');
   assert.match(proxy, /config\.maxFrames = maxSupportedFrames/,
     'a later supported host block-size change must not outgrow the worker mapping');
-  assert.match(worker, /MessageType::setParameter[\s\S]*processorSnapshot\s*\(processor\)/,
-    'the worker must accept and acknowledge a complete parameter snapshot');
+  assert.match(worker, /MessageType::setParameter[\s\S]*hostRevisions\.accept\s*\(edit\.parameterIndex, edit\.revision\)/,
+    'a late host edit already delivered by audio must not overwrite vendor editor changes');
   assert.match(worker, /MessageType::setState[\s\S]*processorSnapshot\s*\(processor\)/,
     'the worker must return its post-state parameter values and program');
   assert.match(worker, /class ParentProcessWatchdog[\s\S]*TerminateProcess\s*\(GetCurrentProcess\(\), 73\)/,

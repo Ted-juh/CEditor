@@ -9,7 +9,7 @@
 #include "InstrumentHost/PluginEditorHost.h"
 #include "InstrumentHost/FloatingEditorWindows.h"
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
-#include "ControlSurface/Ctrl49WindowsEndpoints.h"
+#include "ControlSurface/Ctrl49Endpoints.h"
 #include "ControlSurface/Ctrl49EmbeddedAssets.h"
 #include "UpdateCheck.h"
 
@@ -1938,7 +1938,7 @@ void ValueTreeBridge::ensureInstrumentHost()
     {
         namespace surface = ceditor::ctrl49;
         surface::Ctrl49SurfaceBroker::Options surfaceOptions;
-        surfaceOptions.discover = &surface::discoverCtrl49WindowsEndpoints;
+        surfaceOptions.discover = &surface::discoverCtrl49Endpoints;
         // Same marshal-and-guard as the service's emit above, same documented raw `this`.
         surfaceOptions.emit = [this] (const juce::String& eventName, const juce::var& payload)
         {
@@ -1953,6 +1953,9 @@ void ValueTreeBridge::ensureInstrumentHost()
         surfaceOptions.pngAssets.push_back ({ 0x0200,
             surface::Bytes (surface::assets::kKnobStripPng,
                             surface::assets::kKnobStripPng + surface::assets::kKnobStripPngSize) });
+        surfaceOptions.pngAssets.push_back ({ 0x0220,
+            surface::Bytes (surface::assets::kLiveKnobsPng,
+                            surface::assets::kLiveKnobsPng + surface::assets::kLiveKnobsPngSize) });
         surfaceOptions.pngAssets.push_back ({ 0x0210,
             surface::Bytes (surface::assets::kHostageLogoPng,
                             surface::assets::kHostageLogoPng + surface::assets::kHostageLogoPngSize) });

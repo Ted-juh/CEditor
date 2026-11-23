@@ -1,5 +1,8 @@
 #pragma once
 
+#include "ControlSurface/Ctrl49PresetBrowser.h"
+#include <bitset>
+
 #include <array>
 #include <atomic>
 #include <deque>
@@ -440,6 +443,7 @@ public:
         // mutation; the outer VST3 sets this false because the DAW owns the session through
         // get/setStateInformation — a host file would fight the project file over the truth.
         bool persistSession = true;
+        bool confirmRackChangesOnClose = false;
         /** Whether a scan also sweeps the standard system VST3 folders (§8.6.5) on top of the
             user's own scan paths. The product wants them; a TEST must not, because a test that
             reads whatever the developer happens to have installed is not a test — it passes on
@@ -500,6 +504,8 @@ public:
         no user session exists. Runs once — getState calls it lazily so plug-in code only
         ever loads after the UI is up and asking. */
     void restoreSession();
+    bool rackChangedForClose();
+    juce::Result finishRackClose (bool keepChanges);
 
     const InstrumentRackHost& getRackHost() const     { return rack; }
     bool isScanning() const                           { return scanBusy.load(); }
@@ -632,6 +638,8 @@ public:
 
     /** Whether HoSTage reads Mackie Control / HUI ports as controls (the default) rather than
         passing them to the instruments as MIDI. Persisted in mackie-section.json. */
+    // Message thread. The connected LIVE page consumes this row; other pages use normal mappings.
+    std::function<bool (int, bool)> onCtrl49BlueButton;
     bool mackieSectionEnabled() const { return mackieSection.load(); }
 
     /** The surface broker reports manual page changes so a captured scene can remember the
@@ -829,6 +837,9 @@ public:
 
         A surface that declares nothing gets a zeroed BrowseSurface, which every function in
         SurfaceBrowse.h handles by refusing rather than by inventing. */
+    using SurfacePreset = ctrl49::BrowserPreset;
+    std::vector<SurfacePreset> surfacePartPresets (const juce::String& partId);
+    void loadSurfacePartPreset (const juce::String& partId, const juce::String& recordId);
     surface::BrowseSurface browseSurface() const;
     /** The facets the encoders turn — the library's own values, never invented ones. */
     std::vector<surface::BrowseFacet> browseFacets() const;
@@ -838,6 +849,7 @@ public:
 
     // -- the CTRL49's stage pages (Ctrl49StagePages.h) --------------------------------------
     // Each is a page the surface has only once it is asked for, like the browser.
+    int controlScreenSkin() const { return surfaceSkin; }
     bool soundcheckOnSurface() const             { return surfaceSoundcheckPage; }
     bool layersOnSurface() const                 { return surfaceLayersPage; }
     bool discoverOnSurface() const               { return surfaceDiscoverPage; }
@@ -953,6 +965,9 @@ public:
         category; empty is every kind. */
     SurfaceDiscover surfaceDiscover (const juce::String& kind, int count);
 
+   #if JUCE_LINUX
+    void reopenCtrl49PlayingInputs();
+   #endif
     bool ownsHardwareSurface() const;
     /** Claims the surface for this instance, taking it from an instance whose heartbeat has
         gone stale. Returns false when another live instance holds it. */
@@ -1222,6 +1237,7 @@ private:
                                  bool addNew, std::function<void()> afterLoaded = {});
     /** Availability, computed live against the catalogue (caller holds no locks; this takes
         catalogLock itself): empty = loadable, else the actionable reason. */
+    juce::Array<const LibraryRecord*> orderedPartPresets (const RackPart& part);
     juce::String recordUnavailableReason (const LibraryRecord& record) const;
     /** What `availableOnly` means here: the source is still on disk AND the plug-in the record
         targets is in the catalogue. Only the service knows the second half. */
@@ -1242,6 +1258,7 @@ private:
     /** True when the plug-in had a list and it went into the library - the caller re-emits
         the library then, because a merge nobody is told about is a browser that does not
         show the sounds until something unrelated refreshes it. */
+    bool syncTyrellPresetName (const juce::String& partId);
     bool ingestProgramList (const juce::String& partId);
     void loadRackRecord (const LibraryRecord& record);
     void attachParameters (const juce::String& partId);
@@ -1715,6 +1732,8 @@ private:
     // becomes a browser under somebody's hands is a surface that stopped doing what they had
     // it doing.
     bool surfaceBrowsing = false;
+    static constexpr int numControlSkins = 15; // Classic plus live_skin_names.json entries 1–14
+    int surfaceSkin = 0;
     bool surfaceSoundcheckPage = false;
     bool surfaceLayersPage = false;
     bool surfaceDiscoverPage = false;
@@ -1809,6 +1828,8 @@ private:
     juce::String requestedSurfaceStagePage;
     std::vector<std::vector<std::uint8_t>> virtualSurfaceInput;
     // Each part's loaded preset as last seen, so a change can show that preset's page.
+    struct H2pGroups { juce::String fingerprint, bank; std::vector<juce::StringArray> categories; };
+    std::map<juce::String, H2pGroups> surfaceH2pGroups;
     std::map<juce::String, juce::String> seenPartPresets;
     void followPresetPages();
     bool surfaceWanted = true;
@@ -2105,6 +2126,7 @@ private:
     struct PartParameters
     {
         ParameterInventory inventory;
+        double presetNameCheckDue = 0;
         std::unique_ptr<PartParameterSync> sync;
         std::map<juce::String, float> lastKnownValues;
     };
@@ -2146,6 +2168,7 @@ private:
     // Written on the MIDI thread, drained on the controlling thread; the mutex spans a few
     // string copies, far from any audio path.
     std::mutex midiActivityLock;
+    std::bitset<128> keyboardAttacksSinceDrain;
 
     // -- MIDI health (see evaluateMidiHealth) --------------------------------------------
     // Per input, what it has sent that could still be wrong: the notes it has not released,
@@ -2400,6 +2423,10 @@ private:
     void refreshMidiPickups();
     void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
                         int cc, int channel, int note = -1);
+   #if JUCE_LINUX
+    static bool isCtrl49PlayingInput (const juce::String& name);
+    juce::StringArray openedCtrl49Inputs, disabledCtrl49Inputs;
+   #endif
     bool audioRunning = false;
 
     // Cleared in the destructor so an asynchronous instantiate callback that outlives this
@@ -2408,6 +2435,9 @@ private:
     std::atomic<juce::uint64> performanceSaveGeneration { 0 };
     std::atomic<bool> performanceSavePending { false };
     bool performanceWriteErrorReported = false;
+    juce::String openingRackComparison;
+    juce::var openingRackDocument;
+    bool sessionWrittenThisRun = false;
     bool performanceBaselineKnown = false;
     bool performanceBaselineExisted = false;
     bool performanceSavesBlocked = false;
@@ -2416,6 +2446,7 @@ private:
 
     std::thread scanThread;
     std::thread libraryScanThread;
+    bool checkedTyrellPresetLibrary = false;
     bool libraryScanBusy = false;
     bool libraryScanFinished = false;
     juce::Array<juce::var> libraryScanReport;

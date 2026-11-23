@@ -25,6 +25,10 @@
   #define NOMINMAX
  #endif
  #include <windows.h>
+#elif JUCE_LINUX
+ #include <poll.h>
+ #include <sys/syscall.h>
+ #include <unistd.h>
 #endif
 
 namespace
@@ -46,22 +50,6 @@ bool isMidiControllerParameter (const juce::AudioProcessorParameter& parameter)
         return id >= first && id < first + count;
     }
     return false;
-}
-
-/** Whether a value that arrives with every other parameter's (a snapshot being put back, not
-    a knob being turned) is to be written: only one that differs from what is there, and never
-    a MIDI-controller parameter.
-
-    Both used to be written. Hostage hands the worker every parameter's value before it reads a
-    state (IsolatedPluginProxy::flushParameterValues), so each save of the rack wrote all of
-    them, and on Vanguard, which is built with JUCE, that sent every controller on all sixteen
-    channels at zero: volume off, pitch bend at the bottom, all sound off. A preset loaded, the
-    rack saved, and the keys played some other sound or none; a rack reopened was silent. The
-    parameters all read right throughout, which is why it was looked for in the wrong place
-    (heard and measured 2026-10-08; CEditorPluginWorkerRealVstSmoke's sound sequence holds it). */
-bool snapshotValueIsToBeWritten (const juce::AudioProcessorParameter& parameter, float value)
-{
-    return ! isMidiControllerParameter (parameter) && std::abs (parameter.getValue() - value) > 1.0e-6f;
 }
 
 juce::var parameterMetadata (juce::AudioProcessor& processor)
@@ -173,18 +161,35 @@ private:
     PositionInfo position;
 };
 
+// Accessed under the processor callback lock. Audio and control may carry the
+// same host edit: a late duplicate must never undo an edit made inside the VST.
+class HostParameterRevisions
+{
+public:
+    explicit HostParameterRevisions (int count) : applied (static_cast<size_t> (count)) {}
+    bool accept (size_t index, juce::uint32 revision)
+    {
+        if (static_cast<juce::int32> (revision - applied[index]) <= 0)
+            return false;
+        applied[index] = revision;
+        return true;
+    }
+private:
+    std::vector<juce::uint32> applied;
+};
+
 class WorkerAudioThread final : public juce::Thread
 {
 public:
     WorkerAudioThread (juce::AudioProcessor& processorToUse, SharedDataPlaneMapping& mappingToUse,
-                       std::atomic<bool>& processorControlActiveToUse)
+                       std::atomic<bool>& processorControlActiveToUse, HostParameterRevisions& revisions)
         : juce::Thread ("Hostage plug-in audio worker"), processor (processorToUse),
           mapping (mappingToUse), config (mapping.dataPlane().getHeader()->config),
           floatBuffer (static_cast<int> (juce::jmax (config.maxInputChannels,
                                                      config.maxOutputChannels)),
                        static_cast<int> (config.maxFrames)),
           doubleBuffer (floatBuffer.getNumChannels(), floatBuffer.getNumSamples()),
-          processorControlActive (processorControlActiveToUse),
+          hostRevisions (revisions), processorControlActive (processorControlActiveToUse),
           passThroughWhileSuspended (processor.getTotalNumInputChannels() > 0
                                      || processor.isMidiEffect())
     {
@@ -310,10 +315,11 @@ private:
             if (event.parameterIndex >= static_cast<juce::uint32> (parameters.size())
                 || event.sampleOffset >= header.numFrames)
                 continue;
+            if (! hostRevisions.accept (event.parameterIndex, event.revision)) continue;
             auto* parameter = parameters[static_cast<int> (event.parameterIndex)];
             const auto value = juce::jlimit (0.0f, 1.0f, event.normalizedValue);
             // A MIDI-controller parameter written with the value it has is a controller sent for
-            // nothing (snapshotValueIsToBeWritten): a morph blends every parameter, these too.
+            // nothing: a morph blends every parameter, these too.
             if (midiControllerParameters[event.parameterIndex] && std::abs (parameter->getValue() - value) <= 1.0e-6f)
                 continue;
             if ((event.flags & parameterGestureBegin) != 0)
@@ -430,6 +436,7 @@ private:
     size_t parameterScanCursor = 0;
     juce::uint64 lastProcessedSequence = 0;
     std::atomic<bool> failed { false };
+    HostParameterRevisions& hostRevisions;
     std::atomic<bool>& processorControlActive;
     const bool passThroughWhileSuspended = false;
 };
@@ -499,6 +506,31 @@ public:
         prewarmedOut = prewarmed.load (std::memory_order_acquire);
     }
 
+    // Spire reads its preset label when it constructs its view. Keep the host's
+    // native frame and live processor, and replace just the vendor view. Post this
+    // after the control reply so the host can service native window messages.
+    void refreshSpireView()
+    {
+        juce::MessageManager::callAsync ([this]
+        {
+            if (frame == nullptr)
+                return;
+            if (frameHostWindow == 0)
+            {
+                destroyNow(); // Parked editor: the next open builds the current preset's view.
+                return;
+            }
+            try
+            {
+                if (frame->recreateEditor (processor))
+                    return;
+            }
+            catch (...) {}
+            destroyNow();
+            state.store (State::failed, std::memory_order_release);
+        });
+    }
+
     void closeNow() { closeOnMessageThread(); }
     void destroyNow()
     {
@@ -542,7 +574,9 @@ private:
         // Off-screen until Hostage places it: the window exists at the plug-in's size
         // the moment it is created, and without this it appeared at the host window's
         // origin for up to a poll tick before jumping to where it belonged.
+        #if ! JUCE_LINUX
         frame->setTopLeftPosition (-32000, -32000);
+        #endif
         // On the prewarm path the parent is HWND_MESSAGE; on a cold explicit open it is
         // the Hostage peer. Both make a child with no taskbar button or foreground claim.
         frame->addToDesktop (0, reinterpret_cast<void*> (
@@ -574,7 +608,9 @@ private:
         if (frame != nullptr)
         {
             frameHostWindow = hostWindow;
+            #if ! JUCE_LINUX
             frame->setTopLeftPosition (-32000, -32000);
+            #endif
             frame->setVisible (true);
             publishHandle();
             publishSize();
@@ -682,21 +718,41 @@ private:
         {
             // The editor dies before the frame it sits in, and before the processor that
             // created it — the same ordering the host's own editor windows keep.
-            editor->removeComponentListener (this);
-            removeChildComponent (editor.get());
-            editor.reset();
+            detachEditor();
+        }
+
+        bool recreateEditor (juce::AudioProcessor& processor)
+        {
+            detachEditor();
+            editor.reset (processor.createEditorIfNeeded());
+            if (editor == nullptr)
+                return false;
+            addAndMakeVisible (*editor);
+            editor->addComponentListener (this);
+            setSize (editor->getWidth(), editor->getHeight());
+            owner.publishSize();
+            return true;
         }
 
         void paint (juce::Graphics& graphics) override { graphics.fillAll (juce::Colours::black); }
-        void resized() override { editor->setTopLeftPosition (0, 0); }
+        void resized() override { if (editor != nullptr) editor->setTopLeftPosition (0, 0); }
 
         juce::Point<int> contentSize() const noexcept
         {
+            if (editor == nullptr) return { getWidth(), getHeight() };
             return { juce::jmax (1, editor->getWidth()),
                      juce::jmax (1, editor->getHeight()) };
         }
 
     private:
+        void detachEditor()
+        {
+            if (editor == nullptr) return;
+            editor->removeComponentListener (this);
+            removeChildComponent (editor.get());
+            editor.reset();
+        }
+
         void componentMovedOrResized (juce::Component&, bool, bool wasResized) override
         {
             if (wasResized)
@@ -745,11 +801,11 @@ public:
                          WorkerEditorController& editorToUse,
                          juce::uint32 generationToUse, juce::uint32 maxFramesToUse,
                          std::atomic<bool>& quitToUse,
-                         std::atomic<bool>& processorControlActiveToUse)
+                         std::atomic<bool>& processorControlActiveToUse, HostParameterRevisions& revisions)
         : juce::Thread ("Hostage plug-in control worker"), processor (processorToUse),
           channel (channelToUse), editor (editorToUse), generation (generationToUse),
           maxFrames (maxFramesToUse), quit (quitToUse),
-          processorControlActive (processorControlActiveToUse)
+          processorControlActive (processorControlActiveToUse), hostRevisions (revisions)
     {
     }
 
@@ -824,37 +880,48 @@ public:
                 {
                     juce::String jsonError;
                     const auto json = decodeJsonPayload (received.message, jsonError);
-                    const auto valuesValue = json.isObject()
-                        ? json.getProperty ("values", {}) : json;
-                    const auto* values = valuesValue.getArray();
-                    const auto pickUpMs = json.isObject()
-                        ? juce::jlimit (10, 2000, (int) json.getProperty ("pickUpMs", 400))
-                        : 400;
+                    const auto editsValue = json.getProperty ("edits", {});
+                    const auto* edits = editsValue.getArray();
                     const auto parameters = processor.getParameters();
-                    bool valid = jsonError.isEmpty() && values != nullptr
-                              && values->size() == parameters.size();
+                    std::vector<ParameterEvent> commands;
+                    bool valid = jsonError.isEmpty() && edits != nullptr;
                     if (valid)
-                        for (const auto& value : *values)
-                            valid = valid && (value.isInt() || value.isInt64()
-                                           || value.isDouble() || value.isBool());
+                        for (const auto& edit : *edits)
+                        {
+                            const auto* fields = edit.getArray();
+                            if (fields == nullptr || fields->size() != 3 || ! (*fields)[0].isInt()
+                                || ! ((*fields)[1].isInt() || (*fields)[1].isInt64())
+                                || ! ((*fields)[2].isInt() || (*fields)[2].isDouble()))
+                            {
+                                valid = false;
+                                break;
+                            }
+                            const auto index = static_cast<int> ((*fields)[0]);
+                            const auto revision = static_cast<juce::int64> ((*fields)[1]);
+                            const auto value = static_cast<float> ((*fields)[2]);
+                            if (! juce::isPositiveAndBelow (index, parameters.size())
+                                || revision < 0 || revision > 0xffffffffLL || ! std::isfinite (value))
+                            {
+                                valid = false;
+                                break;
+                            }
+                            commands.push_back ({ static_cast<juce::uint32> (index), 0,
+                                juce::jlimit (0.0f, 1.0f, value), parameterValue,
+                                static_cast<juce::uint32> (revision) });
+                        }
                     if (! valid)
-                        reply = errorReply (generation, received.message.requestId,
-                                            "invalid worker parameter snapshot");
+                        reply = errorReply (generation, received.message.requestId, "invalid host parameter edits");
                     else
-                    {
                         invokeProcessor ([&]
                         {
-                            for (int index = 0; index < parameters.size(); ++index)
+                            for (const auto& edit : commands)
                             {
-                                const auto value = juce::jlimit (0.0f, 1.0f, static_cast<float> (
-                                    static_cast<double> (values->getReference (index))));
-                                if (snapshotValueIsToBeWritten (*parameters[index], value))
-                                    parameters[index]->setValue (value);
+                                auto* parameter = parameters[static_cast<int> (edit.parameterIndex)];
+                                if (hostRevisions.accept (edit.parameterIndex, edit.revision)
+                                    && std::abs (parameter->getValue() - edit.normalizedValue) > 1.0e-6f)
+                                    parameter->setValue (edit.normalizedValue);
                             }
-                            reply = makeJsonMessage (MessageType::setParameter, generation,
-                                received.message.requestId, processorSnapshot (processor));
-                        }, pickUpMs);
-                    }
+                        });
                 }
                 else if (received.message.type == MessageType::parameterText)
                 {
@@ -912,7 +979,7 @@ public:
                     // a copy of every parameter beside it, written back after the restore because
                     // "its bank blob did not bring the sound back". It does: what silenced a restored
                     // Vanguard was Hostage itself, writing its MIDI-controller parameters
-                    // (snapshotValueIsToBeWritten), and that copy was one more place it did so. A
+                    // during save, and that copy was one more place it did so. A
                     // state saved with the copy still loads; the copy is ignored.
                     juce::MemoryBlock beforeState;
                     bool deferredState = false;
@@ -1050,6 +1117,8 @@ public:
                                 reply = makeJsonMessage (MessageType::applyVstPreset, generation,
                                     received.message.requestId, processorSnapshot (processor));
                             });
+                        if (applied && preset.hasFileExtension ("spf2"))
+                            editor.refreshSpireView();
                         if (! applied)
                             reply = errorReply (generation, received.message.requestId,
                                                 "worker could not apply the vendor preset");
@@ -1249,6 +1318,7 @@ private:
     const juce::uint32 maxFrames;
     std::atomic<bool>& quit;
     std::atomic<bool>& processorControlActive;
+    HostParameterRevisions& hostRevisions;
 };
 
 #if JUCE_WINDOWS
@@ -1265,6 +1335,29 @@ private:
     HANDLE handle = nullptr;
 };
 
+#elif JUCE_LINUX
+class ParentProcessHandle
+{
+public:
+    explicit ParentProcessHandle (juce::uint32 processId)
+        : fd (processId == static_cast<juce::uint32> (::getppid())
+              ? static_cast<int> (::syscall (SYS_pidfd_open, processId, 0)) : -1) {}
+    ~ParentProcessHandle() { if (fd >= 0) ::close (fd); }
+    bool isValid() const noexcept { return fd >= 0; }
+    bool isAlive() const noexcept
+    {
+        pollfd event { fd, POLLIN, 0 };
+        if (fd < 0) return false;
+        int status;
+        do { status = ::poll (&event, 1, 0); } while (status < 0 && errno == EINTR);
+        return status == 0;
+    }
+private:
+    int fd;
+};
+#endif
+
+#if JUCE_WINDOWS || JUCE_LINUX
 class ParentProcessWatchdog final : public juce::Thread
 {
 public:
@@ -1289,7 +1382,9 @@ public:
                 // This thread is deliberately independent of JUCE's message loop and the audio
                 // worker. If vendor construction, state code, or an editor has wedged either of
                 // those, a dead Hostage parent must still reap this orphan and its OS handles.
+               #if JUCE_WINDOWS
                 if (TerminateProcess (GetCurrentProcess(), 73) == FALSE)
+               #endif
                     std::_Exit (73);
                 return;
             }
@@ -1361,11 +1456,13 @@ int main (int argc, char* argv[])
         || ! mapping.openWorker (names, error) || ! control.openWorker (names.controlPipe, error)
         || mapping.dataPlane().getHeader()->workerGeneration != generation)
         return 65;
+   #if JUCE_WINDOWS
     if (! PluginWorkerJob::joinCurrentProcess (workerJobName, error))
     {
         control.send (errorReply (generation, 0, error), 1000, error);
         return 65;
     }
+   #endif
     if (! parentWatchdog.startThread (juce::Thread::Priority::normal))
         return 65;
 
@@ -1459,9 +1556,10 @@ int main (int argc, char* argv[])
     std::atomic<bool> quit { false };
     std::atomic<bool> processorControlActive { false };
     WorkerEditorController editor (*processor);
-    WorkerAudioThread audio (*processor, mapping, processorControlActive);
+    HostParameterRevisions hostRevisions (processor->getParameters().size());
+    WorkerAudioThread audio (*processor, mapping, processorControlActive, hostRevisions);
     WorkerControlThread commands (*processor, control, editor, generation,
-                                  config.maxFrames, quit, processorControlActive);
+                                  config.maxFrames, quit, processorControlActive, hostRevisions);
     const auto audioStarted = audio.startThread (juce::Thread::Priority::highest);
     const auto commandsStarted = audioStarted
         && commands.startThread (juce::Thread::Priority::normal);

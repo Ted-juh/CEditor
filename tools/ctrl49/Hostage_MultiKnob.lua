@@ -31,6 +31,34 @@ local SYM = { play = { 0, 84, 11, 12 }, stop = { 14, 85, 10, 10 }, run = { 28, 8
               wait = { 42, 85, 10, 10 }, warn = { 56, 84, 13, 12 }, dot5 = { 72, 86, 5, 5 },
               dot7 = { 80, 85, 7, 7 }, ring11 = { 90, 84, 11, 11 }, ring17 = { 104, 82, 17, 17 } }
 
+-- BEGIN LIVE SKIN PALETTES
+local skins = {
+    { 0xFF101412, 0xFFFFF0CE, 0xFFB1B19E, 0xFFFFBD54 },
+    { 0xFFB4B9B3, 0xFF1C262B, 0xFF405053, 0xFF7B2B13 },
+    { 0xFF43281D, 0xFFF5DDB1, 0xFFCDB17F, 0xFFFFD684 },
+    { 0xFF0C172A, 0xFFDAFAFF, 0xFF7EB5CE, 0xFF4DE8FF },
+    { 0xFF111111, 0xFFFFFFFF, 0xFF9A9A9A, 0xFFF09609 },
+    { 0xFF0F1424, 0xFFE6E9F5, 0xFF8890B0, 0xFFFFB547 },
+    { 0xFFEEEDE8, 0xFF151515, 0xFF6E6D68, 0xFFFF6A13 },
+    { 0xFF1E4C8A, 0xFFE8F1FF, 0xFF9FC1EC, 0xFFFFD54A },
+    { 0xFFFFD23F, 0xFF111111, 0xFF5A503F, 0xFFE8317F },
+    { 0xFFAFBF73, 0xFF1E2913, 0xFF56653A, 0xFF0B1205 },
+    { 0xFFB8181F, 0xFFFFFFFF, 0xFFFFC9C4, 0xFFFFD447 },
+    { 0xFF2B2B2D, 0xFFF4EFE2, 0xFFC9C4B5, 0xFFF2C514 },
+    { 0xFF151515, 0xFFF4F1EA, 0xFFBEBEBE, 0xFFFFB347 },
+    { 0xFF06100A, 0xFFFFF8E6, 0xFFE3DCC6, 0xFFFFB04A },
+}
+-- END LIVE SKIN PALETTES
+local skin, skin_decoded = 0, false
+function set_skin(args)
+    local id = get_byte(args, 0)
+    skin = skins[id] and id or 0
+    if skin ~= 0 and not skin_decoded then
+        decode_image(14, 0x0220, 18, 0x0221, WHITE)
+        skin_decoded = true
+    end
+end
+
 local initialized = false
 local mode = 0
 local title = "HOSTAGE"
@@ -1088,13 +1116,8 @@ local function draw_live()
         say(SMALL, labels[k], DIM, x, 212, 57, 12)
         say(ROWTXT, values[k], k == 1 and WHITE or GREY, x, 226, 57, 18)
     end
-    local pads = "1-8"
-    if half == 8 then pads = "9-16" end
-    if live.flags % 4 < 2 then
-        say(SMALL, "NO LANE DRAWN: EVERY STEP PLAYS AS PLAYED. TURN E2-E5 OR A PAD TO DRAW ONE", DARK, 8, 252, 464, 14)
-    else
-        say(SMALL, "PADS: STEPS " .. pads .. " ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE", DARK, 8, 252, 464, 14)
-    end
+    local steps = half == 8 and "9-16" or "1-8"
+    say(SMALL, "BLUE B1-B8: STEPS " .. steps .. "     DRUM PADS: RACK ASSIGNMENTS", GREY, 8, 252, 464, 14)
 end
 
 -- --- METERS -----------------------------------------------------------------------------------------
@@ -1258,6 +1281,37 @@ local function value_text(slot)
     return text
 end
 
+-- The same assignments and payload as Classic, with the lab knob artwork
+-- sampled at sixteen angles. Numbers always show the full live value.
+local function draw_skinned_controls()
+    local palette = skins[skin]
+    local bg, ink, label, accent = palette[1], palette[2], palette[3], palette[4]
+    draw_rect(0, 0, 480, 272, bg)
+    draw_rect(0, 0, 480, 3, accent)
+    say(TITLE, title, ink, 0, 5, 480, 22)
+    for slot = 1, 8 do
+        local x, y = knob_pos(slot)
+        local name, mark = unmark(labels[slot])
+        if name ~= "" or values[slot] ~= 0 or (value_texts and value_texts[slot] ~= "") then
+            local frame = values[slot] * 15 / 127 + 0.5
+            frame = frame - frame % 1
+            draw_image(18, 0x0221, x + 10, y, frame * 44, (skin - 1) * 44, 44, 44, WHITE)
+            say(VALM, value_text(slot), ink, x - 21, y + 46, 106, 18)
+            say(LBL, name, label, x - 21, y + 66, 106, 16)
+            if mark == "warn" then symbol("warn", x + 53, y, WARN) end
+        else
+            draw_rect(x + 23, y + 21, 18, 2, label)
+        end
+        if slot == active + 1 then draw_rect(x + 16, y + 84, 32, 2, accent) end
+    end
+    if page_number > 0 then
+        draw_rect(16, 238, 448, 1, label)
+        local name = unmark(labels[active + 1] or "")
+        if name ~= "" then say(STRIP, name .. "   " .. value_text(active + 1), ink, 16, 242, 324, 24) end
+        say(ROWNUM, "PAGE " .. tostring(page_number) .. " / " .. tostring(page_count), label, 344, 244, 120, 20)
+    end
+end
+
 local function draw_knobs()
     ensure_knobs()
 
@@ -1316,6 +1370,46 @@ local function draw_knobs()
     end
 end
 
+local rack_screen = {}
+function set_rack(args)
+    page_kind = 10
+    rack_screen.cursor = get_byte(args, 0) + 1
+    local count = get_byte(args, 1)
+    local i = 2
+    rack_screen.title, i = read_string(args, i)
+    rack_screen.position, i = read_string(args, i)
+    rack_screen.rows = {}
+    for r = 1, count do
+        local row = {}
+        row.instrument, i = read_string(args, i)
+        row.preset, i = read_string(args, i)
+        rack_screen.rows[r] = row
+    end
+    rack_screen.path = i < #args and read_string(args, i) or ""
+end
+
+function set_presets(args)
+    set_rack(args)
+    page_kind = 11
+end
+
+local function draw_rack()
+    local presets = page_kind == 11
+    title_bar(rack_screen.title, rack_screen.position)
+    if #rack_screen.rows == 0 then say(ROWTXT, presets and "No presets for this part" or "No parts in rack", GREY, 10, 48, 450, 24) end
+    for r, row in ipairs(rack_screen.rows) do
+        local y = 36 + (r - 1) * 38
+        if r == rack_screen.cursor then
+            draw_rect(4, y, 472, 36, ROW)
+            draw_rect(4, y, 3, 36, ORANGE)
+        end
+        say(ROWTXT, row.instrument, WHITE, 12, y + 7, presets and 365 or 215, 24)
+        say(ROWTXT, row.preset, GREY, presets and 386 or 230, y + 7, presets and 86 or 240, 24)
+    end
+    if presets then say(SMALL, rack_screen.path, GREY, 8, 228, 464, 18) end
+    say(SMALL, presets and "PRESS: OPEN/LOAD    LEFT: BACK    BROWSE: MENU" or "UP/DOWN OR DIAL: BROWSE     PRESS DIAL: SELECT     CONTROL: BACK", GREY, 8, 250, 464, 16)
+end
+
 function draw(args)
     if not initialized then init("") end
 
@@ -1327,6 +1421,7 @@ function draw(args)
         return
     end
 
+    if page_kind == 10 or page_kind == 11 then draw_rack() return end
     if page_kind == 2 then
         draw_check()
         return
@@ -1356,5 +1451,5 @@ function draw(args)
         return
     end
 
-    draw_knobs()
+    if page_kind == 0 and skin ~= 0 then draw_skinned_controls() else draw_knobs() end
 end

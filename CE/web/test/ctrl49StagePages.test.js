@@ -34,9 +34,9 @@ function rig() {
 
 test('both pages are off until asked for, and a payload without them reads as off', () => {
   assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false, live: false });
-  assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false, live: false });
+  assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false, live: false, skin: 0 });
   assert.deepEqual(normalizeHostState({ surfacePages: { soundcheck: true, layers: 'yes', discover: true, cue: 1 } }).surfacePages,
-    { soundcheck: true, layers: false, discover: true, cue: false, changes: false, meters: false, live: false }, 'only a real true turns a page on');
+    { soundcheck: true, layers: false, discover: true, cue: false, changes: false, meters: false, live: false, skin: 0 }, 'only a real true turns a page on');
 });
 
 test('the screen payload carries one stage call, and only one of the two known ones', () => {
@@ -53,7 +53,7 @@ test('the screen payload carries one stage call, and only one of the two known o
 test('turning the pages on in the stand-in adds them after the performance page, LAYERS first', () => {
   let state = applyMockCommand(rig(), { cmd: 'soundcheckOnSurface', on: true });
   state = applyMockCommand(state, { cmd: 'layersOnSurface' });
-  assert.deepEqual(state.surfacePages, { soundcheck: true, layers: true, discover: false, cue: false, changes: false, meters: false, live: false },
+  assert.deepEqual(state.surfacePages, { soundcheck: true, layers: true, discover: false, cue: false, changes: false, meters: false, live: false, skin: 0 },
     'on, and flipped with no "on"');
 
   const performance = mockSurfaceScreen(state, cursor(1));

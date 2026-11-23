@@ -14,6 +14,8 @@ const records = Array.from({ length: 7854 }, (_, index) => ({
   instrument: plugins[index % 3], targetCeId: `synth-${index % 3}`, category: 'Pad', available: true,
   favourite: index % 3 === 0,
 }));
+records.push({ recordId: 'rack-1', type: 'rack', sourceType: 'rackCapture', factory: false,
+  name: 'Keyboard rig', available: true });
 records.push({ recordId: 'effect', type: 'preset', sourceType: 'vstpreset', factory: true,
   name: 'Room', instrument: 'Reverb', targetCeId: 'effect', isEffect: true, available: true });
 let query = normalizeLibraryQuery({});

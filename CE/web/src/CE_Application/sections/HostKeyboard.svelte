@@ -1,3 +1,8 @@
+<script module>
+  const nativeView = globalThis.window?.__JUCE__?.initialisationData?.hostKeyboardView;
+  let savedView = nativeView?.[0];
+</script>
+
 <script>
   /**
    * HostKeyboard.svelte — the one keyboard on screen, in two sizes.
@@ -26,6 +31,7 @@
    * There used to be a second keyboard for this under the rack, linear in semitones, which
    * never lined up with the piano above it. One keyboard, one geometry (pianoGeometry.js).
    */
+  import { hardwareKeyboardNotes } from '../stores/hostMeters.js';
   import { onDestroy } from 'svelte';
   import { hostNote, hostState, hostKeyboardMode, showKeyboardPlay, showPartRange,
            setPartMidiRules, partColor } from '../stores/instrumentHost.js';
@@ -34,8 +40,13 @@
            playKeyboardWidthPercent }
     from '../utils/pianoGeometry.js';
 
-  let baseOctave = $state(4);   // C4 at the left edge in play mode
-  let playOctaves = $state(4);
+  const count = savedView?.playOctaves;
+  const initialCount = count === FULL_KEYBOARD ||
+    (Number.isInteger(count) && count >= 1 && count <= MAX_COMPLETE_OCTAVES) ? count : 4;
+  let playOctaves = $state(initialCount);
+  const maxSavedBase = maxPlayBaseOctave(initialCount === FULL_KEYBOARD ? 1 : initialCount);
+  let baseOctave = $state(Math.max(-1, Math.min(maxSavedBase,
+    Number.isInteger(savedView?.baseOctave) ? savedView.baseOctave : 4)));
   const PLAY_OCTAVE_OPTIONS = Array.from({ length: MAX_COMPLETE_OCTAVES }, (_, i) => i + 1);
 
   let mode = $derived($hostKeyboardMode.mode);
@@ -156,15 +167,22 @@
     if (key in KEYMAP) release(`key:${event.code || key}`);
   }
 
+  function saveKeyboardView() {
+    savedView = { baseOctave, playOctaves };
+    if (nativeView) window.__JUCE__.backend.emitEvent('saveHostKeyboardView', savedView);
+  }
+
   function shiftOctave(amount) {
     if (playOctaves === FULL_KEYBOARD) return;
     baseOctave = Math.max(-1, Math.min(maxBaseOctave, baseOctave + amount));
+    saveKeyboardView();
   }
 
   function setPlayOctaves(value) {
     playOctaves = value === FULL_KEYBOARD ? FULL_KEYBOARD : Number(value);
     if (playOctaves !== FULL_KEYBOARD)
       baseOctave = Math.min(baseOctave, maxPlayBaseOctave(playOctaves));
+    saveKeyboardView();
   }
 
   // --- the range, on the rim -------------------------------------------------------------
@@ -314,7 +332,7 @@
          style:width={mode === 'play' ? `${playWidth}%` : '100%'}>
       {#each slots as slot (slot.note)}
         <div class="white-slot">
-          <button type="button" class="piano-key white" class:down={pressed.has(slot.note)}
+          <button type="button" class="piano-key white" class:down={pressed.has(slot.note) || $hardwareKeyboardNotes.includes(slot.note)}
                   class:in-range={inRange(slot.note)}
                   style={inRange(slot.note) ? `--part-color:${rangeColor}` : ''}
                   data-note={slot.note} aria-label={`Note ${slot.note}`}
@@ -335,7 +353,7 @@
             {/if}
           </button>
           {#if slot.sharp >= 0}
-            <button type="button" class="piano-key black" class:down={pressed.has(slot.sharp)}
+            <button type="button" class="piano-key black" class:down={pressed.has(slot.sharp) || $hardwareKeyboardNotes.includes(slot.sharp)}
                     class:in-range={inRange(slot.sharp)}
                     style={inRange(slot.sharp) ? `--part-color:${rangeColor}` : ''}
                     data-note={slot.sharp} aria-label={`Note ${slot.sharp}`}

@@ -21,12 +21,13 @@ inline bool isNamedVendorPresetFile (const juce::File& file)
     return file.hasFileExtension ("vstpreset;nksf;fxp;spf2;h2p");
 }
 
-// Zebra3's MIDI program selector reports numbered slots, not its disk preset library.
+// The u-he MIDI program selector reports numbered slots, not its disk preset library.
 // Keep this vendor-specific: another synth may have an actual sound called "Program 1".
-inline bool isZebra3ProgramSlot (const juce::String& instrument, const juce::String& vendor,
+inline bool isUheProgramSlot (const juce::String& instrument, const juce::String& vendor,
                                 const juce::String& name)
 {
-    if (! instrument.equalsIgnoreCase ("Zebra3") || ! vendor.equalsIgnoreCase ("u-he")) return false;
+    if ((! instrument.equalsIgnoreCase ("Zebra3") && ! instrument.equalsIgnoreCase ("TyrellN6"))
+        || ! vendor.equalsIgnoreCase ("u-he")) return false;
     const auto lower = name.trim().toLowerCase();
     for (const auto* prefix : { "program", "preset", "slot" })
         if (lower.startsWith (prefix))
@@ -238,11 +239,14 @@ inline VendorPreset readVendorPreset (const juce::File& file)
         auto lines = juce::StringArray::fromLines (text);
         // Module presets also say #AM=Zebra3. Only complete patches contain MainMix and
         // MPreset; feeding an oscillator/effect module to the host would leave half a sound.
-        if (! lines.contains ("#AM=Zebra3") || ! lines.contains ("#Vers=1")
-            || ! lines.contains ("#cm=MainMix") || ! lines.contains ("#cm=MPreset"))
-            return fail ("Unsupported or incomplete Zebra3 H2P preset.");
+        if (lines.contains ("#AM=TyrellN6") && lines.contains ("#cm=main") && lines.contains ("#cm=Tyrell"))
+            result.instrument = "TyrellN6";
+        else if (lines.contains ("#AM=Zebra3") && lines.contains ("#Vers=1")
+                 && lines.contains ("#cm=MainMix") && lines.contains ("#cm=MPreset"))
+            result.instrument = "Zebra3";
+        else
+            return fail ("Unsupported or incomplete H2P preset.");
         result.sourceType = "h2p";
-        result.instrument = "Zebra3";
         result.manufacturer = "u-he";
         result.category = file.getParentDirectory().getFileName();
         // Native Zebra3 component state is H2P text with a #pgm filename header. Supply the

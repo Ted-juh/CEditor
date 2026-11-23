@@ -223,6 +223,28 @@ try {
   await page.evaluate(() => window.soundEvent('instrumentHostError', { message: 'Could not save the rack: library is not writable.' }));
   assert.equal(await page.getByTestId('host-save-notice').count(), 0);
   await page.getByRole('alert').filter({ hasText: 'library is not writable' }).waitFor();
+  const dock = page.getByTestId('host-dock');
+  const button = name => dock.getByRole('button', { name, exact: true });
+  await button('Save current rack as').click();
+  await dock.getByLabel('Rack name', { exact: true }).fill('Rehearsal');
+  await button('Save').click();
+  assert.deepEqual(await page.evaluate(() => window.soundCommands.at(-1)), { cmd: 'saveRackToLibrary', name: 'Rehearsal' });
+  await dock.getByLabel('Preset type').selectOption('rack');
+  await page.getByTestId('browser-search').fill('Keyboard rig');
+  await page.getByTestId('preset-row').first().getByRole('button', { name: /^Keyboard rig/ }).click();
+  for (const [label, submit, cmd] of [['Rename selected rack', 'Rename', 'renameSavedRack'],
+                                      ['Duplicate selected rack', 'Duplicate', 'duplicateSavedRack']]) {
+    await button(label).click();
+    await dock.getByLabel('Rack name', { exact: true }).fill('Evening rig');
+    await button(submit).click();
+    assert.deepEqual(await page.evaluate(() => window.soundCommands.at(-1)), { cmd, recordId: 'rack-1', name: 'Evening rig' });
+  }
+  await button('Delete selected rack').click();
+  await button('Cancel').click();
+  assert.equal(await page.evaluate(() => window.soundCommands.some(c => c.cmd === 'removeLibraryRecord')), false);
+  await button('Delete selected rack').click();
+  await button('Delete').click();
+  assert.deepEqual(await page.evaluate(() => window.soundCommands.at(-1)), { cmd: 'removeLibraryRecord', recordId: 'rack-1' });
   assert.deepEqual(errors, []);
   console.log('Sounds dock: virtual rows, keyboard, filters, target commands, effect add, details, sizing and collapse passed.');
 } finally { await browser.close(); await server.close(); }

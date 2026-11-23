@@ -6,6 +6,8 @@
 // outside CTest is intentional: a representative installed VST3, its licence state and any UI it
 // opens are properties of the test machine rather than deterministic repository fixtures.
 
+#include "InstrumentHost/EditorSnapshot.h"
+#include "InstrumentHost/SpirePresetState.h"
 #include "InstrumentHost/IsolatedPluginProxy.h"
 #include "InstrumentHost/PluginScannerCoordinator.h"
 #include "InstrumentHost/VendorPreset.h"
@@ -246,6 +248,41 @@ int main (int argc, char* argv[])
         result.phase = "prepare";
         processor->prepareToPlay (sampleRate, blockSize);
 
+        if (juce::SystemStats::getEnvironmentVariable ("HOSTAGE_SMOKE_NATIVE_EDITOR", {}) == "1")
+        {
+            result.phase = "open and reopen native editor";
+            for (int attempt = 0; attempt < 2; ++attempt)
+            {
+                juce::DocumentWindow window ("HoSTage editor smoke", juce::Colours::black, 0);
+                auto* editor = processor->createEditorIfNeeded();
+                auto* native = dynamic_cast<ceditor::host::editorSnapshot::ForeignWindowSource*> (editor);
+                juce::Component rack;
+                juce::Viewport dock;
+                rack.addAndMakeVisible (dock);
+                dock.setViewedComponent (editor, true);
+                dock.setSize (320, 200);
+                rack.setSize (900, 500);
+                window.setContentNonOwned (&rack, true);
+                window.setVisible (true);
+                const auto deadline = juce::Time::getMillisecondCounterHiRes() + 8000.0;
+                while (native != nullptr && native->foreignWindowHandle() == 0
+                       && juce::Time::getMillisecondCounterHiRes() < deadline)
+                    juce::MessageManager::getInstance()->runDispatchLoopUntil (20);
+                if (native == nullptr || native->foreignWindowHandle() == 0)
+                    throw std::runtime_error ("Worker did not supply a native editor window");
+                std::cout << "Native editor window " << native->foreignWindowHandle()
+                          << " size " << editor->getWidth() << "x" << editor->getHeight() << std::endl;
+                dock.setSize (juce::jmax (40, editor->getWidth() / 2),
+                                   juce::jmax (40, editor->getHeight() / 2));
+                rack.setSize (editor->getWidth() + 40, editor->getHeight() + 40);
+                dock.setTopLeftPosition (rack.getWidth() - dock.getWidth(), 0);
+                dock.setViewPosition (editor->getWidth(), editor->getHeight());
+                if (! dock.getHorizontalScrollBar().isVisible() || dock.getViewPositionX() <= 0)
+                    throw std::runtime_error ("Oversized native editor could not scroll horizontally");
+                juce::MessageManager::getInstance()->runDispatchLoopUntil (1000);
+            }
+        }
+
         if (argc == 6)
         {
             result.phase = "vendor preset";
@@ -276,6 +313,10 @@ int main (int argc, char* argv[])
                     throw std::runtime_error ("H2P recall did not retain the real preset name");
             }
             if (preset.sourceType == "spire")
+            {
+                const auto controller = ceditor::host::readSpireController (after);
+                if (controller.getProperty ("preset_meta", {}).getProperty ("name", {}).toString() != preset.name)
+                    throw std::runtime_error ("Spire retained the wrong preset name");
                 for (const auto& property : preset.parameters.getDynamicObject()->getProperties())
                 {
                     bool matched = false;
@@ -284,6 +325,7 @@ int main (int argc, char* argv[])
                             matched = std::abs (parameter->getValue() - static_cast<float> (property.value)) < 0.00001f;
                     if (! matched) throw std::runtime_error ("Spire parameter differs from the preset file");
                 }
+            }
         }
 
         // Presets by ear. The checks above read state and parameters, and both can be right while
