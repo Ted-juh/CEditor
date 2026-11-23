@@ -5,11 +5,16 @@
 // one check and said nothing about the rest, and the chain's first broken link (playerIcons, for a
 // day) hid every check after it. CI runs this, so a failure there names all of them.
 //
+// They run side by side, on as many workers as parallelSlots.mjs says (CEDITOR_TEST_JOBS=1 for one at
+// a time): each check is still a process of its own, on its worker's dev-server port and Vite cache.
+// A check's lines are printed when it ends, so two checks' output never interleaves.
+//
 // Run:  node browser-checks/runAll.mjs [name ...]   (names, without .mjs, run just those)
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runPool, slotEnv, workerCount } from './parallelSlots.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -48,12 +53,33 @@ const only = process.argv.slice(2);
 const chosen = only.length ? CHECKS.filter((name) => only.includes(name)) : CHECKS;
 const failed = [];
 const started = Date.now();
+const workers = workerCount();
+if (workers > 1) console.log(`${workers} workers (CEDITOR_TEST_JOBS=1 for one at a time)`);
 
-for (const name of chosen) {
-  const t0 = Date.now();
-  const run = spawnSync(process.execPath, [path.join(HERE, `${name}.mjs`)], {
-    cwd: path.resolve(HERE, '..'), encoding: 'utf8', timeout: PER_CHECK_MS, maxBuffer: 64 * 1024 * 1024,
+/** One check in a process of its own; resolves with what spawnSync used to return. */
+function runCheck(name, env) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [path.join(HERE, `${name}.mjs`)], {
+      cwd: path.resolve(HERE, '..'), env: { ...process.env, ...env },
+    });
+    let stdout = '', stderr = '', error = null;
+    child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding('utf8').on('data', (chunk) => { stderr += chunk; });
+    const timer = setTimeout(() => {
+      error = new Error(`timed out after ${PER_CHECK_MS / 60000} min`);
+      child.kill();
+    }, PER_CHECK_MS);
+    child.on('error', (e) => { error = e; });
+    child.on('close', (status, signal) => {
+      clearTimeout(timer);
+      resolve({ status: error ? null : status, signal, error, stdout, stderr });
+    });
   });
+}
+
+await runPool(chosen, workers, async (name, slot) => {
+  const t0 = Date.now();
+  const run = await runCheck(name, workers > 1 ? slotEnv(slot, { base: 5300, cacheName: 'checks' }) : {});
   const seconds = ((Date.now() - t0) / 1000).toFixed(0);
   const output = `${run.stdout ?? ''}${run.stderr ?? ''}`.trimEnd();
   const lastLine = output.split('\n').filter(Boolean).pop() ?? '';
@@ -61,15 +87,16 @@ for (const name of chosen) {
     console.log(`ok    ${name} (${seconds} s) ${lastLine.slice(0, 160)}`);
   } else {
     const why = run.error ? run.error.message : `exit ${run.status ?? run.signal}`;
-    console.log(`FAIL  ${name} (${seconds} s, ${why})`);
     // The end of its output, where a check says what it found; the whole of it would bury the rest.
-    console.log(output.split('\n').slice(-40).map((line) => `      ${line}`).join('\n'));
+    console.log(`FAIL  ${name} (${seconds} s, ${why})\n`
+      + output.split('\n').slice(-40).map((line) => `      ${line}`).join('\n'));
     failed.push(name);
   }
-}
+});
 
 const minutes = ((Date.now() - started) / 60000).toFixed(1);
+const inOrder = chosen.filter((name) => failed.includes(name));
 console.log(failed.length
-  ? `\n${failed.length} of ${chosen.length} browser checks failed (${minutes} min): ${failed.join(', ')}`
+  ? `\n${failed.length} of ${chosen.length} browser checks failed (${minutes} min): ${inOrder.join(', ')}`
   : `\nAll ${chosen.length} browser checks passed (${minutes} min).`);
 process.exit(failed.length ? 1 : 0);

@@ -147,7 +147,9 @@ jobs:
   # The component acceptance harness, browser-checks/componentBehavior.mjs: 95 cases, each a control
   # edited through the real inspector and driven by the pointer and the keys, saved, reloaded and
   # checked again. Sixteen minutes on its first run, which the browser-checks job has not the time
-  # for (it stops at thirty), so it has a runner of its own. No bundle: it runs the editor in a Vite dev
+  # for (it stops at thirty), so it has a runner of its own. Since 2026-11-23 it splits itself over
+  # half the runner's cores (two here), as runAll.mjs does the browser checks: browser-checks/
+  # parallelSlots.mjs. No bundle: it runs the editor in a Vite dev
   # server, which compiles the modules as they are asked for. What a failing case saw (a screenshot
   # each, and results.json) is kept as an artifact.
   component-behavior:

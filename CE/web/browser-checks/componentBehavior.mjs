@@ -5,13 +5,74 @@ import { chromium } from 'playwright-core';
 import { chromiumLaunchOptions, DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { join, sep } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { slotEnv, workerCount } from './parallelSlots.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const out = process.env.CEDITOR_BEHAVIOR_OUT ?? fileURLToPath(new URL('../../../work/component-behavior/', import.meta.url));
 await mkdir(out, { recursive: true });
-const server = await createServer({ root, configFile: join(root, 'vite.config.js'), server: { host: '127.0.0.1', port: 0 } });
+
+// It splits itself. Run whole, it starts as many copies of itself as parallelSlots.mjs has workers,
+// copy i of n running cases i, i + n, i + 2n... (CEDITOR_BEHAVIOR_SHARD="i/n"), each with its own
+// dev-server port, Vite cache and output folder (worker-i), and puts their results back in case
+// order in results.json. One at a time, the 96 cases took seventeen minutes. CEDITOR_BEHAVIOR_CASE
+// runs in one process, since a few named cases are not worth several browsers.
+const shard = /^(\d+)\/(\d+)$/.exec(process.env.CEDITOR_BEHAVIOR_SHARD ?? '');
+if (!shard && !process.env.CEDITOR_BEHAVIOR_CASE && workerCount() > 1) process.exit(await runShards(workerCount()));
+
+async function runShards(n) {
+  const started = Date.now();
+  console.log(`${n} workers, each running every ${n}th case (CEDITOR_TEST_JOBS=1 for one at a time)`);
+  const codes = await Promise.all(Array.from({ length: n }, (_, i) => new Promise((resolve) => {
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
+      cwd: process.cwd(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        ...slotEnv(i, { base: 5400, cacheName: 'behavior' }),
+        CEDITOR_BEHAVIOR_SHARD: `${i}/${n}`,
+        CEDITOR_BEHAVIOR_OUT: join(out, `worker-${i}`) + sep,
+      },
+    });
+    // Whole lines, so two workers' output never shares one.
+    createInterface({ input: child.stdout }).on('line', (line) => console.log(line));
+    createInterface({ input: child.stderr }).on('line', (line) => console.error(line));
+    child.on('error', (e) => { console.error(`FAIL worker ${i} did not start: ${e.message}`); resolve(1); });
+    child.on('close', (code) => resolve(code ?? 1));
+  })));
+
+  const merged = { results: [], errors: [] };
+  for (let i = 0; i < n; i++) {
+    try {
+      const part = JSON.parse(await readFile(join(out, `worker-${i}`, 'results.json'), 'utf8'));
+      merged.results.push(...part.results);
+      merged.errors.push(...part.errors);
+    } catch {
+      merged.errors.push(`worker ${i} wrote no results`);
+    }
+  }
+  merged.results.sort((a, b) => a.index - b.index);
+  await writeFile(join(out, 'results.json'), JSON.stringify(merged, null, 2));
+
+  const failed = merged.results.filter((r) => r.status === 'fail');
+  const minutes = ((Date.now() - started) / 60000).toFixed(1);
+  const broken = codes.filter((code) => code !== 0).length;
+  if (failed.length || broken) {
+    console.error(`\n${failed.length} of ${merged.results.length} cases failed (${minutes} min)`
+      + failed.map((r) => `\n  ${r.name}`).join('')
+      + (broken && !failed.length ? `\n${broken} worker(s) stopped without a failing case: see their output above` : ''));
+    return 1;
+  }
+  console.log(`\nAll ${merged.results.length} cases passed (${minutes} min).`);
+  return 0;
+}
+
+// No port here: Vite reads 0 as "the configured one", so this asked for 5173 all along, and the port
+// is the config's (CEDITOR_DEV_PORT, which a worker of the split run sets, else 5173).
+const server = await createServer({ root, configFile: join(root, 'vite.config.js'), server: { host: '127.0.0.1' } });
 await server.listen();
 const browser = await chromium.launch(chromiumLaunchOptions({ channel: 'msedge' }));
 const page = await browser.newPage({ viewport: { width: 1680, height: 1050 } });
@@ -89,13 +150,17 @@ async function reopen(id) {
   },{text,id});
   await settle();
 }
+let caseCount = 0;
 async function check(name,fn) {
+  // Its place in the file, which is how a split run divides the cases and puts them back in order.
+  const index = caseCount++;
+  if (shard && index % Number(shard[2]) !== Number(shard[1])) return;
   const wanted = onlyCases.filter(n => name.includes(n));
   if (onlyCases.length && !wanted.length) return;
   for (const n of wanted) matchedCases.add(n);
   const before=errors.length;
-  try { await fn(); assert.deepEqual(errors.slice(before),[]); results.push({name,status:'pass'}); console.log('PASS',name); }
-  catch(e) { results.push({name,status:'fail',error:String(e)}); console.error('FAIL',name,String(e)); await page.screenshot({path:join(out,`${name.replace(/[^a-z0-9]/gi,'-')}.png`)}); }
+  try { await fn(); assert.deepEqual(errors.slice(before),[]); results.push({index,name,status:'pass'}); console.log('PASS',name); }
+  catch(e) { results.push({index,name,status:'fail',error:String(e)}); console.error('FAIL',name,String(e)); await page.screenshot({path:join(out,`${name.replace(/[^a-z0-9]/gi,'-')}.png`)}); }
   finally { await page.mouse.up(); await page.keyboard.up('Space'); await page.evaluate(()=>window.__JUCE__=undefined); }
 }
 async function captureMidi() {
@@ -909,10 +974,13 @@ try {
   await check('Pixel appearance paints round or square dots glow and ghost intensity with saved properties',async()=>{
     const id=await fixture('PixelDisplay',{Transform:{width:160,height:160},Pixel:{pixelsW:8,pixelsH:8,padding:0,litColour:'FFFFFFFF',unlitColour:'FFFF0000',brightness:100,contrast:100,showGhost:false,showGlass:false,dotShape:'round',glow:0,elements:[{id:'dot',kind:'bitmap',x:2,y:2,w:1,h:1,bits:'1'}]}});
     const pixel=(x,y)=>node(id).locator('canvas').first().evaluate((c,{x,y})=>Array.from(c.getContext('2d').getImageData(x,y,1,1).data),{x,y});
+    // Half opacity is 127.5 of 255, which a canvas cannot hold: Chromium builds round it either way (128 on
+    // CI's, 127 on a newer Edge), and both are the half-opacity ghost this checks.
+    const halfRedGhost=async(x,y)=>{const [r,g,b,a]=await pixel(x,y);return r===255&&g===0&&b===0&&(a===127||a===128);};
     assert.deepEqual(await pixel(50,50),[255,255,255,255]);assert.equal((await pixel(43,43))[3],0,'round dot has an empty corner');
     await tab('Pixels');await props.getByRole('radio',{name:'Square',exact:true}).click();await settle();assert.equal((await pixel(43,43))[3],255,'square dot fills its corner');await reopen(id);assert.equal((await pixel(43,43))[3],255);
     await tab('Pixels');let input=cell('Glow').locator('input.scrub-value');await input.fill('1');await input.press('Enter');await settle();assert.ok((await pixel(61,50))[3]>40,'glow paints beyond the crisp dot');
-    await props.getByTitle('Ghost dots — faint unlit dots (realism cue)',{exact:true}).click();await settle();assert.deepEqual(await pixel(10,10),[255,0,0,128],'contrast 100 paints half-opacity red ghosts');await reopen(id);assert.ok((await pixel(61,50))[3]>40);assert.deepEqual(await pixel(10,10),[255,0,0,128]);
+    await props.getByTitle('Ghost dots — faint unlit dots (realism cue)',{exact:true}).click();await settle();assert.ok(await halfRedGhost(10,10),`contrast 100 paints half-opacity red ghosts, not ${await pixel(10,10)}`);await reopen(id);assert.ok((await pixel(61,50))[3]>40);assert.ok(await halfRedGhost(10,10),`after reopening, not ${await pixel(10,10)}`);
   });
   await check('Pixel Reset appearance restores the painted default while preserving element content',async()=>{
     const content={pixelsW:16,pixelsH:16,elements:[{id:'bar',kind:'bitmap',x:4,y:4,w:6,h:2,bits:'111111111111'}]};

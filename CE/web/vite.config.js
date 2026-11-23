@@ -46,6 +46,22 @@ function projectVersion() {
 //
 // `enforce: 'pre'` is required, not stylistic: plain plugins run AFTER vite:resolve, so without it
 // the builtin is externalized (and the warning printed) before this ever sees the id.
+// A worker of the browser tests run side by side has a dev-server port of its own (CEDITOR_DEV_PORT,
+// browser-checks/parallelSlots.mjs). Twenty-odd harnesses pass `port: 0` for "any port", which Vite
+// reads as "the configured one", and their inline 0 outranks this file's port: every one of them asked
+// for 5173, and two at once failed with "Port 5173 is already in use". A `config` hook sees the file
+// and the inline config merged, so a harness that names no port of its own gets the worker's here.
+function workerPort() {
+  const port = Number(process.env.CEDITOR_DEV_PORT);
+  return {
+    name: 'ce-worker-port',
+    config(config) {
+      if (port && !config.server?.port) return { server: { port } };
+      return null;
+    },
+  };
+}
+
 function stubNodeModuleBuiltin() {
   const VIRTUAL = '\0ce:empty-node-module';
   return {
@@ -146,7 +162,7 @@ export function embedPlayerBundle({ web = fileURLToPath(new URL('.', import.meta
 }
 
 export default defineConfig(({ command }) => ({
-  plugins: [stubNodeModuleBuiltin(), dracoDefaultsLeftOut(), svelte(), oneByteChunks(), embedPlayerBundle()],
+  plugins: [workerPort(), stubNodeModuleBuiltin(), dracoDefaultsLeftOut(), svelte(), oneByteChunks(), embedPlayerBundle()],
   define: {
     __APP_BUILD__: JSON.stringify(buildStamp()),
   },
@@ -164,8 +180,11 @@ export default defineConfig(({ command }) => ({
   // a worker bundle can only be split like that as an ES module. The client falls back to the page
   // wherever a module worker cannot start (utils/fontWorkerClient.js).
   worker: { format: 'es' },
+  // A worker of the browser tests run side by side gets a dependency cache and a port of its own
+  // (browser-checks/parallelSlots.mjs says why). Unset, they are Vite's cache and 5173.
+  ...(process.env.CEDITOR_VITE_CACHE_DIR ? { cacheDir: process.env.CEDITOR_VITE_CACHE_DIR } : {}),
   server: {
-    port: 5173,
+    port: Number(process.env.CEDITOR_DEV_PORT) || 5173,
     strictPort: true,
     // The CTRL49 screen preview (ctrl49.html) runs the display page the app embeds, from where
     // the app embeds it, so the preview and the keyboard can never be running different files.

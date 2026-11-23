@@ -145,20 +145,28 @@ The node suite takes about three and a half minutes here. `validate-script-expor
 failure, but do not read a run full of skips as coverage.
 
 `npm run test:browser` additionally drives Playwright over the built bundle and the editor's dev
-server: 39 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
+server: 46 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
 first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Windows, in a job of
 their own beside the web tests and the C++ build; run them locally when you touch rendering, the
 docks, the player inbound path or the learn chips.
+
+**Both browser runs go side by side** (`browser-checks/parallelSlots.mjs` says how): half the logical
+processors as workers, at most eight, each with a dev-server port and a Vite cache of its own, so
+eight here and two on CI's four cores. On 2026-11-23, on a 32-thread machine: the 46 browser checks
+in 1.8 min (8 one at a time), the 96 harness cases in 2.2 min (about 17). `CEDITOR_TEST_JOBS=1`
+runs either one at a time, as before; any other number sets the workers. A worker's port is
+5300 + n for the checks and 5400 + n for the harness, so neither touches a dev server on 5173.
 
 `npm run test:everything` runs `test:all`, `test:browser` and `test:component-behavior` one after
 the other, each whatever the one before did, and ends on a summary; on Windows the browser checks
 find Chrome or Edge themselves when `CHROMIUM_PATH` is not set.
 
 `npm run test:component-behavior` runs the component acceptance harness, `componentBehavior.mjs`:
-95 cases, each a control edited through the inspector, driven by the pointer and the keys, saved
-and reopened. About seventeen minutes here, and CI's longest job, `component-behavior`. Run it when
-you touch a control's renderer, the inspector or the preview's input handling;
-`CEDITOR_BEHAVIOR_CASE="Meter|Crossfader"` runs the cases whose names contain either.
+96 cases, each a control edited through the inspector, driven by the pointer and the keys, saved
+and reopened. It splits itself into workers (above): about two minutes here, and CI's job of the
+same name. Run it when you touch a control's renderer, the inspector or the preview's input
+handling; `CEDITOR_BEHAVIOR_CASE="Meter|Crossfader"` runs the cases whose names contain either, in
+one process.
 
 ### C++ *on* Windows: use a Developer shell, or you will get MinGW
 

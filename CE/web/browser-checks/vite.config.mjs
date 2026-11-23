@@ -13,6 +13,8 @@ export default defineConfig({
   define: { __APP_BUILD__: JSON.stringify({ sha: 'check', branch: 'check', time: '', version: '0.0.0' }) },
   // As in the main config: the font worker splits its bundle, which only an ES module worker can do.
   worker: { format: 'es' },
+  // A worker of the checks run side by side gets a dependency cache of its own (parallelSlots.mjs).
+  ...(process.env.CEDITOR_VITE_CACHE_DIR ? { cacheDir: process.env.CEDITOR_VITE_CACHE_DIR } : {}),
   build: {
     outDir: '../dist-scenery',
     emptyOutDir: true,
