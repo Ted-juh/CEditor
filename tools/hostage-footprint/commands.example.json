@@ -1,0 +1,13 @@
+[
+ {"cmd": "getState", "waitMs": 500},
+ {"cmd": "addScanPath", "path": "/usr/lib/vst3", "waitMs": 500},
+ {"cmd": "scan", "waitMs": 25000},
+ {"cmd": "loadInstrument", "ceId": "CEID-OF-FIRST-INSTRUMENT", "waitMs": 5000},
+ {"cmd": "loadInstrument", "ceId": "CEID-OF-SECOND-INSTRUMENT", "waitMs": 5000},
+ {"cmd": "loadInstrument", "ceId": "CEID-OF-FIRST-INSTRUMENT", "waitMs": 5000},
+ {"cmd": "loadInstrument", "ceId": "CEID-OF-SECOND-INSTRUMENT", "waitMs": 5000},
+ {"cmd": "hostNote", "note": 48, "velocity": 100, "on": true, "channel": 1, "waitMs": 50},
+ {"cmd": "hostNote", "note": 55, "velocity": 100, "on": true, "channel": 1, "waitMs": 50},
+ {"cmd": "hostNote", "note": 60, "velocity": 100, "on": true, "channel": 1, "waitMs": 50},
+ {"cmd": "hostNote", "note": 64, "velocity": 100, "on": true, "channel": 1, "waitMs": 50}
+]

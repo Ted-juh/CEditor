@@ -163,12 +163,14 @@ nine strings of a `set_labels` call always fit one frame.
 screen card, and the startup trace (`%APPDATA%\CEditor\ctrl49-trace.log`) names every reply.
 
 **Commands we had not named.** 02/31 creates an off-screen canvas, 02/32 selects or resizes one,
-02/33 decodes a PNG into one; 02/11 writes a control/colour state; 02/23 sets a device parameter.
-The canvas family is unused by CEditor (it redraws per frame) and is noted for later.
+02/33 decodes a PNG into one; 02/11 writes a control/colour state; 02/23 binds a screen control to
+show a device setting (it does not change the setting: 04/01 does, see
+[the second reading](#second-reading-2026-11-21)). The canvas family is unused by CEditor (it
+redraws per frame) and is noted for later.
 
 **Lua functions.** The full registered set: `get_byte`, `print`, `mem_usage(selector)`,
 `clear_errors()` (clears the on-screen Lua error), `set_hook_enabled(id, on)`,
-`led_control_set_level(_midi)`, `lua_ifc_load_script`, `draw_rect`, `draw_image`, `decode_image`,
+`led_control_set_level(_midi)`, `draw_rect`, `draw_image`, `decode_image`,
 `draw_text`, **`draw_system_text`** (earlier notes had it as `draw_system`),
 `lua_widget_make_dirty`, `asset_get_valid`, `text_data.new/set`. Hook 2 is MIDI notes: with
 `set_hook_enabled(2, 1)` the firmware calls the page's `note(args)` with the three MIDI bytes
@@ -183,6 +185,252 @@ the justification box. `font` indexes sixteen Aileron faces in alphabetical orde
 … F7`. It is described here only so nobody mistakes it for something to try: it is a different
 device's protocol and must never be sent to the CTRL49.
 
+### Second reading (2026-11-21)
+
+Read again from the same updater, this time down to the machine code, for what HoSTage can use.
+M-Audio publishes no CTRL49 firmware, so everything here is the Advance's; the CTRL49 runs the same
+runtime and, by everything seen so far, the same hardware (the Alesis VX49 very likely too). Treat
+each point as "very likely the same" until the CTRL49 shows it. Nothing was run and nothing was
+sent; no firmware bytes are in this repository.
+
+**How it was read.** The download is an InstallShield setup: its appended `ISSetupStream` holds
+three files, each XOR-scrambled with a key made from its own name and then zlib-compressed. One is
+an MSI; its cabinet holds `advanced_firmware_updater.exe`, whose data section carries the
+firmware as two Intel HEX texts: the application at `0x08040000` (566 KB, after a 256 KB
+bootloader) and a 4 MB resource image at `0x08100000` (2.75 MB used) that goes to an external
+flash chip.
+
+**The chip.** An STM32F429 or F439 (Cortex-M4F; the two differ only in a crypto block). Flash at
+`0x0800_0000`, RAM at `0x2000_0000`, exactly the F42x/F43x interrupt table (91 device IRQs, with
+the firmware's own handlers on 88 LTDC and 90 DMA2D), the F4-only CCM RAM, and no Cortex-M7 cache
+control. SysTick reloads every 21,000 cycles for an 8 kHz tick, which puts the core at 168 MHz.
+External SDRAM sits at `0xC000_0000`; the code's top address is `0xC200_0000`, so most likely
+32 MB, which fits the 20.8 MB `mem_usage(0)` that drew no refusal. The 480×272 screen is double
+buffered: the LCD controller scans one buffer while DMA2D draws into the other, swapped on
+vertical blank.
+
+**The software.** No operating system: one main loop plus a 15-task scheduler run off the 8 kHz
+tick. Lua 5.2 with the whole standard library (string, table, math, coroutine, bit32, os, io,
+debug, package); PNG decoding is LodePNG, text is FreeType. That settles the open question in
+[the stress pages](#the-stress-pages-memory-blocks): LodePNG reads the stress block, so the blocks
+that did not draw fail after decoding.
+
+**Device settings: 04/01 sets, 04/02 reads.** The firmware keeps a table of settings, each with
+an id, a current value, a minimum, a default and a maximum. 04/01 is `[id: 1 byte][value: 4
+base-128 digits]`; the value is offset by 2^27 on the wire (send `value + 0x0800_0000`), so
+negatives work. The firmware clamps to the setting's range and acts only on a change. 04/02 is
+`[id: 1 byte]` and replies 04/02 with the id and the value in the same form. **The id is not
+bounds-checked**: an id past the table reads a wild pointer, so send only ids from this table.
+
+| Id | Setting | Range (default) |
+|---|---|---|
+| 0 | Current page | |
+| 1 / 2 / 3 | Bank / cursor preset / active preset | 0–3 / 0–31 / 0–31 |
+| 4 / 5 / 6 / 7 | Stop-or-play / arp on / arp latch / note repeat | 0–1 |
+| 8 | Pad full level | 0–1 |
+| 10 / 11 / 12 | Time-div state / shift state / time-div value | 0–1 / 0–1 / 0–7 |
+| 16 | **Disable VIP timeout** | 0–1 (0) |
+| 17 | "Lua Hooks" (a 32-bit value; not found connected to `set_hook_enabled`, see below) | 32-bit |
+| 18 | Common channel | 1–32 (1) |
+| 19 | Note display type | 0–1 |
+| 20 | **Screen brightness** | 1–10 (10) |
+| 21 | Transport format (MMC, MIDI, PTEX …) | 0–4 |
+| 22 / 23 | **Octave / transpose** | −4…4 / −36…36 |
+| 24 / 25 | Keybed curve / sensitivity | 0–4 / 1–10 (5) |
+| 26 / 27 / 28 | Pad threshold / curve / sensitivity | 0–15 (5) / 0–4 / 1–10 (5) |
+| 29 | **Internal tempo**, 16.16 fixed point | 30–300 BPM (120) |
+| 30 / 31 / 32 | Tap average / tempo LED / clock source | 2–4 (3) / 0–1 (1) / 0–1 |
+| 34 / 35 | Firmware version / boot ROM | read only (`0x125` / `0x112`) |
+
+**Never send** 13–15 (firmware mode and requested firmware mode: 14 = 3 is how the keyboard is
+switched toward update mode), 33 (save global settings: a flash write), 36 (factory reset) or 37
+(send program). 9 has no readable name and is left alone too.
+
+Uses for HoSTage: per-song octave, transpose and velocity curve from the setlist; the keyboard's
+tempo, arp and tempo LED following the song; dimming the screen on a dark stage; reading the
+firmware version to know what it talks to.
+
+**The VIP timeout.** The keyboard falls back from the VIP screen when no valid SysEx frame has
+arrived for **3 seconds** (any accepted frame resets the clock; the 03/00 keepalive every ~900 ms
+is a 3× margin), and only while setting 13 says VIP mode (2). Setting 16 = 1 turns the fallback
+off: a host stall such as a heavy song load no longer drops the screen, at the price of a stale
+screen if the host dies.
+
+**Lua hooks.** `set_hook_enabled(id, on)` sets bit `id` of a mask held in RAM (setting 17 carries
+the name but no code was found joining the two). The firmware then calls the
+page's Lua global of the hook's name:
+
+| Hook | Lua function called | When |
+|---|---|---|
+| 0 | `post_page_draw()` | after the built-in page has drawn |
+| 1 | `post_dma2d_queue_empty()` | when the drawing queue has emptied |
+| 2 | `note(args)` | a note was generated (status, note, velocity); HoSTage uses this one |
+
+The only other Lua functions the firmware calls are `draw(args)` and the ones a host names in
+02/3C (or 02/2C, the same call aimed at one widget). Akai's own pages used names such as `set_widget_id(args)` and
+`arp_program_line_zero(args)`; those came from VIP over SysEx, not from the keyboard.
+
+**No clock, but frames.** `os.clock()` is unusable: the C library's `_times` is a stub that fills
+nothing, so it returns leftover stack values. A page measures time in frames. It can, however,
+make its own frames: the screen loop is paced by vertical blank and draws what is queued, and
+Akai's one built-in Lua page (resource type 16 id 0, a falling-notes visualiser) ends `draw()`
+with `lua_widget_make_dirty(WID)`, so it redraws every frame with no host traffic. Its fade uses a
+translucent rectangle, `draw_rect(x, y, w, h, 0x20000000)`: colours are `0xAARRGGBB` with alpha.
+Not yet tried on the CTRL49; if it holds, peak hold, meter decay and marquees could run on the
+keyboard and the host would send only changes.
+
+**Nothing persists.** Uploaded objects go to RAM. The flash writes found reachable in normal
+operation are the settings and presets (setting 33) and an erase that sits with the built-in
+debug page's output; the firmware itself is only rewritten in update mode. No command was found
+that stores a page.
+
+**Extending what a page can draw.** Lua itself draws nothing; a page draws only through the
+firmware's functions (rectangles with alpha, text in the sixteen faces, images and crops of
+them), and there is no line, arc, circle, gradient or pixel primitive. What can be added, and how:
+
+- *Lua helpers, inside the page.* Lines, rounded rectangles, filled circles and rings (one rect
+  per row), gradients (bands of translucent rects), bars and sparklines, all built on `draw_rect`.
+  The firmware sees only more calls, so the cost is the per-redraw budget measured on the CTRL49:
+  stutter at about 880 rects a redraw at 9 redraws/s. A filled circle of radius 20 is about 40.
+- *Code sent while the page runs.* `load()` is in the firmware, so a page can compile Lua handed
+  to it as text through 02/3C and add or replace functions without re-uploading itself or
+  re-decoding its images. One frame carries at most 1000 bytes, so longer code goes in parts.
+- *Shapes the firmware cannot draw* (arcs, waveforms, logos, smooth gradients): render them on the
+  PC into 8-bit grey filmstrips, as HoSTage does for knobs. Heavy once (upload, decode, memory),
+  one cheap DMA2D blit per frame after that.
+- *Not possible:* new built-in (C) functions. Lua cannot load native code (the firmware carries
+  "dynamic libraries not enabled"), and adding primitives means replacing the firmware.
+- *Untested:* if a page can draw into one of the off-screen canvases (02/31–02/33), something
+  expensive could be built once and redrawn as a single image every frame.
+
+**The command map.** Type 02 implements 51 commands: 00–06, 0D–1C, 21–3C; the gaps (07–0C,
+1D–20) fall through to an error reply. Type 04: 00, 01 (set setting), 02 (read setting), 04, 05
+(LED level), 06 (pad RGB), 07 and 08; 03 is not implemented. 04/00, 04/04, 04/07 and 04/08 work
+on controls and the active preset and are not mapped yet. Types 01, 03, 05 and 06 have handlers of
+their own; 03 includes the request for update mode.
+
+### Third reading (2026-11-22): what HoSTage does not use yet
+
+The same image, read for what it offers beyond the commands HoSTage already sends. Same caveat:
+this is the Advance's firmware. Three earlier statements are corrected by it: `lua_ifc_load_script`
+is not callable from Lua (it is the C loader's name in an error message; the preview's stub that
+throws behaves as the keyboard's missing global would), the hook mask is a RAM word and not
+setting 17, and a page's functions are called through 02/3C and 02/2C, not 02/00.
+
+**The firmware has widgets of its own, with their art in flash.** VIP's control page was not Lua:
+it was built from native widgets that the firmware draws in C from 8-bit coverage images it
+already holds and tints. HoSTage draws its knobs in Lua from a filmstrip it uploads.
+
+| Commands | Widget | Art in flash | What the commands carry |
+|---|---|---|---|
+| 02/12–1C | **Knob**, up to 1024 | type 11 id 0: a 74×71 base, 256 frames of 66×62 (two arc weights × 128 values) and 256 of 48×45 (an arc and a pie × 128) | 12 create (id, art id, two bytes); 13 and 14 a byte pair each, second ≥ first (defaults 0–0 and 0–127); 15, 16, 17 three colours; 18 a mode byte; 19 and 1B a string each; 1A and 1C a 14-bit value each |
+| 02/00–06 | **Pad**, up to 1024 | type 8 id 0: 74×74, off and on | 00 create (id, art id, byte); 01 a state byte; 02, 05, 06 three colours; 03 a string; 04 a value |
+| 02/21–22 | **Text object** | the Aileron faces | 21 create (id, two 14-bit numbers, byte); 22 set the string |
+| 02/24–2B | properties of an object addressed by (id, byte, byte) | | strings, colours and bytes; 2C calls a Lua function for such an object |
+
+A colour is sent as A, R, G, B, each a two-digit base-128 number 0–255, as 04/06 sends its RGB.
+The knob's defaults are `0x7F804000`, `0xFFFF0000` and `0xFFFF0000`. Replies are the usual 02/3D;
+`0x46` is a status not seen before: a pair sent with the second below the first. Type 13 holds
+button art (73×33 off and on, a 75×9 bar and a 6×10 marker) for a widget not matched to its
+commands yet; 2D–2F, 34 (a canvas operation taking two rectangles) and 38 (an id, a byte and two
+28-bit numbers) are unmapped; 30, 35, 36 and 37 are accepted and do nothing.
+
+What it would give HoSTage's knob pages: nothing to upload or decode at connect, a value change
+that is one 6-byte frame, and drawing that costs no Lua. What is missing is the recipe (which
+values mean what, how a widget is placed in a scene). VIP sent it: the VIP captures behind the
+engineering handoff contain 02/12–1C frames for its knob page, and reading those against this
+table is the short way to a working sequence. VIP drove the CTRL49 with the same code as the
+Advances, so the CTRL49 very likely carries the same art; `asset_get_valid(11, 0)` in the asset
+probe says so directly.
+
+**The device functions, as the code has them.**
+
+- `print(a, b)` does not reach the host: it writes its strings to the screen, on the overlay Lua
+  errors use, and `clear_errors()` wipes that. A page can show its own diagnostics on the keyboard.
+- `mem_usage(n)` returns field `n` of the C library's heap report: 0 is the heap claimed so far
+  (what the stress page read), **7 is bytes in use and 8 is bytes free**. `n` is not checked.
+- `led_control_set_level(id, level)` and `led_control_set_level_midi(id, level)` set an LED from
+  Lua, with no host round trip. Ids run 1–58 through a table: 42–45 are the pad-bank buttons (the
+  ids HoSTage sends in 04/05), 1–8 and 19–26 are two rows of eight, and ids with no LED are ignored.
+- Fonts are loaded once at start-up from resource type 15. An uploaded font is not picked up.
+
+**Liveness.** 06/02 is a ping: the keyboard answers 06/03 with one zero byte. 04/02 (read a
+setting) answers too. Either closes the gap noted under "Still requires hardware": the app can
+tell a keyboard that has stopped answering from one that is merely quiet.
+
+**Session commands (type 03).** 00 keepalive, 08 identity. **03/06 asks for update mode and must
+never be sent**; 03/07 puts the previous mode back. 03/03 is not mapped.
+
+**The other VIP keyboards.** The image serves the ADVANCE25, 49 and 61 alike, and its frame check
+is only the Akai maker byte. Everything HoSTage sends to a CTRL49 an Advance should take with its
+own header and ports (the table below); the VX49 very likely too. Untested: it needs one of them.
+
+**In order of what it buys HoSTage:**
+
+1. Native knobs and pads: the fastest and lightest pages, if the recipe from the VIP captures
+   works on the CTRL49.
+2. Settings over 04/01: octave, transpose, velocity curve, tempo, clock source and brightness per
+   song; the VIP timeout off during a heavy song load.
+3. Pages that redraw themselves (`lua_widget_make_dirty` from `draw()`): meters, peak hold and
+   marquees on the keyboard, the host sending only changes.
+4. A ping, so a dead keyboard is noticed.
+5. LEDs set from Lua, for feedback that does not wait for the host.
+6. `load()` for patching a running page; a Lua drawing library; `print` and `mem_usage(7)` while
+   developing pages.
+7. A refuse list in `Ctrl49Protocol` for what must never go out: 03/06, settings 13–15, 33, 36,
+   37, and setting ids outside the table.
+8. The Advance keyboards and the VX49 as further devices.
+
+### Changing the firmware, and sound (assessed 2026-11-22)
+
+What new firmware would add for HoSTage: native drawing (lines, arcs, gradients through DMA2D), a
+working clock for Lua, encoders and buttons delivered to Lua so pages navigate without a round
+trip, pages kept in flash so the screen appears at power-on with no 3–5 s upload, and larger
+frames than 1000 bytes. Everything else the host already does.
+
+**Patching Akai's image** is technically within reach (the application fills 566 KB of a 768 KB
+slot, and the updater shows no sign of signing), but: no CTRL49 firmware exists to patch, so it
+would mean cross-flashing a patched Advance image; the CTRL49's own bootloader and update protocol
+are unknown; a patched vendor firmware cannot be distributed, so it could never be a HoSTage
+feature; and nothing would restore a CTRL49 to stock.
+
+**Firmware of our own** is shippable and starts with a head start (the chip, memory, screen
+timing and peripherals above, and the pin map, which the firmware's start-up code reveals), but it
+is months of work (key velocity scanning, pads, encoders, LEDs, display, USB and DIN MIDI, the
+flash chip), needs the case open, and is one-way without a backup of the stock firmware.
+
+**The decisive first step, and it only reads.** Every STM32F42x/43x carries ST's system
+bootloader in ROM ([AN2606](https://www.st.com/resource/en/application_note/cd00167594-stm32-microcontroler-system-memory%20-Boot-mode-stmicroelectronics.pdf)),
+which cannot be erased. Started with BOOT0 high (BOOT1/PB2 low) it speaks USB DFU on PA11/PA12 and
+serial on USART1 (PA9/PA10). The Advance firmware puts its USB socket on exactly those pins
+(GPIOA 11 and 12 set to AF10, the OTG FS clock enabled), so DFU should appear on the keyboard's own
+USB cable. STM32CubeProgrammer, free from ST, then reads the readout-protection level:
+
+- **Level 0** (`0xAA`): the whole 2 MB of flash, the CTRL49's bootloader included, can be read.
+  That gives a backup, the real CTRL49 image, and a way back from any experiment.
+- **Level 1**: reads are refused. **Do not lower it to 0**: that mass-erases the chip and the
+  stock firmware is gone for good.
+- **Level 2**, or the level reads as `0xFF`: the ROM bootloader is unreachable for good. Firmware
+  work on the CTRL49 is closed.
+
+It needs the case open and BOOT0 pulled to 3.3 V at power-up (on the pin or its pull-down
+resistor). Connect and read only: no download, no erase, no option-byte change.
+
+**Sound.** The STM32F429 is audio-capable: a serial audio interface (SAI), two I2S ports, an
+audio PLL, a two-channel 12-bit DAC, and DSP instructions. The board uses none of it for sound.
+The SAI and the DAC are never touched, and SPI2, the one I2S-capable port in use, is set up by
+`SPI_Init` as an SPI master (software chip select, clock / 16): a data bus, most likely to the
+asset flash or the LED drivers. Sound would take a DAC board on free I2S or SAI pins (whether any
+are free is unknown: the screen and the SDRAM take many), a jack, and firmware of our own. The chip
+is in the class of known open synth hardware (the Axoloti Core: an STM32F427 at 168 MHz with SDRAM
+and a codec; Mutable Instruments' Clouds and Elements: an STM32F405 at 168 MHz), so real synthesis
+and sample playback, never VST3s. That would be a different product from HoSTage.
+
+**ST's tools, if it ever comes to that.** STM32CubeProgrammer for the read above; STM32CubeIDE
+and STM32CubeMX for pins, clocks and building; STM32CubeF4's drivers and examples for the
+STM32F429I-Discovery (LTDC, DMA2D, SDRAM, USB device); TouchGFX Designer, ST's GUI framework for
+LTDC and DMA2D screens. None of them changes what a page can do under the stock firmware.
+
 ### Probe: does the CTRL49 carry images of its own?
 
 The ADVANCE's asset flash holds 512 tintable knob frames and other sprites, under asset types
@@ -192,6 +440,21 @@ upload and no decode. `Start_CTRL49_Asset_Probe.cmd` finds out, read-only: its p
 uses (ids 0..600) and tries `draw_image` on the first few, plain and tinted orange. It writes
 nothing to the keyboard. Close HoSTage/CEditor, VIP and your DAW first; turn encoder 1 to step
 through the types that have images. Result: not yet run.
+
+What the probe should find, if the CTRL49's resource flash matches the ADVANCE's (read
+2026-11-21; each record is `type, id`, a checksum, then the data):
+
+| Type | Ids | What |
+|---|---|---|
+| 20 | 0–13 | PNGs: a 480×272 RGBA screen (0); a 33×4191 knob strip, 127 frames of 33×33 (11); meter faces with dB scales, 118×177 and 118×205 (4, 5); 24-px bars (2, 8, 9, 12, 13); small icons and arrows (1, 3, 6, 7, 10) |
+| 1 | 0–16 | containers holding the splash screens and the DAW cards (Ableton, Bitwig, Cubase, FL Studio, Logic, Reaper, Pro Tools, Studio One, MPC, User), which will be M-Audio's own on the CTRL49 |
+| 11 | 0 | one 1.6 MB container, most likely the tintable knob frames |
+| 15 | 0–15 | the sixteen Aileron faces, OpenType |
+| 16 | 0 | Lua source: the falling-notes visualiser |
+| 19 | 0 | text (arp mode names and the like) |
+| 3, 8, 13 | 0 | small containers (the boot image and two others) |
+
+The generic ones (type 20's strip, meter faces and bars) are the ones worth drawing from flash.
 
 ### The VIP screen keyboards and their ids
 
@@ -418,8 +681,10 @@ Close VIP, your DAW and HoSTage / CEditor first: only one program can own the sc
 | Meters | two analog VU meters | a baked face + a 48-frame needle filmstrip; E1 = level of a demo signal |
 | Animation | a logo with a sweeping sheen, a spinner, a scrolling marquee, sliding preset cards, breathing buttons | flipbooks (frame N of a strip — what a GIF becomes), movement with easing, masking (the strip's ends painted over the text), tint; **E1 sets the redraw rate, 5–30/s** |
 
-The device keeps no time: every animation frame is a redraw the host asks for, and the frame
-counter the host sends is the only clock. There is no GIF on the device either, but a GIF is only
+The device keeps no time: `os.clock()` returns garbage, and the frame counter the host sends is
+the only clock the lab uses. Every animation frame here is a redraw the host asks for; the
+firmware suggests a page could also drive its own frames (see
+[the second reading](#second-reading-2026-11-21)), which is untested. There is no GIF on the device either, but a GIF is only
 frames — `python make_lab_assets.py --gif in.gif out_strip.png [--width 120]` turns one into a
 flipbook strip, and prints what it will cost in device memory.
 
