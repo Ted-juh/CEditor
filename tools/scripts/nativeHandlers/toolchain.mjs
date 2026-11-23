@@ -10,6 +10,8 @@
 // missing and each verifier skipped: the Java and C# instance checks had never run on the platform
 // the plug-in ships on.
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 
 export const IS_WINDOWS = process.platform === 'win32';
 export const LIB_EXT = IS_WINDOWS ? '.dll' : process.platform === 'darwin' ? '.dylib' : '.so';
@@ -22,6 +24,24 @@ export function which(command) {
     return true;
   } catch {
     return false;
+  }
+}
+
+/*
+ * On Windows, the Clang that ships with the Visual Studio whose headers the Developer environment set
+ * up (VCINSTALLDIR) goes first on PATH, for every compile here and in the processes they start. That
+ * STL accepts only a Clang at least as new as the one it was released with: GitHub's runner image
+ * moved to MSVC 14.52, whose headers stop on "STL1000: Unexpected compiler version, expected Clang 22
+ * or newer", while the LLVM first on its PATH (C:\Program Files\LLVM) was Clang 20, and both C++
+ * checks failed to compile. The Clang in VC\Tools\Llvm is the one its own headers expect (22.1 beside
+ * 14.52). On PATH rather than by full path, because the commands name `clang` bare and that path has
+ * a space in it. A Visual Studio without its Clang leaves PATH as it was.
+ */
+if (IS_WINDOWS && process.env.VCINSTALLDIR) {
+  const llvmBin = path.join(process.env.VCINSTALLDIR, 'Tools', 'Llvm', process.arch === 'arm64' ? 'ARM64' : 'x64', 'bin');
+  if (existsSync(path.join(llvmBin, 'clang.exe'))) {
+    const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
+    process.env[pathKey] = `${llvmBin}${path.delimiter}${process.env[pathKey] ?? ''}`;
   }
 }
 

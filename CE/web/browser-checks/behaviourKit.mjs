@@ -27,6 +27,7 @@ import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -65,7 +66,9 @@ export async function boot({ width = 1700, height = 1000, controlSet = '' } = {}
   // so it keeps working, and a helper's source names __ceImport, not import.
   await page.addInitScript(() => { window.__ceImport = (path) => import(path); });
 
-  await page.goto(url, { waitUntil: 'networkidle' });
+  // The first load compiles the editor's modules, and in a split run (parallelSlots.mjs) builds the
+  // worker's own dependency cache too: on CI's runner that went past Playwright's 30 s default.
+  await page.goto(url, { waitUntil: 'networkidle', timeout: DEV_SERVER_FIRST_LOAD_MS });
   await page.waitForSelector('.app', { timeout: 60000 });
   await page.waitForTimeout(150);
 
