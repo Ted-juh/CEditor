@@ -33,7 +33,7 @@ function rig() {
 }
 
 test('both pages are off until asked for, and a payload without them reads as off', () => {
-  assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false, live: false });
+  assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false, live: false, skin: 0 });
   assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false, live: false, skin: 0 });
   assert.deepEqual(normalizeHostState({ surfacePages: { soundcheck: true, layers: 'yes', discover: true, cue: 1 } }).surfacePages,
     { soundcheck: true, layers: false, discover: true, cue: false, changes: false, meters: false, live: false, skin: 0 }, 'only a real true turns a page on');

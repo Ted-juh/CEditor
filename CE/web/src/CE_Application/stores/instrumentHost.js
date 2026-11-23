@@ -2360,8 +2360,8 @@ export function emptyHostState() {
     performance: emptyPerformance(),
     soundcheck: normalizeSoundcheck(),
     // The CTRL49's pages beyond the knobs: on the keyboard only once asked for, like the browser.
-    surfacePages: { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false,
-                    live: false },
+    surfacePages: { skin: 0, soundcheck: false, layers: false, discover: false, cue: false, changes: false,
+                    meters: false, live: false },
     product: emptyProduct(),
     reliability: emptyReliability(),
     licence: emptyLicence(),

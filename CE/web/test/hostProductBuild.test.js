@@ -706,7 +706,7 @@ test('every command-sending store export is reachable from Svelte or deliberatel
     // The sound browser's parts, and the state they share.
     'sounds/SoundsRail.svelte', 'sounds/SoundsInspector.svelte', 'sounds/SoundsMap.svelte',
     'sounds/SoundsAuditionBar.svelte', 'sounds/SoundsBulkBar.svelte', 'sounds/SoundsShootout.svelte',
-    'sounds/soundsBrowser.svelte.js',
+    'sounds/soundsBrowser.svelte.js', 'sounds/RackLibraryActions.svelte',
   ].map((name) => readFileSync(path.join(
     repoRoot, 'CE', 'web', 'src', 'CE_Application', 'sections', name), 'utf8')).join('\n');
 

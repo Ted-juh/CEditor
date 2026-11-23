@@ -67,5 +67,6 @@ test('rack parts reflow deliberately beside a wide native editor', () => {
 test('host sliders use rectangular tracks and fader caps', () => {
   assert.match(theme, /slider-runnable-track[\s\S]{0,180}border-radius: 0/);
   assert.match(theme, /slider-thumb[\s\S]{0,220}border-radius: 0/);
-  assert.match(theme, /input\.fader::-webkit-slider-thumb[\s\S]{0,120}width: 22px/);
+  // The mixer rotates its fader a quarter turn, so the cap's visible 22px width is its height.
+  assert.match(theme, /input\.fader::-webkit-slider-thumb[\s\S]{0,120}height: 22px/);
 });

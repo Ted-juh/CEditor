@@ -136,5 +136,6 @@ test('the store sends the switch, and the screens hide what a player cannot do',
     'no Project utility in a player');
   const surface = readFileSync(new URL('../src/CE_Application/sections/HostSurfacePanel.svelte', import.meta.url), 'utf8');
   assert.match(surface, /\{#if !player\}\s*<button type="button" class="ghost" data-testid="surface-describe"/);
-  assert.match(surface, /function dropOn\(event, control\) \{\s*if \(player \|\|/, 'nothing can be dropped on a player\'s controls');
+  // One handler for the browser's drop and the Linux pointer drag alike.
+  assert.match(surface, /function attachDraggedParameter\(control\) \{\s*if \(player \|\|/, 'nothing can be dropped on a player\'s controls');
 });

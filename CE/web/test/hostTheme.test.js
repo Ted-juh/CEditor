@@ -33,7 +33,8 @@ test('one token set owns common controls and semantic states', () => {
 test('shared range controls preserve the square fader language', () => {
   assert.match(theme, /slider-runnable-track[\s\S]{0,180}border-radius: 0/);
   assert.match(theme, /slider-thumb[\s\S]{0,220}border-radius: 0/);
-  assert.match(theme, /input\.fader::-[\s\S]*?width: 22px/);
+  // The mixer rotates its fader a quarter turn, so the cap's visible 22px width is its height.
+  assert.match(theme, /input\.fader::-webkit-slider-thumb[\s\S]{0,120}height: 22px/);
 });
 
 test('piano keys keep their authored white and black appearance', () => {
