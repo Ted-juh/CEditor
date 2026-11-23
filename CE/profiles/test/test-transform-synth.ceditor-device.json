@@ -4,8 +4,8 @@
   "minCEditorVersion": "0.2.0",
   "id": "test-transform-synth",
   "name": "Test Transform Synth",
-  "manufacturer": "Test",
-  "family": "Test Transform Synth",
+  "manufacturer": "CEditor",
+  "family": "Internal Test",
   "status": "test",
   "trust": "builtin",
   "variables": {
@@ -482,6 +482,13 @@
         "pan.offset": -6,
         "mode.table": 2
       }
+    }
+  ],
+  "sources": [
+    {
+      "type": "internal",
+      "title": "CEditor Test Transform Synth",
+      "notes": "Synthetic profile for encoding.transform, encoding.table and the ccSequence recipe, run by both engines (CE/tests/DeviceProfileEngineTests.cpp, CE/web/test/deviceProfileTransform.test.js)."
     }
   ]
 }

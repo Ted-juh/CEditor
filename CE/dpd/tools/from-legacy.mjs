@@ -22,11 +22,18 @@ const LIBRARY = join(HERE, '..', 'library');
 /** The hand-made models' ids, which a converted model must not take. */
 export const handMadeIds = () => new Set(readdirSync(LIBRARY).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)));
 
-/** Every engine profile but those made from a DPD model in the first place. */
+/*  Profiles the Designer does not open yet, and why. Each is here by name, so a real instrument's
+    profile that comes to use the same features fails the check rather than slipping past it. */
+export const NOT_CONVERTED = {
+  'test-transform-synth': 'the engines\' test of encoding.transform, encoding.table and the ccSequence '
+    + 'recipe, none of which the conversion carries yet',
+};
+
+/** Every engine profile but those made from a DPD model in the first place, and NOT_CONVERTED. */
 export function generatedProfiles() {
   return readdirSync(PROFILES).filter((f) => f.endsWith('.ceditor-device.json')).sort()
     .map((f) => JSON.parse(readFileSync(join(PROFILES, f), 'utf8')))
-    .filter((p) => !p.dpdSource);
+    .filter((p) => !p.dpdSource && !(p.id in NOT_CONVERTED));
 }
 
 /** One profile through the conversion and the gate: [] when it holds, else what does not. */
