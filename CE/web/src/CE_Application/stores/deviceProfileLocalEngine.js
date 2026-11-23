@@ -481,7 +481,9 @@ function encodeWireValue(parameter, value) {
   // not range-checked still cannot send one.
   const rounded = roundAsCpp(numeric);
 
-  if (isU14(encoding)) {
+  // isU14 counts s14-lsb-msb among the two-byte encodings (its width); it is signed, and has its
+  // own branch below.
+  if (isU14(encoding) && encoding !== 's14-lsb-msb') {
     if (!(rounded >= 0 && rounded <= 16383)) return { error: `Encoded u14 value outside 0-16383 for ${id}` };
     const [msb, lsb] = [(rounded >> 7) & 0x7f, rounded & 0x7f];
     // u14-lsb-msb keeps the same 14 bits least significant byte first, as decodeParameterValue reads
