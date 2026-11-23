@@ -1,8 +1,15 @@
 name: HoSTage Linux standalone
+# On every push to main, at the owner's word (2026-11-23), beside ci.yml; and by hand from the
+# Actions tab. It came from the branch the Linux port was built on, which pushed it there alone.
 on:
   push:
-    branches: [codex/hostage-linux-build]
+    branches: [main]
   workflow_dispatch:
+
+# As ci.yml: a newer push to main stops the run before it, rather than queueing behind it.
+concurrency:
+  group: hostage-linux-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
