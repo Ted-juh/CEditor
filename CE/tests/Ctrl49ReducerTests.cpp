@@ -308,6 +308,61 @@ int main()
         }
         check (splashDraws == 6 && keepalives >= 6,
                "a 2.5 s loading page is redrawn six times with keepalives, never 900 ms without one");
+
+        bool introSent = false;
+        for (const auto& frame : out.frames)
+            introSent = introSent || frame == Ctrl49Session::buildIntroFrame (0) || frame == Ctrl49Session::buildIntroFrame (1);
+        check (! introSent, "a page that does not play in is never sent set_intro");
+    }
+
+    {   // --- the loading page plays in: a frame number and a redraw every 50 ms -----------------
+        struct Recorder final : IControllerOutput
+        {
+            std::vector<Bytes> frames;
+            void sendSysEx (const Bytes& frame) override { frames.push_back (frame); }
+        } out;
+
+        Ctrl49SessionOptions options;
+        options.loadingMilliseconds = 2500;
+        options.playIntro = true;
+        options.sleep = [] (int) {};
+        const Bytes page (100, static_cast<std::uint8_t> ('-'));
+        Ctrl49Session session (out, page, options);
+        session.start();
+        session.stop();
+
+        const auto startup = Ctrl49Session::buildStartupSequence (page);
+        const auto init = buildLuaCall (Ctrl49Session::kTarget, "init", {});
+        const auto draw = buildDraw (Ctrl49Session::kTarget, {});
+        const auto initAt = std::find (out.frames.begin(), out.frames.end(), init) - out.frames.begin();
+        check (initAt + 2 < (long) out.frames.size()
+                   && out.frames[(size_t) initAt + 1] == Ctrl49Session::buildIntroFrame (0)
+                   && out.frames[(size_t) initAt + 2] == draw,
+               "the first draw after init is told frame 0, so the finished logo never flashes up first");
+        check (out.frames.size() > startup.size()
+                   && std::equal (startup.begin(), startup.end() - 1, out.frames.begin(),
+                                  [] (const auto& step, const Bytes& sent) { return step.frame == sent; }),
+               "everything before it is the proven startup, unchanged");
+
+        // Through the dwell: frames 1..49 in order, each followed by its draw, a keepalive every
+        // eighth frame (400 ms), and no frame for 2500 ms itself, where set_mode(1) takes over.
+        int expected = 1, inOrder = 0, framesSinceKeepalive = 0, longestWithoutKeepalive = 0;
+        bool eachDrawn = true;
+        const auto keepalive = buildKeepalive();
+        for (std::size_t i = (size_t) initAt + 3; i < out.frames.size(); ++i)
+        {
+            if (out.frames[i] == keepalive) { framesSinceKeepalive = 0; continue; }
+            if (out.frames[i] != Ctrl49Session::buildIntroFrame (expected)) continue;
+            ++inOrder;
+            ++expected;
+            longestWithoutKeepalive = std::max (longestWithoutKeepalive, ++framesSinceKeepalive);
+            eachDrawn = eachDrawn && i + 1 < out.frames.size() && out.frames[i + 1] == draw;
+        }
+        check (inOrder == 49, "a 2.5 s dwell plays 49 frames, numbered in order (got " + std::to_string (inOrder) + ")");
+        check (eachDrawn, "each frame is drawn as it is told");
+        check (longestWithoutKeepalive <= 8, "a keepalive at least every 400 ms of frames, never 900 ms without one");
+        check (Ctrl49Session::buildIntroFrame (300) == buildLuaCall (Ctrl49Session::kTarget, "set_intro", { 0x01, 0x2C }),
+               "the frame goes high byte first");
     }
 
     {   // --- a PNG uploaded while the page runs ------------------------------------------------

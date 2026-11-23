@@ -2138,6 +2138,7 @@ void ValueTreeBridge::ensureInstrumentHost()
         };
         surfaceOptions.pageLua.assign (surface::assets::kHostagePageLua,
                                        surface::assets::kHostagePageLua + surface::assets::kHostagePageLuaSize);
+        surfaceOptions.playIntro = true;   // the page plays its splash in (set_intro)
         surfaceOptions.pngAssets.push_back ({ 0x0200,
             surface::Bytes (surface::assets::kKnobStripPng,
                             surface::assets::kKnobStripPng + surface::assets::kKnobStripPngSize) });

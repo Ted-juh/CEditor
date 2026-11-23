@@ -47,7 +47,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('[data-testid=ctrl49-sent] .call').length > 2);
 
   const scenes = {
-    splash: ['init', 'set_mode', 'draw'],
+    splash: ['init', 'set_mode', 'set_intro', 'draw'],
     control: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
     performance: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
     browse: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
@@ -85,6 +85,22 @@ try {
   await slotValue.fill('127');
   const full = await measure();
   assert.ok(full.orange > empty.orange + 100, `turning slot 1 up fills its knob (${empty.orange} -> ${full.orange})`);
+
+  // The splash plays in: frame 0 is the background, the last frame the whole logo, and Play
+  // walks from one to the other at the session's rate.
+  await page.locator('[data-scene=splash]').click();
+  const introFrame = page.getByLabel('Intro frame');
+  const last = Number(await introFrame.getAttribute('max'));
+  await introFrame.fill('0');
+  const dark = await measure();
+  await introFrame.fill(String(last));
+  const whole = await measure();
+  assert.ok(dark.orange < 2000 && whole.orange > dark.orange + 2000,
+    `the intro starts dark and ends on the logo (${dark.orange} -> ${whole.orange} orange)`);
+  await page.getByTestId('ctrl49-play-intro').click();
+  await page.waitForFunction((end) => document.querySelector('[data-testid=ctrl49-intro-frame]')?.value === String(end), last,
+    { timeout: last * 50 + 5000 });
+  assert.equal((await measure()).orange, whole.orange, 'played through, it lands on the same picture');
 
   // A call the page does not define is named, where it can be read.
   await page.locator('[data-scene=custom]').click();

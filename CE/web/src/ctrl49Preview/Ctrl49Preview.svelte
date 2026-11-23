@@ -57,13 +57,37 @@
     return () => { cancelled = true; made?.dispose(); screen = null; };
   });
 
-  onDestroy(() => screen?.dispose());
+  // The splash's intro: how many frames it is, read from the page so the controls follow an edit,
+  // and a player that tells the page each frame at the session's rate (kIntroFrameMs, 50 ms).
+  const INTRO_END = Number(pageLua.match(/^local INTRO_END\s*=\s*(\d+)/m)?.[1] ?? 0);
+  const INTRO_FRAME_MS = 50;
+  const introFrame = $derived(preview.splash.frame ?? INTRO_END);
+  let player = null;
+
+  function stopIntro() {
+    if (player !== null) clearInterval(player);
+    player = null;
+  }
+
+  function playIntro() {
+    stopIntro();
+    preview.splash.frame = 0;
+    player = setInterval(() => {
+      if (preview.scene !== 'splash' || introFrame >= INTRO_END) stopIntro();
+      else preview.splash.frame = introFrame + 1;
+    }, INTRO_FRAME_MS);
+  }
+
+  onDestroy(() => { stopIntro(); screen?.dispose(); });
 
   function callsForScene() {
     const p = preview;
     switch (p.scene) {
       case 'splash':
-        return [{ name: 'set_mode', bytes: [0] }];
+        return [
+          { name: 'set_mode', bytes: [0] },
+          { name: 'set_intro', bytes: [(introFrame >> 8) & 0xff, introFrame & 0xff] },
+        ];
       case 'control': {
         const slots = p.control.slots;
         return [
@@ -229,7 +253,14 @@
 
     {#if preview.scene === 'splash'}
       <p class="hint">Mode 0: what the page draws during the session's loading dwell, before
-        <code>set_mode(1)</code>.</p>
+        <code>set_mode(1)</code>. The session plays it in, telling each draw its frame
+        (<code>set_intro</code>, 20 a second): the emblem, then ST, then HO and AGE, then the caption.</p>
+      <div class="row">
+        <button type="button" onclick={playIntro} data-testid="ctrl49-play-intro">Play intro</button>
+        <label class="field small">Intro frame <input type="number" min="0" max={INTRO_END} value={introFrame} data-testid="ctrl49-intro-frame"
+          onfocus={selectAll} oninput={(e) => { stopIntro(); preview.splash.frame = int(e.currentTarget.value, 0, INTRO_END); }} /></label>
+        <span class="hint">of {INTRO_END}, {(INTRO_END * INTRO_FRAME_MS / 1000).toFixed(1)} s</span>
+      </div>
 
     {:else if preview.scene === 'control'}
       <label class="field">Page name

@@ -1,6 +1,7 @@
 -- Hostage CTRL49 page: a branded startup screen followed by the live eight-knob page.
--- The session draws once while mode is 0, keeps that splash visible for its loading dwell,
--- then calls set_mode(1) and redraws. The logo is uploaded as object 0x0210, already orange.
+-- While mode is 0 the session plays the splash in through its loading dwell (set_intro, a frame
+-- at a time), then calls set_mode(1) and redraws. The logo is uploaded as object 0x0210, a grey
+-- coverage image the page tints orange.
 
 local FRAME           = 64
 local KNOB_PNG_ID     = 0x0200
@@ -294,17 +295,92 @@ end
 -- arc filmstrips, arrows, tabs), and VIP says so beside its decode_image ("Passing white to create
 -- an 8-bit buffer"). An RGBA PNG decodes to colour and the tint is ignored, which is why the logo
 -- and every knob came out white. Both images are grey palette PNGs now; see make_filmstrip.py.
+--
+-- THE INTRO. The splash plays in while the keyboard loads: the emblem fades in, then the solid ST
+-- in the middle of the wordmark, then HO and AGE either side of it, then the caption and the bar.
+-- The keyboard keeps no time, so the host sends the frame number (set_intro, 20 a second, from
+-- Ctrl49Session's loading dwell) and each frame is drawn from that number alone: a late redraw
+-- shows the right picture rather than slowing the intro down.
+--
+-- A fade is the tint walking from the background to the colour. A coverage image drawn in a
+-- colour part of the way there is that image at that opacity, and tinting is the one thing about
+-- these images already seen working on the CTRL49. (A translucent colour, Akai's own way to fade,
+-- has not been tried on this keyboard.)
+local INTRO_EMBLEM  = { 2, 14 }      -- frames: from, to
+local INTRO_ST      = { 14, 22 }
+local INTRO_SIDES   = { 22, 30 }
+local INTRO_CAPTION = { 30, 36 }
+local INTRO_END     = 36
+local intro = INTRO_END             -- a host that does not play the intro gets the whole splash
+
+-- The logo's parts, as crops of hostage_logo.png (x, y, w, h in the image, which is drawn at
+-- 20, 84). T's crossbar overhangs A's left leg in columns 304-312, so the two are split there by
+-- rows: the bar above row 29, the foot of the leg from row 29 down. ctrl49KnobPage.test.js holds
+-- the crops to the image: every lit pixel in exactly one part, and no letter cut in two.
+local LOGO_EMBLEM = { { 0, 0, 124, 80 } }
+local LOGO_ST     = { { 232, 0, 72, 80 }, { 304, 0, 9, 29 } }
+local LOGO_SIDES  = { { 135, 0, 94, 80 }, { 313, 0, 127, 80 }, { 304, 29, 9, 51 } }
+
+-- set_intro [frame high][frame low]
+function set_intro(args)
+    intro = get_byte(args, 0) * 256 + get_byte(args, 1)
+end
+
+-- How far a step of the intro has got, 0 to 1, eased so it starts and lands softly.
+local function intro_step(span)
+    local t = (intro - span[1]) / (span[2] - span[1])
+    if t <= 0 then return 0 end
+    if t >= 1 then return 1 end
+    return t * t * (3 - 2 * t)
+end
+
+-- `colour` `t` of the way from the background: 0 is the background, 1 the colour itself.
+local function faded(colour, t)
+    if t >= 1 then return colour end
+    local out = 0xFF000000
+    for _, unit in ipairs({ 65536, 256, 1 }) do
+        local from = math.floor(BLACK / unit) % 256
+        local to = math.floor(colour / unit) % 256
+        out = out + math.floor(from + (to - from) * t + 0.5) * unit
+    end
+    return out
+end
+
+-- One part of the logo at `t` of its fade. False when the device would not draw it.
+local function draw_logo_part(crops, t)
+    if t <= 0 then return true end
+    local colour = faded(ORANGE, t)
+    for _, c in ipairs(crops) do
+        if not pcall(draw_image, 18, LOGO_DECODED_ID, 20 + c[1], 84 + c[2], c[1], c[2], c[3], c[4], colour) then
+            return false
+        end
+    end
+    return true
+end
+
 local function draw_splash()
-    draw_text(SPLASH, 0, 180, 480, 24)
+    local caption = intro_step(INTRO_CAPTION)
+    if caption > 0 then
+        text_data.set(SPLASH, { color = faded(GREY, caption) })
+        draw_text(SPLASH, 0, 180, 480, 24)
+    end
     local drawn = false
     if pcall then
-        drawn = pcall(draw_image, 18, LOGO_DECODED_ID, 20, 84, 0, 0, 440, 80, ORANGE)
+        drawn = draw_logo_part(LOGO_EMBLEM, intro_step(INTRO_EMBLEM))
+            and draw_logo_part(LOGO_ST, intro_step(INTRO_ST))
+            and draw_logo_part(LOGO_SIDES, intro_step(INTRO_SIDES))
     end
     if not drawn then
-        draw_text(WORDMARK, 0, 84, 480, 80)
+        local letters = intro_step({ INTRO_ST[1], INTRO_SIDES[2] })
+        if letters > 0 then
+            text_data.set(WORDMARK, { color = faded(ORANGE, letters) })
+            draw_text(WORDMARK, 0, 84, 480, 80)
+        end
     end
-    draw_rect(192, 222, 96, 2, DIM)
-    draw_rect(192, 222, 48, 2, ORANGE)
+    if caption > 0 then
+        draw_rect(192, 222, 96, 2, faded(DIM, caption))
+        draw_rect(192, 222, 48, 2, faded(ORANGE, caption))
+    end
 end
 
 -- --- the stage pages ------------------------------------------------------------------------------

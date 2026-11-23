@@ -1,10 +1,12 @@
 // The HoSTage keyboard page's knob pages (tools/ctrl49/Hostage_MultiKnob.lua), run in Lua against
 // a recording stand-in for the firmware: what each knob says (the plug-in's value, else its
 // position), a knob with nothing on it, the symbols drawn for the host's ASCII marks, the bottom
-// strip, and that drawing never asks the keyboard to redraw, which freezes a CTRL49.
+// strip, and that drawing never asks the keyboard to redraw, which freezes a CTRL49. And the splash
+// the page plays in while the keyboard loads.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { inflateSync } from 'node:zlib';
 import {
   rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews, browseStatePayload,
   metersPayload, livePayload, layersPayload,
@@ -331,4 +333,167 @@ test('preset screen identifies the part and distinguishes loaded from highlighte
     for (const value of strings.filter(Boolean)) assert.ok(texts.includes(value));
     assert.ok(texts.some(s => s.includes('BROWSE: MENU')));
   } finally { p.close(); }
+});
+
+// --- The splash plays in --------------------------------------------------------------------------
+// While the keyboard loads, the session sends set_intro with a frame number 20 times a second
+// (Ctrl49Session, playIntro). The emblem fades in, then the solid ST in the middle of the wordmark,
+// then HO and AGE either side of it, then the caption and the bar.
+
+const ORANGE = 0xFFFF9408, BACKGROUND = 0xFF07090D;
+const span = (name) => {
+  const m = source.match(new RegExp(`^local INTRO_${name}\\s*=\\s*\\{\\s*(\\d+),\\s*(\\d+)\\s*\\}`, 'm'));
+  return [Number(m[1]), Number(m[2])];
+};
+const middle = ([from, to]) => Math.floor((from + to) / 2);
+const logoParts = (calls) => calls.filter((c) => c.kind === 'image' && c.id === LOGO_DECODED && c.sy < SYMBOL_ROW);
+const fading = (calls) => logoParts(calls).filter((c) => c.c !== ORANGE);
+const red = (colour) => (colour >>> 16) & 0xff;
+const crop = (c) => [c.sx, c.sy, c.sw, c.sh];
+
+async function splash() {
+  const p = await page();
+  p.call('set_mode', [0]);
+  return { ...p, frame: (n) => { p.call('set_intro', [n >> 8, n & 0xff]); return p.draw(); } };
+}
+
+// The intro's three parts, as the page draws them: each one's crops are the ones still fading
+// half way through its step.
+async function partsAsDrawn() {
+  const p = await splash();
+  try {
+    return { emblem: fading(p.frame(middle(span('EMBLEM')))).map(crop), st: fading(p.frame(middle(span('ST')))).map(crop),
+             sides: fading(p.frame(middle(span('SIDES')))).map(crop) };
+  } finally { p.close(); }
+}
+
+test('the splash plays in: the emblem, then ST in the middle, then HO and AGE, then the caption', async () => {
+  const p = await splash();
+  try {
+    const first = p.frame(0);
+    assert.equal(logoParts(first).length, 0, 'frame 0 is the background and nothing on it');
+    assert.deepEqual(said(first), [], 'and no caption yet');
+
+    const emblem = p.frame(middle(span('EMBLEM')));
+    assert.ok(fading(emblem).length > 0 && fading(emblem).length === logoParts(emblem).length, 'the emblem fades in on its own');
+    assert.ok(logoParts(emblem).every((c) => c.sx + c.sw <= 130), 'and it is the emblem, left of the wordmark');
+
+    const st = p.frame(middle(span('ST')));
+    assert.ok(logoParts(st).filter((c) => c.c === ORANGE).every((c) => c.sx + c.sw <= 130), 'the emblem is in');
+    assert.ok(fading(st).length > 0 && fading(st).every((c) => c.sx >= 232 && c.sx + c.sw <= 313), 'then ST, the middle of the wordmark');
+
+    const sides = p.frame(middle(span('SIDES')));
+    assert.ok(fading(sides).some((c) => c.sx + c.sw <= 232) && fading(sides).some((c) => c.sx >= 304),
+      'then HO and AGE, either side of it, together');
+    assert.ok(fading(sides).every((c) => c.sx + c.sw <= 232 || c.sx >= 304), 'and only those');
+    assert.deepEqual(said(sides), [], 'the caption waits for the letters');
+
+    const done = p.frame(span('CAPTION')[1]);
+    assert.ok(logoParts(done).length > 0 && logoParts(done).every((c) => c.c === ORANGE), 'at the end the whole logo is orange');
+    assert.deepEqual(said(done), ['CTRL49 CONTROL SURFACE']);
+    assert.equal(p.asked(), 0, 'the intro never asks the keyboard to redraw itself: the host clocks every frame');
+  } finally { p.close(); }
+});
+
+test('a fade walks the tint from the background to the colour, a little further each frame', async () => {
+  const p = await splash();
+  try {
+    const [from, to] = span('EMBLEM');
+    let last = red(BACKGROUND);
+    for (let f = from + 1; f < to; f++) {
+      const colours = [...new Set(logoParts(p.frame(f)).map((c) => c.c))];
+      assert.equal(colours.length, 1, `frame ${f}: the emblem is one colour`);
+      assert.ok(red(colours[0]) > last && red(colours[0]) < red(ORANGE), `frame ${f}: brighter than the frame before, not yet orange`);
+      assert.equal(colours[0] >>> 24, 0xff, `frame ${f}: an opaque colour, the only kind seen to tint on the keyboard`);
+      last = red(colours[0]);
+    }
+  } finally { p.close(); }
+});
+
+test('a host that does not play the intro gets the whole splash at once', async () => {
+  const p = await page();
+  const played = await splash();
+  try {
+    p.call('set_mode', [0]);
+    const still = p.draw();
+    const end = played.frame(span('CAPTION')[1]);
+    assert.deepEqual(logoParts(still).map(crop), logoParts(end).map(crop));
+    assert.ok(logoParts(still).every((c) => c.c === ORANGE));
+    assert.deepEqual(said(still), said(end));
+  } finally { p.close(); played.close(); }
+});
+
+// hostage_logo.png's grey levels (an 8-bit palette PNG, as make_symbols.py writes it).
+function logoGrey() {
+  const png = fs.readFileSync(new URL('../../../tools/ctrl49/hostage_logo.png', import.meta.url));
+  let width = 0, height = 0, palette = null;
+  const idat = [];
+  for (let at = 8; at < png.length;) {
+    const length = png.readUInt32BE(at), type = png.toString('latin1', at + 4, at + 8);
+    const data = png.subarray(at + 8, at + 8 + length);
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0); height = data.readUInt32BE(4);
+      assert.deepEqual([data[8], data[9], data[12]], [8, 3, 0], 'an 8-bit palette PNG, not interlaced');
+    }
+    if (type === 'PLTE') palette = data;
+    if (type === 'IDAT') idat.push(data);
+    at += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const index = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (width + 1)];
+    for (let x = 0; x < width; x++) {
+      const a = x > 0 ? index[y * width + x - 1] : 0, b = y > 0 ? index[(y - 1) * width + x] : 0;
+      const c = x > 0 && y > 0 ? index[(y - 1) * width + x - 1] : 0;
+      let p = 0;
+      if (filter === 1) p = a;
+      else if (filter === 2) p = b;
+      else if (filter === 3) p = (a + b) >> 1;
+      else if (filter === 4) {
+        const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+        p = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      index[y * width + x] = (raw[y * (width + 1) + 1 + x] + p) & 0xff;
+    }
+  }
+  return { width, grey: (x, y) => palette[index[y * width + x] * 3] };
+}
+
+test("the intro's crops fit the logo: every lit pixel in one part, and no letter cut in two", async () => {
+  const parts = await partsAsDrawn();
+  const { width, grey } = logoGrey();
+  const owner = new Map();
+  for (const [name, crops] of Object.entries(parts))
+    for (const [sx, sy, sw, sh] of crops)
+      for (let x = sx; x < sx + sw; x++)
+        for (let y = sy; y < sy + sh; y++) {
+          assert.ok(!owner.has(y * width + x), `(${x}, ${y}) is in two crops`);
+          owner.set(y * width + x, name);
+        }
+
+  const lit = (x, y) => x >= 0 && x < width && y >= 0 && y < SYMBOL_ROW && grey(x, y) > 0;
+  const seen = new Set();
+  let pixels = 0;
+  for (let y = 0; y < SYMBOL_ROW; y++)
+    for (let x = 0; x < width; x++) {
+      if (!lit(x, y) || seen.has(y * width + x)) continue;
+      // One stroke of the logo (8-connected): all of it must belong to the same part.
+      const names = new Set(), stack = [[x, y]];
+      seen.add(y * width + x);
+      while (stack.length) {
+        const [px, py] = stack.pop();
+        pixels++;
+        assert.ok(owner.has(py * width + px), `(${px}, ${py}) is lit and in no crop: it would never be drawn`);
+        names.add(owner.get(py * width + px));
+        for (let dx = -1; dx <= 1; dx++)
+          for (let dy = -1; dy <= 1; dy++)
+            if (lit(px + dx, py + dy) && !seen.has((py + dy) * width + px + dx)) {
+              seen.add((py + dy) * width + px + dx);
+              stack.push([px + dx, py + dy]);
+            }
+      }
+      assert.equal(names.size, 1, `the stroke at (${x}, ${y}) is split between ${[...names].join(' and ')}`);
+    }
+  assert.ok(pixels > 7000, `the whole logo was looked at (${pixels} lit pixels)`);
 });

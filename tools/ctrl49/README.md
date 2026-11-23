@@ -29,6 +29,31 @@ Adding a new kind of page:
    with a byte test, and the same builder in `ctrl49Payloads.js` with a scene in the preview.
 3. Give it a page in `Ctrl49SurfaceBroker`: `pages()`, `pumpInput()`, `refreshDisplay()`.
 
+### The splash plays in
+
+While HoSTage connects, the splash is not a still: the emblem fades in, then the solid ST in the
+middle of the wordmark, then HO and AGE either side of it, then the caption and the bar. 1.8 s at
+20 frames a second, then the finished logo holds for the rest of the 2.5 s loading dwell, which
+is when the keyboard decodes the knob strip for the first page (a decode stops the keyboard
+while it runs, so it belongs where nothing moves).
+
+- **The host is the clock.** The keyboard keeps no time, and `lua_widget_make_dirty` from `draw()`
+  froze it, so `Ctrl49Session` sends `set_intro [frame hi][frame lo]` and a draw every 50 ms
+  through the dwell (`playIntro`, which the app sets with this page and nothing else does). The
+  page draws each frame from its number alone. The first draw after `init` is told frame 0, so
+  the finished logo, which the page draws when no host plays the intro, never flashes up first.
+- **A fade is a tint.** The logo is a grey coverage image; drawn in a colour part of the way from
+  the background to orange, it is the logo at that opacity. Tinting is already proven on the
+  CTRL49; a translucent colour (Akai's own fade) is not.
+- **The parts are crops of `hostage_logo.png`.** T's crossbar overhangs A's left leg (columns
+  304–312), so those columns are cut by rows. `ctrl49KnobPage.test.js` decodes the PNG and checks
+  every lit pixel is in exactly one part and no stroke is cut between two: change the logo and the
+  test says whether the crops still fit.
+- **In the preview:** the Splash scene's **Play intro** plays it at the session's rate, and
+  **Intro frame** shows any one frame.
+
+Not yet seen on the keyboard; `hardware-checklist.md` section 1 says what to look for.
+
 ### The knob pages: values, symbols, the bottom strip
 
 - **Values as the plug-in writes them.** A control page's `set_values` carries, after its nine
@@ -126,9 +151,9 @@ kept beside its soundcheck. Over five seconds without preloading reads as slow, 
 preload on" when the setlist preloads nothing.
 
 **The page script has grown with them.** `Hostage_MultiKnob.lua` was 9 KB on `main` and is
-about 61 KB now, with all seven and the knob page work above. HoSTage uploads it without
-comments and indentation (`Ctrl49LuaStrip.h`): about 42 KB, inside the 58 KB Rig full build that
-ran on the keyboard.
+about 70 KB now, with all seven, the knob page work and the intro above. HoSTage uploads it
+without comments and indentation (`Ctrl49LuaStrip.h`): about 47 KB, inside the 58 KB Rig full
+build that ran on the keyboard.
 [`hardware-checklist.md`](hardware-checklist.md) is how to find out how far it can grow.
 
 Checks: `node --test test/ctrl49Preview.test.js` (payload bytes, and that every function the

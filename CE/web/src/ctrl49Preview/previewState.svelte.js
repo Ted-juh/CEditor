@@ -8,6 +8,9 @@ export const preview = $state({
   scene: 'control',
   scale: 2,
 
+  // The splash's frame of its intro (set_intro); null is the last frame, the whole splash.
+  splash: { frame: null },
+
   control: {
     title: 'Diva Filter',
     active: 0,

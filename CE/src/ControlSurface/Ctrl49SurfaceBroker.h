@@ -102,8 +102,13 @@ public:
         /** Session pacing, injectable so tests do not sleep out the real loading page. */
         std::function<void (int)> sessionSleep;
         /** How long the HoSTage splash stays up before the first page. The demo's 900 ms was
-            gone before anyone saw it; the startup is paced anyway, so this is time well spent. */
+            gone before anyone saw it; the startup is paced anyway, so this is time well spent.
+            The intro takes 1.8 s of it, and the rest holds the finished logo while the keyboard
+            decodes the knob strip for the first page. */
         int loadingMilliseconds = 2500;
+        /** Play the splash in (Ctrl49SessionOptions::playIntro). Only for a page with set_intro:
+            the app sets it with HoSTage's page; tests that pass a few bytes leave it off. */
+        bool playIntro = false;
         /** A keepalive every this many upload chunks during startup (see Ctrl49SessionOptions). */
         int keepaliveEveryUploadFrames = 16;
 

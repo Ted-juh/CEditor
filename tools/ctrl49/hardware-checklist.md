@@ -53,6 +53,23 @@ is at the bottom.
 - [x] Page Left / Right on the keyboard walks the control pages and the performance page, and
       the card follows.
 
+**The intro (new, not yet on the keyboard).** The splash now plays in while HoSTage connects: the
+emblem fades in, then ST, then HO and AGE, then the caption and the bar, 1.8 s in all at 20
+frames a second (`ctrl49.html`'s Splash scene shows it; Play intro). It plays each time HoSTage
+takes the keyboard's screen, so close HoSTage and open it again to watch it from the start.
+
+- [ ] The screen goes from black to the emblem without first flashing the finished logo.
+      **Write down** anything that appears before the emblem.
+- [ ] The fades are smooth, or they step. **Write down** roughly how many steps you can see in
+      the emblem's fade: about 12 frames are sent, so seeing fewer says the screen has fewer
+      colour levels than the page asks for (the README's open "Color depth" question).
+- [ ] ST arrives before HO and AGE, and the T's crossbar and the A's leg beneath it arrive
+      with their own letters (the logo is cut there by rows).
+- [ ] The finished logo holds still for about 0.7 s, then the first page. **Write down** whether
+      that page comes up at once or the logo stays longer: the knob strip is decoded then, and
+      how long that takes has not been measured.
+- [ ] If the intro stutters, or the stock screen comes back during it, **write down** where.
+
 **Cue.** Have a setlist of a few songs, one with sections and notes.
 
 - [x] Turn on **Cue**. Page Right from the performance page arrives at CUE first.

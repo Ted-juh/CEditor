@@ -150,8 +150,15 @@ void Ctrl49Session::start()
 
     options_.log ("Starting CTRL49 display session: uploading one original Lua page.");
     {
+        auto sequence = buildStartupSequence (rawLua_, assets_, options_.keepaliveEveryUploadFrames);
+        // The sequence ends init, draw. A page that plays in draws its finished splash until it
+        // is told a frame, so the first draw is told frame 0; otherwise the keyboard could show
+        // the whole logo for a moment before the fade began.
+        if (options_.playIntro)
+            sequence.insert (sequence.end() - 1, { buildIntroFrame (0), 2 });
+
         std::lock_guard<std::mutex> lock (midiMutex_);
-        for (const auto& step : buildStartupSequence (rawLua_, assets_, options_.keepaliveEveryUploadFrames))
+        for (const auto& step : sequence)
         {
             sendLocked (step.frame);
             if (step.pauseMs > 0)
@@ -164,16 +171,30 @@ void Ctrl49Session::start()
     // frame — lands. The first draw follows init by 3 ms, and init decodes the page's images,
     // so it is re-sent through the dwell, with a keepalive, every 400 ms (the watchdog allows ~900): a draw the device
     // was not ready for is followed by one it is, and the watchdog is fed while it waits.
+    //
+    // A page that plays in (playIntro) is redrawn every kIntroFrameMs instead, each draw told its
+    // frame. The frame is counted from the time waited, not read off a clock: every frame sent is
+    // the next one, so a slow send stretches the intro a little rather than skipping part of it.
+    // The keepalive keeps its 400 ms.
     options_.log ("Loading page displayed.");
+    const int frameMs = options_.playIntro ? kIntroFrameMs : 400;
+    int sinceKeepalive = 0;
     for (int waited = 0; waited < options_.loadingMilliseconds;)
     {
-        const auto step = std::min (400, options_.loadingMilliseconds - waited);
+        const auto step = std::min (frameMs, options_.loadingMilliseconds - waited);
         options_.sleep (step);
         waited += step;
+        sinceKeepalive += step;
         if (waited < options_.loadingMilliseconds)
         {
             std::lock_guard<std::mutex> lock (midiMutex_);
-            sendLocked (buildKeepalive());
+            if (sinceKeepalive >= 400)
+            {
+                sendLocked (buildKeepalive());
+                sinceKeepalive = 0;
+            }
+            if (options_.playIntro)
+                sendLocked (buildIntroFrame (waited / kIntroFrameMs));
             sendLocked (buildDraw (kTarget, {}));
         }
     }
@@ -259,6 +280,13 @@ std::vector<Bytes> Ctrl49Session::buildPngUpload (std::uint16_t id, const Bytes&
     Bytes raw = png;
     raw.push_back (0x00);
     return buildObjectUpload (ObjectKey { kObjectTypePng, id }, raw);
+}
+
+Bytes Ctrl49Session::buildIntroFrame (int frame)
+{
+    const auto clamped = static_cast<std::uint16_t> (std::clamp (frame, 0, 0xFFFF));
+    return buildLuaCall (kTarget, "set_intro", { static_cast<std::uint8_t> (clamped >> 8),
+                                                 static_cast<std::uint8_t> (clamped & 0xFF) });
 }
 
 std::size_t Ctrl49Session::uploadPng (std::uint16_t id, const Bytes& png)

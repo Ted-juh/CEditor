@@ -37,6 +37,12 @@ struct Ctrl49SessionOptions
     // Time the loading page stays up before the landing/main page is shown.
     int loadingMilliseconds = 900;
 
+    // Play the loading page in. Through the dwell the page gets set_intro with a frame number
+    // (two bytes, high first) and a redraw every kIntroFrameMs, instead of the plain redraw every
+    // 400 ms; its first draw, straight after init, is frame 0. Only for a page that defines
+    // set_intro (HoSTage's does): any other page would answer every frame with a Lua error.
+    bool playIntro = false;
+
     // Injectable for tests; defaults to a real sleep. Receives milliseconds.
     std::function<void (int)> sleep;
 
@@ -107,8 +113,15 @@ public:
     void setAllPadsRgb (int red, int green, int blue);
     void setActivePadBank (int bank);  // lights exactly one of the four bank LEDs
 
+    // The set_intro call for one frame of the loading page's intro (Ctrl49SessionOptions::playIntro).
+    // Pure; exposed for tests.
+    static Bytes buildIntroFrame (int frame);
+
     static constexpr std::uint8_t kTarget      = 0x02;
     static constexpr std::uint16_t kLuaObjectId = 0x0101;
+    // The intro's clock: 20 frames a second. An empty page stayed smooth at 30 redraws a second
+    // on the CTRL49, and a frame of the intro is about a dozen draw calls.
+    static constexpr int kIntroFrameMs = 50;
 
 private:
     void keepaliveLoop();
