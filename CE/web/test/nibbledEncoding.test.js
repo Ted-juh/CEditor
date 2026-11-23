@@ -30,8 +30,18 @@ import {
 } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 import { readText } from './support/readText.mjs';
 
-const GAIA = JSON.parse(readText(fileURLToPath(
+const PROFILE = JSON.parse(readText(fileURLToPath(
   new URL('../../profiles/test/roland-gaia-sh01.ceditor-device.json', import.meta.url))));
+
+// What most of this file pins is the ENCODER, across everything its nibbles can carry. A value
+// outside its parameter's range is refused before the encoder sees it, in both engines, and the
+// GAIA's ranges are narrower than its fields (the first two-nibble parameter is an arp end step,
+// 1-32). So here every nibbled parameter is opened to the widest field, which leaves the encoder's
+// own limit as the only one; the profile's ranges are held separately, below.
+const GAIA = {
+  ...PROFILE,
+  parameters: PROFILE.parameters.map((p) => (p.encoding?.type === 'nibbled' ? { ...p, range: { min: 0, max: 0xffff } } : p)),
+};
 
 const bytes = (hex) => hex.trim().split(/\s+/);
 /** The value bytes of a DT1: after the 7-byte header and 4-byte address, before checksum and F7. */
@@ -111,14 +121,18 @@ test('an absent nibble count means two, and an impossible one is refused', () =>
 });
 
 test('every parameter in the profile compiles', () => {
-  // The blunt one. Before this, 622 of them could not be built on the desktop build at all.
+  // The blunt one. Before this, 622 of them could not be built on the desktop build at all. The
+  // profile as it ships, each parameter at both ends of its range: a value outside it is refused,
+  // as DeviceProfileEngine.cpp refuses it, so 1 is not a value every parameter can take.
   const failures = [];
-  for (const parameter of GAIA.parameters) {
-    const result = localCompileParameter(GAIA, { parameterId: parameter.id, value: 1 });
-    if (!result?.ok) failures.push(`${parameter.id}: ${result?.error}`);
+  for (const parameter of PROFILE.parameters) {
+    for (const value of parameter.range ? [parameter.range.min, parameter.range.max] : [1]) {
+      const result = localCompileParameter(PROFILE, { parameterId: parameter.id, value });
+      if (!result?.ok) failures.push(`${parameter.id} at ${value}: ${result?.error}`);
+    }
   }
   assert.deepEqual(failures, []);
-  assert.equal(GAIA.parameters.length, 882);
+  assert.equal(PROFILE.parameters.length, 882);
 });
 
 test('the decoder reads back what each encoder writes', () => {

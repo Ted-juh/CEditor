@@ -186,7 +186,7 @@ also fixes C-116: Python preview did not run at all under the security pass's SE
 | [C-75](claude-findings.md) | U | developer tool in the product | "New Screen (CTRL49)" on the welcome screen opens a Screen Builder whose work goes nowhere | in a test |  | pending |
 | [C-76](claude-findings.md) | U | licensing | The Edition tab sells "Script actions" as Pro, but nothing can call them in any edition | read in code |  | pending |
 | [C-24](claude-findings.md) | S4 | docs | Release notes, README and user docs quote numbers and formats the product no longer matches | read in code |  | pending |
-| [C-33](claude-findings.md) | S4 | preview | The preview JS engine still builds different bytes from the C++ engine | in a test |  | pending |
+| [C-33](claude-findings.md) | S4 | preview | The preview JS engine still builds different bytes from the C++ engine | in a test | `eaad6fe2` (out-of-range half) | pending |
 | [C-56](claude-findings.md) | S4 |  | Animation polish | read in code |  | pending |
 | [C-70](claude-findings.md) | S4 | docs | The scripting manual's language table contradicts the product | read in code |  | pending |
 | [C-77](claude-findings.md) | S4 | licensing UI | Every user of the free AGPL editor is told "Newer builds: a paid upgrade" | in a test |  | pending |

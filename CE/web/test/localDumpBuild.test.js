@@ -30,7 +30,8 @@ function profile() {
     variables: { deviceId: 16 },
     parameters: [
       { id: 'p.level', type: 'integer', encoding: { type: 'u7' } },
-      { id: 'p.wide', type: 'integer', encoding: { type: 'u14' } },
+      // A range, because without one an integer is 0-127 to both engines and 9000 is refused.
+      { id: 'p.wide', type: 'integer', range: { min: 0, max: 16383 }, encoding: { type: 'u14' } },
       { id: 'p.name', type: 'text', encoding: { type: 'text-ascii', length: 4, pad: 32 } },
     ],
     dumpDefinitions: [{

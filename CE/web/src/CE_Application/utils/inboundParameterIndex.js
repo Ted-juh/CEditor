@@ -168,6 +168,11 @@ export function fingerprintParameter(profile, parameterId) {
   const encoded = probes.map((value) => encodeParameterValue(parameter, value)?.bytes ?? []);
   let lead = 0;
   while (lead < width && encoded.every((bytes) => bytes[lead] === encoded[0][lead])) lead++;
+  // They are the prefix's LAST bytes only when its constant part ends on the value. A parameter
+  // every probe builds the same whole message for (an action, which sends its own trigger byte
+  // whatever it is given) ends on a checksum or F7 instead, and counting that as the value read the
+  // F7 back as 119.
+  if (lead > 0 && raw.slice(raw.length - lead).join() !== encoded[0].slice(0, lead).join()) lead = 0;
 
   return {
     parameterId,
@@ -370,7 +375,10 @@ function decodePairHalf(entry, byte, values) {
   } else {
     const current = values?.[parameterId];
     if (current === undefined || current === null || current === '') return null;
-    const encoded = encodeParameterValue(parameter, current);
+    // Only its two bytes are wanted here. Without the type it is not range-checked: the entry carries
+    // no range, and the encoder reads a missing one as 0-127, as C++ does, which a coarse half of
+    // 7 (896) is outside of.
+    const encoded = encodeParameterValue({ id: parameterId, encoding: entry.encoding }, current);
     if (!encoded || encoded.error || encoded.bytes?.length !== 2) return null;
     const msb = lsbFirst ? encoded.bytes[1] : encoded.bytes[0];
     wire = order(msb, byte & 0x7f);

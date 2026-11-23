@@ -37,6 +37,12 @@ test('every field of every dump is where the engine puts it, as wide as it write
   for (const file of ['roland-gaia-sh01.ceditor-device.json', 'roland-sh-201.ceditor-device.json',
     'yamaha-an1x-dpd.ceditor-device.json', 'test-sysex-synth.ceditor-device.json']) {
     const profile = JSON.parse(profileText(file));
+    // A field whose range holds one value (the AN1x's reserved bytes are 0-0) cannot be built two
+    // ways: any other value is refused, by this engine as by C++. It is given room for the second
+    // one, so where it sits is still checked.
+    for (const p of profile.parameters) {
+      if (p.range && Number(p.range.min) === Number(p.range.max)) p.range = { ...p.range, max: Number(p.range.min) + 1 };
+    }
     const parameters = new Map(profile.parameters.map((p) => [p.id, p]));
     for (const dump of profile.dumpDefinitions) {
       const layout = dumpLayout(dump, parameters);

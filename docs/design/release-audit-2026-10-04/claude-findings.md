@@ -415,6 +415,8 @@ Read-in-code.
 
 ### C-33 — The preview JS engine still builds different bytes from the C++ engine   (S4 · faulty · preview)
 
+**Partly fixed** on `claude/dazzling-euler-ozjcpv` in `eaad6fe2`: the out-of-range half. The JS engine refuses what `validateAndEncodeValue` refuses, in its order and words (not a number, outside an integer, float or bipolar parameter's range, more than the encoder's bytes hold), and an action sends its trigger byte as C++ does. Checked against a harness over the real `DeviceProfileEngine.cpp` with 105,577 values across every test profile. **Still open:** the boolean-u7 switches below, and `test-sysex-synth`'s `mod.depth` and `currentPatchDump`, which both engines now refuse alike.
+
 SH-201: 34 booleans declare `trueValue: 1` with `boolean-u7` — C++ sends `01`, the JS preview/Designer shows `7F`
 (`deviceProfileLocalEngine.js:250`). Out of range: JS clamps (−20 → `00`), C++ refuses. The shipped test fixture
 `test-sysex-synth` (in the user's device list) has `mod.depth` 0..255 on a 1-byte u7 and a `currentPatchDump` with no
