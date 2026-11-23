@@ -402,11 +402,6 @@ something the program does with every profile, which the larger library makes ea
   covers the profiles, not the engine. Closing it means `encodeParameterValue` in
   `deviceProfileLocalEngine.js` refusing what `validateAndEncodeValue` in `DeviceProfileEngine.cpp`
   refuses, and a test that the two agree on an out-of-range value.
-- **Reading a controller back ignores its channel.** `inboundParameterIndex.js` masks the channel
-  nibble of a CC's status byte, so `B1 4A 40` matches a parameter compiled on channel 1. For the
-  JP-08, whose Lower part sends on `lowerChannel`, a knob turned on the Lower part is read as the
-  Upper part's (`matchInbound` returns `upper.vcf.cutoff` for `B0`, `B1` and `B5`). A recipe whose
-  channel is a variable other than `channel` should keep that channel in its fingerprint.
 - **Korg's wide NRPN values are sent, not read back.** A recipe with `lowBitsController` sends the
   low bits first on that controller (CC 63 on the minilogue xd), then the rest on CC 6, in both
   engines. On the way in, `nrpn.js` assembles a value from CC 6 and 38 only, so when the instrument

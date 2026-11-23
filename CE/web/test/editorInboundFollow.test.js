@@ -17,12 +17,14 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { get } from 'svelte/store';
 
 import { followInboundMessage } from '../src/CE_Application/stores/deviceProfileSession.js';
 import { deviceRoleMappings, deviceRuntimeState, profileSources } from '../src/CE_Application/stores/deviceProfileStores.js';
 import { clearInboundIndexCache } from '../src/CE_Application/stores/inboundIndexCache.js';
 import { rememberOutboundEcho } from '../src/CE_Application/stores/deviceMidiRuntime.js';
+import { readText } from './support/readText.mjs';
 
 // Small, but shaped like the real thing: one parameter reachable by a declared CC and one reachable
 // only by the Roland DT1 SysEx the instrument answers dumps with.
@@ -137,4 +139,23 @@ test('an empty payload is ignored', () => {
   followInboundMessage({});
   followInboundMessage({ deviceRole: 'primary', hex: '' });
   assert.deepEqual(get(deviceRuntimeState), {});
+});
+
+test('a part on a channel of its own moves its own controls, on the channels the role sets', () => {
+  // The JP-08 sends its Upper part on `channel` and its Lower part on `lowerChannel`, and both use
+  // CC 74 for cutoff. Only the role's variables say which channel is which part, so this is where
+  // they have to reach the index: moved to 5 and 6, a Lower knob on channel 6 is the Lower cutoff.
+  const source = readText(fileURLToPath(new URL('../../profiles/test/roland-jp-08.ceditor-device.json', import.meta.url)));
+  clearInboundIndexCache();
+  deviceRuntimeState.set({});
+  deviceRoleMappings.set({ primary: { role: 'primary', profileId: 'roland-jp-08', variables: { channel: 5, lowerChannel: 6 } } });
+  profileSources.set({ 'roland-jp-08': { profileId: 'roland-jp-08', source } });
+
+  followInboundMessage({ deviceRole: 'primary', hex: 'B5 4A 40' });
+  assert.equal(valueFor('primary', 'lower.vcf.cutoff'), 64);
+  assert.equal(valueFor('primary', 'upper.vcf.cutoff'), undefined, 'the Upper part did not move');
+
+  followInboundMessage({ deviceRole: 'primary', hex: 'B4 4A 20' });
+  assert.equal(valueFor('primary', 'upper.vcf.cutoff'), 32);
+  assert.equal(valueFor('primary', 'lower.vcf.cutoff'), 64, 'and the Lower part stayed where it was');
 });

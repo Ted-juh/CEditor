@@ -133,7 +133,10 @@ controller does what. A profile read from that list:
 
 The JP-08 has two parts, Upper and Lower, and sends the Lower part's controllers one channel above
 the Upper's. Its profile has both, on the variables `channel` and `lowerChannel`, which must be set
-to match the instrument (and `lowerChannel` to 1 when `channel` is 16).
+to match the instrument (and `lowerChannel` to 1 when `channel` is 16). A panel following the synth
+needs them too: most controllers are used by both parts, and only the channel says which part
+turned one, so a controller of that kind arriving on a channel that is neither part's is ignored
+rather than given to one of them.
 
 ### NRPN profiles (Sequential, Dave Smith Instruments and Oberheim)
 
@@ -644,9 +647,6 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **The preview engine does not check ranges.** The JavaScript engine compiles a value outside a
   parameter's range where the C++ engine refuses it, so a preview can show a message the program
   would not send.
-- **Reading controllers back ignores the channel.** When a synth sends a controller, CEditor finds
-  the parameter by its message with the channel masked out. For a profile with two parts on two
-  channels (the JP-08), a knob turned on the Lower part is read as the Upper part's.
 - **The largest profiles take a moment to open in the Device Profile Designer.** It converts the
   profile each time it opens one: about 2.5 seconds for a KRONOS drum kit (20,352 parameters), 1.7
   for a FANTOM, under one for most. A drum kit's Bulk dumps screen takes about 3 more the first time
