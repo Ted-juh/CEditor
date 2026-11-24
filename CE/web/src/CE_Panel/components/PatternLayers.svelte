@@ -16,6 +16,7 @@
    * once.
    */
   import { systemReducedMotion } from '../../CE_Application/stores/reducedMotion.js';
+  import { patternFrameCap } from '../../CE_Application/stores/patternFrameCap.js';
   import { knownTileSize, patternEntries, patternImageUrl, patternStyles, readPattern } from '../../CE_Application/utils/patternLayers.js';
 
   let {
@@ -27,7 +28,8 @@
     clip = '',
     // The preview's own Reduced motion switch, where there is one; the OS setting is read here.
     reducedMotion = false,
-    // A cap on how often a pattern moves, frames a second; 0 is every frame the browser draws.
+    // A cap on how often a pattern moves, frames a second; 0 is every frame the browser draws, or the
+    // page's own cap (stores/patternFrameCap.js: 30 in a plug-in exported with it on).
     fps = 0,
   } = $props();
 
@@ -64,10 +66,11 @@
   }
 
   let reduced = $derived(reducedMotion || $systemReducedMotion);
+  let cap = $derived(fps > 0 ? fps : $patternFrameCap);
   let drawn = $derived(patternEntries(background)
     .filter(([, node]) => readPattern(node).place === place)
     .map(([name, node]) => {
-      const styles = patternStyles(node, naturalSize(node?.src), { width, height }, { reduced, fps });
+      const styles = patternStyles(node, naturalSize(node?.src), { width, height }, { reduced, fps: cap });
       return styles ? { name, ...styles } : null;
     })
     .filter(Boolean));

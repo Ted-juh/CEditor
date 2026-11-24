@@ -687,6 +687,13 @@ own section:
 A pattern's tint can be animated like a fill colour: in the **Animation** tool it is
 **Background › Pattern 1 tint**.
 
+A moving pattern costs the computer a little every frame, and so does every animation that loops. A
+panel can keep up to ten things moving (a gradient that turns or sweeps counts as two); over that,
+the status bar shows the count in amber, the **Animation** tool shows **Panel: … loops**, and the
+**Export** tab says so above **Export Plugin** — the plugin still builds. Click any of them to go to
+the loops one by one. In the **Export** tab, **Patterns at 30 fps** makes moving patterns in the
+exported plugin step thirty times a second: about 40% lighter, and most look the same.
+
 ### Shapes
 
 A **Shape** draws a rectangle, ellipse, line, triangle, star, arrow and more; choose the **Kind** on its

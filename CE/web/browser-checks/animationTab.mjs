@@ -866,6 +866,27 @@ await settle();
 await ev(() => window.__anim.removeAnimation('pressEcho2'));
 await settle();
 
+// --- The loop budget ----------------------------------------------------------------------------
+
+check('ten loops is within the budget: no chip', async () => {});
+await ev(() => window.__anim.addLoops(10));
+await settle();
+assert.equal(await ev(() => window.__anim.loopAlarm()), '');
+await ev(() => window.__anim.addLoops(11));
+await settle();
+check('eleven is over it: the tab says so, and the chip goes to a loop', async () => {});
+assert.equal(await ev(() => window.__anim.loopAlarm()), 'Panel: 11 loops');
+await ev(() => window.__anim.clickLoopAlarm());
+await settle();
+assert.deepEqual(await ev(() => window.__anim.tabRequest()), { tab: 'animation' });
+const target = await ev(() => window.__anim.target());
+assert.equal(target.kind, 'animation');
+// The tab takes the focus it was handed and selects that animation: a loop.
+assert.match(await ev(() => window.__anim.selectedAnimation()), /^loop\d+$/);
+await ev(() => window.__anim.dropLoops());
+await settle();
+assert.equal(await ev(() => window.__anim.loopAlarm()), '');
+
 // --- The rules --------------------------------------------------------------------------------
 
 check('there is not one slider in the tab', async () => {});

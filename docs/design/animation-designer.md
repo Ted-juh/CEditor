@@ -54,7 +54,7 @@ or gradient, from a large library of effects. Those two sentences are most of th
 | The first text effects | Typewriter, explode, roll, push, wipe, crossfade and shimmer, each in and out. More later. |
 | The dock tab's preview | Plays when Play is pressed. Loops by nature (While in, patterns) keep running once started. |
 | The name for a user's preset | "Animation preset" in the interface, `.ceanim` as a file, because "preset" already means a synth's sound here (HoSTage's Save preset, program banks, `.vstpreset`). |
-| How much looping is too much | Measured in the plug-in during step 3; the number goes to the owner, who approved this route. |
+| How much looping is too much | Measured in step 3 (below); the owner chose **ten moving loops a panel**, a gradient loop counting two, warned about and never refused, with "moving patterns at 30 frames a second" a switch in the Export tab. |
 
 ## The model
 
@@ -569,6 +569,33 @@ imports one through the file picker, and adopts a preset a panel carried), and t
 compiled with GCC (`-fsyntax-only`, as `CLAUDE.md` gives it). Not run: MSVC, and the app's own file
 dialogs, which are the CTRL49 screen's already.
 
+## As built: the loop budget (2026-11-24)
+
+The owner's answer to step 3's measurement: ten, a warning and not a refusal, and asked how it is
+given. Not a popup — that interrupts and is clicked away — but the three places CEditor already
+says such things, each in its own words, each a click away from the loops themselves:
+
+- **The status bar** (`layout/StatusBar.svelte`): `4 loops` while the panel has any, amber and
+  `12 loops · 10 is the budget` above it, as the MIDI item turns amber when its port cannot send.
+- **The Animation tab's chips**: `Panel: 12 loops`, beside "2 targets do nothing" and "1 clash".
+- **The Export tab**, which Export Plugin opens: a section, Animation, whose note says the count —
+  and above ten that each open plug-in window uses more processor time than ten would, and that the
+  plug-in still builds.
+
+Each one's tooltip lists the loops ("Wave › Pattern 1", "Chrome › sheen (counts 2)") and each click
+selects the next looping control with the Animation tab open on it (`stores/loopBudgetStore.js`).
+What counts is `utils/loopBudget.js`: a moving pattern, a looping keyframe animation (a gradient
+loop counts two), a looping text effect or sequence; a loop that plays while a state holds counts,
+since it is what the panel can be doing.
+
+The owner's second question — count the plug-in windows? — has no number to count: the editor
+cannot know how many windows someone opens, so the Export note says each open window pays it again.
+
+**Patterns at 30 fps**, the Export tab's switch (`exportSettings.patternFps`): off by default. The
+player reads it as it loads the panel (`stores/patternFrameCap.js`) and moving patterns step thirty
+times a second, about 40 % less processor time in both engines; keyframe animations keep their
+easing, which steps would break. The editor's Preview always moves them every frame.
+
 ## Open
 
-- The loop budget's number and its two choices (above, step 3), the owner's.
+Nothing for the owner at present.

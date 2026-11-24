@@ -62,6 +62,7 @@
   import FramesEditor from './animation/FramesEditor.svelte';
   import PresetLinkCard from './animation/PresetLinkCard.svelte';
   import PresetLibrary from './animation/PresetLibrary.svelte';
+  import { panelLoopSummary, panelLoopLines, showNextLoop } from '../stores/loopBudgetStore.js';
   import SequenceTimeline from './animation/SequenceTimeline.svelte';
   import * as anime from '../utils/animeTimeline.js';
   import { addKeyframe, removeKeyframe, updateKeyframe, normalizeKeyframes, keyframesDuration, sampleKeyframes, isColourTarget } from '../utils/keyframeModel.js';
@@ -663,8 +664,15 @@ onMount(() => {
             <button type="button" class="ic" onclick={clearEditorTarget} title="Clear: stop editing this control" aria-label="Clear"><X size={14} /></button>
           </span>
         </div>
-        {#if deadCount || clashes.length || unknownCount}
+        {#if deadCount || clashes.length || unknownCount || $panelLoopSummary.over}
           <div class="alarms">
+            {#if $panelLoopSummary.over}
+              <!-- The panel's loops over the budget (utils/loopBudget.js). A click goes to each in turn. -->
+              <button type="button" class="alarm loops" data-loop-alarm onclick={showNextLoop}
+                      title={`More than ${$panelLoopSummary.budget} things on this panel keep moving; each open plug-in window draws them all.\n${$panelLoopLines.join('\n')}\nClick to go to each in turn.`}>
+                Panel: {$panelLoopSummary.count} loops
+              </button>
+            {/if}
             {#if deadCount}
               <span class="alarm" role="status">
                 {deadCount} {deadCount === 1 ? 'target does' : 'targets do'} nothing
@@ -1230,6 +1238,7 @@ onMount(() => {
     font-size: 12px; font-weight: 600; color: #1A1206; background: #E5A029;
     padding: 2px 7px; border-radius: 4px; white-space: nowrap;
   }
+  button.alarm { border: 0; font-family: inherit; line-height: inherit; cursor: pointer; }
   .listwrap { flex: 1; min-height: 60px; display: flex; flex-direction: column; }
   .newrow { display: flex; gap: 6px; }
   .newrow .txt { flex: 1; }

@@ -28,6 +28,7 @@
   import { countRolesInControls } from '../utils/deviceRoles.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { outputSends } from '../utils/midiEndpoints.js';
+  import { panelLoopSummary, panelLoopLines, showNextLoop } from '../stores/loopBudgetStore.js';
 
   let deviceRoles = $derived([...countRolesInControls($activePanel?.controls).keys()]);
   let deviceRole = $derived(deviceRoles.length === 1 ? deviceRoles[0] : deviceRoles.length ? '' : DEFAULT_DEVICE_ROLE);
@@ -104,6 +105,15 @@
       title={deviceRole ? `${deviceRole} MIDI output: ${midiOutput?.name ?? 'Unavailable'}. Input: ${midiInput?.name ?? 'None'}. Click to configure ports.` : `Panel devices: ${deviceRoles.join(', ')}. Click to configure ports.`}
       onclick={() => displayTabRequest.set({ tab: 'ports' })}>
       MIDI out: {deviceRole ? midiOutput?.name ?? 'Unavailable' : `${deviceRoles.length} devices`}
+    </button>
+  {/if}
+  {#if panel && $panelLoopSummary.count > 0}
+    <!-- What the panel keeps moving, against the budget of ten (utils/loopBudget.js): amber above it.
+         A warning, never a refusal; a click goes to each loop in turn in the Animation tab. -->
+    <button class="status-item loop-status" class:status-warn={$panelLoopSummary.over} data-loop-status
+      title={`${$panelLoopSummary.over ? `More than ${$panelLoopSummary.budget} things keep moving: each open plug-in window draws them all, and uses more processor time than ${$panelLoopSummary.budget} would.` : `Things this panel keeps moving (the budget is ${$panelLoopSummary.budget}).`}\n${$panelLoopLines.join('\n')}\nClick to go to each in turn.`}
+      onclick={showNextLoop}>
+      {$panelLoopSummary.count} {$panelLoopSummary.count === 1 ? 'loop' : 'loops'}{$panelLoopSummary.over ? ` · ${$panelLoopSummary.budget} is the budget` : ''}
     </button>
   {/if}
   <span class="spacer"></span>
@@ -186,6 +196,8 @@
     text-align: left;
   }
   .midi-status:hover { text-decoration: underline; }
+  .loop-status { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+  .loop-status:hover { text-decoration: underline; }
 
   .status-item.dim {
     opacity: 0.7;

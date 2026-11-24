@@ -18,6 +18,7 @@ import { displayTabRequest } from '../src/CE_Application/stores/displayTab.js';
 import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
 import { updateControlProperty } from '../src/CE_Application/stores/controls.js';
 import { animationPresetLibrary } from '../src/CE_Application/stores/animationPresetLibrary.js';
+import { editorTarget } from '../src/CE_Application/stores/editorTarget.js';
 
 const CONTROL_ID = 'ctrl_anim';
 
@@ -285,6 +286,20 @@ window.__anim = {
   clickAdopt: () => document.querySelector('[data-adopt] button')?.click(),
   panelPresets: () => JSON.parse(JSON.stringify(get(panels)[0].animationPresets ?? [])),
   libraryPresets: () => JSON.parse(JSON.stringify(get(animationPresetLibrary))),
+  addLoops: (n) => {
+    for (let i = 0; i < n; i += 1) {
+      updateControlProperty(CONTROL_ID, `Animations.loop${i}`, { _type: 'Animation', name: `loop${i}`, enabled: true, kind: 'keyframes',
+        trigger: { type: 'always' }, duration: 900, delay: 0, easing: 'linear', targets: [{ path: 'Transform' }], frames: [{ at: 0, opacity: 1 }, { at: 1, opacity: 0.9 }] });
+    }
+  },
+  dropLoops: () => panels.update((list) => list.map((panel) => ({ ...panel, controls: panel.controls.map((c) => {
+    if (c._children.Core.id !== CONTROL_ID) return c;
+    const kept = Object.fromEntries(Object.entries(c._children.Animations._children).filter(([key]) => !key.startsWith('loop')));
+    return { ...c, _children: { ...c._children, Animations: { ...c._children.Animations, _children: kept } } };
+  }) }))),
+  loopAlarm: () => textOf(document.querySelector('[data-loop-alarm]')),
+  clickLoopAlarm: () => document.querySelector('[data-loop-alarm]')?.click(),
+  target: () => JSON.parse(JSON.stringify(get(editorTarget) ?? null)),
   carryPreset: (preset) => panels.update((list) => list.map((panel) => ({ ...panel, animationPresets: [...(panel.animationPresets ?? []), preset] }))),
   typeNewName: (value) => {
     const input = [...document.querySelectorAll('.newrow input')][0];
