@@ -327,6 +327,7 @@
   } from '../utils/sliderControlPart.js';
   import { floating } from '../utils/floatingUi.js';
   import { dispatchInteraction, dispatchKeyEvent, scriptsHear } from '../scripting/panelRuntime.js';
+  import { playGesture, watchGesture } from '../utils/gestureEvents.js';
   import {
     registerKeysSurface, isLiveSurface, keysCapture, keysBubble, keysUp, letGo as keysLetGo,
     noteRaised as keysNoteRaised, keyFields, pianoSilence, keyIsTheEditors,
@@ -7934,6 +7935,24 @@
     return true;
   }
 
+  // --- Gestures with no duration (utils/gestureEvents.js) ---------------------------------------
+  // A click, a long press and a flick on a control play its Events-row animations (the States tab's,
+  // docs/design/animation-designer.md), and a long press and a flick raise 'onLongPress' and
+  // 'onFlick' for scripts, beside onClick and onDoubleClick. A gesture the control already uses is
+  // shared, never taken: a knob dragged and let go fast still turned, and was also flicked.
+  let stopGesture = () => {};
+  onDestroy(() => stopGesture());
+
+  function beginGesture(control, event) {
+    stopGesture();
+    const id = getControlId(control);
+    stopGesture = watchGesture(control, event, {
+      scale: scale || 1,
+      onLongPress: (payload) => dispatchInteraction(id, 'onLongPress', payload),
+      onFlick: (payload) => dispatchInteraction(id, 'onFlick', payload),
+    });
+  }
+
   // Control-local coordinates (logical px) for a pointer/wheel event — the payload for interaction scripts.
   function controlLocalPoint(event) {
     const rect = event?.currentTarget?.getBoundingClientRect?.() ?? pointerActiveElement?.getBoundingClientRect?.();
@@ -7969,6 +7988,7 @@
       deltaX: event.deltaX,
       deltaY: event.deltaY,
     });
+    playGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
     // Hardware style: while an LCD edit zone is active, the wheel acts as a data
     // knob — cycling the char under the caret (text) or the option (choice).
     if (lcdEdit.active && lcdEdit.id === getControlId(control)) {
@@ -8442,8 +8462,10 @@
     const downAt = Number.isFinite(event?.timeStamp) && event.timeStamp > 0 ? event.timeStamp
       : (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const isDoubleTap = downId === lastPointerDownId && (downAt - lastPointerDownAt) < 350;
+    beginGesture(control, event);
     if (isDoubleTap) {
       dispatchInteraction(downId, 'onDoubleClick', controlLocalPoint(event));
+      playGesture(control, 'doubleClick');
       if (!lastPointerMoved && Math.hypot(event.clientX - lastPointerDownPosition.x,
         event.clientY - lastPointerDownPosition.y) <= 5 && resetRangeOnDoubleClick(control, event)) {
         event.preventDefault(); event.stopPropagation();

@@ -135,6 +135,23 @@ test('a state trigger fires on entering its state, from any or a named state, an
   assert.equal(triggerHeld({ trigger: { to: ['*'] } }, ['hover']), false, 'nothing specific to hold on');
 });
 
+// The test above passes lower-case names on both sides. The runtime does not: it hands over the
+// States section's keys as written ("Hover"), while the tab writes a trigger's states lower-cased.
+// Compared as written, a sequence on a state never started in the app. Held here with the states a
+// real knob reports.
+test('a state trigger matches the states the runtime reports, whatever their case', async () => {
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { resolveInteractiveControl } = await import('../src/CE_Application/utils/interactionRuntime.js');
+  const knob = createControl('Knob');
+  const resting = resolveInteractiveControl(knob, {}).runtime.activeStates;
+  const hovered = resolveInteractiveControl(knob, { hover: true }).runtime.activeStates;
+  assert.ok(hovered.includes('Hover'), `the runtime reports ${hovered.join(', ')}`);
+  const written = { trigger: { type: 'stateChange', from: ['*'], to: ['hover'] } };
+  assert.equal(triggerFires(written, resting, hovered), true, 'as the tab writes it');
+  assert.equal(triggerHeld(written, hovered), true);
+  assert.equal(triggerFires({ trigger: { type: 'stateChange', from: ['*'], to: ['Hover'] } }, resting, hovered), true, 'as a hand-written file might');
+});
+
 // --- The timeline -------------------------------------------------------------------------------
 
 test('the easing a keyframe arrives with is the same bezier the CSS transition gets', () => {

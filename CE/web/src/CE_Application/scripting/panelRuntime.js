@@ -474,6 +474,73 @@ function channelizePath(control, path) {
   return path;
 }
 
+// SHORT PATHS (docs/design/animation-designer.md, decided by the owner on 2026-11-24): a step that
+// can only be one thing may be left out — "Text.colour" is "Text.Fill.colour", "bodyCap.scale" is
+// "Parts.bodyCap.Layout.scale". Tried only where the path as written leads nowhere, so no path that
+// resolves today changes. The written steps must appear in order in one full path to a property:
+// the first on its section (or, with the section left out, on the step after it) and the last on
+// its last, capitals ignored. Two fits or more are refused with both named, never guessed:
+// "Background.colour" could be the fill or the border. Mirrored in CE/src/Player/PanelValueModel.h;
+// the two must agree, which PanelValueModelTests.cpp and scriptShortPaths.test.js hold.
+const SHORT_PATH_DEPTH = 8;
+
+function collectLeafPaths(node, prefix, out, depth) {
+  if (depth > SHORT_PATH_DEPTH || !node || typeof node !== 'object' || Array.isArray(node)) return;
+  for (const key of Object.keys(node._children ?? {})) collectLeafPaths(node._children[key], [...prefix, key], out, depth + 1);
+  for (const key of Object.keys(node)) {
+    if (key === '_children' || key === '_type') continue;
+    const value = node[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) collectLeafPaths(value, [...prefix, key], out, depth + 1);
+    else out.push([...prefix, key]);
+  }
+}
+
+function stepsFit(written, full, offset) {
+  const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+  if (written.length < 2 || full.length - offset < written.length) return false;
+  if (!same(written[0], full[offset]) || !same(written.at(-1), full.at(-1))) return false;
+  let at = offset + 1;
+  for (let i = 1; i < written.length - 1; i += 1) {
+    while (at < full.length - 1 && !same(written[i], full[at])) at += 1;
+    if (at >= full.length - 1) return false;
+    at += 1;
+  }
+  return true;
+}
+
+/** Every full property path a short path fits on this control, as dotted strings. */
+function shortPathFits(control, segments) {
+  if (!control?._children || segments.length < 2) return [];
+  const first = String(segments[0]).toLowerCase();
+  const section = Object.keys(control._children).find((key) => key.toLowerCase() === first);
+  const leaves = [];
+  if (section) collectLeafPaths(control._children[section], [section], leaves, 1);
+  else for (const key of Object.keys(control._children)) collectLeafPaths(control._children[key], [key], leaves, 1);
+  const offset = section ? 0 : 1;
+  return [...new Set(leaves.filter((full) => stepsFit(segments, full, offset)).map((full) => full.join('.')))];
+}
+
+/** The one path a short path names, or null: none fits, or more than one does. */
+function shortPathFor(control, segments) {
+  const fits = shortPathFits(control, segments);
+  return fits.length === 1 ? fits[0] : null;
+}
+
+/** A short path that could be more than one thing, said once, with every candidate. */
+function reportAmbiguousPath(call, path, control, segments) {
+  // Only a path that leads nowhere as written is a short path: an exact one is never ambiguous.
+  const first = String(segments[0] ?? '').toLowerCase();
+  const section = Object.keys(control?._children ?? {}).find((key) => key.toLowerCase() === first);
+  const exact = section
+    ? walkCaseInsensitive(control, segments)
+    : Object.keys(control?._children ?? {}).some((key) => walkCaseInsensitive(control._children[key], segments));
+  if (exact) return false;
+  const fits = shortPathFits(control, segments);
+  if (fits.length < 2) return false;
+  addScriptTrace('error', '', `${call}("${path}"): "${segments.join('.')}" could be ${fits.length} things on "${control?._children?.Core?.name ?? ''}": ${fits.join(', ')}. Write more of the path.`);
+  return true;
+}
+
 /** Map a script path's segments to the model's real-case section path. */
 function resolveModelPath(control, segments) {
   // A bare control name means its value — `.value` is documented as the default representation, so
@@ -487,7 +554,7 @@ function resolveModelPath(control, segments) {
     path = SHORTHANDS[first];
   // Explicit section path (e.g. "background.fill.colour") — walk from the control.
   } else if (control?._children && Object.keys(control._children).some((k) => k.toLowerCase() === first)) {
-    path = walkCaseInsensitive(control, segments) ?? segments.join('.');
+    path = walkCaseInsensitive(control, segments) ?? shortPathFor(control, segments) ?? segments.join('.');
   } else {
     // Otherwise search each section for the property (e.g. a bare "fill.colour" or a channel name).
     path = null;
@@ -497,7 +564,7 @@ function resolveModelPath(control, segments) {
         if (sub) { path = `${secKey}.${sub}`; break; }
       }
     }
-    if (path == null) path = SHORTHANDS[first] ?? segments.join('.');
+    if (path == null) path = SHORTHANDS[first] ?? shortPathFor(control, segments) ?? segments.join('.');
   }
   return channelizePath(control, path);
 }
@@ -821,6 +888,8 @@ function setValue(path, value, formOrOpts = '') {
   }
 
   const modelPath = resolveModelPath(control, segs);
+  // A short path that fits two properties is refused rather than written as a new one of neither.
+  if (modelPath === segs.join('.') && reportAmbiguousPath('set', path, control, segs)) return;
   // A script renaming a control follows the same rule as the editor: no dots in a name.
   if (modelPath === 'Core.name') value = sanitizeControlName(value);
 
@@ -1046,6 +1115,7 @@ function getValue(path, form = '', report = false) {
   if (report && raw === undefined && !readsLiveValue(control, modelPath) && customChannelOfPath(control, modelPath) == null) {
     const explicitSection = segs.length > 1
       && Object.keys(control._children ?? {}).some((k) => k.toLowerCase() === String(segs[0]).toLowerCase());
+    if (reportAmbiguousPath('get', addressed.path, control, segs)) return undefined;
     if (pathReadsNothing(control, segs)) {
       getFoundNothing(addressed.path, segs.join('.'), name);
       return undefined;
@@ -10533,6 +10603,8 @@ function samplePayload(event) {
   if (event === 'onValueChange' || event === 'onValueChanged') return 64;
   if (event === 'onActiveHandleChanged') return { activeHandle: 'current', previousActiveHandle: 'start' };
   if (event && event.startsWith('on') && (event.includes('Pointer') || event.includes('Click'))) return { x: 0, y: 0 };
+  if (event === 'onLongPress') return { x: 0, y: 0, held: 500 };
+  if (event === 'onFlick') return { x: 0, y: 0, direction: 'up', speed: 900 };
   return undefined;
 }
 

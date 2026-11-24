@@ -38,11 +38,14 @@ const node = (trigger, extra = {}) => ({
 // --- Reading -------------------------------------------------------------------------------------
 
 test('the trigger types a keyframe animation answers', () => {
-  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'beat', 'script']);
+  // `event` joined on 2026-11-24: a gesture (click, long press, flick…), the States tab's Events
+  // row, played on request as `script` is (stateMotion.js).
+  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'beat', 'script', 'event']);
   assert.equal(defaultIterations('always'), 'infinite');
   assert.equal(defaultIterations('stateChange'), 'infinite', 'a state animation loops while the state holds');
   assert.equal(defaultIterations('valueChange'), 1);
   assert.equal(defaultIterations('beat'), 1);
+  assert.equal(defaultIterations('event'), 1, 'a gesture plays it once');
 });
 
 test('only the part matters in a target, and anything not under Parts is the control', () => {

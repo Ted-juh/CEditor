@@ -7,6 +7,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import ConditionBuilder from './ConditionBuilder.svelte';
+  import StateMotionSection from './StateMotionSection.svelte';
   import { BASE_STATE_TARGET, buildStateTargetOptions, resolveSelectedStateName, summarizeStateOverrides } from '../utils/stateTargets.js';
   import { STATE_RULE_VALUE_NAMES } from '../utils/interactionRuntime.js';
   import Layers from 'lucide-svelte/icons/layers';
@@ -320,6 +321,9 @@
       </PropertyCell>
     </PropertySection>
 
+    <!-- How the control gets into this state and out of it: animations, read from their triggers. -->
+    <StateMotionSection {control} stateName={selectedStateName} showEvents={false} />
+
     <PropertySection title="Advanced" icon={Wrench}>
       <PropertyCell label="Raw Patches" span={4} hint="Optional JSON editing for advanced state patch work.">
         <div class="advanced-header">
@@ -344,6 +348,9 @@
       {/if}
     </PropertySection>
   {/if}
+
+  <!-- Gestures with no duration belong to the control, not to a state: shown for Base too. -->
+  <StateMotionSection {control} />
 {/if}
 
 <style>

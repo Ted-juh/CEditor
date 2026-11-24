@@ -482,6 +482,14 @@ export function triggersTie(a, b) {
     return `both answer a change of ${a.source}`;
   }
   if (a.type !== 'stateChange') return '';
+  // A leaving animation answers a state being left, an entering one a state being entered: they
+  // never claim the same change by the same rule. Two leaving ones tie on a state they both leave.
+  if ((a.leaving === true) !== (b.leaving === true)) return '';
+  if (a.leaving === true) {
+    if (isAnyList(a.from) || isAnyList(b.from)) return isAnyList(a.from) && isAnyList(b.from) ? 'both answer leaving any state' : '';
+    const left = a.from.filter((state) => b.from.includes(state));
+    return left.length ? `both answer leaving ${left.join(', ')}` : '';
+  }
   const aAny = isAnyList(a.to);
   if (aAny !== isAnyList(b.to)) return '';
   if (!fromListsMeet(a.from, b.from)) return '';
@@ -557,6 +565,7 @@ export const KEYFRAME_TRIGGER_LABELS = {
   valueChange: 'When the value changes',
   beat: 'On the beat',
   script: 'When a script plays it',
+  event: 'On a click or gesture',
 };
 
 /** Where a keyframe animation plays, as a targets list: a part, or the control itself. */
@@ -698,6 +707,11 @@ export function buildTarget(partName, offered) {
 // fires. Animations that answer the same change start together, so the bars say what the separate
 // Delay and Duration boxes could not: what runs after what, and what overlaps.
 
+/** A gesture's id as a trigger summary says it (stateMotion.js MOTION_EVENTS). */
+const EVENT_WORDS = {
+  click: 'click', doubleClick: 'double-click', longPress: 'long press', flick: 'flick', wheelUp: 'wheel up', wheelDown: 'wheel down',
+};
+
 /** "entering pressed", "on the beat" — an animation's trigger in a few words. */
 export function triggerSummary(row) {
   const t = row?.trigger ?? {};
@@ -705,8 +719,10 @@ export function triggerSummary(row) {
     if (t.type === 'always') return 'all the time';
     if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
     if (t.type === 'script') return 'from a script';
+    if (t.type === 'event') return `on ${EVENT_WORDS[t.event] ?? 'a gesture'}`;
   }
   if (t.type === 'valueChange') return `when ${t.source} changes`;
+  if (t.leaving === true) return `leaving ${!t.from?.length || t.from.includes('*') ? 'any state' : t.from.join(', ')}`;
   const to = !t.to?.length || t.to.includes('*') ? 'any state' : t.to.join(', ');
   return row?.kind === 'keyframes' && row?.iterations === 'infinite' ? `while ${to}` : `entering ${to}`;
 }

@@ -633,6 +633,8 @@ export const CONTROL_EVENTS = [
   { id: 'activeHandleChanged', fn: 'onActiveHandleChanged', payload: 'info', summary: 'A slider with more than one handle moved to another handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end".' },
   { id: 'click', fn: 'onClick', payload: 'mouse', summary: 'The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.' },
   { id: 'doubleClick', fn: 'onDoubleClick', payload: 'mouse', summary: 'The control was double-clicked. `mouse.x` and `mouse.y` say where.' },
+  { id: 'longPress', fn: 'onLongPress', payload: 'mouse', summary: 'The control was pressed and held without moving, for half a second. `mouse.x` and `mouse.y` say where, `mouse.held` how long in ms. Only while the panel is open.' },
+  { id: 'flick', fn: 'onFlick', payload: 'flick', summary: 'The mouse was let go while moving fast across the control, as when flicking a card away. `flick.direction` is "left", "right", "up" or "down", `flick.speed` how fast in pixels a second, and `flick.x` and `flick.y` where it was let go. A drag that turns the control and ends fast is a flick too. Only while the panel is open.' },
   { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` the keys held.' },
   { id: 'pointerMove', fn: 'onPointerMove', payload: 'mouse', summary: 'The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.' },
   { id: 'pointerUp', fn: 'onPointerUp', payload: 'mouse', summary: 'The mouse button was released.' },

@@ -230,9 +230,10 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
   if (keyframes && trigger.type === 'always') {
     return { ok: false, reason: 'It plays all the time — it is already playing on the stage.' };
   }
-  if (keyframes && (trigger.type === 'beat' || trigger.type === 'script')) {
+  if (keyframes && (trigger.type === 'beat' || trigger.type === 'script' || trigger.type === 'event')) {
     // Nothing on the stage makes a beat or a script call happen, so Play asks for the animation
-    // directly — exactly what ce.anim.play does.
+    // directly — exactly what ce.anim.play does. A gesture is the same request the surface makes
+    // when it recognises one; the stage's control answers the real gesture too.
     return { ok: true, request: true, steps: [], exact: true, note: '' };
   }
 

@@ -127,17 +127,28 @@ tinted._children.Animations._children = {
   },
 };
 
+// The States tab's Events row (2026-11-24): keyframe animations a gesture plays — a click, a long
+// press, a flick upwards and a wheel turned up — on one button, so a real mouse can be pointed at it.
+const clicker = place(createControl('Button'), 'clicker', 345, 80, 50, 50);
+const gesture = (name, trigger, frames) => ({ ...keyframes(name, { type: 'event', ...trigger }, frames, 900), iterations: 1 });
+clicker._children.Animations._children = {
+  bump: gesture('bump', { event: 'click' }, [{ at: 0, scale: 1 }, { at: 0.5, scale: 0.7 }, { at: 1, scale: 1 }]),
+  hold: gesture('hold', { event: 'longPress', hold: 500 }, [{ at: 0, opacity: 1 }, { at: 0.5, opacity: 0.3 }, { at: 1, opacity: 1 }]),
+  fling: gesture('fling', { event: 'flick', direction: 'up', speed: 300 }, [{ at: 0, y: 0 }, { at: 0.5, y: -10 }, { at: 1, y: 0 }]),
+  spin: gesture('spin', { event: 'wheelUp' }, [{ at: 0, rotate: 0 }, { at: 1, rotate: 90 }]),
+};
+
 // ce.anim is declared because this panel has no script of its own for the runtime to derive it from;
 // a panel whose script calls ce.anim.play gets the module from that script.
 const panel = {
   id: 'motion', name: 'Motion', width: 400, height: 380, bgColour: 'FF1E1E1E',
-  controls: [button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted],
+  controls: [button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker],
   scripting: { modules: ['ce.core', 'ce.anim'] },
 };
 panels.set([]);
 addPanel(panel);
 setActivePanel(panel.id);
-panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
+panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
 mount(GaiaPagesHarness, { target: document.getElementById('host'), props: { panelId: panel.id } });
 setPreviewModeEnabled(true);
 

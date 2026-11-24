@@ -48,6 +48,9 @@
   import X from 'lucide-svelte/icons/x';
   import AnimationList from './animation/AnimationList.svelte';
   import TargetList from './animation/TargetList.svelte';
+  import PathBar from './animation/PathBar.svelte';
+  import { flattenTargets, targetSteps, targetTree } from '../utils/targetPaths.js';
+  import { FLICK_DIRECTIONS, LONG_PRESS_MS, MOTION_EVENTS } from '../utils/stateMotion.js';
   import EasingCurve from './animation/EasingCurve.svelte';
   import StateChips from './animation/StateChips.svelte';
   import AnimationStage from './animation/AnimationStage.svelte';
@@ -84,10 +87,8 @@
     addTarget,
     removeTarget,
     moveTarget,
-    buildTarget,
     OFFERED_PROPERTIES,
     OFFERED_ROOT_PROPERTIES,
-    CONTROL_ITSELF,
     TRIGGER_TYPES,
     EASING_CHOICES,
     CUSTOM_EASING,
@@ -142,6 +143,8 @@
   let selected = $derived(rows.find((row) => row.name === selectedName) ?? null);
 
   let sequence = $derived(selected?.kind === SEQUENCE_KIND);
+  // A transition that plays when a state is left rather than entered (`trigger.leaving`).
+  let leavingTrigger = $derived(!sequence && selected?.triggerType === 'stateChange' && selected?.trigger?.leaving === true);
   // For "does this part exist" on a sequence, generator-made parts count: a filmstrip's frame
   // lives on one, and the document never holds it.
   let knownPartNames = $derived(sequence ? [...new Set([...partNames, ...Object.keys(resolvedPartsOf(control))])] : partNames);
@@ -184,26 +187,28 @@
   let rawTargetIndex = $state(-1);
   let targetIndex = $derived(rawTargetIndex >= 0 && rawTargetIndex < targets.length ? rawTargetIndex : -1);
 
-  // What the "add a target" row is set to.
-  let newPart = $state('');
-  let newProperty = $state(OFFERED_PROPERTIES[0].path);
-  // A change lands on one of the control's parts or on the control itself. A control with no parts
-  // of its own has only the second — and until this was offered, the Add button was simply dead
-  // for it, with nothing to say why.
-  let onControl = $derived(newPart === CONTROL_ITSELF || !partNames.length);
-  let partForAdd = $derived(onControl ? '' : (newPart || partNames[0] || ''));
-  let partOptions = $derived([
-    ...partNames.map((name) => ({ value: name, label: name })),
-    { value: CONTROL_ITSELF, label: 'The control itself' },
-  ]);
-  // What the Change dropdown offers: the part's properties or the control's own, and for a
-  // sequence the control's value channels and a frame track per filmstrip part.
-  let offered = $derived(offeredTargetsFor(control, selected?.kind, { onControl }));
-  let offeredForAdd = $derived(offered.find((entry) => entry.path === newProperty) ?? offered[0]);
+  // What the "add a change" row is set to: one target, picked with the path bar
+  // (animation/PathBar.svelte) as Knob01 › Body › Cap › Scale. It replaced two flat lists, "On"
+  // (every part by its internal name, then "The control itself") and "Change"; the owner asked for
+  // the control or any part of it to be easy to pick (2026-11-24). The choices are the same ones:
+  // the path bar is built from offeredTargetsFor and writes with buildTarget.
+  let pendingTarget = $state(null);
+  // The control's own entries, value channels and filmstrip frames included: what a track's label
+  // is looked up in.
+  let offered = $derived(offeredTargetsFor(control, selected?.kind, { onControl: true }));
+  let addChoices = $derived(flattenTargets(targetTree(control, selected?.kind)));
+  // Until something is picked: the first part's first property, where the old "On" list began; a
+  // control with no parts of its own starts on the control itself, which is all it has.
+  let targetForAdd = $derived(
+    addChoices.find((item) => item.target.path === pendingTarget?.path)?.target
+      ?? addChoices.find((item) => item.target.path.startsWith('Parts.'))?.target
+      ?? addChoices[0]?.target
+      ?? null
+  );
   // Tell the user before they add it, not after.
-  let addStatus = $derived(sequence
-    ? sequenceTargetStatus(buildTarget(partForAdd, offeredForAdd), knownPartNames, { triggerType: selected?.triggerType ?? 'stateChange' })
-    : targetStatus(buildTarget(partForAdd, offeredForAdd), partNames));
+  let addStatus = $derived(!targetForAdd ? { works: false, detail: 'This control offers nothing to change.' } : sequence
+    ? sequenceTargetStatus(targetForAdd, knownPartNames, { triggerType: selected?.triggerType ?? 'stateChange' })
+    : targetStatus(targetForAdd, partNames));
 
     // Arm from the selection only when NOTHING is armed — not merely when nothing of this kind is.
   // A target of another kind means another tab is being opened right now, and stealing it is how
@@ -397,8 +402,8 @@ onMount(() => {
 
   function add() {
     if (!selected) return;
-    const target = buildTarget(partForAdd, offeredForAdd);
-    if (!target) return;
+    if (!targetForAdd) return;
+    const target = { ...targetForAdd, properties: [...(targetForAdd.properties ?? [])] };
     // On a sequence a new track starts with one keyframe holding the authored value, as the kind
     // switch seeds, so adding it changes nothing on screen until a second one.
     if (sequence) {
@@ -547,25 +552,17 @@ onMount(() => {
 
 {#snippet addbox()}
   <div class="addbox">
-    <label class="addfield">
-      <span>On</span>
-      <PropertySelect options={partOptions}
-                      value={onControl ? CONTROL_ITSELF : partForAdd} ariaLabel="Part" disabled={offeredForAdd?.scope === 'control'}
-                      onchange={(value) => { newPart = value; }} />
-    </label>
-    <label class="addfield">
-      <span>Change</span>
-      <PropertySelect options={offered.map((entry) => ({ value: entry.path, label: entry.label }))}
-                      value={offeredForAdd?.path ?? newProperty} ariaLabel="What to change"
-                      onchange={(value) => { newProperty = value; }} />
-    </label>
-    <button type="button" class="addbtn" disabled={!offeredForAdd} onclick={add}>
+    <div class="addpath">
+      <PathBar {control} kind={selected?.kind} value={targetForAdd}
+               onchange={(target) => { pendingTarget = target; }} />
+    </div>
+    <button type="button" class="addbtn" disabled={!targetForAdd} onclick={add}>
       <Plus size={13} /> {sequence ? 'Add this track' : 'Add this change'}
     </button>
     <button type="button" class="mk quiet" onclick={() => { adding = false; }}>Done</button>
-    {#if !addStatus.works}
+    {#if targetForAdd && !addStatus.works}
       <p class="warn">
-        <b>{titleCase(offeredForAdd.label)} does nothing.</b>
+        <b>{titleCase(targetSteps(targetForAdd).at(-1) ?? targetForAdd.path)} does nothing.</b>
         {addStatus.detail}
       </p>
     {/if}
@@ -744,7 +741,11 @@ onMount(() => {
                   <span class="lab">Trigger</span>
                   <PropertySelect options={KEYFRAME_TRIGGER_TYPES.map((value) => ({ value, label: KEYFRAME_TRIGGER_LABELS[value] }))}
                                   value={selected.triggerType} ariaLabel="Keyframe trigger"
-                                  onchange={(value) => setProps({ trigger: { ...(selected.animation.trigger ?? {}), type: value } })} />
+                                  onchange={(value) => setProps({ trigger: {
+                                    ...(selected.animation.trigger ?? {}),
+                                    type: value,
+                                    ...(value === 'event' && !selected.animation.trigger?.event ? { event: 'click' } : {}),
+                                  } })} />
                 </div>
                 {#if selected.triggerType === 'stateChange'}
                   <div class="r top">
@@ -789,6 +790,29 @@ onMount(() => {
                       onchange={(value) => setProp('trigger.every', Math.max(1, Math.round(value)))} /></div>
                   </div>
                   <p class="hint">Plays on every {selected.trigger.every === 1 ? 'beat' : `${selected.trigger.every}th beat`} while the transport runs.</p>
+                {:else if selected.triggerType === 'event'}
+                  {@const gesture = MOTION_EVENTS.find((entry) => entry.id === selected.animation.trigger?.event) ?? MOTION_EVENTS[0]}
+                  <div class="r">
+                    <span class="lab">Event</span>
+                    <PropertySelect options={MOTION_EVENTS.map((entry) => ({ value: entry.id, label: entry.label }))}
+                                    value={gesture.id} ariaLabel="Event"
+                                    onchange={(value) => setProp('trigger.event', value)} />
+                  </div>
+                  {#if gesture.id === 'flick'}
+                    <div class="r">
+                      <span class="lab">Direction</span>
+                      <Segmented options={FLICK_DIRECTIONS.map((value) => ({ value, label: value === 'any' ? 'Any' : { left: '←', right: '→', up: '↑', down: '↓' }[value], title: value }))}
+                                 value={selected.animation.trigger?.direction ?? 'any'} ariaLabel="Flick direction"
+                                 onchange={(value) => setProp('trigger.direction', value)} />
+                    </div>
+                  {:else if gesture.id === 'longPress'}
+                    <div class="r">
+                      <span class="lab">Hold</span>
+                      <div class="cell"><NumberCell label="ms" value={selected.animation.trigger?.hold ?? LONG_PRESS_MS} min={150} step={50}
+                        onchange={(value) => setProp('trigger.hold', Math.max(150, Math.round(value)))} /></div>
+                    </div>
+                  {/if}
+                  <p class="hint">Plays on each {gesture.label.toLowerCase()} on the control, in Preview and in the plug-in. A gesture the control already uses is shared, never taken.</p>
                 {:else if selected.triggerType === 'script'}
                   <p class="hint">Played by a script — <code>ce.anim.play("{controlName}", "{selected.name}")</code> — or with Play in the Preview.</p>
                 {:else}
@@ -797,9 +821,22 @@ onMount(() => {
               {:else}
                 <div class="r">
                   <label for="anim-trigger">Trigger</label>
-                  <Segmented options={TRIGGER_TYPES.map((value) => ({ value, label: value === 'stateChange' ? 'State' : 'Value' }))}
-                             value={selected.triggerType} ariaLabel="Trigger"
-                             onchange={(value) => setProp('trigger.type', value)} />
+                  {#if sequence}
+                    <Segmented options={TRIGGER_TYPES.map((value) => ({ value, label: value === 'stateChange' ? 'State' : 'Value' }))}
+                               value={selected.triggerType} ariaLabel="Trigger"
+                               onchange={(value) => setProp('trigger.type', value)} />
+                  {:else}
+                    <!-- Leaving plays when a From state is left (`trigger.leaving`): the States tab's
+                         Leaving slot. A choice here rather than a row of its own: the tab never scrolls. -->
+                    <Segmented options={[{ value: 'stateChange', label: 'State' }, { value: 'leaving', label: 'Leaving' }, { value: 'valueChange', label: 'Value' }]}
+                               value={leavingTrigger ? 'leaving' : selected.triggerType} ariaLabel="Trigger"
+                               onchange={(value) => setProps({ trigger: {
+                                 ...(selected.animation?.trigger ?? {}),
+                                 type: value === 'valueChange' ? 'valueChange' : 'stateChange',
+                                 leaving: value === 'leaving',
+                                 ...(value === 'leaving' ? { reverse: false } : {}),
+                               } })} />
+                  {/if}
                 </div>
                 {#if selected.triggerType === 'stateChange'}
                   <div class="r top">
@@ -814,6 +851,8 @@ onMount(() => {
                   </div>
                   {#if sequence}
                     <p class="hint">Plays from the start each time the control enters a To state.</p>
+                  {:else if leavingTrigger}
+                    <p class="hint">Plays when the control leaves a From state, for a To state (* is any).</p>
                   {:else}
                     <div class="r">
                       <span class="lab" title="Play it backwards when a To state is left — how a hover lift settles">Leaving</span>
@@ -861,12 +900,13 @@ onMount(() => {
               <div class="panehead">
                 <b>Frames</b>
                 <span class="count">{selected.frames.length}</span>
-                <label class="playson">
+                <div class="playson">
                   <span>Plays on</span>
-                  <PropertySelect options={[{ value: '', label: 'The control itself' }, ...partNames.map((name) => ({ value: name, label: name }))]}
-                                  value={selected.part} ariaLabel="Plays on"
-                                  onchange={(value) => setProp('targets', keyframeTargets(value))} />
-                </label>
+                  <!-- A keyframe animation plays on a place, not a property: the path bar's
+                       place and part, the same picker the other kinds add a change with. -->
+                  <PathBar {control} kind="keyframes" compact value={keyframeTargets(selected.part)[0]}
+                           onchange={(target) => setProp('targets', [{ path: target.path }])} />
+                </div>
               </div>
               <div class="panebody">
                 {#if targets.some((entry) => !entry.status.works)}
@@ -1166,11 +1206,11 @@ onMount(() => {
   .panehead b { font-weight: 600; }
   .panehead .count { color: #AEB9C4; }
   .panebody { flex: 1; min-height: 0; overflow: hidden auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; scrollbar-color: #4A5560 #12161A; }
-  .playson { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #AEB9C4; width: 260px; }
-  .playson span { white-space: nowrap; }
+  .playson { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #AEB9C4; min-width: 0; }
+  .playson > span { white-space: nowrap; }
 
-  .addbox { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 12px; border-bottom: 1px solid #2B323A; background: #1A2026; }
-  .addfield { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #AEB9C4; flex: 1 1 150px; max-width: 240px; min-width: 0; }
+  .addbox { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 10px; padding: 6px 12px; border-bottom: 1px solid #2B323A; background: #1A2026; }
+  .addpath { flex: 1 1 420px; min-width: 0; font-size: 13px; color: #AEB9C4; }
   .addbtn {
     display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
     border: 1px solid #2E7D6B; border-radius: 6px; background: #10362F; color: #BFF3E6;

@@ -526,6 +526,10 @@ export function readTrigger(animation) {
     origin: ['user', 'external'].includes(trigger.origin) ? trigger.origin : 'any',
     every: Math.max(1, Math.round(Number(trigger.every) || 1)),
     event: String(trigger.event ?? ''),
+    // Plays when a state in `from` is LEFT (transitionSelection.js, rule 1). The States tab's
+    // Leaving slot writes it: "to default" cannot say "leaving hover" on a knob, which is never in
+    // the default state — ActiveHandleCurrent is active at rest. 2026-11-24.
+    leaving: trigger.leaving === true,
   };
 }
 

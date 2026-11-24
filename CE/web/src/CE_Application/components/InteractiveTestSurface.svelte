@@ -1,5 +1,6 @@
 <script>
   import { onDestroy } from 'svelte';
+  import { playGesture, watchGesture } from '../utils/gestureEvents.js';
   import CanvasControl from '../editor/CanvasControl.svelte';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { customArpeggiatorKeyPatch } from '../utils/customNumericEditing.js';
@@ -1372,6 +1373,7 @@
     // zoomed. It passes through now; a plain scroll still drives the component.
     if (event.ctrlKey || event.metaKey) return;
     if (isReadOnly) return;
+    if (!isDisabled) playGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
     if (isCustomComponent) {
       if (isDisabled) return;
       // Wheel off (the default) on the behaviour: as on the panel, the wheel is not the component's.
@@ -1420,7 +1422,14 @@
     patchSession({ hover: false, pressed: false, dragging: false });
   }
 
+  // Gestures with no duration play the control's Events-row animations here as they do in Preview
+  // (utils/gestureEvents.js), so the Animation tab's stage answers a real click, long press, flick or
+  // wheel turn. No script events: nothing on the stage reaches the panel's scripts.
+  let stopGesture = () => {};
+  onDestroy(() => stopGesture());
+
   function handleDoubleClick(event) {
+    if (!isDisabled && !isReadOnly) playGesture(control, 'doubleClick');
     if (isDisabled || !isCustomComponent) return;
     const targetControl = resolvedControl ?? control;
     const rect = hitboxElement?.getBoundingClientRect?.();
@@ -1445,6 +1454,8 @@
   function handlePointerDown(event) {
     if (isReadOnly) return;
     if (isDisabled) return;
+    stopGesture();
+    stopGesture = watchGesture(control, event);
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget?.setPointerCapture?.(event.pointerId);

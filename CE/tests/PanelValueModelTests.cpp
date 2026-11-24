@@ -837,6 +837,42 @@ int main()
                "gatherPanelScripts: a nested control's script targets that control (got " + targets.joinIntoString (",") + ")");
     }
 
+    // --- short paths (2026-11-24): the same cases as CE/web/test/scriptShortPaths.test.js ----------
+    // A step that can only be one thing may be left out; tried only where the path as written leads
+    // nowhere; two fits resolve to nothing. The WebView and this model must agree.
+    {
+        ceditor::PanelValueModel shortModel;
+        check (shortModel.loadFromJson (R"JSON({
+          "name": "Short", "controls": [
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "b1", "name": "Btn01", "controlType": "Button" },
+              "Background": { "_type": "Background", "_children": {
+                "Fill": { "_type": "Fill", "colour": "FF112233" },
+                "Border": { "_type": "Border", "colour": "FF445566", "top": { "colour": "FF000000" } } } },
+              "Text": { "_type": "Text", "_children": {
+                "Fill": { "_type": "Fill", "colour": "FFFFFFFF" },
+                "Font": { "_type": "Font", "underlineColour": "FF00FF00" } } } } },
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "k1", "name": "Knob01", "controlType": "Knob" },
+              "Parts": { "_type": "Parts", "_children": {
+                "bodyCap": { "_type": "Part", "_children": { "Layout": { "_type": "PartLayout", "scale": 1.25 } } },
+                "labelTitle": { "_type": "Part", "_children": { "Text": { "_type": "Text", "_children": {
+                  "Fill": { "_type": "Fill", "colour": "FFAA0000" } } } } } } } } }
+          ] })JSON"), "short paths: parsed");
+
+        check (shortModel.getValue ("Btn01.Text.colour").toString() == "FFFFFFFF", "short path: Text.colour is Text.Fill.colour");
+        check (shortModel.getValue ("btn01.text.COLOUR").toString() == "FFFFFFFF", "short path: capitals ignored");
+        check ((double) shortModel.getValue ("Knob01.Parts.bodyCap.scale") == 1.25, "short path: a part's section left out");
+        check ((double) shortModel.getValue ("Knob01.bodyCap.scale") == 1.25, "short path: Parts left out as well");
+        check (shortModel.getValue ("Knob01.labelTitle.Text.colour").toString() == "FFAA0000", "short path: a knob's title label colour");
+        check (shortModel.getValue ("Btn01.Background.colour").isVoid(), "short path: Background.colour could be the fill or the border, so it is nothing");
+        check (ceditor::PanelValueModel::shortPathFits (shortModel.controlByName ("Btn01"), juce::StringArray::fromTokens ("Background.colour", ".", "")).size() >= 2,
+               "short path: and both are found");
+        check (shortModel.getValue ("Btn01.fill.colour").toString() == "FF112233", "a bare fill.colour is found by the section search, as before");
+        check (shortModel.setValue ("Btn01.Text.colour", juce::var ("FF00FF00")), "short path: setValue");
+        check (shortModel.getValue ("Btn01.Text.Fill.colour").toString() == "FF00FF00", "short path: the write lands on the real property");
+    }
+
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;
     return failures == 0 ? 0 : 1;
 }

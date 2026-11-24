@@ -49,6 +49,12 @@ or gradient, from a large library of effects. Those two sentences are most of th
 | Short paths in scripts | Accepted where one exists: `Knob01.Text.colour` beside `Knob01.Text.Fill.colour`. |
 | Presets | Users save their own. Applied presets are **linked by default**, as controls follow a control set. |
 | Mouse over, exit, press | Through **states**, not a new mouse layer (below). |
+| Changing the C++ script runtime | Allowed where new events need it to reach scripts (`onLongPress`, `onFlick`), and beyond that where a step needs it. |
+| How the work arrives | Step by step on the working branch, each verified locally, with a draft pull request at the end of each step. |
+| The first text effects | Typewriter, explode, roll, push, wipe, crossfade and shimmer, each in and out. More later. |
+| The dock tab's preview | Plays when Play is pressed. Loops by nature (While in, patterns) keep running once started. |
+| The name for a user's preset | "Animation preset" in the interface, `.ceanim` as a file, because "preset" already means a synth's sound here (HoSTage's Save preset, program banks, `.vstpreset`). |
+| How much looping is too much | Measured in the plug-in during step 3; the number goes to the owner, who approved this route. |
 
 ## The model
 
@@ -94,13 +100,16 @@ and what moves while it is there.
 
 Every state gets a **Motion** section on the States tab with three slots:
 
-| Slot | Plays | Stored as (exists today) |
+| Slot | Plays | Stored as |
 |---|---|---|
 | Entering | when the state starts: mouse over, for Hover | a transition with `trigger.to` the state |
 | While in | the whole time the state holds | a keyframes loop with a `stateChange` trigger, which already plays while its To state holds |
-| Leaving | when it ends: mouse exit, for Hover | Entering played backwards (`trigger.reverse`, the default), or one with `trigger.from` the state |
+| Leaving | when it ends: mouse exit, for Hover | Entering played backwards (`trigger.reverse`, the default), or one of its own with the state in `trigger.from` and `trigger.leaving: true` |
 
-So nothing new goes into the file; the same triggers get a place where they make sense. A preset
+Almost nothing new goes into the file: the same triggers get a place where they make sense. The one
+addition is `trigger.leaving`. Building it showed why: the first try stored Leaving as "entering
+`default`", and that never fires on a knob, which rests in a state of its own (`ActiveHandleCurrent`)
+and so never enters `default` when the pointer leaves. A preset
 fills a slot in one click. A scene is for more than one control, and its trigger can be the same
 state ("Knob01 enters Hover"). A state with a rule animates a threshold the same way: a state
 `Hot`, rule `value > 100`, Entering Flash, While in a glow pulse. The owner's name ↔ value swap is
@@ -259,11 +268,61 @@ real app under Xvfb where it draws.
    `effect`, `swap`, `pattern`, `seek`, regenerated into the seven preludes.
 6. **Value-drawn**, knobs first: a ring sweep that hands back to the value.
 
+## As built: step 1 (2026-11-24)
+
+Built on the working branch, verified as the next paragraph says. What it is, where it lives, and
+what building it found.
+
+- **The path bar** (`components/animation/PathBar.svelte`, over `utils/targetPaths.js`) replaced
+  the Animation tab's two flat lists, On (every part by its internal name) and Change. Steps are
+  the place (Whole control, Background, Text, Channels, a knob's Body, Pointer, Ticks or Labels, or
+  a part by its own name), the part in a role group, and the property; a typed search ("text col",
+  "cap scale", "Text.colour"); and Browse, the same levels side by side. Results and the browser
+  float over the rows below: the dock is too short for them to push. The keyframe kind's Plays on
+  uses it too. Target rows read as paths, the stored path kept as their tooltip and `data-path`.
+  Nothing stored changed: every entry is built with `buildTarget` from `offeredTargetsFor`.
+- **Short paths** in the path bar's search and in scripts' `get`/`set`: the web runtime's
+  `resolveModelPath` and its C++ mirror in `PanelValueModel.h` try one only where a path as written
+  leads nowhere, and an ambiguous one is refused with its candidates (`get`/`set` say them).
+- **Motion on the States tab** (`sections/StateMotionSection.svelte`, `utils/stateMotion.js`):
+  Entering, While in and Leaving for the state being edited, each listing what fills it, a chip
+  opening that animation in the Animation tab, and New writing one. A new Entering or Leaving
+  transition starts out easing the state's own overrides, so it does something at once.
+- **The Events row**: click, double-click, long press, flick, wheel up and wheel down, each a
+  keyframe animation with `trigger: { type: 'event', event }` (flick: `direction`, `speed`; long
+  press: `hold`). `utils/gestureEvents.js` recognises them on the Preview surface, the exported
+  player and the Animation tab's stage, and plays them through the same request `ce.anim.play`
+  makes. The Animation tab's keyframe trigger has the Event choice with those settings.
+- **Script events** `onLongPress(mouse)` (`mouse.held`) and `onFlick(flick)` (`direction`, `speed`,
+  `x`, `y`), raised from the Preview and the player. No C++ change was needed: the C++ runtime
+  dispatches any event by name and raises no pointer event itself.
+
+Found on the way, and fixed:
+
+- **A sequence never started on a state.** The tab writes trigger states lower-cased (`hover`); the
+  runtime reports the States section's keys as written (`Hover`); the sequence player compared them
+  as written. Its tests passed lower case on both sides. `keyframeModel.js` now ignores case, as the
+  other two players do, with a test on a real knob's states.
+- **Leaving needed one new field.** Stored first as "entering `default`", it never fired on a knob,
+  which rests in `ActiveHandleCurrent`. `trigger.leaving: true` plays when a state in `from` is
+  left (`transitionSelection.js`, rule 1); `readTrigger` passes it on, clash detection keeps
+  leaving and entering animations apart, and the Animation tab's Trigger choice is State, Leaving
+  or Value for a transition.
+- **A Knob has no Background or Text section** of its own (its words are its Labels parts), yet the
+  old list offered "the control itself › Text colour" for it. The path bar offers a section only
+  where the control has one.
+
+Not built in this step: picking on a stage by click, double-click and Ctrl+click belongs to the
+Designer's stage (step 5); the dock tab has the path bar and Browse.
+
+Verified locally: `npm run test:all`, `npm run build`, svelte-check (one warning, there before),
+`npm run lint`, the Animation tab and panel-motion browser checks (the second drives a real click,
+long press, flick and wheel at a button in the Preview), the C++ tests with scripting on, and
+`PanelValueModelTests` with the short-path cases the web test has. Not run: the app under Xvfb,
+and Windows, whose compiler is CI's to give.
+
 ## Open
 
-- The file extension of an exported preset.
-- Whether the dock tab's preview loops by itself or plays only on Play.
-- A performance budget, measured: how many looping effects a panel may carry before the editor
-  warns, in the plug-in, on the slowest machine supported.
+- The performance budget's number, measured in step 3 and brought to the owner.
 - Whether `@property` and animated `clip-path` behave the same in WebKitGTK as in WebView2; both
-  are needed by steps 2 and 3.
+  are needed by steps 2 and 3. A check, not a decision.

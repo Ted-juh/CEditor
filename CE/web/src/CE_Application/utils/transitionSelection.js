@@ -20,6 +20,10 @@
  *     its `from` ('*' or an empty list matches anything). It plays in REVERSE when a state in its
  *     `to` is left and the frame after matches its `from` — unless `reverse` is false. A forward
  *     match on a named state outranks a forward match on '*', which outranks a reverse match.
+ *     A LEAVING animation (`leaving: true`, the States tab's Leaving slot) turns this round: it
+ *     plays forward when a state in its `from` is left and the frame after matches its `to`, and
+ *     at no other time. "Entering default" cannot say that for a control that rests in a state of
+ *     its own, as every knob does (ActiveHandleCurrent).
  *  2. A VALUE change plays the animations whose `source` changed, filtered by `origin`: "user"
  *     only while the pointer or keyboard is on the control, "external" only when it is not (MIDI
  *     coming back from the synth, host automation, a script).
@@ -116,6 +120,12 @@ export function matchStrength(entry, change, signals) {
   if (trigger.type !== 'stateChange' || !change.stateChanged) return 0;
   const to = trigger.to ?? [];
   const from = trigger.from ?? [];
+  if (trigger.leaving === true) {
+    if (!change.exited.size || !listMatches(to, change.after)) return 0;
+    if (isAny(from)) return 3;
+    for (const state of change.exited) if (from.includes(state)) return 4;
+    return 0;
+  }
   if (isAny(to)) {
     return listMatches(from, change.before) ? 3 : 0;
   }

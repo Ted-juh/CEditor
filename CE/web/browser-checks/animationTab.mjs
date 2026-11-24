@@ -532,13 +532,15 @@ assert.deepEqual(await rowOrder(), beforeKeys);
 // The Part picker used to list parts and nothing else, so a control with no parts of its own had a
 // dead Add button and no way to animate at all. The control itself is a choice now.
 
-const partChoices = (await ev(() => window.__anim.addOptions()))[0];
-check('the Part picker ends with the control itself', () => {
-  assert.equal(partChoices.at(-1), 'The control itself', partChoices.join(' | '));
+// Since 2026-11-24 the row is a path bar, and the control itself is its first Where entry.
+const partChoices = await ev(() => window.__anim.placeOptions());
+check('the path bar\'s Where step starts with the control itself, then the control\'s parts by name', () => {
+  assert.equal(partChoices[0], 'Whole control', partChoices.join(' | '));
+  for (const part of ['background', 'track', 'fill', 'handle', 'label']) assert.ok(partChoices.includes(part), partChoices.join(' | '));
 });
-await ev(() => window.__anim.choosePart('The control itself'));
+await ev(() => window.__anim.choosePart('Whole control'));
 await settle();
-const ownChoices = (await ev(() => window.__anim.addOptions()))[1];
+const ownChoices = await ev(() => window.__anim.changeOptions());
 check('and the Change list becomes the control\'s own properties', () => {
   assert.deepEqual(ownChoices.slice(0, 3), ['Scale', 'Rotation', 'Opacity'], ownChoices.join(' | '));
   assert.ok(!ownChoices.includes('Width'), 'the panel owns a control\'s size');
@@ -707,17 +709,25 @@ await page.waitForTimeout(500);
 check('a double-click on a keyframe is the one way to send the playhead to it from a row', async () => {});
 assert.equal(await playheadMs(), landed);
 
-const options = await ev(() => window.__anim.changeOptions());
-check('for a sequence the Change list offers the control\'s value channel after the part properties', () => {
-  assert.ok(options.some((o) => /^Channel: Knob Value/.test(o)), options.join(' | '));
+// The Change list used to end with "Channel: Knob Value"; in the path bar a value channel is its
+// own place, Channels › Knob Value.
+const options = await ev(() => window.__anim.placeOptions());
+check('for a sequence the path bar offers the control\'s value channels as a place of their own', () => {
+  assert.ok(options.includes('Channels'), options.join(' | '));
 });
-await ev(() => window.__anim.chooseChange('Channel: Knob Value'));
+await ev(() => window.__anim.choosePart('Channels'));
+await page.waitForTimeout(300);
+const channelChoices = await ev(() => window.__anim.changeOptions());
+check('under it, each channel by its label', () => {
+  assert.ok(channelChoices.includes('Knob Value'), channelChoices.join(' | '));
+});
+await ev(() => window.__anim.chooseChange('Knob Value'));
 await page.waitForTimeout(300);
 const channelWarning = await ev(() => window.__anim.addWarning());
-const pickerOff = await ev(() => window.__anim.partPickerDisabled());
-check('a channel is a whole path: the part picker steps aside and nothing warns', () => {
+const partStep = await ev(() => window.__anim.partStepShown());
+check('a channel is a whole path: there is no part step, and nothing warns', () => {
   assert.equal(channelWarning, '', channelWarning);
-  assert.equal(pickerOff, true);
+  assert.equal(partStep, false);
 });
 await ev(() => window.__anim.add());
 await page.waitForTimeout(400);
@@ -727,6 +737,9 @@ assert.ok(pathsNow.includes('ValueChannels.mainValue'), pathsNow.join(', '));
 assert.deepEqual((await ev(() => window.__anim.storedKeyframes('seqDemo'))).at(-1), [[0, 0.5]]);
 
 // Many tracks: the list scrolls inside its own box, the ruler stays, and the tab does not move.
+// Back to a part first: the path bar stays where it was last put, which was Channels.
+await ev(() => window.__anim.choosePart(window.__anim.firstPart()));
+await page.waitForTimeout(200);
 for (const label of ['Rotation', 'Opacity', 'Fill colour', 'Text colour', 'Width', 'Height', 'X position']) {
   await ev((l) => window.__anim.chooseChange(l), label);
   await page.waitForTimeout(200);

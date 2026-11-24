@@ -21,6 +21,7 @@
   import X from 'lucide-svelte/icons/x';
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
   import { targetCost } from '../../utils/animationModel.js';
+  import { targetSteps } from '../../utils/targetPaths.js';
 
   let {
     rows = [],
@@ -78,11 +79,14 @@
     dropIndex = -1;
   }
 
-  /** "Parts.label.Layout.scale" reads better split up. */
-  function shortPath(path) {
-    const parts = String(path ?? '').split('.');
-    if (parts[0] === 'Parts' && parts.length > 2) return { part: parts[1], rest: parts.slice(2).join('.') };
-    return { part: '', rest: String(path ?? '') };
+  /**
+   * "Parts.bodyCap.Layout.scale" reads as the path bar shows it: Body › Cap, then Scale
+   * (utils/targetPaths.js). The stored path stays on the row as its tooltip and `data-path`.
+   */
+  function shortPath(target) {
+    const steps = targetSteps(target);
+    if (steps.length > 1) return { part: steps.slice(0, -1).join(' › '), rest: steps.at(-1) };
+    return { part: '', rest: steps[0] ?? '' };
   }
 </script>
 
@@ -90,7 +94,7 @@
 <div class="targets" role="listbox" tabindex="-1" aria-label="What this animation changes"
      onpointermove={moveDrag} onpointerup={endDrag} onpointercancel={endDrag}>
   {#each rows as row (row.index)}
-    {@const bits = shortPath(row.path)}
+    {@const bits = shortPath(row.target)}
     {@const cost = row.status.works ? targetCost(row.target) : null}
     <div
       class="trow"
@@ -120,7 +124,7 @@
         <GripVertical size={13} aria-hidden="true" />
       </span>
 
-      <span class="what">
+      <span class="what" data-path={row.path} title={row.path}>
         {#if bits.part}<b>{bits.part}</b>{/if}
         <i>{bits.rest || '(no path)'}</i>
       </span>

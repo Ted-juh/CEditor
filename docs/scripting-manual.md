@@ -874,6 +874,8 @@ Raised by the control the script belongs to.
 | `onActiveHandleChanged(info)` | A slider with more than one handle moved to another handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end". |
 | `onClick(mouse)` | The control was clicked. `mouse.x` and `mouse.y` say where, inside the control. |
 | `onDoubleClick(mouse)` | The control was double-clicked. `mouse.x` and `mouse.y` say where. |
+| `onLongPress(mouse)` | The control was pressed and held without moving, for half a second. `mouse.x` and `mouse.y` say where, `mouse.held` how long in ms. Only while the panel is open. |
+| `onFlick(flick)` | The mouse was let go while moving fast across the control, as when flicking a card away. `flick.direction` is "left", "right", "up" or "down", `flick.speed` how fast in pixels a second, and `flick.x` and `flick.y` where it was let go. A drag that turns the control and ends fast is a flick too. Only while the panel is open. |
 | `onPointerDown(mouse)` | A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` the keys held. |
 | `onPointerMove(mouse)` | The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position. |
 | `onPointerUp(mouse)` | The mouse button was released. |

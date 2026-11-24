@@ -43,7 +43,10 @@ import { readTrigger } from './interactionRuntime.js';
 import { easingToCss } from './easing.js';
 import { describeChange, matchStrength } from './transitionSelection.js';
 
-export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'beat', 'script'];
+// `event`: a gesture on the control — click, double-click, long press, flick, a wheel turn — played
+// on request from where the gesture is recognised, as `script` is from ce.anim.play. Its id is in
+// `trigger.event` (stateMotion.js MOTION_EVENTS); the player needs no branch for it. 2026-11-24.
+export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'beat', 'script', 'event'];
 
 /** What a frame can set, and the value each has when a frame leaves it out. */
 export const FRAME_PROPERTIES = ['scale', 'rotate', 'x', 'y', 'opacity'];

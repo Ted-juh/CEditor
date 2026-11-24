@@ -122,11 +122,12 @@ window.__anim = {
   },
   storedEnabled: (name) => animation(name).enabled,
 
-  targetPaths: () => [...document.querySelectorAll('.trow .what')].map(textOf),
+  // A row reads as a path (Body › Cap, Scale); the stored path it stands for is its data-path.
+  targetPaths: () => [...document.querySelectorAll('.trow .what')].map((what) => what.dataset.path),
   // The verdict without the "solid only" note a colour target carries beside it.
   targetVerdicts: () => [...document.querySelectorAll('.trow .does')].map((d) => textOf(d).replace(/\s*solid only$/, '')),
   targetNotes: () => [...document.querySelectorAll('.trow .does .note')].map((n) => n.getAttribute('title')),
-  deadRows: () => [...document.querySelectorAll('.trow.bad .what')].map(textOf),
+  deadRows: () => [...document.querySelectorAll('.trow.bad .what')].map((what) => what.dataset.path),
   targetCount: () => document.querySelectorAll('.trow').length,
   removeTarget: (index) => { document.querySelectorAll('.trow')[index]?.querySelector('.drop')?.click(); },
   storedTargets: (name) => animation(name).targets.map((t) => t.path),
@@ -139,8 +140,13 @@ window.__anim = {
     return [...(button?.querySelectorAll('svg path') ?? [])].map((p) => p.getAttribute('d'));
   },
   pickKind: (kind) => { [...document.querySelectorAll('[aria-label="Kind"] button')].find((b) => new RegExp(`^${kind}$`, 'i').test(b.textContent.trim()))?.click(); },
-  changeOptions: () => [...document.querySelectorAll('[aria-label="What to change"] option')].map((o) => o.textContent.trim()),
-  partPickerDisabled: () => !!document.querySelector('[aria-label="Part"]')?.disabled,
+  // The add row's path bar (components/animation/PathBar.svelte), which replaced the "On" and
+  // "Change" lists on 2026-11-24: a Where step (the control itself, Background, Text, Channels, a
+  // part by its name), a Part step for a knob's role groups only, and the property.
+  changeOptions: () => [...document.querySelectorAll('.addbox [data-step="property"] option')].map((o) => o.textContent.trim()),
+  placeOptions: () => [...document.querySelectorAll('.addbox [data-step="place"] option')].map((o) => o.textContent.trim()),
+  partStepShown: () => !!document.querySelector('.addbox [data-step="part"] select'),
+  pathBarText: () => [...document.querySelectorAll('.addbox .pathbar .steps select')].map((s) => s.selectedOptions[0]?.textContent.trim() ?? ''),
   storedTargetPaths: (name) => animation(name).targets.map((t) => t.path),
   storedKeyframes: (name) => animation(name).targets.map((t) => (t.keyframes ?? []).map((k) => [k.time, k.value])),
   storedLoopHold: (name) => ({ loop: animation(name).loop, hold: animation(name).hold, duration: animation(name).duration }),
@@ -222,17 +228,21 @@ window.__anim = {
   storedEasing: (name) => animation(name).easing,
 
   addOptions: () => [...document.querySelectorAll('.addbox select')].map((s) => [...s.options].map((o) => o.textContent.trim())),
+  /** Choose where a change lands: a Where entry, or a part within a role group. */
   choosePart: (label) => {
-    const select = document.querySelectorAll('.addbox select')[0];
-    const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
-    if (!select || !option) return false;
-    select.value = option.value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
+    for (const step of ['place', 'part']) {
+      const select = document.querySelector(`.addbox [data-step="${step}"] select`);
+      const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
+      if (!select || !option) continue;
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    return false;
   },
   addDisabledNow: () => document.querySelector('.addbtn')?.disabled === true,
   chooseChange: (label) => {
-    const select = document.querySelectorAll('.addbox select')[1];
+    const select = document.querySelector('.addbox [data-step="property"] select');
     const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
     if (!select || !option) return false;
     select.value = option.value;

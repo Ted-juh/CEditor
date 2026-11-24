@@ -289,6 +289,64 @@ await wait(60);
 check('and with both off, hover animates again', async () => {});
 assert.match((await transition('btn')).duration, /^0\.4s/);
 
+// --- Gestures: the States tab's Events row, played by a real mouse ------------------------------
+// Each gesture is pointed at the control as a person would (utils/gestureEvents.js recognises it on
+// the preview surface) and must start exactly its own animation, which the fired lamps record.
+
+const clickerBox = await page.locator('.canvas-control[data-control-id="clicker"]').boundingBox();
+const cx = clickerBox.x + clickerBox.width / 2;
+const cy = clickerBox.y + clickerBox.height / 2;
+const firedOn = async (id) => (await ev(() => window.__motion.activity()))[id] ?? { names: [], seq: 0 };
+async function gestureFires(label, act) {
+  const before = (await firedOn('clicker')).seq;
+  await act();
+  await wait(120);
+  const after = await firedOn('clicker');
+  return { names: after.seq !== before ? after.names : [], playing: (await ev(() => window.__motion.keyframes('clicker'))).name };
+}
+
+const clicked = await gestureFires('click', () => page.mouse.click(cx, cy));
+check('a click plays the click animation, and only that one', () => {
+  assert.deepEqual(clicked.names, ['bump'], JSON.stringify(clicked));
+  assert.match(clicked.playing, /ce-kf-/, clicked.playing);
+});
+await wait(1000);
+
+const held = await gestureFires('long press', async () => {
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await wait(650);
+});
+await page.mouse.up();
+check('holding still for half a second plays the long-press animation before the button is let go', () => {
+  assert.deepEqual(held.names, ['hold'], JSON.stringify(held));
+});
+await wait(1000);
+
+const flung = await gestureFires('flick', async () => {
+  await page.mouse.move(cx, cy + 10);
+  await page.mouse.down();
+  await page.mouse.move(cx, cy - 10, { steps: 2 });
+  await page.mouse.move(cx, cy - 40, { steps: 2 });
+  await page.mouse.up();
+});
+check('a fast release upwards plays the upward flick; it is not a click', () => {
+  assert.deepEqual(flung.names, ['fling'], JSON.stringify(flung));
+});
+await wait(1000);
+
+const wheeled = await gestureFires('wheel', async () => {
+  await page.mouse.move(cx, cy);
+  await page.mouse.wheel(0, -120);
+});
+check('turning the wheel up plays the wheel-up animation', () => {
+  assert.deepEqual(wheeled.names, ['spin'], JSON.stringify(wheeled));
+});
+const wheeledDown = await gestureFires('wheel down', () => page.mouse.wheel(0, 120));
+check('and turning it down plays nothing: no animation answers it', () => {
+  assert.deepEqual(wheeledDown.names, [], JSON.stringify(wheeledDown));
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();
