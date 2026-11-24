@@ -1486,11 +1486,11 @@ export const COMMANDS = [
      nothing to play it on, and the C++ preludes carry a no-op stub for it like every visual verb. */
   {
     id: 'animatePlay', category: 'Animation', signature: 'animatePlay(control, animation)',
-    summary: 'Play one of a control\'s keyframe animations from its first frame.',
+    summary: 'Play one of a control\'s keyframe animations or text effects from its start.',
     example: '`animatePlay("Lamp", "flash")` plays Lamp\'s flash animation.',
     notes: [
-      'Returns true if the control has a keyframe animation of that name. Already playing: restarts.',
-      'A transition cannot be played this way: rejected with a console error listing the keyframe animations.',
+      'Returns true if the control has a keyframe animation or a text effect of that name. Already playing: restarts.',
+      'A transition cannot be played this way: rejected with a console error listing the animations it can play.',
     ],
     runtime: RUNTIME_WEBVIEW,
     params: [

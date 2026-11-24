@@ -95,7 +95,8 @@
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
-  import { noteAnimationsFired, animationPlays } from '../stores/animationActivity.js';
+  import { noteAnimationsFired, animationPlays, requestAnimationPlay } from '../stores/animationActivity.js';
+  import { splitText, textEffectSpan, textPieceStyles } from '../utils/textEffects.js';
   import { createKeyframePlayer, animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { transport } from '../stores/transport.js';
   import {
@@ -1814,6 +1815,68 @@
     if (fired?.length) noteAnimationsFired(core?.id, fired);
   });
   let rootKeyframeCSS = $derived(animationDeclaration(activeKeyframes?.parts?.get('') ?? null));
+
+  // --- Text effects (utils/textEffects.js) -------------------------------------------------------
+  // While a text effect plays on the control's own text, the text is drawn as pieces (letters,
+  // words, lines or the whole), each with its own animation, a stagger after the last. A text SWAP
+  // (trigger `textChange`) plays when the words change — a Label that shows a knob's name and, while
+  // it is touched, its value: the words that left play their "out" effect on a ghost of the old text
+  // while the new words play "in". Text drawn as SVG (an outline, a glow, a gradient fill) has no
+  // pieces to cut; it plays the effect whole.
+  const isSwapOut = (item) => item?.trigger?.type === 'textChange' && item.effect?.way === 'out';
+  let ownTextEffects = $derived(activeKeyframes?.texts?.get('') ?? []);
+  let liveTextEffect = $derived(ownTextEffects.filter((item) => !isSwapOut(item)).at(-1) ?? null);
+  let ghostTextEffect = $derived(ownTextEffects.filter(isSwapOut).at(-1) ?? null);
+
+  /** Lines of text cut into pieces for one effect, each piece with its inline style; per line. */
+  function textPiecesFor(lines, item) {
+    const all = [];
+    lines.forEach((line, index) => {
+      for (const piece of splitText(line === '' ? '\u200B' : line, item.effect.split)) all.push({ ...piece, line: index });
+    });
+    const styles = textPieceStyles(item.effect, all, { phase: item.phase, seedText: `${core?.id ?? ''}:${item.name}` });
+    const pieces = all.map((piece, index) => ({ ...piece, style: styles[index] }));
+    return lines.map((_, index) => pieces.filter((piece) => piece.line === index));
+  }
+
+  /** Which text a swap waits for: `to` names 'value', 'name', or any change ('*' or none). */
+  function swapMatches(trigger, shownAs) {
+    const to = trigger?.to ?? [];
+    return !to.length || to.includes('*') || to.includes(String(shownAs ?? '').toLowerCase());
+  }
+
+  // The words as they were last drawn, so a change can leave a ghost of them; and the ghost.
+  let shownTextFrame = { text: null, shownAs: '', lines: [], anchor: '', span: '', glyph: '' };
+  let ghostText = $state(null);
+  let ghostTimer = null;
+  onDestroy(() => clearTimeout(ghostTimer));
+  $effect(() => {
+    const frame = {
+      text: renderedTextContent,
+      shownAs: String(text?.shownAs ?? ''),
+      lines: svgTextLines,
+      anchor: textAnchorStyle,
+      span: textSpanStyle,
+      glyph: textGlyphStyle,
+    };
+    const live = previewSessionOverride != null;
+    untrack(() => {
+      const before = shownTextFrame;
+      shownTextFrame = frame;
+      if (!live || before.text === null || before.text === frame.text || !core?.id) return;
+      const swaps = keyframeEntries.filter((entry) => entry.text && entry.trigger?.type === 'textChange'
+        && swapMatches(entry.trigger, frame.shownAs));
+      if (!swaps.length) return;
+      const out = swaps.find((entry) => entry.text.way === 'out');
+      if (out && before.text) {
+        clearTimeout(ghostTimer);
+        ghostText = { ...before, seq: (ghostText?.seq ?? 0) + 1 };
+        const count = splitText(before.text, out.text.split).filter((piece) => piece.animated).length;
+        ghostTimer = setTimeout(() => { ghostText = null; }, textEffectSpan(out.text, count) + 80);
+      }
+      for (const entry of swaps) requestAnimationPlay(core.id, entry.name);
+    });
+  });
   // Colour frames reach the layers that paint as inherited custom properties. Only a control that
   // has any sets them; then it and every part set all four, so a pulse stays where it was put.
   let keyframeColours = $derived(activeKeyframes?.colours?.size ? activeKeyframes.colours : null);
@@ -2895,6 +2958,14 @@
    * the browser's parse shows the loss.
    */
   let textGlyphAndLineStyle = $derived([textGlyphStyle, soleLineStyle].filter(Boolean).join('; '));
+  // The live words as pieces while a text effect plays on them, per line; null when none does.
+  let livePieces = $derived(liveTextEffect && !showBlockTextVisual ? textPiecesFor(svgTextLines, liveTextEffect) : null);
+  let ghostPieces = $derived(ghostText && ghostTextEffect && !showBlockTextVisual ? textPiecesFor(ghostText.lines, ghostTextEffect) : null);
+  // Text drawn as SVG plays the effect whole, on the drawing.
+  let textVisualEffectStyle = $derived(liveTextEffect && (showBlockTextVisual || textSet.usesCustomFlow)
+    ? (textPieceStyles({ ...liveTextEffect.effect, stagger: 0 }, [{ text: renderedTextContent, animated: true }],
+      { phase: liveTextEffect.phase, seedText: `${core?.id ?? ''}:${liveTextEffect.name}` })[0] ?? '').replace(/display:inline-block;white-space:pre;/, '')
+    : '');
   let hasLineDecorations = $derived(
     textFont?.underline === true || textFont?.strikethrough === true || textFont?.overline === true
   );
@@ -3513,6 +3584,7 @@
             ?? activeTransitions?.partTransitions?.get?.(part?.meta?.booleanInputs?.paintFrom)
             ?? null}
           animationList={activeKeyframes?.parts?.get?.(partName) ?? null}
+          textEffect={activeKeyframes?.texts?.get?.(partName)?.at(-1) ?? null}
           colourChannels={keyframeColours ? (keyframeColours.get(partName) ?? {}) : null}
           fadeHidden={fadeableParts.has(partName)}
           debug={interactionDebugEnabled}
@@ -3874,6 +3946,18 @@
           styles are alignment and spacing, and on a single line they say the same thing one level
           up — 225 labels on the GAIA panel is 225 elements saved.
         -->
+        {#if ghostPieces}
+          <!-- The words a swap replaced, leaving with their "out" effect (see Text effects above). -->
+          {#key ghostText.seq}
+            <span class="text-span text-ghost" aria-hidden="true" style="{ghostText.anchor}; {ghostText.span}">
+              <span class="text-glyphs" style={ghostText.glyph}>
+                {#each ghostPieces as linePieces}
+                  <span class="text-line ghost-line">{#each linePieces as piece}<span style={piece.style}>{piece.text}</span>{/each}</span>
+                {/each}
+              </span>
+            </span>
+          {/key}
+        {/if}
         <span class="text-span ce-colour-anim" style="{textAnchorStyle}; {textSpanStyle}">
           <span
             bind:this={textGlyphElement}
@@ -3882,10 +3966,14 @@
             style={textGlyphAndLineStyle}
           >
             {#if foldsSoleLine}
-              {blockLineDomText(svgTextLines[0])}
+              {#if livePieces}
+                {#each livePieces[0] as piece}<span style={piece.style}>{piece.text}</span>{/each}
+              {:else}
+                {blockLineDomText(svgTextLines[0])}
+              {/if}
             {:else}
               {#each svgTextLines as line, index}
-                <span class="text-line" style={blockLineDomStyleFor(index)}>{blockLineDomText(line)}</span>
+                <span class="text-line" style={blockLineDomStyleFor(index)}>{#if livePieces}{#each livePieces[index] as piece}<span style={piece.style}>{piece.text}</span>{/each}{:else}{blockLineDomText(line)}{/if}</span>
               {/each}
             {/if}
           </span>
@@ -3905,7 +3993,7 @@
       namespaces the <defs> ids so both can coexist in one document.
     -->
     {#snippet textVisual(ns, fillGate, drawText)}
-        <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
+        <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true" style={textVisualEffectStyle || undefined}>
           {#if customTextureFill}
             <defs>
               <filter id={`${textShapeMaskId(ns)}-texture-tint`} x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
@@ -4629,6 +4717,15 @@
   .text-line {
     display: block;
     min-width: 0;
+  }
+
+  /* A swap's outgoing words: on top of nothing and under the live text, never in the way. */
+  .text-ghost {
+    pointer-events: none;
+  }
+
+  .ghost-line {
+    white-space: pre;
   }
 
   .text-glyphs.hidden-glyphs {

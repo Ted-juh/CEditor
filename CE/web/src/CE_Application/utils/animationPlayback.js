@@ -225,12 +225,13 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
   if (!control || !row) return { ok: false, reason: 'Nothing to play.' };
   const trigger = row.trigger ?? readTrigger(row.animation ?? row);
   const span = spanOf(row, timeScale);
-  const keyframes = row.kind === 'keyframes';
+  // A text effect plays as a keyframe animation does: requested, or by its state or value.
+  const keyframes = row.kind === 'keyframes' || row.kind === 'text';
 
   if (keyframes && trigger.type === 'always') {
     return { ok: false, reason: 'It plays all the time — it is already playing on the stage.' };
   }
-  if (keyframes && (trigger.type === 'beat' || trigger.type === 'script' || trigger.type === 'event')) {
+  if (keyframes && (trigger.type === 'beat' || trigger.type === 'script' || trigger.type === 'event' || trigger.type === 'textChange')) {
     // Nothing on the stage makes a beat or a script call happen, so Play asks for the animation
     // directly — exactly what ce.anim.play does. A gesture is the same request the surface makes
     // when it recognises one; the stage's control answers the real gesture too.

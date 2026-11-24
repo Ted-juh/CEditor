@@ -110,3 +110,64 @@ test('in and out of roll, push and wipe go the way they say', () => {
   assert.match(rule('wipe', 'in', 'right'), /0%\{clip-path:inset\(0 100% 0 0\)\}/, 'wiped in from the left');
   assert.match(rule('wipe', 'out', 'right'), /100%\{clip-path:inset\(0 0 0 100%\)\}/);
 });
+
+// --- The name ↔ value swap -----------------------------------------------------------------------
+
+test('a Label showing "name, value while touched" reads the name, and the value while its knob is pressed or dragged', async () => {
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { shownAs, shownText } = await import('../src/CE_Application/utils/labelText.js');
+  const knob = createControl('Knob', { Core: { name: 'Filter Cutoff' } });
+  assert.equal(shownAs('nameValue', {}), 'name');
+  assert.equal(shownAs('nameValue', { hover: true }), 'name', 'hovering is not touching');
+  assert.equal(shownAs('nameValue', { pressed: true }), 'value');
+  assert.equal(shownAs('nameValue', { dragging: true }), 'value');
+  assert.equal(shownAs('value', {}), 'value', 'any other Label: what it shows');
+  assert.equal(shownText(knob, 'nameValue', {}), 'Filter Cutoff');
+  assert.equal(shownText(knob, 'nameValue', { pressed: true }), shownText(knob, 'value', { pressed: true }));
+});
+
+test('the swap recipe makes a Label the owner\'s example: four text effects, each on the words its swap brings', async () => {
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { setNestedValue } = await import('../src/CE_Application/stores/controlTreeUtils.js');
+  const { animationsPatch } = await import('../src/CE_Application/utils/animationModel.js');
+  const { nameValueSwapPatch } = await import('../src/CE_Application/utils/textEffects.js');
+  const label = createControl('Label');
+  assert.equal(label._children.Animations, undefined, 'a Label starts with no Animations section');
+  const { patch, names } = nameValueSwapPatch(label, animationsPatch);
+  for (const [path, value] of Object.entries(patch)) assert.ok(setNestedValue(label, path, value), `wrote ${path}`);
+  assert.equal(label._children.Text.shows, 'nameValue');
+  assert.deepEqual(names, ['valueIn', 'nameOut', 'valueOut', 'nameIn']);
+  const read = Object.fromEntries(names.map((name) => [name, readTextEffect(label._children.Animations._children[name])]));
+  assert.deepEqual([read.valueIn.effect, read.valueIn.way, read.valueIn.trigger.to], ['push', 'in', ['value']]);
+  assert.deepEqual([read.nameOut.effect, read.nameOut.way, read.nameOut.trigger.to], ['push', 'out', ['value']]);
+  assert.deepEqual([read.valueOut.effect, read.valueOut.way, read.valueOut.trigger.to], ['crossfade', 'out', ['name']]);
+  assert.deepEqual([read.nameIn.effect, read.nameIn.way, read.nameIn.trigger.to, read.nameIn.colour], ['typewriter', 'in', ['name'], 'FFFFE3E3']);
+  assert.equal(read.nameIn.delay, 150, 'the name waits a moment before it is typed back');
+
+  // Again: the names never collide, and the section is added to, not replaced.
+  const again = nameValueSwapPatch(label, animationsPatch);
+  assert.deepEqual(again.names, ['valueIn2', 'nameOut2', 'valueOut2', 'nameIn2']);
+  assert.ok(Object.keys(again.patch).every((key) => key === 'Text.shows' || key.startsWith('Animations.')));
+});
+
+test('a text effect is played by the keyframe player: on request, and on the words of its part', async () => {
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { resolveInteractiveControl } = await import('../src/CE_Application/utils/interactionRuntime.js');
+  const { createKeyframePlayer } = await import('../src/CE_Application/utils/keyframeAnimation.js');
+  const button = createControl('Button');
+  button._children.Animations._children = {
+    type: newTextEffectShape('type', 'typewriter', 'in'),
+    legend: { ...newTextEffectShape('legend', 'shimmer', 'in', 'legend'), trigger: { type: 'always' }, iterations: 'infinite' },
+  };
+  let clock = 0;
+  const player = createKeyframePlayer({ now: () => clock });
+  const runtime = resolveInteractiveControl(button, {}).runtime;
+  let frame = player.next(runtime, {});
+  assert.deepEqual([...frame.texts.keys()], ['legend'], 'the shimmer plays all the time, on its part');
+  assert.equal(frame.texts.get('legend')[0].effect.iterations, 'infinite');
+  clock += 100;
+  frame = player.next(runtime, { plays: { type: 1 } });
+  assert.deepEqual(frame.fired, ['type'], 'the script-triggered typewriter on request');
+  assert.equal(frame.texts.get('')[0].name, 'type');
+  assert.match(frame.rules, /@keyframes ce-tx-[0-9a-z]+-0-[ab]\{0%\{opacity:0;\}1%\{opacity:1;\}100%\{opacity:1\}\}/);
+});

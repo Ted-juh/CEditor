@@ -28,6 +28,8 @@ import {
   resolveInteractiveControl,
 } from './interactionRuntime.js';
 import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt, cleanBezier } from './easing.js';
+import { TEXT_TRIGGER_TYPES, newTextEffectShape } from './textEffects.js';
+import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import {
   KEYFRAME_TRIGGER_TYPES,
   FRAME_PROPERTIES,
@@ -57,7 +59,9 @@ export const PANEL_EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic
  * different things and both stay: `keyframes` is CSS playing a shape on one part, `sequence` is
  * anime.js posing document values — which is what reaches a value channel or a filmstrip frame.
  */
-export const ANIMATION_KINDS = ['transition', 'keyframes', 'sequence'];
+// `text`: real text, whole or a piece at a time (utils/textEffects.js), step 2 of the Animation
+// Designer, 2026-11-24.
+export const ANIMATION_KINDS = ['transition', 'keyframes', 'sequence', 'text'];
 
 /** The kind whose targets are tracks. */
 export const SEQUENCE_KIND = 'sequence';
@@ -250,6 +254,19 @@ export function animationsEnabled(control) {
  * A keyframe animation's target only says WHERE it plays — the frames say what moves — so the one
  * thing that can be wrong with it is a part that is not there.
  */
+/** A text effect plays on the control's own words ('Text') or a part's. */
+function textTargetStatus(target, partNames) {
+  const path = String(target?.path ?? '').trim();
+  if (path.startsWith('Parts.')) {
+    const part = path.split('.')[1] || '';
+    if (part && partNames.length && !partNames.includes(part)) {
+      return { works: false, reason: 'missing part', part, detail: `This control has no part called "${part}", so the words it plays on are not there.` };
+    }
+    return { works: true, animates: 'text', buckets: [], part };
+  }
+  return { works: true, animates: 'text', buckets: [], part: '' };
+}
+
 function keyframeTargetStatus(target, partNames) {
   const part = keyframePart({ targets: [target] });
   if (part && partNames.length && !partNames.includes(part)) {
@@ -374,9 +391,11 @@ export function baseValueAt(control, path) {
 export function describeTargets(row, partNames = []) {
   const keyframes = row?.kind === 'keyframes';
   const sequence = row?.kind === SEQUENCE_KIND;
+  const words = row?.kind === 'text';
   const context = { triggerType: String(row?.triggerType ?? row?.trigger?.type ?? 'stateChange') };
   const statusOf = (target) => {
     if (keyframes) return keyframeTargetStatus(target, partNames);
+    if (words) return textTargetStatus(target, partNames);
     if (sequence) return sequenceTargetStatus(target, partNames, context);
     return sequenceOnlyStatus(target, String(row?.kind ?? 'transition')) ?? targetStatus(target, partNames);
   };
@@ -519,7 +538,7 @@ function landings(row, partNames) {
  * transitions.
  */
 export function findClashes(rows, partNames = []) {
-  const live = (rows ?? []).filter((row) => row?.enabled !== false && !['keyframes', SEQUENCE_KIND].includes(row?.kind ?? 'transition'));
+  const live = (rows ?? []).filter((row) => row?.enabled !== false && !['keyframes', SEQUENCE_KIND, 'text'].includes(row?.kind ?? 'transition'));
   const placed = live.map((row) => ({ row, at: landings(row, partNames), trigger: row.trigger ?? readTrigger(row.animation) }));
   const clashes = [];
   for (let i = 0; i < placed.length; i += 1) {
@@ -573,6 +592,10 @@ export function keyframeTargets(partName) {
   return [{ path: partName ? `Parts.${partName}` : 'Transform' }];
 }
 
+/** A text effect's own fields, kept when switching kind and back. */
+const TEXT_FIELDS = ['effect', 'way', 'split', 'order', 'stagger', 'direction', 'scatter', 'scale', 'colour'];
+const pick = (source, keys) => Object.fromEntries(keys.filter((key) => source?.[key] !== undefined).map((key) => [key, source[key]]));
+
 /**
  * What switching an animation's kind writes, as one patch.
  *
@@ -584,6 +607,19 @@ export function keyframeTargets(partName) {
 export function kindPatch(row, kind, control = null) {
   const animation = row?.animation ?? {};
   const trigger = animation.trigger ?? {};
+  if (kind === 'text') {
+    // A text effect: a typewriter on the control's own words, keeping a trigger a text effect
+    // answers (anything a keyframe animation answers, and a change of words), else "from a script".
+    const shape = newTextEffectShape(animation.name ?? row?.name ?? '', animation.effect ?? 'typewriter', animation.way ?? 'in');
+    const type = TEXT_TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'script';
+    const patch = { ...shape, ...pick(animation, TEXT_FIELDS), kind: 'text', trigger: { ...trigger, type } };
+    delete patch._type;
+    delete patch.name;
+    delete patch.enabled;
+    const keepTarget = (animation.targets ?? []).find((target) => /^(Text$|Parts\.)/.test(String(target?.path ?? '')));
+    patch.targets = [{ path: keepTarget ? (String(keepTarget.path).startsWith('Parts.') ? `Parts.${String(keepTarget.path).split('.')[1]}` : 'Text') : 'Text' }];
+    return patch;
+  }
   if (kind === SEQUENCE_KIND) {
     // A length for the axis (a transition's 120 ms is a blink, not a sequence: under 200 ms it
     // becomes a second), hold on, and for every target with no track yet one keyframe at 0
@@ -715,7 +751,11 @@ const EVENT_WORDS = {
 /** "entering pressed", "on the beat" — an animation's trigger in a few words. */
 export function triggerSummary(row) {
   const t = row?.trigger ?? {};
-  if (row?.kind === 'keyframes') {
+  if (row?.kind === 'text' && t.type === 'textChange') {
+    const to = (t.to ?? []).filter((state) => state !== '*');
+    return to.length ? `when the ${to.join(' or ')} arrives` : 'when its words change';
+  }
+  if (row?.kind === 'keyframes' || row?.kind === 'text') {
     if (t.type === 'always') return 'all the time';
     if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
     if (t.type === 'script') return 'from a script';
@@ -896,6 +936,24 @@ export function newAnimationShape(name) {
     easing: 'outQuad',
   };
 }
+
+/**
+ * The patch that writes animations onto a control: one key per animation where it has an Animations
+ * section, else the whole section. A Label has none to begin with, and a write to
+ * `Animations.<name>` there landed nowhere — the tree writer does not make a section up — so the
+ * Animation tab's New did nothing on one, and a text effect could not be put on the Label whose
+ * words it plays on. Found building the text swap, 2026-11-24.
+ */
+export function animationsPatch(control, nodes) {
+  if (control?._children?.Animations) {
+    return Object.fromEntries(Object.entries(nodes).map(([name, node]) => [`Animations.${name}`, node]));
+  }
+  const section = deepCloneSection(SECTION_DEFAULTS.Animations);
+  section._children = { ...nodes };
+  return { Animations: section };
+}
+
+const deepCloneSection = (value) => JSON.parse(JSON.stringify(value ?? { _type: 'Animations', enabled: true, _children: {} }));
 
 /** Animation names are object keys, so they have to be usable as a path segment. */
 export function cleanAnimationName(wanted) {

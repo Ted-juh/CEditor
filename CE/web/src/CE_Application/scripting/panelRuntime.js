@@ -5522,15 +5522,17 @@ function animatePlayImpl(controlName, animationName) {
   const control = controlNamed(controlName);
   if (!control) { addScriptTrace('error', '', `ce.anim.play: no control named "${controlName}".`); return false; }
   const all = control?._children?.Animations?._children ?? {};
-  const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
+  // Keyframe animations and text effects play on request; a transition plays when its trigger does.
+  const canPlay = (a) => ['keyframes', 'text'].includes(String(a?.kind ?? ''));
+  const playable = Object.entries(all).filter(([, a]) => canPlay(a)).map(([k]) => k);
   const have = playable.length
-    ? `Its keyframe animations: ${playable.join(', ')}.`
-    : 'It has no keyframe animations — make one in the Animation tab.';
+    ? `The animations it can play: ${playable.join(', ')}.`
+    : 'It has no keyframe animations or text effects — make one in the Animation tab.';
   if (!given(animationName)) { addScriptTrace('error', '', `ce.anim.play: no animation name was given. ${have}`); return false; }
   const wanted = String(animationName).toLowerCase();
   const key = Object.keys(all).find((k) => k.toLowerCase() === wanted);
   const node = key == null ? null : all[key];
-  if (!node || String(node.kind ?? '') !== 'keyframes') {
+  if (!node || !canPlay(node)) {
     const why = node ? `"${key}" is a transition, which plays when its trigger does` : `"${controlName}" has no animation called "${animationName}"`;
     addScriptTrace('error', '', `ce.anim.play: ${why}. ${have}`);
     return false;

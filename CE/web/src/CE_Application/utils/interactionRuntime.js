@@ -42,6 +42,7 @@ import { easingToCss } from './easing.js';
 // A cycle, and a safe one: keyframeAnimation.js reads readTrigger from here, and this file reads
 // readKeyframes from there, each only when called — never while either module is loading.
 import { readKeyframes } from './keyframeAnimation.js';
+import { readTextEffect } from './textEffects.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -610,6 +611,26 @@ function buildTransitionCatalog(control, previewSession) {
  * them is playing at any moment needs the frame before, so a player beside the transition tracker
  * decides that, in the renderer.
  */
+/**
+ * A text effect (utils/textEffects.js) as the keyframe player plays it: the same triggers, the same
+ * runs and restarts, with `text` holding the effect instead of frames. Its span is how long a run is
+ * busy for a value trigger, which needs a number before the text is known; a generous one.
+ */
+function textEffectEntry(animation, key, timeScale) {
+  const effect = readTextEffect(animation, key, { timeScale });
+  if (!effect) return null;
+  return {
+    name: effect.name,
+    text: effect,
+    moves: false,
+    part: effect.part,
+    trigger: effect.trigger,
+    iterations: effect.iterations,
+    frames: [],
+    span: effect.iterations === 'infinite' ? Infinity : effect.delay + effect.duration * effect.iterations + effect.stagger * 24,
+  };
+}
+
 function buildKeyframeCatalog(control, previewSession) {
   const animations = getNodeChild(control, 'Animations');
   const enabled = animations?.enabled !== false && previewSession?.animationsEnabled !== false;
@@ -617,7 +638,8 @@ function buildKeyframeCatalog(control, previewSession) {
   if (!enabled) return { enabled: false, reducedMotion, entries: [] };
   const entries = [];
   for (const [key, animation] of Object.entries(animations?._children ?? {})) {
-    const entry = readKeyframes(animation, key, { timeScale: previewSession?.animationTimeScale });
+    const entry = readKeyframes(animation, key, { timeScale: previewSession?.animationTimeScale })
+      ?? textEffectEntry(animation, key, previewSession?.animationTimeScale);
     if (entry) entries.push(entry);
   }
   return { enabled: true, reducedMotion, entries };

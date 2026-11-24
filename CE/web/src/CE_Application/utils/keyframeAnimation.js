@@ -42,6 +42,7 @@
 import { readTrigger } from './interactionRuntime.js';
 import { easingToCss } from './easing.js';
 import { describeChange, matchStrength } from './transitionSelection.js';
+import { textEffectRules } from './textEffects.js';
 
 // `event`: a gesture on the control — click, double-click, long press, flick, a wheel turn — played
 // on request from where the gesture is recognised, as `script` is from ce.anim.play. Its id is in
@@ -266,7 +267,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
   let previousPlays = {};
   const heldBefore = new Map();         // name -> whether a looping state animation's state held
   const runs = new Map();               // name -> { phase, startedAt } for anything that has played
-  let last = { parts: new Map(), colours: new Map(), rules: '', fired: [], key: '' };
+  let last = { parts: new Map(), colours: new Map(), texts: new Map(), rules: '', fired: [], key: '' };
 
   const flip = (name, t) => {
     const run = runs.get(name);
@@ -334,11 +335,22 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
 
       const parts = new Map();
       const colours = new Map();          // part -> { paint, shape, stroke, text } animation lists
+      const texts = new Map();            // part -> [{ name, effect, phase, trigger }]: text effects
       const rules = [];
       const keyParts = [];
       for (const entry of entries) {
         const phase = playing.get(entry.name);
         if (!phase) continue;
+        if (entry.text) {
+          // A text effect (utils/textEffects.js): the renderer cuts the text and gives each piece its
+          // animation; here, which effect plays on which text, in which phase, and its rules.
+          const list = texts.get(entry.part) ?? [];
+          list.push({ name: entry.name, effect: entry.text, phase, trigger: entry.trigger });
+          texts.set(entry.part, list);
+          rules.push(textEffectRules(entry.text, { phase }));
+          keyParts.push(`${entry.part}:tx:${entry.name}:${phase}`);
+          continue;
+        }
         if (entry.moves) {
           const list = parts.get(entry.part) ?? [];
           list.push(animationValue(entry, phase));
@@ -362,7 +374,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
         last = { ...last, fired };
         return last;
       }
-      last = { parts, colours, rules: [...new Set(rules)].join('\n'), fired, key };
+      last = { parts, colours, texts, rules: [...new Set(rules)].join('\n'), fired, key };
       return last;
     },
     reset() {
@@ -371,7 +383,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
       previousPlays = {};
       heldBefore.clear();
       runs.clear();
-      last = { parts: new Map(), colours: new Map(), rules: '', fired: [], key: '' };
+      last = { parts: new Map(), colours: new Map(), texts: new Map(), rules: '', fired: [], key: '' };
     },
   };
 }

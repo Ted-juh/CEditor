@@ -78,7 +78,7 @@ export function isFlick(result, minSpeed = FLICK_MIN_SPEED) {
 
 function eventRows(control, eventId) {
   return readAnimations(control).filter((row) => row.enabled !== false
-    && row.kind === 'keyframes'
+    && (row.kind === 'keyframes' || row.kind === 'text')
     && row.trigger?.type === 'event'
     && row.trigger.event === eventId);
 }

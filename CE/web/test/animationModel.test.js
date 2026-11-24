@@ -320,13 +320,15 @@ test('a custom bezier and a spring draw their own shape, and an unknown name dra
 
 // --- Odds and ends ----------------------------------------------------------
 
-test('three animation kinds play: transitions, keyframes, and sequences', () => {
+test('four animation kinds play: transitions, keyframes, sequences, and text', () => {
   // This said "one animation kind plays; keyframes are not built yet" until phase 4 of the overhaul
   // gave the runtime a keyframe player (utils/keyframeAnimation.js). The transition trigger types
   // are unchanged; keyframes answer three more. The third kind, `sequence`, came from main in the
   // merge: it was built there under the name `keyframes` too, and is a different thing (tracks on a
   // time axis driving values; test/sequenceAnimations.test.js), so it took a name of its own.
-  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes', 'sequence']);
+  // The fourth, `text`, is the Text engine of the Animation Designer's step 2 (2026-11-24): real text
+  // a piece at a time (utils/textEffects.js), played by the keyframe player.
+  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes', 'sequence', 'text']);
   assert.deepEqual(TRIGGER_TYPES, ['stateChange', 'valueChange']);
   assert.deepEqual(Object.keys(KEYFRAME_TRIGGER_LABELS), KEYFRAME_TRIGGER_TYPES);
 });

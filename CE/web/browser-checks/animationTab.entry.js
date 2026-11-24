@@ -363,6 +363,19 @@ window.__anim = {
     return !!btn;
   },
   presetReport: () => textOf(document.querySelector('.strip .report')),
+  /** Give the knob a Label that shows its name, attached to it, as the editor's Add label does. */
+  addNameLabel: () => {
+    const label = createControl('Label');
+    label._children.Core.id = 'ctrl_name';
+    label._children.Core.name = 'Knob Name';
+    label._children.Core.attachedTo = CONTROL_ID;
+    label._children.Text.shows = 'name';
+    panels.update((list) => list.map((panel) => (panel.id === 'p1' ? { ...panel, controls: [...panel.controls, label] } : panel)));
+  },
+  storedLabel: () => {
+    const label = get(panels)[0].controls.find((entry) => entry._children?.Core?.id === 'ctrl_name');
+    return label ? JSON.parse(JSON.stringify({ shows: label._children.Text.shows, animations: label._children.Animations ?? null })) : null;
+  },
   storedState: (key) => JSON.parse(JSON.stringify(live()._children.States._children[key] ?? null)),
 
   clickDebug: () => document.querySelector('.dbg')?.click(),

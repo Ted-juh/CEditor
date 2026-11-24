@@ -35,6 +35,22 @@ export const TEXT_ORDERS = Object.freeze(['forward', 'reverse', 'centre', 'rando
 export const TEXT_DIRECTIONS = Object.freeze(['left', 'right', 'up', 'down']);
 
 /**
+ * What starts a text effect: a keyframe animation's triggers, and `textChange` — the words changed
+ * (a Label that shows a knob's value, or its name and its value by turns). A textChange trigger's
+ * `to` waits for one of a "name, value while touched" Label's two texts: ['value'], ['name'], or any.
+ */
+export const TEXT_TRIGGER_TYPES = Object.freeze(['always', 'stateChange', 'valueChange', 'beat', 'script', 'event', 'textChange']);
+export const TEXT_TRIGGER_LABELS = Object.freeze({
+  always: 'All the time',
+  stateChange: 'In a state',
+  valueChange: 'When the value changes',
+  beat: 'On the beat',
+  script: 'When a script plays it',
+  event: 'On a click or gesture',
+  textChange: 'When its words change',
+});
+
+/**
  * The first seven effects, as the owner approved them (2026-11-24): each one's defaults. `order`
  * may differ by way — a typewriter types forwards and deletes backwards.
  */
@@ -305,4 +321,43 @@ export function newTextEffectShape(name, effect = 'typewriter', way = 'in', part
     trigger: { type: 'script', from: ['*'], to: [] },
     targets: [{ path: part ? `Parts.${part}` : 'Text' }],
   };
+}
+
+/**
+ * The name ↔ value swap of the owner's example (2026-11-24), for a Label that shows a knob's name
+ * and, while the knob is touched, its value (`Text.shows: 'nameValue'`): the name pushed out to the
+ * right as the value pushes in after it; on letting go, the value fades and the name is typed back,
+ * its letters arriving pale and taking their own colour. Four text effects, each on the swap that
+ * brings its text: `textChange` to 'value' or to 'name'.
+ */
+export function nameValueSwapAnimations() {
+  const swap = (name, effect, way, to, extra = {}) => ({
+    ...newTextEffectShape(name, effect, way),
+    trigger: { type: 'textChange', from: ['*'], to: [to] },
+    ...extra,
+  });
+  return {
+    valueIn: swap('valueIn', 'push', 'in', 'value', { direction: 'right' }),
+    nameOut: swap('nameOut', 'push', 'out', 'value', { direction: 'right' }),
+    valueOut: swap('valueOut', 'crossfade', 'out', 'name', { duration: 220 }),
+    nameIn: swap('nameIn', 'typewriter', 'in', 'name', { delay: 150, colour: 'FFFFE3E3' }),
+  };
+}
+
+/**
+ * The patch that makes `label` a name ↔ value Label: it shows "name, value while touched", and has
+ * the four swap animations (named so they do not collide with any it has). `{ patch, names }`.
+ */
+export function nameValueSwapPatch(label, writeAnimations) {
+  const existing = new Set(Object.keys(label?._children?.Animations?._children ?? {}));
+  const nodes = {};
+  for (const [base, node] of Object.entries(nameValueSwapAnimations())) {
+    let name = base;
+    for (let n = 2; existing.has(name); n += 1) name = `${base}${n}`;
+    existing.add(name);
+    nodes[name] = { ...node, name };
+  }
+  // The writer of animations (animationModel.animationsPatch) is passed in: that module imports this
+  // one, and a Label has no Animations section to write into until one is made.
+  return { patch: { 'Text.shows': 'nameValue', ...writeAnimations(label, nodes) }, names: Object.keys(nodes) };
 }

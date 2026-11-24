@@ -653,20 +653,22 @@ test('ce.anim.play asks the control to play the animation, and asking again play
   });
 });
 
+// "Its keyframe animations:" became "The animations it can play:" on 2026-11-24, when text effects
+// (utils/textEffects.js) became playable too; the Values tab's check says the same (scriptValueKinds).
 test('ce.anim.play refuses a transition and a typo, and says what it can play', () => {
   withLamp((script) => {
     assert.equal(script.animatePlay('Lamp', 'pressIn'), false);
-    assert.match(traced(), /"pressIn" is a transition, which plays when its trigger does\. Its keyframe animations: flash\./);
+    assert.match(traced(), /"pressIn" is a transition, which plays when its trigger does\. The animations it can play: flash\./);
     clearScriptTrace();
     assert.equal(script.animatePlay('Lamp', 'flsh'), false);
-    assert.match(traced(), /has no animation called "flsh"\. Its keyframe animations: flash\./);
+    assert.match(traced(), /has no animation called "flsh"\. The animations it can play: flash\./);
     clearScriptTrace();
     assert.equal(script.animatePlay('Nobody', 'flash'), false);
     assert.match(traced(), /no control named "Nobody"/);
     // A name left out was looked up as the text "undefined", and said so.
     clearScriptTrace();
     assert.equal(script.animatePlay('Lamp'), false);
-    assert.equal(traced(), 'error:ce.anim.play: no animation name was given. Its keyframe animations: flash.');
+    assert.equal(traced(), 'error:ce.anim.play: no animation name was given. The animations it can play: flash.');
     clearScriptTrace();
     assert.equal(script.animatePlay(), false);
     assert.equal(traced(), 'error:ce.anim.play: no control name was given.');
@@ -704,4 +706,17 @@ test('a control the panel does not have, or no path at all, is rejected with an 
     assert.equal(script.animateTo('lamp.value', 1, { duration: 10 }), true);
     assert.equal(script.animateTo('panel.width', 500, { duration: 10 }), true);
   }));
+});
+
+test('ce.anim.play plays a text effect as it plays a keyframe animation', async () => {
+  const { newTextEffectShape } = await import('../src/CE_Application/utils/textEffects.js');
+  withLamp((script, lamp) => {
+    lamp._children.Animations._children.typeIn = newTextEffectShape('typeIn', 'typewriter', 'in');
+    const id = lamp._children.Core.id;
+    assert.equal(script.animatePlay('Lamp', 'typeIn'), true);
+    assert.ok(getStore(animationPlays)[id]?.typeIn > 0);
+    clearScriptTrace();
+    assert.equal(script.animatePlay('Lamp', 'nope'), false);
+    assert.match(traced(), /The animations it can play: flash, typeIn\./);
+  });
 });

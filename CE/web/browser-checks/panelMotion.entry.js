@@ -23,6 +23,9 @@ import { animationActivity } from '../src/CE_Application/stores/animationActivit
 import { startTransport, stopTransport, setTransportBpm } from '../src/CE_Application/stores/transport.js';
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { createCustomComponentStarterPatch } from '../src/CE_Application/utils/customComponentFactory.js';
+import { setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
+import { animationsPatch } from '../src/CE_Application/utils/animationModel.js';
+import { nameValueSwapPatch, newTextEffectShape } from '../src/CE_Application/utils/textEffects.js';
 
 window.__JUCE__ = undefined;
 
@@ -138,17 +141,28 @@ clicker._children.Animations._children = {
   spin: gesture('spin', { event: 'wheelUp' }, [{ at: 0, rotate: 0 }, { at: 1, rotate: 90 }]),
 };
 
+// The Text engine (step 2, 2026-11-24): a Label whose words a script types in, and the owner's name ↔
+// value swap — a Label attached to the knob that shows its name, and its value while it is touched.
+const caption = place(createControl('Label'), 'caption', 20, 362, 160, 18);
+caption._children.Text.content = 'Typewriter';
+for (const [path, value] of Object.entries(animationsPatch(caption, { typeIn: newTextEffectShape('typeIn', 'typewriter', 'in') }))) {
+  setNestedValue(caption, path, value);
+}
+const knobName = place(createControl('Label'), 'knobName', 200, 362, 160, 18);
+knobName._children.Core.attachedTo = 'knob';
+for (const [path, value] of Object.entries(nameValueSwapPatch(knobName, animationsPatch).patch)) setNestedValue(knobName, path, value);
+
 // ce.anim is declared because this panel has no script of its own for the runtime to derive it from;
 // a panel whose script calls ce.anim.play gets the module from that script.
 const panel = {
   id: 'motion', name: 'Motion', width: 400, height: 380, bgColour: 'FF1E1E1E',
-  controls: [button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker],
+  controls: [button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker, caption, knobName],
   scripting: { modules: ['ce.core', 'ce.anim'] },
 };
 panels.set([]);
 addPanel(panel);
 setActivePanel(panel.id);
-panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
+panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker, caption, knobName].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
 mount(GaiaPagesHarness, { target: document.getElementById('host'), props: { panelId: panel.id } });
 setPreviewModeEnabled(true);
 
@@ -216,4 +230,19 @@ window.__motion = {
   /** A script's ce.anim.play, through the real script API. */
   scriptPlay: (control, name) => scriptApiForTesting('', 'motion-script').animatePlay(control, name),
   stopTransport: () => stopTransport(),
+  /** A control's words as drawn: the live pieces and their animations, and the ghost of a swap. */
+  words: (id) => {
+    const el = root(id);
+    if (!el) return null;
+    const live = [...el.querySelectorAll('.text-span:not(.text-ghost) .text-glyphs span')].filter((span) => !span.classList.contains('text-line'));
+    const ghost = [...el.querySelectorAll('.text-ghost .text-glyphs span')].filter((span) => !span.classList.contains('text-line'));
+    const names = (spans) => [...new Set(spans.map((span) => getComputedStyle(span).animationName).filter((name) => name && name !== 'none'))];
+    return {
+      text: el.querySelector('.text-span:not(.text-ghost) .text-glyphs')?.textContent ?? '',
+      pieces: live.length,
+      animations: names(live),
+      ghostText: el.querySelector('.text-ghost .text-glyphs')?.textContent ?? '',
+      ghostAnimations: names(ghost),
+    };
+  },
 };

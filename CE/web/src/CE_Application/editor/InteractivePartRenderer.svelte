@@ -36,6 +36,7 @@
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
+  import { splitText, textPieceStyles } from '../utils/textEffects.js';
   import { isFramesImage, imageFrameLayers, imageFrameLayerStyle } from '../utils/imageFrames.js';
   import { pictureColour, recolourPicture, withRecolouredPicture } from '../utils/pictureRecolour.js';
 
@@ -51,6 +52,9 @@
     colourChannels = null,
     /** Draw a hidden part as invisible rather than not at all, so showing and hiding can fade. */
     fadeHidden = false,
+    // A text effect playing on this part's text (utils/textEffects.js): { name, effect, phase }, or
+    // null. Its @keyframes are in the control's own style element; here the text is cut into pieces.
+    textEffect = null,
     debug = false,
     editableInput = null,
     oneditableinput = null,
@@ -126,6 +130,12 @@
   // From the recoloured part: the panel's shadow, recoloured, is a multiply (withRecolouredPicture).
   let effects = $derived(colouredPart?._children?.Effects ?? null);
   let text = $derived(part?._children?.Text ?? null);
+  let textPieces = $derived.by(() => {
+    if (!textEffect?.effect || !text) return null;
+    const pieces = splitText(String(text.content ?? ''), textEffect.effect.split);
+    const styles = textPieceStyles(textEffect.effect, pieces, { phase: textEffect.phase, seedText: `${partName}:${textEffect.name}` });
+    return pieces.map((piece, index) => ({ ...piece, style: styles[index] }));
+  });
   let image = $derived(colouredPart?._children?.Image ?? null);
   // A panel knob or slider carried by a component (utils/sliderControlPart.js): the panel's own
   // pipeline, fed the session the panel would hold for it, so it draws and animates the same way.
@@ -1108,7 +1118,12 @@
         <div class="interactive-part-text-line" style={`left:${line.left}px; top:${line.top}px; width:${line.width}px; height:${line.height}px; background:${line.colour};`}></div>
       {/each}
       <div class="interactive-part-text ce-colour-anim" style={textStyle}>
-        {text?.content ?? ''}
+        {#if textPieces}
+          <!-- One flex item holding the pieces, so they flow as the words did. -->
+          <span class="interactive-part-text-pieces">{#each textPieces as piece}<span style={piece.style}>{piece.text}</span>{/each}</span>
+        {:else}
+          {text?.content ?? ''}
+        {/if}
       </div>
       {#each textDecorations.filter((line) => line.front) as line (line.kind)}
         <div class="interactive-part-text-line front" style={`left:${line.left}px; top:${line.top}px; width:${line.width}px; height:${line.height}px; background:${line.colour};`}></div>
@@ -1183,6 +1198,10 @@
   .interactive-simple-background { animation: var(--ce-kf-paint, none); }
   .interactive-vector-shape :global(polygon) { animation: var(--ce-kf-shape, none); }
   .interactive-vector-shape :global(line) { animation: var(--ce-kf-stroke, none); }
+  .interactive-part-text-pieces {
+    white-space: inherit;
+  }
+
   .interactive-part-text { animation: var(--ce-kf-text, none); }
   /* A text layer's underline, strikethrough or overline: under its glyphs, or over them (front). */
   .interactive-part-text-line { position: absolute; pointer-events: none; z-index: 1; }

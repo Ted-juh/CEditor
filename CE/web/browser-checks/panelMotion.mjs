@@ -347,6 +347,46 @@ check('and turning it down plays nothing: no animation answers it', () => {
   assert.deepEqual(wheeledDown.names, [], JSON.stringify(wheeledDown));
 });
 
+// --- The Text engine: real words, a piece at a time ------------------------------------------------
+
+const playedText = await ev(() => window.__motion.scriptPlay('caption', 'typeIn'));
+await wait(120);
+const typing = await ev(() => window.__motion.words('caption'));
+check('a script plays a typewriter on a Label: its words become ten letters, each animated', () => {
+  assert.equal(playedText, true);
+  assert.equal(typing.text, 'Typewriter');
+  assert.equal(typing.pieces, 10, JSON.stringify(typing));
+  assert.ok(typing.animations.length && typing.animations.every((name) => /^ce-tx-/.test(name)), JSON.stringify(typing));
+});
+
+const resting = await ev(() => window.__motion.words('knobName'));
+check('the name Label shows the knob\'s name at rest, as plain words', () => {
+  assert.equal(resting.text, 'knob', JSON.stringify(resting));
+  assert.equal(resting.ghostText, '');
+});
+await set('knob', { pressed: true, dragging: true });
+await wait(100);
+const pressed = await ev(() => window.__motion.words('knobName'));
+check('pressing the knob swaps in its value, pushed in, while the name leaves on a ghost of itself', () => {
+  assert.notEqual(pressed.text, 'knob', JSON.stringify(pressed));
+  assert.ok(pressed.animations.some((name) => /^ce-tx-/.test(name)), JSON.stringify(pressed));
+  assert.equal(pressed.ghostText, 'knob', JSON.stringify(pressed));
+  assert.ok(pressed.ghostAnimations.some((name) => /^ce-tx-/.test(name)), JSON.stringify(pressed));
+});
+await wait(900);
+const settled = await ev(() => window.__motion.words('knobName'));
+check('and the ghost is gone once its effect has run', () => {
+  assert.equal(settled.ghostText, '', JSON.stringify(settled));
+});
+await set('knob', { pressed: false, dragging: false });
+await wait(100);
+const released = await ev(() => window.__motion.words('knobName'));
+check('letting go brings the name back, typed in letter by letter, the value leaving on its ghost', () => {
+  assert.equal(released.text, 'knob', JSON.stringify(released));
+  assert.equal(released.pieces, 4, JSON.stringify(released));
+  assert.equal(released.ghostText, pressed.text, JSON.stringify(released));
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();

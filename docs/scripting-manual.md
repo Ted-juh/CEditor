@@ -4866,7 +4866,7 @@ Good to know:
 
 #### `ce.anim.play(control, animation)`
 
-Play one of a control's keyframe animations from its first frame.
+Play one of a control's keyframe animations or text effects from its start.
 
 Example: `animatePlay("Lamp", "flash")` plays Lamp's flash animation.
 
@@ -4875,8 +4875,8 @@ Example: `animatePlay("Lamp", "flash")` plays Lamp's flash animation.
 
 Good to know:
 
-- Returns true if the control has a keyframe animation of that name. Already playing: restarts.
-- A transition cannot be played this way: rejected with a console error listing the keyframe animations.
+- Returns true if the control has a keyframe animation or a text effect of that name. Already playing: restarts.
+- A transition cannot be played this way: rejected with a console error listing the animations it can play.
 
 *Short name: `animatePlay` · Panel window only.*
 

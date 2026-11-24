@@ -472,7 +472,7 @@ check('each working target says what it costs the browser, and a dead one says n
 });
 
 check('every preset is a button in the strip, and says what it does before you add it', async () => {});
-assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide']);
+assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide', 'Name \u2194 value']);
 assert.match(await ev(() => window.__anim.presetHint('Hover lift')), /Grows a little under the pointer/);
 await ev(() => window.__anim.addPreset('Hover lift'));
 await settle();
@@ -487,6 +487,25 @@ assert.match(await ev(() => window.__anim.presetReport()), /Hover lift added to 
 assert.equal(await ev(() => window.__anim.selectedAnimation()), 'hoverLift', 'and the new animation is selected');
 await ev(() => window.__anim.removeAnimation('hoverLift'));
 await settle();
+
+// The name <-> value swap is a recipe, not a preset: it writes the knob's name Label, not the knob.
+await ev(() => window.__anim.addPreset('Name \u2194 value'));
+await settle();
+check('Name <-> value on a knob with no name Label says what to make first, and writes nothing', async () => {});
+assert.match(await ev(() => window.__anim.presetReport()), /has no name Label to swap/);
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'pressEcho']);
+await ev(() => window.__anim.addNameLabel());
+await settle();
+await ev(() => window.__anim.addPreset('Name \u2194 value'));
+await settle();
+const swapped = await ev(() => window.__anim.storedLabel());
+check('with one, it writes the four swap effects onto the Label, which a Label has no section for', () => {
+  assert.equal(swapped.shows, 'nameValue');
+  assert.deepEqual(Object.keys(swapped.animations._children), ['valueIn', 'nameOut', 'valueOut', 'nameIn']);
+  assert.ok(Object.values(swapped.animations._children).every((entry) => entry.kind === 'text'));
+});
+assert.match(await ev(() => window.__anim.presetReport()), /Knob Name now shows the name, and the value while Big Knob is touched/);
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'pressEcho'], 'and the knob itself is untouched');
 
 // --- Debug --------------------------------------------------------------------------------------
 // (The strip that laid every animation on one axis left the tab with the redesign; its arithmetic,

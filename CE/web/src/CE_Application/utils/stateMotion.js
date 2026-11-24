@@ -26,6 +26,7 @@
 import {
   OFFERED_PROPERTIES,
   OFFERED_ROOT_PROPERTIES,
+  animationsPatch,
   keyframeTargets,
   newAnimationShape,
   readAnimations,
@@ -76,7 +77,7 @@ export function stateMotion(control, stateKey) {
 export function eventMotion(control) {
   const out = Object.fromEntries(MOTION_EVENTS.map((event) => [event.id, []]));
   for (const row of readAnimations(control)) {
-    if (row.kind !== 'keyframes' || row.trigger?.type !== 'event') continue;
+    if ((row.kind !== 'keyframes' && row.kind !== 'text') || row.trigger?.type !== 'event') continue;
     if (out[row.trigger.event]) out[row.trigger.event].push(row);
   }
   return out;
@@ -153,7 +154,7 @@ export function newMotionPatch(control, stateKey, slot) {
       targets: stateTargets(control, stateKey),
     };
   }
-  return { name, patch: { [`Animations.${name}`]: node } };
+  return { name, patch: animationsPatch(control, { [name]: node }) };
 }
 
 /** Play the state's Entering transitions back when it ends, or not: one write per transition. */
@@ -174,7 +175,7 @@ export function newEventPatch(control, eventId) {
   if (event.id === 'flick') Object.assign(trigger, { direction: 'any', speed: FLICK_MIN_SPEED });
   if (event.id === 'longPress') trigger.hold = LONG_PRESS_MS;
   const node = { ...loopNode(name, trigger), iterations: 1 };
-  return { name, patch: { [`Animations.${name}`]: node } };
+  return { name, patch: animationsPatch(control, { [name]: node }) };
 }
 
 /** A row in a few words for a slot: its name, and what kind of motion it is. */

@@ -55,8 +55,9 @@ function filmstripStarter() {
 const rowOf = (animation) => describeAnimation('test', animation);
 const switched = (animation, kind, control) => ({ ...animation, ...kindPatch(rowOf(animation), kind, control) });
 
-test('sequence is a third kind, beside the transition and the CSS keyframes', () => {
-  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes', 'sequence']);
+test('sequence is a third kind, beside the transition and the CSS keyframes, and before text', () => {
+  // The Text engine (textEffects.js) added the fourth kind after it; the order is the tab's.
+  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes', 'sequence', 'text']);
   assert.equal(SEQUENCE_KIND, 'sequence');
   assert.deepEqual(SEQUENCE_ONLY_BUCKETS, ['channel', 'frame']);
 });

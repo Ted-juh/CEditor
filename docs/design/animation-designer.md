@@ -321,8 +321,83 @@ long press, flick and wheel at a button in the Preview), the C++ tests with scri
 `PanelValueModelTests` with the short-path cases the web test has. Not run: the app under Xvfb,
 and Windows, whose compiler is CI's to give.
 
+## As built: step 2 (2026-11-24)
+
+The Text engine, verified as the last paragraph says.
+
+- **A fourth kind, `text`** (`utils/textEffects.js`), beside transition, keyframes and sequence. An
+  effect is `effect` (typewriter, explode, roll, push, wipe, crossfade, shimmer), `way` (in or
+  out), `split` (letter, word, line or whole), `order` (forward, backward, from centre, random),
+  `stagger` in ms between pieces, `duration` per piece, and only where the effect has one a
+  `direction` (roll, push, wipe), `scatter` and `scale` (explode) or a `colour` (typewriter's
+  arrival colour, shimmer's light). It plays on the control's own words (`Text`) or a part's
+  (`Parts.<name>`). Its triggers are a keyframe animation's — always, state, value, beat, script,
+  event — and one of its own, `textChange`: when the words change, or only when they change to
+  the value or to the name.
+- **Pieces, not characters.** Words are cut by grapheme (`Intl.Segmenter`), so an accented letter
+  or an emoji is one piece; in scripts whose letters join (Arabic, Devanagari and the rest named
+  in `JOINING`) a letter split falls back to words, since a letter cut out of its word changes
+  shape. Each piece is an inline span with its own CSS animation and a delay from its rank; the
+  keyframes are generated per effect, named `ce-tx-<hash>-…`, and an in effect fills backwards so
+  nothing shows before its turn. Random order is seeded from the words, so it is the same every
+  time those words play.
+- **Where it draws.** A control's HTML text, line by line, and a custom component part's text
+  (`InteractivePartRenderer`). Text the canvas draws as SVG — an outline, a glow, a gradient
+  fill, text on a curve — plays the effect on the whole text block instead; the hint in the tab
+  says so. The text box clips what an effect moves out of it (`overflow: hidden` on the content),
+  which is the label clipping the plan asked for.
+- **The player** draws with the same `PanelPreviewSurface`, so effects play in the plug-in as in
+  the Preview. A Label with animations is not folded into static scenery (`staticPartBaking.js`
+  already refused anything with an Animations section).
+- **`ce.anim.play(control, name)`** plays a text effect as it plays a keyframe animation; its
+  refusal names both ("The animations it can play: …"), and the Values tab's check agrees. The
+  manual, help bundle and API explorer are regenerated; the seven preludes did not change, since
+  the call did not.
+- **The Animation tab**: Text is a fourth Kind. Its pane (`components/animation/TextEffectEditor`)
+  has Effect with In/Out, Cut into, Order and ms apart, then what the effect has — Moves, Flies,
+  Arrives in or Light — and Plays on, the path bar narrowed to the words and the parts with text.
+  The duration reads "Each piece". The trigger list adds "Words change", with Waits for: any
+  words, the value, the name.
+
+**The name ↔ value swap is built on the words, not on the Dragging state**, which is a change from
+the plan above, for a reason found in step 1: a knob draws no words. Its name and value are Labels
+attached to it, and a Label has no Dragging state — the knob has. So:
+
+- a Label gets a new `Text.shows` mode, `nameValue` ("Name, value while touched, of"): it shows its
+  source's name, and its value while the source is pressed or dragged. The surface writes which
+  one it is showing to `Text.shownAs` (`labelText.js` `shownAs`);
+- the recipe (`nameValueSwapPatch`, the "Name ↔ value" button in the Presets strip) writes four
+  effects onto that Label, each waiting for its words: on a press the value pushes in from the
+  left as the name is pushed out to the right, and on release the value crossfades out while the
+  name types back in, 150 ms later, each letter arriving pale pink and settling to the Label's
+  colour. Every one of them is an ordinary text effect, editable in the tab afterwards;
+- an out effect needs the words that are leaving, which are already gone from the model. The
+  canvas keeps a snapshot of the old words and their styles — a ghost — plays the out effect on
+  it over the new words, and drops it when the effect has run. Per-line styles on the ghost are
+  approximate, which is visible only when the two sets of words are styled differently;
+- the button works on the Label itself, or on the armed control's attached Label showing
+  `nameValue` or its name; with neither it says what to make first, and writes nothing.
+
+**Found on the way, and fixed: a Label could not be given an animation at all.** A Label has no
+Animations section, and a write to `Animations.<name>` on a control without one was dropped without
+a word — the tab's Add, the States tab's Motion slots and the recipe all silently did nothing on a
+Label. `animationModel.js` `animationsPatch` writes the whole section from its defaults when it is
+missing, and all three use it.
+
+Not built: hover peeks (an effect shown while the pointer is over its row), text drawn by a
+slider's handle label or a control's own anatomy (a knob's tick labels), and shimmer as anything
+but a sweep, once or looped. Saving an effect as a preset is step 4.
+
+Verified locally: `npm run test:all`, `npm run build`, svelte-check (the one warning from before),
+`npm run lint`, and the Animation tab and panel-motion browser checks. The second plays a
+typewriter from a script on a Label in the Preview and counts its animated letters, then presses
+and releases a knob whose name Label carries the swap, and checks the value pushing in over the
+name's ghost and the name typing back. Not run: the app under Xvfb, so WebKitGTK has not drawn an
+effect yet (see Open), and Windows.
+
 ## Open
 
 - The performance budget's number, measured in step 3 and brought to the owner.
 - Whether `@property` and animated `clip-path` behave the same in WebKitGTK as in WebView2; both
-  are needed by steps 2 and 3. A check, not a decision.
+  are needed by steps 2 and 3. A check, not a decision. Step 2 uses `clip-path: inset()` (wipe)
+  and no `@property`.

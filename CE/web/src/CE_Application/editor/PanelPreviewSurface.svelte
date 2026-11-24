@@ -249,7 +249,7 @@
   } from '../utils/timedButtonPreview.js';
   import { buttonFiring, createButtonFiring } from '../utils/customButtonFiring.js';
   import { labelShows, labelSourceId } from '../utils/labelShows.js';
-  import { shownText } from '../utils/labelText.js';
+  import { shownAs, shownText } from '../utils/labelText.js';
   import {
     createMomentaryButtonPreviewController,
     isPressToTalkBehavior,
@@ -765,7 +765,9 @@
     // something is read as it stands, so two Labels showing each other cannot go round for ever.
     const live = !labelShows(source) ? (resolvedPreviewFor(source)?.control ?? source) : source;
     const content = shownText(live, shows, sessionFor(source));
-    return { ...resolved, control: { ...base, _children: { ...base._children, Text: { ...text, content } } } };
+    // Which text it is, for a text swap's "when the value arrives" (utils/textEffects.js).
+    const as = shownAs(shows, sessionFor(source));
+    return { ...resolved, control: { ...base, _children: { ...base._children, Text: { ...text, content, shownAs: as } } } };
   }
 
   function applyDeviceSyncStatus(control) {

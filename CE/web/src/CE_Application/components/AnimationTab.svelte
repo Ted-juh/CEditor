@@ -49,6 +49,10 @@
   import AnimationList from './animation/AnimationList.svelte';
   import TargetList from './animation/TargetList.svelte';
   import PathBar from './animation/PathBar.svelte';
+  import TextEffectEditor from './animation/TextEffectEditor.svelte';
+  import { TEXT_TRIGGER_LABELS, TEXT_TRIGGER_TYPES, nameValueSwapPatch } from '../utils/textEffects.js';
+  import { labelShows } from '../utils/labelShows.js';
+  import { attachmentsOf } from '../utils/attachedLabels.js';
   import { flattenTargets, targetSteps, targetTree } from '../utils/targetPaths.js';
   import { FLICK_DIRECTIONS, LONG_PRESS_MS, MOTION_EVENTS } from '../utils/stateMotion.js';
   import EasingCurve from './animation/EasingCurve.svelte';
@@ -109,6 +113,7 @@
     kindPatch,
     targetStatus,
     newAnimationShape,
+    animationsPatch,
     cleanAnimationName,
     uniqueAnimationName,
     renameBlockedBecause,
@@ -164,11 +169,13 @@
   let selectedClashes = $derived(selected ? clashesFor(selected.name, clashes) : []);
 
   let keyframes = $derived(selected?.kind === 'keyframes');
-  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence' };
+  let textKind = $derived(selected?.kind === 'text');
+  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence', text: 'Text' };
   const KIND_TITLES = {
     transition: 'Eases between two styles when something changes',
     keyframes: 'Plays a shape of its own on one part — a pulse, a blink — looping, on the beat, or from a script',
     sequence: 'Tracks along a time axis, one per change, each with its own keyframes; a value trigger scrubs it',
+    text: 'Real words, whole or a piece at a time: typewriter, explode, roll, push, wipe, crossfade, shimmer',
   };
 
   const ORIGIN_LABELS = { any: 'Any', user: 'Mine', external: 'Outside' };
@@ -439,7 +446,7 @@ onMount(() => {
     if (!controlId) return;
     const name = uniqueAnimationName(rows.map((row) => row.name), newName);
     if (!name) return;
-    updateControlProperty(controlId, `Animations.${name}`, newAnimationShape(name));
+    applyControlPatch(controlId, animationsPatch(control, { [name]: newAnimationShape(name) }), { pin: true });
     newName = '';
     wantedName = name;
     rawTargetIndex = -1;
@@ -481,6 +488,33 @@ onMount(() => {
   // the armed control, or on every selected control at once — one undo step either way.
   let presetReport = $state('');
   let selectionIds = $derived([...($selectedComponentIds ?? [])]);
+
+  /**
+   * The name ↔ value swap (utils/textEffects.js nameValueSwapPatch): on the armed Label if it shows a
+   * control's name or value, else on the Label showing the armed control's name. The Label is where
+   * the words are; a knob draws none of its own.
+   */
+  function addNameValueSwap() {
+    if (!controlId) return;
+    const byId = (id) => panelControls.find((entry) => entry._children?.Core?.id === id);
+    let label = ['name', 'value', 'nameValue'].includes(labelShows(control)) ? control : null;
+    if (!label) {
+      const attached = (attachmentsOf(panelControls).get(controlId) ?? []).map(byId).filter(Boolean);
+      label = attached.find((entry) => labelShows(entry) === 'nameValue')
+        ?? attached.find((entry) => labelShows(entry) === 'name') ?? null;
+    }
+    if (!label) {
+      presetReport = `${controlName || 'This control'} has no name Label to swap. Give it one (a Label that shows its name), then use Name ↔ value again.`;
+      return;
+    }
+    const id = label._children.Core.id;
+    const { patch, names } = nameValueSwapPatch(label, animationsPatch);
+    const step = beginHistoryTransaction();
+    applyControlPatch(id, patch);
+    commitHistoryTransaction(step);
+    const labelName = label._children.Core.name || id;
+    presetReport = `${labelName} now shows the name, and the value while ${controlName || 'the control'} is touched: ${names.join(', ')}.`;
+  }
 
   function addPreset(presetId, toSelection = false) {
     const preset = PRESET_BY_ID[presetId];
@@ -685,7 +719,7 @@ onMount(() => {
             <div class="grpcol">
               <div class="grp">Timing</div>
               <div class="r">
-                <label for="anim-dur">{sequence ? 'Length' : 'Duration'}</label>
+                <label for="anim-dur">{sequence ? 'Length' : (textKind ? 'Each piece' : 'Duration')}</label>
                 <div class="cell"><NumberCell label="ms" value={sequence ? axisLength : selected.duration} min={sequence ? 100 : 0} step={10}
                   onchange={(value) => setProp('duration', Math.max(sequence ? 100 : 0, Math.round(value)))} /></div>
               </div>
@@ -730,16 +764,24 @@ onMount(() => {
                              onchange={(value) => setProp('direction', value)} />
                 </div>
               {/if}
+              {#if textKind}
+                <div class="r">
+                  <span class="lab">Repeat</span>
+                  <Segmented options={[{ value: 'once', label: 'Once' }, { value: 'infinite', label: 'Loop' }]}
+                             value={selected.iterations === 'infinite' ? 'infinite' : 'once'} ariaLabel="Repeat"
+                             onchange={(value) => setProp('iterations', value === 'infinite' ? 'infinite' : 1)} />
+                </div>
+              {/if}
               <button type="button" class="dbg" onclick={debugSelected}
                       title="Show this animation as it is stored, in the Console tab's debug pane">Debug</button>
             </div>
 
             <div class="grpcol">
               <div class="grp">Runs when</div>
-              {#if keyframes}
+              {#if keyframes || textKind}
                 <div class="r">
                   <span class="lab">Trigger</span>
-                  <PropertySelect options={KEYFRAME_TRIGGER_TYPES.map((value) => ({ value, label: KEYFRAME_TRIGGER_LABELS[value] }))}
+                  <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES).map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] }))}
                                   value={selected.triggerType} ariaLabel="Keyframe trigger"
                                   onchange={(value) => setProps({ trigger: {
                                     ...(selected.animation.trigger ?? {}),
@@ -813,6 +855,15 @@ onMount(() => {
                     </div>
                   {/if}
                   <p class="hint">Plays on each {gesture.label.toLowerCase()} on the control, in Preview and in the plug-in. A gesture the control already uses is shared, never taken.</p>
+                {:else if selected.triggerType === 'textChange'}
+                  {@const waits = (selected.to ?? []).find((state) => state === 'value' || state === 'name') ?? 'any'}
+                  <div class="r">
+                    <span class="lab">Waits for</span>
+                    <Segmented options={[{ value: 'any', label: 'Any words' }, { value: 'value', label: 'The value' }, { value: 'name', label: 'The name' }]}
+                               value={waits} ariaLabel="Waits for"
+                               onchange={(value) => setProp('trigger.to', value === 'any' ? ['*'] : [value])} />
+                  </div>
+                  <p class="hint">Plays when the words change: "in" on the words that arrive, "out" on the ones that leave. A Label showing "Name, value while touched" swaps them as the knob is pressed and let go.</p>
                 {:else if selected.triggerType === 'script'}
                   <p class="hint">Played by a script — <code>ce.anim.play("{controlName}", "{selected.name}")</code> — or with Play in the Preview.</p>
                 {:else}
@@ -914,6 +965,18 @@ onMount(() => {
                 {/if}
                 <FramesEditor frames={selected.frames} onchange={(next) => setProp('frames', next)} />
                 <p class="hint">Scale, turn, move and fade, and two colours: fill recolours a solid fill, a shape or a line; text, its text. A gradient or an image keeps its own colours.</p>
+              </div>
+            </div>
+          {:else if textKind}
+            <div class="pane">
+              <div class="panehead">
+                <b>Text effect</b>
+              </div>
+              <div class="panebody">
+                {#if targets.some((entry) => !entry.status.works)}
+                  <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
+                {/if}
+                <TextEffectEditor row={selected} {control} onpatch={(patch) => setProps(patch)} />
               </div>
             </div>
           {:else if sequence}
@@ -1074,6 +1137,9 @@ onMount(() => {
           <button type="button" class="preset" title={entry.summary}
                   onclick={(event) => addPreset(entry.id, event.shiftKey && selectionIds.length > 1)}>{entry.label}</button>
         {/each}
+        <button type="button" class="preset" data-recipe="nameValue"
+                title="On a knob's name Label (or the Label itself): the name, and the value while the knob is touched — pushed in, then the name typed back"
+                onclick={addNameValueSwap}>Name ↔ value</button>
       </div>
     </div>
   {/if}
