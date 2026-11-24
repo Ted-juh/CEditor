@@ -94,10 +94,14 @@ test('the fill is built the way WebKit draws in order: no layer, and no opacity 
   const { readFile } = await import('node:fs/promises');
   const source = await readFile(new URL('../src/CE_Application/editor/SliderShapeFill.svelte', import.meta.url), 'utf8');
   const clipped = source.slice(source.indexOf('{#if preparedBackground && shape && maskId && clip}'), source.indexOf('{:else if preparedBackground && shape && maskId}'));
-  assert.match(clipped, /<g opacity=\{numberOr\(opacity, 1\)\} style=\{style\}>\s*<foreignObject/, 'opacity and style on a group around it');
-  const foreignObject = clipped.slice(clipped.indexOf('<foreignObject'), clipped.indexOf('>', clipped.indexOf('clip-path=')));
-  assert.doesNotMatch(foreignObject, /opacity=|style=/, 'none on the foreignObject itself');
-  assert.match(foreignObject, /clip-path=\{plainPaint \? `url\(#\$\{maskId\}\)` : undefined\}/, 'a plain fill is cut by an SVG clip');
+  const objects = clipped.match(/<foreignObject\b[^>]*>/g);
+  assert.equal(objects.length, 2, 'the plain or layered fill, and the fill under its effects');
+  for (const tag of objects) assert.doesNotMatch(tag, /opacity=|style=/, 'none on the foreignObject itself');
+  assert.equal(clipped.match(/<g opacity=\{numberOr\(opacity, 1\)\} style=\{style\}>/g).length, 2, 'opacity and style on a group around it');
+  assert.match(objects[1], /clip-path=\{plainPaint \? `url\(#\$\{maskId\}\)` : undefined\}/, 'a plain fill is cut by an SVG clip');
+  // Effects: one group per filter (WebKit ignores a list on one), and the clip round them all.
+  assert.match(clipped, /<g filter=\{`url\(#\$\{effectFilters\[k\]\.id\}\)`\}>/);
+  assert.match(clipped, /<g clip-path=\{`url\(#\$\{maskId\}\)`\}>\s*<g transform=\{`translate\(\$\{safeBounds\.x\} \$\{safeBounds\.y\}\)`\}>\s*\{@render filtered/);
   const plainRule = source.match(/\.shape-fill-plain \{([^}]*)\}/)[1];
   assert.doesNotMatch(plainRule, /position|overflow|opacity|transform|filter|will-change/, 'nothing that gives the plain fill a layer');
 });

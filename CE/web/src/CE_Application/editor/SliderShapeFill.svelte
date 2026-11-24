@@ -13,7 +13,9 @@
    *     the designed sets' shaded plates: colourUnderGradientCSS) is the host's own `background`,
    *     with no layer, cut by an SVG clip on the foreignObject. Both engines cut it and keep it in
    *     order. Nearly every slider part's fill is this.
-   *   - Anything more (layers, effects, patterns) keeps BackgroundRenderer and is cut by a CSS clip
+   *   - A plain fill under a material, shadows or a bevel: the same, each effect an SVG filter on a
+   *     group around it (utils/svgFillEffects.js); the clip goes round the filters, as the mask did.
+   *   - Anything more (layers, blends, filters, patterns) keeps BackgroundRenderer and is cut by a CSS clip
    *     on the host, which WebKit does apply; WebKit may still paint it over what comes after.
    *   - A shape shapeClip.js cannot outline (a clip has no stroke) keeps the mask it always had.
    *
@@ -27,6 +29,9 @@
   import { clipShapeFor } from '../utils/shapeClip.js';
   import { plainFillCSS, colourUnderGradientCSS } from '../utils/plainFillCSS.js';
   import { hasPatterns } from '../utils/patternLayers.js';
+  import { fillEffectsAsSvg } from '../utils/svgFillEffects.js';
+  import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
+  import ShadowFilter from '../../CE_Panel/components/ShadowFilter.svelte';
 
   let {
     background = null,
@@ -80,9 +85,18 @@
   let plainPaint = $derived(plainOne ?? plainTwo);
   // Its colour animation: a gradient's own channel, the colour's, or both (utils/keyframeAnimation.js).
   let plainGradient = $derived(!plainTwo && /gradient\(/.test(plainOne ?? ''));
-  // The SVG clip on the foreignObject is in the SVG's units. The CSS clip on the host is in the
-  // host's own pixels, whose origin is the foreignObject's corner.
-  let clipShift = $derived(plainPaint ? undefined : `translate(${-safeBounds.x} ${-safeBounds.y})`);
+  // A plain fill under a material, shadows or a bevel: the fill plain, each effect an SVG filter on a
+  // group (utils/svgFillEffects.js), innermost first: one id per filter.
+  let effected = $derived(preparedBackground && !plainPaint && !hasPatterns(preparedBackground)
+    ? fillEffectsAsSvg(preparedBackground, safeBounds.width, safeBounds.height)
+    : null);
+  let effectFilters = $derived((effected?.levels ?? []).flatMap((lvl, i) => [
+    ...(lvl.material ? [{ id: `${maskId}-material${i}`, material: lvl.material }] : []),
+    ...(lvl.shadows.length ? [{ id: `${maskId}-shadows${i}`, shadows: lvl.shadows }] : []),
+  ]));
+  // The SVG clip is in the SVG's units. The CSS clip on the host is in the host's own pixels, whose
+  // origin is the foreignObject's corner.
+  let clipShift = $derived(plainPaint || effected ? undefined : `translate(${-safeBounds.x} ${-safeBounds.y})`);
 </script>
 
 {#if preparedBackground && shape && maskId && clip}
@@ -100,6 +114,34 @@
   <!-- The opacity and the part's style (its timing, its keyframes, its colour variables, which the
        HTML inherits) are the group's: on the foreignObject itself, WebKit fades it through a layer
        it places without the foreignObject's x and y, and cuts off that much of its far side. -->
+  {#snippet filtered(k)}
+    {#if k < 0}
+      <foreignObject x={0} y={0} width={safeBounds.width} height={safeBounds.height}>
+        <div xmlns="http://www.w3.org/1999/xhtml" class="shape-fill-plain" class:gradient={effected.gradient} class:both={effected.both} data-shape-clip={maskId} style={effected.paint}></div>
+      </foreignObject>
+    {:else}
+      <g filter={`url(#${effectFilters[k].id})`}>{@render filtered(k - 1)}</g>
+    {/if}
+  {/snippet}
+
+  {#if effected}
+    {#each effectFilters as filter (filter.id)}
+      {#if filter.material}
+        <MaterialFilter id={filter.id} material={filter.material} />
+      {:else}
+        <ShadowFilter id={filter.id} shadows={filter.shadows} width={safeBounds.width} height={safeBounds.height} />
+      {/if}
+    {/each}
+    <!-- Cut after the filters, as the mask cut the effects drawn inside it: an outer shadow outside the
+         part's shape is not drawn. The filters work in the fill's own units, as on the HTML they did. -->
+    <g opacity={numberOr(opacity, 1)} style={style}>
+      <g clip-path={`url(#${maskId})`}>
+        <g transform={`translate(${safeBounds.x} ${safeBounds.y})`}>
+          {@render filtered(effectFilters.length - 1)}
+        </g>
+      </g>
+    </g>
+  {:else}
   <g opacity={numberOr(opacity, 1)} style={style}>
     <foreignObject
       x={safeBounds.x}
@@ -117,6 +159,7 @@
       {/if}
     </foreignObject>
   </g>
+  {/if}
 {:else if preparedBackground && shape && maskId}
   <mask
     id={maskId}

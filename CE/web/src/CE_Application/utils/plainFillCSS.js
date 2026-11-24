@@ -311,6 +311,14 @@ export function plainFillCSS(background, width, height) {
   return `${paint}${shape ? ` ${shape}` : ''}`;
 }
 
+/** The fill layers that paint, bottom first: BackgroundRenderer's own choice, copied (see above). */
+export function visibleFillLayers(background) {
+  const fill = background?._children?.Fill;
+  if (!fill) return [];
+  const order = fill.layerOrder?.length ? fill.layerOrder : DEFAULT_ORDER;
+  return order.filter((id) => LAYERS.includes(id) && layerVisible(background, id));
+}
+
 /**
  * A colour under a gradient — the two layers the designed control sets give a knob's plate, cap and
  * pointer — said as ONE element's background: the gradient its image, the colour beneath it its
@@ -334,10 +342,29 @@ export function colourUnderGradientCSS(background, width, height) {
   const [clipMode] = clipModes;
   if (clipMode !== 'shape' && clipMode !== 'none') return null;
   if (visible.some((layer) => String(fill[`${layer}Blend`] ?? 'normal') !== 'normal')) return null;
-  if (numberOr(fill.gradientOpacity, 100) !== 100) return null;
   if (clipMode === 'shape' && cornersNeedClipPath(background._children?.Corners)) return null;
   const colour = argbToCss(fill.colour);
   if (!colour || !fill.gradient) return null;
+  // A faded gradient is its stops faded: gradients interpolate premultiplied, so scaling every stop's
+  // alpha is the layer's opacity exactly (the soft set fades its caps' highlight to 45 %).
+  const gradient = fadedGradient(fill.gradient, numberOr(fill.gradientOpacity, 100) / 100);
+  if (!gradient) return null;
   const shape = clipMode === 'none' ? '' : fillShapeCSS(background._children?.Corners, width, height);
-  return `${gradientBackgroundCSS(fill.gradient)} background-color: ${colour};${shape ? ` ${shape}` : ''}`;
+  return `${gradientBackgroundCSS(gradient)} background-color: ${colour};${shape ? ` ${shape}` : ''}`;
+}
+
+/** A gradient with every stop's alpha scaled by `fade` (0..1); null if a stop is not hex. */
+function fadedGradient(gradient, fade) {
+  if (!(fade < 1)) return gradient;
+  const stops = gradient?.stops;
+  if (!Array.isArray(stops)) return null;
+  const faded = [];
+  for (const stop of stops) {
+    const hex = String(stop?.color ?? '').replace(/^#/, '');
+    if (!/^([0-9a-f]{6}|[0-9a-f]{8})$/i.test(hex)) return null;
+    const alpha = hex.length === 8 ? parseInt(hex.slice(0, 2), 16) / 255 : 1;
+    const scaled = Math.round(Math.max(0, Math.min(1, alpha * fade)) * 255).toString(16).padStart(2, '0').toUpperCase();
+    faded.push({ ...stop, color: `${scaled}${hex.slice(-6)}` });
+  }
+  return { ...gradient, stops: faded };
 }

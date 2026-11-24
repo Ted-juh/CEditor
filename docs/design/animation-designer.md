@@ -666,10 +666,10 @@ Found there, and left for a change of its own: in WebKitGTK the default knob dra
 cap a square, the value arc a box. Its fills are HTML in an SVG `<foreignObject>` cut by an SVG
 `<mask>` (`editor/SliderShapeFill.svelte`), and WebKit does not apply a mask to a foreignObject. It is
 so before any scene touches the knob, and Chromium, so Windows, is unaffected; the Linux app and the
-Linux plug-ins are not. Fixed in the commit after this one: the fill is drawn with no layer of its
+Linux plug-ins are not. Fixed in the two commits after this one: the fill is drawn with no layer of its
 own and cut by an SVG clip (`utils/shapeClip.js`, `editor/SliderShapeFill.svelte`), and `CLAUDE.md`
-now has the two rules WebKit taught. Not yet in the 19 of 79 built-in sets whose knob plates carry a
-material or surface effect: those plates have the right shape and still cover their pointer.
+now has the rules WebKit taught; a plate's material and shadows became SVG filters on groups round
+it, so all 1,515 slider fills of the 79 built-in sets draw in order.
 
 ## Open
 

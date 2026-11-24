@@ -342,6 +342,9 @@ knob drew there as squares. Two rules came out of it, measured in WebKitGTK 2.52
   fades it through a layer it places without the foreignObject's `x` and `y`, and cuts that much off
   its far side.
 
+A CSS `filter` is a layer too, so a fill's material and shadows go on SVG groups around it instead,
+one group per filter: WebKit ignores a list of them on one (`utils/svgFillEffects.js`).
+
 To see WebKit draw a fixture page: serve `dist-scenery/`, load it in a WebKit2 4.1 `WebView` from
 `/usr/bin/python3.12` with `gi` under `Xvfb` (the three environment variables in "Running it",
 above), and grab the window with ImageMagick's `import -window root`.
