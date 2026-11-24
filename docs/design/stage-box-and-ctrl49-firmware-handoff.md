@@ -88,7 +88,10 @@ All of it is in `tools/ctrl49/README.md`; the short version:
 - **The VIP fallback** comes after 3 s without a valid frame. `Ctrl49Session.h` still says about
   900 ms in a comment.
 - **Native widgets**: knobs (02/12–1C) and pads (02/00–06) the firmware draws itself from art in
-  its flash. HoSTage uses neither. The command shapes are known, the recipe is not.
+  its flash. HoSTage uses neither. The command shapes are known, the recipe is not, and VIP never
+  sends them to the CTRL49 (corrected 2026-11-23 from the USB captures: the README's fourth
+  reading). VIP does use native text objects (02/21–2B) and 02/23 readouts, and those frames are
+  written down.
 - **Pages can probably redraw themselves** (`lua_widget_make_dirty` from `draw()`), there is no
   usable clock, `print` writes to the screen, LEDs can be set from Lua, 06/02 is a ping, nothing
   persists, an uploaded font is ignored.
@@ -224,21 +227,28 @@ Needs the keyboard:
 3. One harmless 04/01 (brightness to 3 and back) to confirm the setting ids before any is used.
 4. The read-only protection check described in the README, if the firmware route is wanted.
 
-Needs the VIP captures: the frames VIP sent for its knob page (02/12–1C, 02/00–06), read against
-the table in the README, for a working native-widget sequence.
+~~Needs the VIP captures: the frames VIP sent for its knob page (02/12–1C, 02/00–06).~~ Read
+2026-11-23: the captures hold no such frames, so the knob and pad recipe needs the keyboard. What
+they did hold, VIP's text objects, 02/23 readouts and how it enters and leaves VIP mode, is in the
+README's fourth reading.
 
 Code, in the order suggested:
 
 1. The real-time fix and the reload of a tripped part, on the Linux branch. It helps every box.
 2. The screenless player: restore at start-up, no web view, by a flag or the player role.
-3. In `Ctrl49Protocol`: a refuse list (03/06; settings 13–15, 33, 36, 37; ids outside the table),
-   04/01 and 04/02 builders, and a ping (06/02) so a silent keyboard is noticed.
+3. In `Ctrl49Protocol`: a refuse list (03/06; setting 13; 14 with any value but 1 or 2; 15 with
+   any value but 0; 33, 36, 37; ids outside the table), 04/01 and 04/02 builders, and a ping
+   (06/02) so a silent keyboard is noticed. Not "settings 13–15" whole: HoSTage starts with
+   14 = 2, as VIP does. The refuse list is built (2026-11-24, `refusalReason`), wider than this
+   line: the README's eleventh reading added restarts, flash writes and 05/00's storage state.
 4. What an idle worker spends about 3% of a fast core on, every block.
 5. LV2 hosting, if the Pi is the target.
 6. A Lua drawing library for pages, tested in the preview.
 
 The firmware route, if taken: a first pin map from the Advance firmware's pin set-up read against
-ST's pin data, and a skeleton on an STM32F429I-Discovery board, before any keyboard is opened.
+ST's pin data (done 2026-11-23: the README's sixth reading, which also found a second
+microcontroller on the board), and a skeleton on an STM32F429I-Discovery board, before any
+keyboard is opened.
 
 For the owner: which box (Pi, thin client, x86 board); whether the Pi's plug-in scope is
 acceptable; whether new firmware is worth a keyboard.

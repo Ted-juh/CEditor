@@ -159,12 +159,16 @@ nine strings of a `set_labels` call always fit one frame.
 
 **Replies.** Every type-02 command except 02/11 and 02/23 is acknowledged with 02/3D
 `[route][route][command][status]`. Status: `0x40` OK, `0x41` bad argument, `0x42` out of memory,
-`0x4C` not found, `0x4D` Lua script error, `0x4E` error. HoSTage shows a refusal on the CTRL49
+`0x4C` not found, `0x4D` Lua script error, `0x4E` error; the
+[fifth reading](#fifth-reading-2026-11-23-native-knobs-scenes-and-the-type-03-replies) adds
+`0x45`, `0x46`, `0x47`, `0x4A` and `0x50`. HoSTage shows a refusal on the CTRL49
 screen card, and the startup trace (`%APPDATA%\CEditor\ctrl49-trace.log`) names every reply.
 
 **Commands we had not named.** 02/31 creates an off-screen canvas, 02/32 selects or resizes one,
-02/33 decodes a PNG into one; 02/11 writes a control/colour state; 02/23 binds a screen control to
-show a device setting (it does not change the setting: 04/01 does, see
+02/33 decodes a PNG into one; 02/11 most likely attaches an object to a canvas (first read as a
+control/colour state; VIP's frames say otherwise, see
+[the fourth reading](#fourth-reading-2026-11-23-the-usb-captures-of-vip)); 02/23 binds a screen
+control to show a device setting (it does not change the setting: 04/01 does, see
 [the second reading](#second-reading-2026-11-21)). The canvas family is unused by CEditor (it
 redraws per frame) and is noted for later.
 
@@ -242,9 +246,13 @@ bounds-checked**: an id past the table reads a wild pointer, so send only ids fr
 | 30 / 31 / 32 | Tap average / tempo LED / clock source | 2–4 (3) / 0–1 (1) / 0–1 |
 | 34 / 35 | Firmware version / boot ROM | read only (`0x125` / `0x112`) |
 
-**Never send** 13–15 (firmware mode and requested firmware mode: 14 = 3 is how the keyboard is
-switched toward update mode), 33 (save global settings: a flash write), 36 (factory reset) or 37
-(send program). 9 has no readable name and is left alone too.
+**Never send** 13 (the firmware mode); 14 with any value but 1 or 2 (14 is the requested mode:
+VIP sends 2 to enter VIP mode and 1 to leave it, HoSTage sends 2 at start, and 3 is how the
+keyboard is switched toward update mode); 15 with any value but 0 (VIP writes 0 at
+every start); 33 (save global settings: a flash write), 36 (factory reset) or 37 (send program).
+9 has no readable name and is left alone too. The values VIP sends for 14 and 15 are in
+[the fourth reading](#fourth-reading-2026-11-23-the-usb-captures-of-vip); this line first ruled
+out 13–15 whole, which would have refused HoSTage's own start.
 
 Uses for HoSTage: per-song octave, transpose and velocity curve from the setlist; the keyboard's
 tempo, arp and tempo LED following the song; dimming the screen on a dark stage; reading the
@@ -267,7 +275,9 @@ page's Lua global of the hook's name:
 | 2 | `note(args)` | a note was generated (status, note, velocity); HoSTage uses this one |
 
 The only other Lua functions the firmware calls are `draw(args)` and the ones a host names in
-02/3C (or 02/2C, the same call aimed at one widget). Akai's own pages used names such as `set_widget_id(args)` and
+02/3C. (This line first added 02/2C as the same call aimed at one widget; the
+[ninth reading](#ninth-reading-2026-11-24-the-commands-nobody-had-mapped) shows it moves a
+widget's text instead.) Akai's own pages used names such as `set_widget_id(args)` and
 `arp_program_line_zero(args)`; those came from VIP over SysEx, not from the keyboard.
 
 **No clock, but frames.** `os.clock()` is unusable: the C library's `_times` is a stub that fills
@@ -281,8 +291,10 @@ keyboard and the host would send only changes.
 
 **Nothing persists.** Uploaded objects go to RAM. The flash writes found reachable in normal
 operation are the settings and presets (setting 33) and an erase that sits with the built-in
-debug page's output; the firmware itself is only rewritten in update mode. No command was found
-that stores a page.
+debug page's output; the firmware itself is only rewritten in update mode. This paragraph first
+said no command stores a page: one does (05/00 with a storage state other than 4, then 05/02),
+and the [eleventh reading](#eleventh-reading-2026-11-24-objects-storage-and-the-commands-that-reboot)
+says why not to use it yet.
 
 **Extending what a page can draw.** Lua itself draws nothing; a page draws only through the
 firmware's functions (rectangles with alpha, text in the sixteen faces, images and crops of
@@ -306,8 +318,9 @@ them), and there is no line, arc, circle, gradient or pixel primitive. What can 
 **The command map.** Type 02 implements 51 commands: 00–06, 0D–1C, 21–3C; the gaps (07–0C,
 1D–20) fall through to an error reply. Type 04: 00, 01 (set setting), 02 (read setting), 04, 05
 (LED level), 06 (pad RGB), 07 and 08; 03 is not implemented. 04/00, 04/04, 04/07 and 04/08 work
-on controls and the active preset and are not mapped yet. Types 01, 03, 05 and 06 have handlers of
-their own; 03 includes the request for update mode.
+on controls and the active preset: the
+[ninth reading](#ninth-reading-2026-11-24-the-commands-nobody-had-mapped) maps them, with type
+01. Types 01, 03, 05 and 06 have handlers of their own; 03 includes the request for update mode.
 
 ### Third reading (2026-11-22): what HoSTage does not use yet
 
@@ -315,33 +328,37 @@ The same image, read for what it offers beyond the commands HoSTage already send
 this is the Advance's firmware. Three earlier statements are corrected by it: `lua_ifc_load_script`
 is not callable from Lua (it is the C loader's name in an error message; the preview's stub that
 throws behaves as the keyboard's missing global would), the hook mask is a RAM word and not
-setting 17, and a page's functions are called through 02/3C and 02/2C, not 02/00.
+setting 17, and a page's functions are called through 02/3C, not 02/00 (this line first said
+"02/3C and 02/2C"; 02/2C is not a call, see the ninth reading).
 
-**The firmware has widgets of its own, with their art in flash.** VIP's control page was not Lua:
-it was built from native widgets that the firmware draws in C from 8-bit coverage images it
-already holds and tints. HoSTage draws its knobs in Lua from a filmstrip it uploads.
+**The firmware has widgets of its own, with their art in flash.** It can draw knobs and pads in C
+from 8-bit coverage images it already holds and tints. VIP does not use those two on the CTRL49:
+[its captured frames](#fourth-reading-2026-11-23-the-usb-captures-of-vip) show pages built from
+Lua (twenty scripts, 43 PNGs) with native text objects for the left column, and no knob or pad
+command at all. HoSTage draws its knobs in Lua from a filmstrip it uploads.
 
 | Commands | Widget | Art in flash | What the commands carry |
 |---|---|---|---|
 | 02/12–1C | **Knob**, up to 1024 | type 11 id 0: a 74×71 base, 256 frames of 66×62 (two arc weights × 128 values) and 256 of 48×45 (an arc and a pie × 128) | 12 create (id, art id, two bytes); 13 and 14 a byte pair each, second ≥ first (defaults 0–0 and 0–127); 15, 16, 17 three colours; 18 a mode byte; 19 and 1B a string each; 1A and 1C a 14-bit value each |
 | 02/00–06 | **Pad**, up to 1024 | type 8 id 0: 74×74, off and on | 00 create (id, art id, byte); 01 a state byte; 02, 05, 06 three colours; 03 a string; 04 a value |
-| 02/21–22 | **Text object** | the Aileron faces | 21 create (id, two 14-bit numbers, byte); 22 set the string |
-| 02/24–2B | properties of an object addressed by (id, byte, byte) | | strings, colours and bytes; 2C calls a Lua function for such an object |
+| 02/21–22 | **Text object** | the Aileron faces | 21 create (id, width, height, most likely a capacity); 22 set the string. VIP's frames for them are in the fourth reading |
+| 02/24–2B | properties of an object addressed by (id, kind, text number) | | strings, colours and bytes; 2C moves one of a widget's texts (first read here as a Lua call; see the ninth reading) |
+| 02/2D–2F | **Button**, kind 8 (matched in the ninth reading) | type 13: 73×33 off and on, a 75×9 bar and a 6×10 marker | 2D create, 2E a min/value/max, 2F three colours |
 
 A colour is sent as A, R, G, B, each a two-digit base-128 number 0–255, as 04/06 sends its RGB.
 The knob's defaults are `0x7F804000`, `0xFFFF0000` and `0xFFFF0000`. Replies are the usual 02/3D;
-`0x46` is a status not seen before: a pair sent with the second below the first. Type 13 holds
-button art (73×33 off and on, a 75×9 bar and a 6×10 marker) for a widget not matched to its
-commands yet; 2D–2F, 34 (a canvas operation taking two rectangles) and 38 (an id, a byte and two
-28-bit numbers) are unmapped; 30, 35, 36 and 37 are accepted and do nothing.
+`0x46` is a status not seen before: a pair sent with the second below the first. This paragraph
+first called 2D–2F, 34 and 38 unmapped and 30, 35, 36 and 37 do-nothings; the ninth reading maps
+all of them, and only 35–37 really do nothing.
 
 What it would give HoSTage's knob pages: nothing to upload or decode at connect, a value change
-that is one 6-byte frame, and drawing that costs no Lua. What is missing is the recipe (which
-values mean what, how a widget is placed in a scene). VIP sent it: the VIP captures behind the
-engineering handoff contain 02/12–1C frames for its knob page, and reading those against this
-table is the short way to a working sequence. VIP drove the CTRL49 with the same code as the
-Advances, so the CTRL49 very likely carries the same art; `asset_get_valid(11, 0)` in the asset
-probe says so directly.
+that is one 15-byte frame (four bytes of payload), and drawing that costs no Lua. The VIP captures
+do not have the recipe: this paragraph first said they held 02/12–1C frames for VIP's knob page,
+and [the fourth reading](#fourth-reading-2026-11-23-the-usb-captures-of-vip) found not one
+02/00–06 or 02/12–1C frame in any of them. Akai's own code has it instead:
+[the fifth reading](#fifth-reading-2026-11-23-native-knobs-scenes-and-the-type-03-replies) reads
+what each value means, how a knob is put in a scene, and a test sequence. Whether the CTRL49
+carries the art at all, `asset_get_valid(11, 0)` in the asset probe says directly.
 
 **The device functions, as the code has them.**
 
@@ -356,10 +373,14 @@ probe says so directly.
 
 **Liveness.** 06/02 is a ping: the keyboard answers 06/03 with one zero byte. 04/02 (read a
 setting) answers too. Either closes the gap noted under "Still requires hardware": the app can
-tell a keyboard that has stopped answering from one that is merely quiet.
+tell a keyboard that has stopped answering from one that is merely quiet. **06/00 and 06/01,
+beside it, mark the firmware for renewal and restart the keyboard: never send them** (eleventh
+reading).
 
 **Session commands (type 03).** 00 keepalive, 08 identity. **03/06 asks for update mode and must
-never be sent**; 03/07 puts the previous mode back. 03/03 is not mapped.
+never be sent**; 03/07 puts the previous mode back; **03/02 restarts the keyboard**. 03/03 is the heap report, and the identity is
+the chip's serial number, not a version: both in
+[the fifth reading](#fifth-reading-2026-11-23-native-knobs-scenes-and-the-type-03-replies).
 
 **The other VIP keyboards.** The image serves the ADVANCE25, 49 and 61 alike, and its frame check
 is only the Akai maker byte. Everything HoSTage sends to a CTRL49 an Advance should take with its
@@ -367,19 +388,610 @@ own header and ports (the table below); the VX49 very likely too. Untested: it n
 
 **In order of what it buys HoSTage:**
 
-1. Native knobs and pads: the fastest and lightest pages, if the recipe from the VIP captures
-   works on the CTRL49.
-2. Settings over 04/01: octave, transpose, velocity curve, tempo, clock source and brightness per
+1. Native knobs and pads: the fastest and lightest pages. The knob's recipe is read from Akai's
+   own code in the fifth reading, with a test sequence; not yet tried on the CTRL49.
+2. Native text objects and 02/23 readouts, VIP's working recipe in
+   [the fourth reading](#fourth-reading-2026-11-23-the-usb-captures-of-vip): labels that cost no
+   Lua, and octave and transpose shown by the keyboard itself.
+3. Settings over 04/01: octave, transpose, velocity curve, tempo, clock source and brightness per
    song; the VIP timeout off during a heavy song load.
-3. Pages that redraw themselves (`lua_widget_make_dirty` from `draw()`): meters, peak hold and
+4. Pages that redraw themselves (`lua_widget_make_dirty` from `draw()`): meters, peak hold and
    marquees on the keyboard, the host sending only changes.
-4. A ping, so a dead keyboard is noticed.
-5. LEDs set from Lua, for feedback that does not wait for the host.
-6. `load()` for patching a running page; a Lua drawing library; `print` and `mem_usage(7)` while
+5. A ping, so a dead keyboard is noticed; the keepalive's own reply already says whether the
+   keyboard is still in VIP mode.
+6. LEDs set from Lua, for feedback that does not wait for the host.
+7. `load()` for patching a running page; a Lua drawing library; `print` and `mem_usage(7)` while
    developing pages.
-7. A refuse list in `Ctrl49Protocol` for what must never go out: 03/06, settings 13–15, 33, 36,
-   37, and setting ids outside the table.
-8. The Advance keyboards and the VX49 as further devices.
+8. **Built (2026-11-24):** `refusalReason` in `Ctrl49Protocol`. `buildFrame` will not build a
+   refused frame and `Ctrl49Session` will not send one; the protocol tests check every refusal and
+   the reducer tests run a whole session through it. It refuses what must never go out: 03/06 and
+   03/07; setting 13; 14 with any
+   value but 1 or 2; 15 with any value but 0; 33, 36, 37; setting ids outside the table; and
+   04/00, 04/04, 04/07 and 04/08, which act on the panel and the stored presets (ninth reading);
+   03/02, 05/02, 05/04, 05/06, 06/00 and 06/01, which restart the keyboard or write its flash, and
+   any 05/00 whose flags byte is not 4 (eleventh reading). (First written as "settings 13–15",
+   which would refuse the 14 = 2 HoSTage starts with.)
+9. The Advance keyboards and the VX49 as further devices.
+
+### Fourth reading (2026-11-23): the USB captures of VIP
+
+The August USB captures, read frame by frame: VIP starting four times (once reopened without a
+power cycle, once driven by hand through its pages), two replays of VIP's start by a test tool,
+and single test frames, thirteen USBPcap files in all. [`capture-reading/`](capture-reading/) does
+the reading (below). Unlike the three readings above, this is the CTRL49 itself answering VIP, so
+what is here holds on this keyboard. Nothing was sent to make it. The captures stay on the owner's
+machine.
+
+**No native knobs or pads.** Not one 02/00–06 or 02/12–1C frame is in any of the thirteen. The
+type-02 commands VIP sends are 0D, 0E, 10, 11, 21–23, 25–2B, 31–33 and 39–3C, and no others. The
+third reading's "VIP sent it" was wrong; it was most likely read from the engineering handoff's
+list of VIP's uploaded PNGs, whose object keys run `00 0E 02 02` to `00 0E 02 3F` and so contain
+`02 12` … `02 1C`. VIP's pages on the CTRL49 are Lua: twenty scripts, 43 PNGs, about 120 calls
+through 02/3C at each start.
+
+**Native text objects: VIP's whole recipe.** VIP's left column (the preset's name, the plug-in's,
+and "MIDI Ch / Oct / Trans" with their values) is eight text objects the firmware draws itself.
+Every frame of them was answered 02/3D OK (`0x40`). The label "MIDI Ch", in the order VIP sends it:
+
+| Frame | Payload | What it sets |
+|---|---|---|
+| 02/21 | `02 03` `00 50` `00 14` `14` | create text object 0x103: width 80, height 20, and most likely a capacity of 20 characters |
+| 02/22 | `02 03` `4D 49 44 49 20 43 68` `00` | the string, `MIDI Ch`: plain ASCII and a closing zero, not MIDI-7 |
+| 02/27 | `02 03 03 00` `00 01` | justification, across then down |
+| 02/2B | `02 03 03 00` `04 00` | padding, across then down |
+| 02/26 | `02 03 03 00` `09 0E` | face 9 (Aileron Regular) at 14 points |
+| 02/2A | `02 03 03 00` `00 00 00 00` | border widths: left, top, right, bottom |
+| 02/28 | `02 03 03 00` `00 00 01 7F 01 7F 01 7F` | background colour `0x00FFFFFF`, transparent |
+| 02/25 | `02 03 03 00` `01 7F 00 68 00 68 00 68` | text colour `0xFF686868` |
+| 02/29 | `02 03 03 00` `01 7F 00 00 00 00 00 00` | border colour `0xFF000000` |
+| 02/0E | `21 03 02 03` `00 0E` `01 77` | in scene 0x21, kind 3, put it at x 14, y 247 |
+
+- **Addressing.** After the 02/21 that makes it, an object is addressed as (id, kind, 0): the id
+  in two base-128 digits, a kind byte, and a zero VIP never varies. 02/0E names the kinds: 3 a
+  text object, 9 a canvas, `0x0D` a Lua target. That is the `0x0D` `buildSetLayerPosition` sends
+  as a constant, and the `0x02` before every target number is the id's high digit (VIP's targets
+  are 0x102–0x106). Ids count per kind: VIP's canvas 0x101 and its text object 0x101 exist side
+  by side.
+- **The properties follow `text_data.set`'s fields**: 22 text, 25 colour, 26 face and size,
+  27 justification, 28 background colour, 29 border colour, 2A the four border widths, 2B padding.
+  VIP never sends 24. A colour is A, R, G, B in two base-128 digits each, as the third reading has
+  it.
+- **02/21's last byte** is most likely the capacity: VIP gives 64 to its two name lines, 20 to the
+  labels and 4 to the values.
+- **Positions are whole-screen**, not relative to the canvas the objects sit on: the values at
+  y 228, the labels at y 247.
+- **A string changes with one 02/22.** VIP creates the two name lines empty and then sets them
+  ("(Custom)", "Nerve"); on its DAW page it adds a ninth object, 0x109, 480 × 29, for the title
+  "DAW Control".
+
+| Id | Shows | Size, capacity | At | Face, size | Colour |
+|---|---|---|---|---|---|
+| 0x102 | the preset's name | 193 × 48, 64 | 0, 147 | 10 SemiBold, 14 | white |
+| 0x101 | the plug-in's name | 193 × 24, 64 | 0, 183 | 9 Regular, 14 | grey `0x68` |
+| 0x106 / 0x107 / 0x108 | channel, octave, transpose | 50 × 20, 4 | 15 / 93 / 140, 228 | 9 Regular, 14 | white |
+| 0x103 / 0x104 / 0x105 | "MIDI Ch", "Oct", "Trans" | 80 / 50 / 50 × 20, 20 | 14 / 92 / 139, 247 | 9 Regular, 14 | grey `0x68` |
+
+**Readouts the keyboard fills in: 02/23.** `02/23 [id: 2 digits][setting]` ties a text object to
+a device setting. VIP ties its three value fields to 18, 22 and 23 (`02 06 12`, `02 07 16`,
+`02 08 17`) under "MIDI Ch", "Oct" and "Trans", and never sends them a string afterwards (the
+channel's field gets "1" once before it is tied, the other two an empty string), so the values VIP's
+screen shows come from the keyboard. That is VIP using the second reading's ids for what its table
+names them: 18 (common channel), 22 (octave) and 23 (transpose) hold on the CTRL49. 02/23 gets no
+02/3D, as the firmware reading said. Not in the captures: whether a field follows a press of the
+octave buttons at once (no such press happened while they ran). If it does, any HoSTage page can
+show octave and transpose with no traffic from the host.
+
+**Entering and leaving VIP mode.** VIP's first 04/01 is setting 14 = 2, `0E 40 00 00 02`, which
+HoSTage sends too (`Ctrl49Session.cpp`). Closing VIP sends 14 = 1, `0E 40 00 00 01` (four times,
+in the capture of VIP closing). Every start also writes 15 = 0, `0F 40 00 00 00`, after the
+screen is built. So 14 is not a setting never to send: 2 enters VIP mode, 1 leaves it, and 3 is
+the value that leads toward update mode. The list under
+[the second reading](#second-reading-2026-11-21) now says so. HoSTage never sends 14 = 1, so when
+it closes, the keyboard leaves VIP mode only by the 3 s timeout.
+
+**The keepalive's reply says which mode the keyboard is in.** 03/01, the answer to every 03/00,
+carries one byte: 1 until 14 = 2 has taken effect, 2 from then on, in every start captured. It is
+setting 13, the current mode: the firmware's 03/00 handler reads 13 and sends it (fifth reading).
+A host that reads it can tell a keyboard that has fallen back from VIP mode from one still showing
+its page, with no extra traffic.
+
+**Other replies.** Every 05/00, 05/01 and 05/0B of an object upload is answered with the same
+command and the object's key, `0x40` added to its third byte: `00 10 42 01` for Lua object 0x101,
+`00 0E 42 22` for PNG 0x122. 01/00 `01 7F 00 00 00 00 00 00`, sent before each 02/10 that
+activates a scene and not named, is answered 01/0A `00 00 40`.
+
+**The canvas, and 02/11.** VIP's left column sits on an off-screen canvas. 02/31
+`02 01 41 46 41 71 41 46 41 71` creates canvas 0x101 with four signed 14-bit numbers (`40 00` is
+zero): 198, 241, 198, 241, most likely its size twice. 02/33 `02 01 0E 02 3D 40 00 40 00` decodes
+PNG object 0x13D (VIP's largest, 25 KB) into it at 0, 0, and 02/32 `02 01 40 00 40 00` comes
+after the create and again after the decode. 02/0E `21 09 02 01 00 00 00 1F` puts the canvas at
+y 31, filling the 198 × 241 under the header.
+Then ten 02/11 frames, `[02 01 09][id, kind]`, name canvas 0x101 with each of the eight text
+objects and Lua targets 0x105 and 0x106: most likely attaching them to it. So 02/11 is not the
+control/colour state the first reading took it for. It gets no reply.
+
+**Setting 29 reads 43, not 120.** At every start VIP reads settings 10, 18, 22, 23 and 29. The
+keyboard answers 0, 1, 0, 0, and for 29 `41 2C 00 00`: `0x2B0000`, which is 43.0 in the 16.16
+format the Advance's table gives its internal tempo, whose default is 120. Either 29 is something
+else on the CTRL49, or its tempo stood at 43 through every capture. A read of 29 while the
+keyboard shows its own tempo settles it. (The eleventh reading found the Advance's range is 30–300,
+so 43 is a legal tempo: most likely the second.)
+
+**Reading the captures again.** Python 3, nothing to install; it reads files and sends nothing:
+
+```
+python capture-reading/pcapsysex.py frames.jsonl CTRL_49_01_VIP_startup.pcapng ...   # every SysEx frame, one JSON line each
+python capture-reading/frames.py frames.jsonl                                        # counts per capture, direction, command
+python capture-reading/frames.py frames.jsonl "02/2[1-9A-B]" CTRL49_09               # VIP's text objects, in order
+```
+
+`pcapsysex.py` decodes only the USB device that carries CTRL49 frames, so other devices on the
+same hub do not leak in.
+
+### Fifth reading (2026-11-23): native knobs, scenes and the type-03 replies
+
+The Advance's application image again, for what the captures could not give. Same caveat as the
+first three readings: it is the Advance's firmware, untried on the CTRL49 except where a capture
+says otherwise. The disassembly came from LLVM's objdump, which Visual Studio's Clang carries:
+`firmware-reading/llvmdis.py LLVM_BIN_DIR APP_IMAGE OUT` writes it with every literal resolved.
+
+**Scenes.** What VIP does with 02/0D, 02/0E and 02/10, read from the handlers:
+
+- `02/0D [scene][slots]` creates scene `scene` (0–127) with room for 1–512 objects (`0x45`
+  outside that, `0x42` out of memory). Creating a scene that already exists first destroys every
+  object in it. VIP's `02/0D 21 0D` is thirteen slots, and it then places exactly thirteen objects.
+- `02/0E [scene][kind][id: 2][x: 2][y: 2]` puts an object in the scene's next free slot. It does
+  not check that the object exists. `0x4A`: the scene is full; `0x50`: the object already sits in
+  another scene; `0x41`: no such scene.
+- `02/0F`, the same payload, moves an object that is already in the scene (`0x46` if it is not).
+- `02/10 [scene]` shows the scene, and is always answered OK.
+- The kinds, from the routine that empties a scene: 1 pad, 3 text, 5 knob, 8 button, 9 canvas,
+  13 Lua target; 11 and 12 can be drawn and destroyed but nothing in this firmware creates one.
+  (This line first listed 7, 8, 11 and 12 as unnamed: 8 is the button of the ninth reading, and 7
+  and 10 appear only as the kind in some commands' error replies.)
+
+**Every command from 02/00 to 02/3A has a fixed payload length** (a minimum, for those that carry
+a string; 02/3B and 02/3C carry their own lengths), and any other length is answered `0x47`:
+
+| Length | Commands |
+|---|---|
+| 1 | 02/10 |
+| 2 | 02/0D, 02/39 |
+| 3 | 02/01, 02/18 |
+| 4 | 02/00, 02/04, 02/13, 02/14, 02/1A, 02/1C, 02/2D, 02/36 |
+| 5 | 02/12, 02/2E, 02/30, 02/35, 02/3A |
+| 6 | 02/11, 02/26, 02/27, 02/2B, 02/2C, 02/32 |
+| 7 | 02/21 |
+| 8 | 02/0E, 02/0F, 02/2A |
+| 9 | 02/33 |
+| 10 | 02/02, 02/05, 02/06, 02/15, 02/16, 02/17, 02/31 |
+| 11 | 02/38 |
+| 12 | 02/25, 02/28, 02/29 |
+| 18 | 02/34 |
+| 26 | 02/2F, 02/37 |
+| more than 2 | 02/03, 02/19, 02/1B, 02/22, 02/23 |
+| more than 4 | 02/24 |
+
+**The knob.** Each knob is a 56-byte record, one per id below 1024. The commands, with what Akai's
+own pages send (at `0x0805538c`, where the firmware makes knobs itself and then calls each setter
+in turn):
+
+| Command | Payload | What it does | Default | Akai's pages |
+|---|---|---|---|---|
+| 02/12 | `[id: 2][art][a][b]` | create. `art` is the id of a type-11 resource in flash; the knob's two texts are made with room for the larger of `a` and `b`, most likely in characters. Creating an id again replaces the knob | | art 0, 128 and 128 |
+| 02/13 | `[id: 2][from][to]` | the value arc, from `from` to `to` (0–127; `to` below `from` is `0x46`) | 0, 0 | 0, 127 |
+| 02/14 | `[id: 2][from][to]` | a second, outer ring, drawn the same way | 0, 127 | 0, 127 |
+| 02/15 | `[id: 2]` A R G B | the base's tint, and the colour that covers the arcs below `from` | `0x7F804000` | `0xFF000000` |
+| 02/16 | `[id: 2]` A R G B | the value arc's colour | `0xFFFF0000` | `0xFF00AEFF` |
+| 02/17 | `[id: 2]` A R G B | the outer ring's colour | `0xFFFF0000` | `0xFF03FF00` |
+| 02/18 | `[id: 2][mode]` | low four bits: 0 the arc from `from` to `to` with the ring; 1 the arc from the centre to `to`, with the ring; 2 and up, from the centre without the ring. `0x10` runs the arcs the other way; `0x20` hides both texts | 0 | 0 |
+| 02/19 / 02/1B | `[id: 2]` text `00` | the name and the value text, plain ASCII as in 02/22 | | "name", "value" |
+| 02/1A / 02/1C | `[id: 2][offset: 2]` | an offset for the name and for the value text, most likely how far below the knob's top each sits | | 92 and 52 |
+
+- **How it draws.** The art's first frame is the knob's base, tinted with the 02/15 colour. The
+  rest is four equal strips of frames: the value arc, its cover, the ring and its cover. A value
+  of 0–127 picks a frame in its strip. The arc is drawn up to `to` in its colour, and then covered
+  up to `from` in the 02/15 colour. Without the type-11 art in flash a knob has nothing to draw,
+  which is what the asset probe's `asset_get_valid(11, 0)` checks.
+- **A knob's texts take the text-property commands**, addressed with kind 5 and the text's
+  number: `02/26 [id][05][00][face][size]` sets the name's face and size, `[01]` the value's.
+  Akai's pages set both to 14 pt. Pads (kind 1) and buttons (kind 8) work the same way; a text object
+  (kind 3) ignores the third byte, which is why VIP always sends 0 there.
+
+**A test sequence.** Untried, and nothing was sent to make it. Knob 0x101 in a new scene 0x30, in
+the middle of the screen, the value at 64, then a change to 100. Showing scene 0x30 hides whatever
+scene was up (HoSTage's page included) until that one is shown again, and the keepalive has to
+keep running throughout:
+
+```
+F0 00 01 05 31 08 02 0D 00 02 30 01 F7                           02/0D scene 0x30, one slot
+F0 00 01 05 31 08 02 12 00 05 02 01 00 20 08 F7                  02/12 knob 0x101, art 0, texts of 32
+F0 00 01 05 31 08 02 0E 00 08 30 05 02 01 01 4B 00 50 F7         02/0E kind 5 at 203, 80
+F0 00 01 05 31 08 02 19 00 09 02 01 43 55 54 4F 46 46 00 F7      02/19 name "CUTOFF"
+F0 00 01 05 31 08 02 1B 00 05 02 01 36 34 00 F7                  02/1B value text "64"
+F0 00 01 05 31 08 02 1A 00 04 02 01 00 5C F7                     02/1A name 92 px down
+F0 00 01 05 31 08 02 1C 00 04 02 01 00 34 F7                     02/1C value text 52 px down
+F0 00 01 05 31 08 02 14 00 04 02 01 00 7F F7                     02/14 ring 0–127
+F0 00 01 05 31 08 02 13 00 04 02 01 00 40 F7                     02/13 arc 0–64
+F0 00 01 05 31 08 02 18 00 03 02 01 00 F7                        02/18 mode 0
+F0 00 01 05 31 08 02 15 00 0A 02 01 01 7F 00 00 00 00 00 00 F7   02/15 0xFF000000
+F0 00 01 05 31 08 02 16 00 0A 02 01 01 7F 00 00 01 2E 01 7F F7   02/16 0xFF00AEFF
+F0 00 01 05 31 08 02 17 00 0A 02 01 01 7F 00 03 01 7F 00 00 F7   02/17 0xFF03FF00
+F0 00 01 05 31 08 02 26 00 06 02 01 05 00 09 0E F7               02/26 name: face 9, 14 pt
+F0 00 01 05 31 08 02 26 00 06 02 01 05 01 09 0E F7               02/26 value text: face 9, 14 pt
+F0 00 01 05 31 08 02 10 00 01 30 F7                              02/10 show scene 0x30
+F0 00 01 05 31 08 02 13 00 04 02 01 00 64 F7                     a value change: arc 0–100
+```
+
+Each frame should be answered 02/3D with `0x40`. A `0x41` to 02/12 means the id is out of range;
+a knob that answers OK and draws nothing most likely means the CTRL49 lacks the art. The value
+text does not follow the arc by itself: a host sends 02/1B with the new number as well.
+
+**Type 03, as the firmware answers it.**
+
+- 03/00, the keepalive: answered 03/01 with setting 13, the current mode, and only when its
+  payload is empty. That settles the fourth reading's mode byte.
+- 03/03: answered 03/04 with the heap report, three 28-bit numbers: the heap claimed, the bytes
+  in use and the number of free blocks (the C library's `mallinfo`, the same report `mem_usage`
+  reads). It only reads, so a host can watch a page's memory with no Lua at all.
+- 03/06 reads setting 13, keeps it, and writes 14 = 3: the request for update mode, never to be
+  sent. 03/07 writes the kept value back to 14.
+- 03/08: answered 03/09 with the chip's 96-bit unique ID, the twelve bytes every STM32F4 carries
+  at `0x1FFF7A10`, in the LSB-first MIDI-7 packing CEditor uses for bulk data. It is a serial
+  number, not a version. The CTRL49's reply in the captures decodes to ST's layout exactly (the
+  die's X and Y on the wafer, the wafer number, a seven-letter ASCII lot code), so the CTRL49 is
+  an STM32F4 running this same identity code. The values are this keyboard's serial and are left
+  out here.
+- 03/01, 03/04 and 03/05 do nothing. 03/02 restarts the keyboard (eleventh reading).
+
+### Sixth reading (2026-11-23): the board's pins, and a second chip
+
+Which pin of the STM32F429 goes to what, read from the Advance application's own set-up. The
+firmware is built on ST's peripheral library, so every pin passes through `GPIO_Init`
+(`0x0806db38`: pins, mode, speed, output type, pull) or `GPIO_PinAFConfig` (`0x0806dbf4`: pin
+and alternate function). `firmware-reading/pinmap.py` finds all 123 such calls, recovers their
+arguments and names each alternate function from the datasheet's table (DS9405 table 12). The
+devices behind the pins come from the code that drives them. Same caveat as the other readings:
+this is the Advance's board. The CTRL49 very likely shares it (same runtime, same identity code),
+and nothing here has been checked against a CTRL49's board.
+
+| Device | Pins | What the code says |
+|---|---|---|
+| SDRAM (FMC bank 1) | data PD14/15, PD0/1, PE7–15, PD8–10; address PF0–5, PF12–15, PG0–2; banks PG4/5; PC0 (SDNWE), PC2 (SDNE0), PC3 (SDCKE0), PF11 (SDNRAS), PG15 (SDNCAS), PG8 (SDCLK), PE0/1 (NBL0/1) | 16-bit, 13 row and 9 column address bits, 4 banks: **32 MB**, now confirmed. Clock HCLK / 2 (84 MHz), CAS latency 2 |
+| Screen (LCD-TFT) | red PH2, PH3, PC10, PB0, PH10, PH11, PB1, PG6; green PE5, PE6, PH13, PH14, PB10, PB11, PC7, PD3; blue PE4, PG12, PG10, PG11, PI4–7; PC6 HSYNC, PA4 VSYNC, PF10 DE, PG7 CLK | 24-bit RGB, 480 × 272. Horizontal sync 42 clocks, back porch 1, front porch 2; vertical sync 11 lines, back porch 1, front porch 4. Pixel clock 12 MHz (the second PLL ×192, ÷2, ÷8), about 79 frames a second |
+| USB | PA11, PA12 (OTG FS) | the USB socket |
+| DIN MIDI | PD5 TX, PD6 RX (USART2) | **31,250 baud**, 8N1: the five-pin MIDI ports |
+| Asset flash | PF7 SCK, PF8 MISO, PF9 MOSI (SPI5); **PF6** chip select | A serial NOR flash: commands `03` (read, 24-bit address), `9F` (ID), `06` (write enable), `05` (status). A built-in debug page prints its ID ("Flash RDID 0x%x"). The flash writer refuses anything at or below `0x0803FFFF`, so the 256 KB bootloader is safe, and sends `0x08100000`–`0x084FFFFF` here |
+| Shift-register chain | PB13 SCK, PB14 MISO, PB15 MOSI (SPI2); **PI2** latch | Full duplex by DMA, 7 bytes (56 bits) a transfer, PI2 pulsed low and high before each: 56 LED outputs with software PWM, and 40 buttons read back on MISO (eighth reading) |
+| Analog inputs | PA0, PA1, PA2, PC1, PC4 (ADC1); PA3, PA5, PA6, PA7 (ADC2) | Both converters together, by DMA, five channels each (ADC2's fifth is channel 18, which has no pin), the highest of four readings kept |
+| Analog multiplexer | **PH4, PH5, PC5** | After each scan the code steps a four-position select on these three, so the nine inputs give up to 36 readings: pads, wheels and pedals, most likely |
+| Model straps | **PC8, PD13** (inputs, pull-down) | Read as a two-bit number at start: 2 is "ADVANCE61", 1 the 25, otherwise "ADVANCE49". This is where the model, and with it the USB and SysEx product id, comes from |
+| Second chip | **PB5**, **PG9**, **PG13**; PB6 TX, PB7 RX (USART1) | Its reset, BOOT0 and BOOT1, and a serial link to it (below) |
+| Clock output | PB9 (TIM4 CH4) | A 1 MHz square wave (toggle mode, timer at 84 MHz ÷ 2 ÷ 21), set up in the routine that starts the second chip; that chip's own set-up fits a 1 MHz clock input (seventh reading), so most likely its clock, not measured |
+
+**The last four.** PH9 is most likely the LED chain's output enable (eighth reading). PA9 (an
+output, cleared at start), PB3 (an output, held low at start) and PI10 (an input with pull-down)
+are set once at start and never touched again, neither through the library nor through their
+registers directly: most likely unused or tied to a fixed state on this board.
+
+**A second microcontroller.** At start the main chip holds PB5 low, sets PG9 high and PG13 low,
+releases PB5, and greets the other chip over USART1 with ST's bootloader handshake (`0x7F`,
+answered `0x79`): it is starting a second STM32 in its own ROM bootloader, the way AN2606
+describes. It then reads four bytes at `0x08003FEC` of that chip's flash, and if they are not
+`00 00 02 01` it writes the 16 KB image the main firmware carries at `0x080addcc` and verifies it
+(the main firmware stops if that fails). The image is for an STM32F1-class part with 16 KB of
+flash and 4 KB of RAM (its stack starts at `0x20000FD8`, and it addresses the F1's port
+registers at `0x40010800` onward); its version block reads `VersionStart` … `---VersionEnd---`.
+[The seventh reading](#seventh-reading-2026-11-24-the-second-chip-is-the-keybed-scanner) reads
+that image: it is the keybed scanner. Three things follow:
+
+- New firmware for the main chip also has to start and listen to this one: four-byte messages at
+  460,800 baud, in the seventh reading.
+- The second chip is reprogrammed only through the main chip, so it is not a separate risk.
+- The CTRL49 very likely has one too. Its own firmware for it is not in M-Audio's driver package.
+
+**Pins for sound.** Every SAI and I2S signal, checked against the pins above and the ones the
+chip needs anyway (PH0/PH1 for the 25 MHz crystal, PA13/PA14 for SWD, PB2 for BOOT1):
+
+- **SAI1:** no. Block A's frame and clock pins are screen lines and its data pins are the MIDI
+  input and a screen line; block B's frame and clock pins are the asset flash's SPI5.
+- **I2S3:** no. Its clock is on PB3 (an output) or PC10 (screen red bit 2).
+- **The DAC:** no. Its outputs are PA4 (VSYNC) and PA5 (an analog input).
+- **I2S2:** yes, on PI1 (clock), PI0 or PB12 (word select) and PI3 (data), all unused. But I2S2
+  is SPI2's hardware, which runs the shift-register chain, so the chain would have to move, and
+  its master-clock pin is PC6 (HSYNC), so the DAC would have to make its own clock (a PCM5102A
+  does). "Unused" means the Advance application never sets the pin up; whether it is wired to
+  anything needs the board.
+
+**What only the board can settle.** Pins the application never sets up (anything the 256 KB
+bootloader uses, which is not in the updater); which connector each line reaches; the part numbers
+of the flash, the shift registers and the second chip; and whether the CTRL49's board is this one.
+Photographs of both sides, a multimeter, and a logic analyser on SPI2, SPI5 and USART1 would
+settle most of it. Reading the CTRL49's own firmware, if its protection level allows, would settle
+all of it: `pinmap.py` then runs on the real thing.
+
+```
+python firmware-reading/llvmdis.py "<VS>/VC/Tools/Llvm/x64/bin" images/hex00_08040000.bin app.lst
+python firmware-reading/pinmap.py app.lst docs/STM32F429/DS_stm32f427vg.pdf
+```
+
+### Seventh reading (2026-11-24): the second chip is the keybed scanner
+
+The 16 KB image the Advance application carries for its second chip (at `0x080addcc`),
+disassembled at its own load address: `llvmdis.py LLVM_BIN_DIR coproc.bin coproc.lst 08000000`.
+It is small and plain: ST's F1 peripheral library, one interrupt, one job. Same caveat: the
+Advance's board, unchecked on a CTRL49.
+
+**The chip.** Its vector table has 43 interrupt slots, which is an STM32F101, F102 or F103 of low
+or medium density. 16 KB of flash (the image fills it), at least 4 KB of RAM (the stack starts at
+`0x20000FD8`). Only USART1 (interrupt 37) has a handler of its own; everything else runs from a
+main loop and the SysTick interrupt.
+
+**What it does: scans the keybed and measures each key's speed.**
+
+- **Rows PA0–PA7** are push-pull outputs, one pulled low at a time. **Columns PB0–PB15** are
+  inputs with pull-ups. That is 8 × 16 = 128 switches. Between rows it turns port B into outputs
+  for a moment and back, which drains the lines so a key does not show up in the next row. JTAG is
+  switched off (SWD kept) so PB3 and PB4 can be columns.
+- **The whole matrix is scanned in the SysTick interrupt**, every 720 clocks.
+- **Each key has two contacts**, on neighbouring rows of the same column (switch numbers n and
+  n + 16). Per key, a small state machine stores the time the first contact closes and, when the
+  second closes, sends the difference. The main chip turns that time into a velocity. Key numbers
+  are (row with its low bit cleared) × 16 + column: room for 64 keys, which covers the ADVANCE61.
+- **An independent watchdog** is set at start and refreshed in the main loop.
+
+**The link: one way, four bytes a message.**
+
+| Message | Bytes |
+|---|---|
+| Key down | `FF`, key, time high, time low. The time is the gap between the two contacts in scan periods (the scan counts itself up by one at the end of every pass), capped at `0xEEEE` |
+| Key up | `FE`, key, `00`, `00` |
+
+The second chip sets its UART up to send only. On the main chip, after it has checked or
+rewritten the second chip, USART1 listens at **460,800 baud** into a circular DMA buffer, and a
+parser (`0x08053c84`) turns each message into a note: the key number through a table to a note
+(the table pointer is set per model, most likely), the time through a curve (`0x08053bf8`) to a
+velocity.
+
+**Link-speed straps.** PC13 and PC14 (inputs with pull-ups) pick the second chip's baud rate: 0 is
+9,600, 1 is 28,800, 2 is 115,200 and 3 is 460,800. The main chip listens at 460,800, so on the
+Advance both straps are left open.
+
+**Its clock most likely comes from the main chip.** The second chip's PLL multiplies its external
+clock input by 12, and it runs with zero flash wait states, which the F1 allows only up to 24 MHz.
+So that input is at most 2 MHz. The main chip's PB9 puts out exactly 1 MHz, from the routine that
+starts this chip. If that is the clock, it runs at 12 MHz and scans every 60 µs, so the key time
+is in 60 µs steps (up to about 3.7 s). Not measured. (It also sets its oscillator up for a
+crystal, where AN2867 asks for bypass mode with an external clock; it apparently works.)
+
+**Its pins:**
+
+| Second chip | Goes to |
+|---|---|
+| PA0–PA7 | keybed rows |
+| PB0–PB15 | keybed columns. PB2 is also its BOOT1, which the main chip's PG13 holds low while starting it |
+| PA9 (TX), PA10 (RX): USART1, the pins its ROM bootloader uses | main chip PB7 (RX), PB6 (TX) |
+| NRST, BOOT0 | main chip PB5, PG9 |
+| OSC_IN | main chip PB9 (1 MHz), most likely |
+| PC13, PC14 | link-speed straps |
+| PA13, PA14 | SWD, left on |
+
+**What follows.**
+
+- **Only the keybed goes through this chip.** The pads, wheels and pedals are the main chip's
+  analog inputs, and the buttons are on SPI2's chain (eighth reading).
+- **For firmware of our own, the keybed is the easy part.** Leave this chip running its stock
+  image, or start it the way the main firmware does, and parse four-byte messages at 460,800 baud.
+  Its image is Akai's (it ships inside every updater), so our firmware would rely on the chip
+  already holding version 2.1 rather than carry it.
+- **The CTRL49**, if its board is this one, has the same scanner and the same messages, with its
+  own key table. Not checked.
+
+### Eighth reading (2026-11-24): the panel, the last pins and velocity
+
+What the main chip does with the shift-register chain, the analog readings and the keybed's
+times. One limit first: **the CTRL49's control section is not the Advance's.** The CTRL49 has
+faders (the engineering handoff's mapper found them on the Mackie/HUI port) and the Advance has
+none, so the buttons, knobs and analog layout below describe the Advance only. What carries over
+is the core: the chip, SDRAM, screen, asset flash, USB, MIDI and the keybed scanner.
+
+**The shift-register chain (SPI2).**
+
+- **56 LED outputs with brightness.** The transmit side is 32 frames of 7 bytes at `0x20010aa4`,
+  sent one after another. `0x0805f690` sets an LED by turning a 0–127 level into how many of the
+  32 frames its bit is on: software PWM. Its only callers are in "set an LED" (`0x0805bc80`), the
+  routine behind the 58-entry LED id table, so 04/05 and `led_control_set_level` most likely end
+  up here.
+- **40 buttons.** Five of the seven bytes read back (`0x0805f714`, inverted: active low) go
+  through a debouncer (`0x0806854c`). Each press or release is then mapped through one of two
+  layout tables, chosen by the model number, to a per-button entry at `0x2000fca8` that sends a note
+  (`0x90`) or a CC (`0xB0`). Buttons 24, 26 and 39 are handled specially. The other two input
+  bytes are not read by that routine.
+- **PH9 is most likely the chain's output enable.** Every time the firmware pauses the 8 kHz task
+  table (it saves and clears the enable mask at `0x200069e4`: object uploads, settings writes,
+  mode changes) it also switches PH9 off, and the LED PWM is one of those tasks. Blanking the LEDs
+  while their refresh is stopped is the obvious reason.
+
+**The analog side.** The 36 readings (nine inputs × four multiplexer positions) are handed out by
+`0x0805c264`, each to a handler by control type: through a 2,048-entry curve at `0x2000d80c` or a
+×1.25 scale, into a 1,024-entry event queue at `*0x20010280`. Which reading is which knob, pad or
+wheel was not followed, for the reason above.
+
+**Velocity, from the keybed's time** (`0x08053bf8`, per key-down message):
+
+1. speed = scale × 50 ÷ time, where time is the scanner's count of scans between the two contacts
+   and scale a float at `0x20000004`;
+2. **white keys × 1.414**: the bit mask `0xAB5` over note % 12 marks exactly the seven white
+   keys, so the firmware compensates for their different travel;
+3. offset + speed × gain (floats at `0x200038cc` and `0x20000008`), clamped to 0–2047;
+4. a 2,048-entry curve at `0x200058d0`, shifted right by 7: the velocity, 0–127.
+
+The curve lives in RAM, so it is built at run time, most likely from the keybed curve and
+sensitivity settings (ids 24 and 25); that link was not followed.
+
+### Ninth reading (2026-11-24): the commands nobody had mapped
+
+Every command the earlier readings left open, read from its handler. Same caveat: the Advance's
+firmware. Each handler's error reply also names a kind, which is how 02/35–37 were found to
+belong to a kind with no code behind it.
+
+**Type 01: the screen itself.**
+
+| Command | Payload | What it does |
+|---|---|---|
+| 01/00 | A, R, G, B (14-bit each) | Sets the LCD controller's background colour (its `BCCR` register, the colour wherever no layer covers the screen). VIP sends opaque black (`01 7F 00 00 00 00 00 00`) before showing each scene. Answered 01/0A `00 00 40` |
+| 01/01 | | Answered OK, does nothing else |
+| 01/02 | | Redraws a full-screen image when one is waiting; not followed further |
+| 01/03 | type, id, x, y, A, R, G, B (16 bytes) | Draws an asset from the keyboard's store at x, y, tinted, through the same routine as 01/02: most likely, not tried |
+| 01/04, 01/05, 01/07 | | Nothing, no answer |
+| 01/06 | 2 bytes | Answers with 0 |
+| 01/08 | | Answered 01/09 with 0 |
+
+A type-01 command of the wrong length is answered with status `0x43`.
+
+**Type 02: widgets, texts and canvases.**
+
+| Command | Payload | What it does |
+|---|---|---|
+| 02/24 | `[id: 2][kind][text]` text `00` | Sets one of a widget's texts; for a text object (kind 3) the object itself. The general form of 02/19, 02/1B and 02/22 |
+| 02/2C | `[id: 2][kind][text][offset: 2]` | Sets one of a widget's text offsets (pads, knobs, buttons). The general form of 02/1A and 02/1C; not a Lua call |
+| 02/2D | `[id: 2][art][capacity]` | Creates a **button** (kind 8) from the type-13 art: the "button art" the third reading found in flash. Its texts get room for `capacity` |
+| 02/2E | `[id: 2][min][value][max]` | The button's range (max below min is `0x46`), which most likely drives its bar and marker |
+| 02/2F | `[id: 2]` three colours, A R G B each | The button's colours (defaults `0xFF000000`, `0xFF00BB00`, `0xFF0000BB`) |
+| 02/30 | `[id: 2][kind][flags][1 set / 0 clear]` | Sets or clears state flags on a pad, text, knob or button. On a knob, flag `0x08` dims it (drawn at alpha `0x35` instead of `0xFF`) |
+| 02/34 | `[canvas: 2]` x, y, w, h (signed 14-bit), A R G B | Fills a rectangle of an off-screen canvas with a colour |
+| 02/35, 02/36, 02/37 | | Stubs: decoded and answered `0x4E`. Their kind, 10, has no code |
+| 02/38 | `[id: 2][kind][width: 4][height: 4]` | The size of a widget's text box (pads, knobs, buttons); Akai's knobs use 119 × 40 |
+
+**Type 04: controls and presets.**
+
+| Command | Payload | What it does |
+|---|---|---|
+| 04/00 | `[state: 2][control: 2]` | Acts on panel control 0–37 through the same routine the panel uses; state 1 takes a path of its own, most likely the press |
+| 04/04 | an object key | Finds an uploaded object and hands it to the active preset (setting 3): most likely preset data through the object upload |
+| 04/07 | a short packed block | VIP's on-keyboard preset editor. A first byte 0–8 sets one preset field (table, two indexes checked against the table's size, value); `FE` with bytes 2 and 3 sets character `i` of the name being edited to `c`; `FF` redraws, most likely to apply |
+| 04/08 | | Stores the edited name into the active preset, with the task table paused as for flash writes |
+
+04/00 does whatever the panel control does on this firmware, and 04/04, 04/07 and 04/08 change the
+keyboard's own presets. **Leave all four alone**, as with setting 33: the refuse list under the
+third reading should hold them too.
+
+**Kinds 11 and 12** have a draw routine in the scene loop, a destroy routine and one byte that can
+be read and written, but nothing in this firmware creates one and their setters are never called:
+leftovers. Kinds 7 and 10 appear only as the kind in error replies.
+
+**What HoSTage could use from this.** 01/00 for the screen behind its pages; 02/30 to dim a knob
+or button that is out of range; 02/24, 02/2C and 02/38 to label native widgets; 02/34 to paint on a
+canvas without Lua; and the native button (02/2D–2F) beside the native knob, both untried on the
+CTRL49.
+
+### Tenth reading (2026-11-24): what the rest of ST's documents add
+
+The ST documents in `docs/STM32F429/` that the earlier readings had not used, read for what bears
+on the keyboard: TN1433 (chip markings), ES0206 (errata), the BSDL files (boundary scan), TN1489
+(physical attacks) and AN2867 (oscillators). The others (packaging, WLCSP, RTC, RNG, timers,
+self-test, functional safety, CAN, evaluation tools, IBIS models) say nothing about it; the SVD
+files could label peripheral registers in the listings.
+
+**Which chip, from its top.** A photograph of the chip, once the case is open, settles three
+things at once:
+
+- **The part.** STM32F4**29** or **39**, then a pin-count letter, a flash letter and a package
+  letter (the datasheet's ordering code). Only packages with at least 169 pins carry every pin
+  the firmware uses (checked against ST's BSDL file for each package): A (169), I (176), B (208)
+  or N (216), with T for LQFP and H for BGA. The flash letter is G (1 MB) or I (2 MB; E, 512 KB,
+  is too small for the layout), and two independent hints say G: the Advance's layout fills
+  exactly 1 MB, and its flash writer sends `0x08100000` and up to the external flash, where a
+  2 MB part keeps its second internal bank.
+- **F429 or F439.** The firmware never touches the F439's crypto or hash blocks (nor the random
+  number generator), so only the marking tells.
+- **The silicon revision.** TN1433 shows where each package carries its revision code, and
+  ES0206 (table 2) maps it: A, Y, 1, 3, or 4/5/B, the `REV_ID` `0x1000` … `0x2003` a debugger
+  also reads from `DBGMCU_IDCODE`.
+
+**What the revision decides** (ES0206; there are no errata at all for the LCD controller or DMA2D):
+
+| Erratum | Revisions | Why it matters here |
+|---|---|---|
+| 2.2.14: flash reads corrupted while PA12 is in use, on 2 MB parts or with dual bank on | A, Y, 1 | PA12 is the board's USB D+. Harmless on a 1 MB part with dual bank off: one more reason Akai's layout points to the G |
+| 2.3.4: a CPU burst read interrupted at the end of an SDRAM row | A, Y, 1 | Avoided with the SDRAM read FIFO, which the Advance turns on |
+| 2.3.5: corrupted reads when the FMC holds stack or heap | A only | The Lua heap lives in SDRAM (`mem_usage(0)` reported 20.8 MB) |
+| 2.3.9 and 2.3.15: SDRAM burst-read corruption (2.3.15 only with the read FIFO on) | all | They bite the stock firmware as much as one of ours. Firmware of our own applies ST's workaround (a precharge before switching SDRAM banks, or no FIFO) |
+
+**Boundary scan: the real board's pins without its firmware.** The chip has a boundary-scan TAP
+in series with its debug TAP (RM0090 section 38.5; ID code `0x06419041` for the F42x/43x).
+ST's BSDL files, one per package, describe it: SAMPLE reads every pin, EXTEST drives any pin, and
+both are meant to run with **NRST held low** ("Keep the NRST pin low", in the files' compliance
+pattern). So the stock firmware is not running and cannot be harmed, and nothing is read from
+flash. RM0090 switches boundary scan off only at read protection Level 2, so even at Level 1,
+where the firmware cannot be read, a JTAG adapter on JTMS, JTCK, JTDI, JTDO and NJTRST (PA13,
+PA14, PA15, PB3, PB4; dedicated to JTAG after every reset) can, on the CTRL49's own board:
+
+- read the model straps (PC8, PD13) and anything wired straight to a pin;
+- drive one pin at a time and see what answers: an LED, the backlight, a chip select;
+- clock the SPI2 shift-register chain by hand (PB13, PB15, the PI2 latch) and read its buttons
+  back on PB14.
+
+It needs the case open and the JTAG pads found, and it writes nothing to the chip. Together with
+the read-protection check it decides how far the pin map above holds for the CTRL49.
+
+**Physical attacks (TN1489).** ST's bulletin is general: an STM32 part without a SESIP or PSA
+certification covering physical attacks (none is claimed for the F429) should not be considered
+resistant to them. It names no
+attack and changes nothing here: at Level 1 there is no ordinary way to a backup, and Level 1 is
+not to be lowered.
+
+### Eleventh reading (2026-11-24): objects, storage and the commands that reboot
+
+The object family (type 05), the rest of types 03 and 06, and the settings table, read from
+their handlers. Same caveat: the Advance's firmware. Several of these write flash or restart the
+keyboard, so this section is first of all a list of what never to send.
+
+**Never send** (all of them would reach the CTRL49 if it runs this runtime):
+
+| Command | What it does |
+|---|---|
+| 03/02 | Restarts the keyboard at once (a system reset through the core's reset register) |
+| 06/00 | Writes a word into the last four bytes of the application's flash (`0x080FFFFC`), clears the asset flash's "valid" word, and restarts: most likely into update mode, with application and assets both marked for renewal |
+| 06/01 | The same without touching the assets: the application alone marked for renewal, then a restart |
+| 05/06 | Writes the asset flash's "valid" word (`0x12345678` at its last four bytes, offset `0x3FFFFC`), which the firmware checks at start. Most likely the updater's last step |
+| 05/04 | Erases one of the persistent storage areas (64 KB block erases on the external flash) |
+| 05/02 | Writes an object into its persistent storage area, or compacts the areas (an erase and a rewrite) |
+
+**The rest of type 05.** Every 05 command answers with the same command and a short status
+(0 OK, 2 not found, 4 not an uploaded object):
+
+- **05/00's "flags" byte is the object's storage state.** It is stored straight into the object
+  and decides where it lives: **4 is RAM only**, which is what VIP and HoSTage send. 0–3 are
+  persistent areas. Two of them, 2 and 3, are a ping-pong pair of 64 KB in the external flash at
+  offsets `0x3D0000` and `0x3E0000`; the active one starts with `0x10101010`, and a compaction
+  moves everything to the other. The keyboard's own presets live there too (resource type 32;
+  04/08's save ends in the same commit as 05/02).
+- **05/07 reads part of an object back:** `[key][length: 4 digits][offset: 4 digits]`, answered
+  with the bytes (MIDI-7 packed, so a frame holds about 850 of them). It reads only what is already in the RAM table (status 2 otherwise), and a
+  resource from flash gets there when something loads it, a knob's art when the knob is created,
+  for example.
+- **05/09** frees every uploaded (state 4) object; **05/0A** most likely frees one (its key was
+  not traced). Both are RAM only.
+- 05/03, 05/05 and 05/08 are empty.
+
+**So a page can be stored, and should not be yet.** Uploading with a flags byte of 2 or 3 instead
+of 4 and then sending 05/02 would keep a page in flash across power cycles: a connect without the
+3–5 s upload, only the bind and the scene. This is what the "Nothing persists" paragraph under the
+second reading did not find. But the store is 64 KB, shared with the presets, and written by
+erase and rewrite. HoSTage's page alone is about 42 KB before its images. Leave it until a backup
+of the stock firmware exists.
+
+**Setting 29 is the internal tempo on the Advance.** The settings table (32-byte rows from
+`0x080ca020`, each with its name) gives "Internal Tempo": 16.16 fixed point, minimum 30, default
+120, maximum 300. The CTRL49's 43.0 (fourth reading) is inside that range, so most likely its
+stored tempo rather than a different setting. The table also names 14 and 15 both "Requested FW
+Mode", and confirms 9 has no name.
+
+**For HoSTage:** the refuse list in `Ctrl49Protocol` (`refusalReason`, built the same day)
+refuses all of these, the settings listed under the second reading and the type-04 commands of
+the ninth, and any 05/00 whose storage state is not 4. It also refuses any frame that is not one
+well-formed CTRL49 frame, so the Akai updater's `F0 47 …` cannot go out through the session either.
 
 ### Changing the firmware, and sound (assessed 2026-11-22)
 
@@ -395,33 +1007,75 @@ are unknown; a patched vendor firmware cannot be distributed, so it could never 
 feature; and nothing would restore a CTRL49 to stock.
 
 **Firmware of our own** is shippable and starts with a head start (the chip, memory, screen
-timing and peripherals above, and the pin map, which the firmware's start-up code reveals), but it
+timing and peripherals above, and the pin map in
+[the sixth reading](#sixth-reading-2026-11-23-the-boards-pins-and-a-second-chip)), but it
 is months of work (key velocity scanning, pads, encoders, LEDs, display, USB and DIN MIDI, the
-flash chip), needs the case open, and is one-way without a backup of the stock firmware.
+flash chip), needs the case open, and is one-way without a backup of the stock firmware. The sixth
+and seventh readings take one item off that list: the keybed is scanned, velocity included, by a
+second microcontroller with firmware of its own, and the main chip only listens to four-byte
+messages from it.
 
 **The decisive first step, and it only reads.** Every STM32F42x/43x carries ST's system
-bootloader in ROM ([AN2606](https://www.st.com/resource/en/application_note/cd00167594-stm32-microcontroler-system-memory%20-Boot-mode-stmicroelectronics.pdf)),
-which cannot be erased. Started with BOOT0 high (BOOT1/PB2 low) it speaks USB DFU on PA11/PA12 and
-serial on USART1 (PA9/PA10). The Advance firmware puts its USB socket on exactly those pins
-(GPIOA 11 and 12 set to AF10, the OTG FS clock enabled), so DFU should appear on the keyboard's own
-USB cable. STM32CubeProgrammer, free from ST, then reads the readout-protection level:
+bootloader in its system memory ([AN2606](https://www.st.com/resource/en/application_note/cd00167594-stm32-microcontroler-system-memory%20-Boot-mode-stmicroelectronics.pdf),
+chapter 41), written by ST in production and outside the user flash that any erase touches. With
+BOOT0 high and BOOT1 (PB2) low at reset it runs, and listens for USB DFU on PA11/PA12 and serial on
+USART1 (PA9/PA10), as well as USART3, CAN2 and I2C1 (its version 9 adds I2C2, I2C3 and SPI1, 2
+and 4). The Advance firmware puts its USB socket on exactly those pins (GPIOA 11 and 12 set to
+AF10, which the datasheet's alternate-function table gives as OTG_FS_DM and OTG_FS_DP; the OTG FS
+clock enabled), so DFU should appear on the keyboard's own USB cable, on one condition:
 
-- **Level 0** (`0xAA`): the whole 2 MB of flash, the CTRL49's bootloader included, can be read.
-  That gives a backup, the real CTRL49 image, and a way back from any experiment.
-- **Level 1**: reads are refused. **Do not lower it to 0**: that mass-erases the chip and the
-  stock firmware is gone for good.
-- **Level 2**, or the level reads as `0xFF`: the ROM bootloader is unreachable for good. Firmware
-  work on the CTRL49 is closed.
+- **DFU needs the board's crystal.** The bootloader chooses its interface on the internal
+  oscillator, but runs DFU (and CAN) on the external clock, which must be a whole number of MHz
+  from 4 to 26. It measures that clock against the internal one, and ST notes a low crystal
+  (8 MHz) is measured more reliably than a high one (25 MHz). A board whose clock fails this gets
+  no DFU, and the way in is USART1 instead: a 3.3 V serial adapter on PA9/PA10, 8 bits, even
+  parity, the speed taken from the host's first `0x7F`. PA9 is also the USB VBUS-sense pin: if
+  the board wires the socket's 5 V to it, it is not free for that.
+- **The Advance's crystal is 25 MHz** (read 2026-11-23 from the application image). Its start-up
+  code, `SystemInit` at `0x0805e690`, switches the external oscillator on with bypass off, so a
+  crystal rather than a clock module, waits for it, and writes `0x07405419` to the PLL register:
+  source HSE, ÷25, ×336, then ÷2 for 168 MHz and ÷7 for USB's 48 MHz. Only 25 MHz gives exactly
+  that: the PLL's input must be 1–2 MHz, so ÷25 needs 25–50 MHz, and the chip takes 26 at most.
+  The routine that reports the clocks, at `0x0806de60`, carries the same 25 MHz as its crystal
+  value, beside 16 MHz for the internal oscillator. 25 MHz meets the bootloader's condition, but
+  it is the very value ST names as detected less reliably than 8 MHz: if DFU does not appear,
+  power the keyboard off and on and try again, then use USART1. The CTRL49 has the same crystal
+  if it shares the Advance's board, as everything read so far suggests; that is not checked.
 
-It needs the case open and BOOT0 pulled to 3.3 V at power-up (on the pin or its pull-down
-resistor). Connect and read only: no download, no erase, no option-byte change.
+STM32CubeProgrammer, free from ST, then connects and shows which of the three read-protection
+levels the chip is at. The level is the RDP option byte:
+
+- **Level 0** (`0xAA`): everything reads. The whole internal flash, the CTRL49's own bootloader
+  included, can be read: a backup, the real CTRL49 image, and a way back from any experiment. That
+  is 1 MB on an F429xG and 2 MB on an F429xI; the Advance's layout, a 256 KB bootloader and a
+  768 KB application slot, fills exactly 1 MB, which leans toward the xG.
+- **Level 1** (any value but `0xAA` and `0xCC`, `0xFF` included; also the level after an
+  option-byte erase): the bootloader still connects, but every read of the flash and the backup
+  SRAM is refused, from a debugger too. **Do not lower it to 0**: that mass-erases the user flash
+  and the backup SRAM, and the stock firmware is gone for good.
+- **Level 2** (`0xCC`): the chip no longer boots into its system memory at all, so with BOOT0 high
+  it starts its own firmware as usual and nothing answers on DFU or the serial port; JTAG and SWD
+  are off for good too. It cannot be undone. Firmware work on the CTRL49 is closed.
+
+It needs the case open and BOOT0 held at 3.3 V through power-up or a reset (on the pin or its
+pull-down resistor): the boot pins are latched on the fourth clock edge after reset. Connect and
+read only: no download, no erase, no option-byte change. With the case open, photograph the chip
+and look for the JTAG pads too:
+[the tenth reading](#tenth-reading-2026-11-24-what-the-rest-of-sts-documents-add) says what the
+marking settles and what boundary scan can map even at Level 1.
+
+Checked on 2026-11-23 against ST's own documents: AN2606 rev 71 (chapter 41, tables 2, 90 and
+92), RM0090 rev 22 (section 2.4 on boot, 3.7.3 on read protection) and the F427/F429 datasheet
+DS9405 rev 14 (tables 10 and 12, the ordering code). This paragraph first said a level reading
+`0xFF` was Level 2: `0xFF` is Level 1. It also missed the DFU crystal condition, which the Advance's 25 MHz meets.
 
 **Sound.** The STM32F429 is audio-capable: a serial audio interface (SAI), two I2S ports, an
 audio PLL, a two-channel 12-bit DAC, and DSP instructions. The board uses none of it for sound.
 The SAI and the DAC are never touched, and SPI2, the one I2S-capable port in use, is set up by
-`SPI_Init` as an SPI master (software chip select, clock / 16): a data bus, most likely to the
-asset flash or the LED drivers. Sound would take a DAC board on free I2S or SAI pins (whether any
-are free is unknown: the screen and the SDRAM take many), a jack, and firmware of our own. The chip
+`SPI_Init` as an SPI master (software chip select, clock / 16): it drives a shift-register chain,
+most likely the LEDs (the asset flash is on SPI5; see the sixth reading). Sound would take a DAC
+board, a jack and firmware of our own, and the pins are tight: of the audio interfaces only I2S2
+has free pins, and only if SPI2's chain moves elsewhere (the sixth reading has the detail). The chip
 is in the class of known open synth hardware (the Axoloti Core: an STM32F427 at 168 MHz with SDRAM
 and a codec; Mutable Instruments' Clouds and Elements: an STM32F405 at 168 MHz), so real synthesis
 and sample playback, never VST3s. That would be a different product from HoSTage.

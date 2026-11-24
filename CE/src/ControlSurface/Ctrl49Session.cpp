@@ -138,6 +138,10 @@ std::string Ctrl49Session::failure() const
 
 void Ctrl49Session::sendLocked (const Bytes& frame)
 {
+    // The last guard before the cable. buildFrame already refuses to build these, so this only
+    // trips on a frame put together some other way, or on bytes that are no CTRL49 frame at all.
+    if (const auto why = refusalReason (frame))
+        throw std::invalid_argument ("refused to send " + *why);
     output_.sendSysEx (frame);
 }
 

@@ -16,6 +16,48 @@ namespace
         const Bytes encoded = encodeBase128 (value, digits);
         out.insert (out.end(), encoded.begin(), encoded.end());
     }
+
+    std::string commandLabel (std::uint8_t type, std::uint8_t command)
+    {
+        static const char* hex = "0123456789ABCDEF";
+        return std::string { hex[type >> 4], hex[type & 0x0F], '/', hex[command >> 4], hex[command & 0x0F] };
+    }
+
+    // 04/01 is [id: 1 byte][value: 4 base-128 digits], the value offset by 2^27 so negatives
+    // travel. The firmware clamps a value to the setting's range; what it does not do is check
+    // the id, or stop a write that switches modes, writes flash or resets the keyboard.
+    std::optional<std::string> settingWriteRefusal (const Bytes& payload)
+    {
+        if (payload.size() != 5)
+            return std::string ("a setting write is an id and four value digits");
+
+        const std::uint8_t id = payload[0];
+        const auto value = static_cast<std::int64_t> (decodeBase128 (payload.data() + 1, 4)) - 0x08000000;
+        const auto setting = "setting " + std::to_string (id);
+
+        if (id > kLastSettingId)
+            return setting + " is past the firmware's settings table";
+
+        switch (id)
+        {
+            case 9:  return setting + " has no name in the firmware and is left alone";
+            case 13: return setting + " is the firmware mode";
+            case 14:
+                if (value == 1 || value == 2)
+                    return std::nullopt;  // leave VIP mode / VIP mode: what VIP and HoSTage send
+                return setting + " (requested firmware mode) may only be 1 or 2; 3 leads toward update mode";
+            case 15:
+                if (value == 0)
+                    return std::nullopt;  // VIP writes 0 at every start
+                return setting + " (requested firmware mode) may only be 0";
+            case 33: return setting + " saves the global settings to flash";
+            case 34: return setting + " is the firmware version, read only";
+            case 35: return setting + " is the boot ROM version, read only";
+            case 36: return setting + " is a factory reset";
+            case 37: return setting + " sends a program";
+            default: return std::nullopt;
+        }
+    }
 } // namespace
 
 //==================================================================================================
@@ -114,6 +156,8 @@ Bytes buildFrame (std::uint8_t type, std::uint8_t command, const Bytes& payload)
     for (const std::uint8_t b : payload)
         if (b >= 0x80)
             throw std::invalid_argument ("payload byte has high bit set");
+    if (const auto why = refusalReason (type, command, payload))
+        throw std::invalid_argument ("refused to build " + *why);
 
     Bytes out;
     out.reserve (sizeof (kHeader) + 4 + payload.size() + 1);
@@ -124,6 +168,95 @@ Bytes buildFrame (std::uint8_t type, std::uint8_t command, const Bytes& payload)
     out.insert (out.end(), payload.begin(), payload.end());
     out.push_back (kSysExEnd);
     return out;
+}
+
+//==================================================================================================
+// Refusals
+
+std::optional<std::string> refusalReason (std::uint8_t type, std::uint8_t command, const Bytes& payload)
+{
+    const auto refuse = [&] (const std::string& why) -> std::optional<std::string>
+    {
+        return commandLabel (type, command) + ": " + why;
+    };
+
+    switch (type)
+    {
+        case 0x03:
+            if (command == 0x02) return refuse ("restarts the keyboard");
+            if (command == 0x06) return refuse ("asks for update mode");
+            if (command == 0x07) return refuse ("writes the requested firmware mode back from what 03/06 kept");
+            break;
+
+        case 0x04:
+            switch (command)
+            {
+                case 0x00: return refuse ("acts as if a panel control were pressed");
+                case 0x01:
+                    if (const auto why = settingWriteRefusal (payload))
+                        return refuse (*why);
+                    break;
+                case 0x02:
+                    if (payload.size() != 1)
+                        return refuse ("a setting read is one id");
+                    if (payload[0] > kLastSettingId)
+                        return refuse ("setting " + std::to_string (payload[0]) + " is past the firmware's settings table");
+                    break;
+                case 0x04: return refuse ("copies an uploaded object into the active preset");
+                case 0x07: return refuse ("edits the keyboard's stored presets");
+                case 0x08: return refuse ("stores the edited preset name");
+                default: break;
+            }
+            break;
+
+        case 0x05:
+            switch (command)
+            {
+                case 0x00:
+                    if (payload.size() != 9)
+                        return refuse ("an object begin is a key, a size and a storage state");
+                    if (payload[8] != kObjectStateRam)
+                        return refuse ("storage state " + std::to_string (payload[8])
+                                       + " would put the object in flash; only 4 (RAM) may be sent");
+                    break;
+                case 0x02: return refuse ("writes an object into the keyboard's flash");
+                case 0x04: return refuse ("erases a storage area of the keyboard's flash");
+                case 0x06: return refuse ("marks the keyboard's asset flash valid");
+                default: break;
+            }
+            break;
+
+        case 0x06:
+            if (command == 0x00 || command == 0x01)
+                return refuse ("marks the firmware for renewal and restarts the keyboard");
+            break;
+
+        default:
+            break;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> refusalReason (const Bytes& frame)
+{
+    // F0 [header 5] TT CC L0 L1 [payload] F7
+    constexpr std::size_t kOverhead = sizeof (kHeader) + 4 + 1;
+    if (frame.size() < kOverhead || frame.back() != kSysExEnd)
+        return std::string ("not a complete CTRL49 frame");
+    for (std::size_t i = 0; i < sizeof (kHeader); ++i)
+        if (frame[i] != kHeader[i])
+            return std::string ("not a CTRL49 frame (another device's header)");
+    for (std::size_t i = 1; i + 1 < frame.size(); ++i)
+        if (frame[i] >= 0x80)
+            return std::string ("a CTRL49 frame byte has its high bit set");
+
+    const std::size_t declared = decodeBase128 (frame.data() + sizeof (kHeader) + 2, 2);
+    if (declared != frame.size() - kOverhead)
+        return std::string ("the frame's length field does not match its payload");
+
+    const auto first = frame.begin() + static_cast<std::ptrdiff_t> (sizeof (kHeader) + 4);
+    const Bytes payload (first, frame.end() - 1);
+    return refusalReason (frame[sizeof (kHeader)], frame[sizeof (kHeader) + 1], payload);
 }
 
 //==================================================================================================

@@ -348,6 +348,40 @@ int main()
         check (slept == 2 * (int) expected.size(), "at the startup sequence's pace, 2 ms a frame");
     }
 
+    {   // --- nothing a session sends is on the refuse list -------------------------------------
+        // The refuse list (Ctrl49Protocol.h) is checked twice, when a frame is built and when the
+        // session sends it. A whole session, start to stop with every kind of live traffic, must
+        // pass both: if it did not, the list would be refusing what CEditor needs.
+        struct Recorder final : IControllerOutput
+        {
+            std::vector<Bytes> frames;
+            void sendSysEx (const Bytes& frame) override { frames.push_back (frame); }
+        } out;
+        Ctrl49SessionOptions options;
+        options.loadingMilliseconds = 900;
+        options.sleep = [] (int) {};
+        const std::vector<Ctrl49Session::PngAsset> assets { { 0x0200, Bytes (700, 0x11) } };
+        Ctrl49Session session (out, Bytes (100, static_cast<std::uint8_t> ('-')), assets, options);
+
+        bool threw = false;
+        try
+        {
+            session.start();
+            session.callLua ("set_labels", { 0x01, 0x02 }, true);
+            session.uploadPng (0x0301, Bytes (600, 0x22));
+            session.setPadRgb (3, 10, 20, 30);
+            session.setAllPadsRgb (255, 165, 0);
+            session.setActivePadBank (2);
+        }
+        catch (const std::exception&) { threw = true; }
+        session.stop();
+
+        bool allPass = ! out.frames.empty();
+        for (const auto& frame : out.frames)
+            allPass = allPass && ! refusalReason (frame);
+        check (! threw && allPass, "a whole session, start to stop, sends nothing the refuse list refuses");
+    }
+
     std::cout << "-------------------\n"
               << (failures == 0 ? "ALL PASS" : std::to_string (failures) + " FAILED") << std::endl;
     return failures == 0 ? 0 : 1;

@@ -52,8 +52,34 @@ Bytes decodeMidi7 (const Bytes& encoded, std::size_t rawSize);
 inline constexpr std::size_t kMaxPayloadBytes = 1000;
 
 // Wraps a payload in the vendor frame. Throws std::invalid_argument if any payload byte
-// is >= 0x80 or the payload exceeds kMaxPayloadBytes.
+// is >= 0x80, the payload exceeds kMaxPayloadBytes, or the frame is one refusalReason()
+// refuses: those are never built, so they cannot be sent by accident.
 Bytes buildFrame (std::uint8_t type, std::uint8_t command, const Bytes& payload);
+
+//==================================================================================================
+// Refusals
+//
+// Frames that must never reach the keyboard: they restart it, write its flash, switch it toward
+// update mode, act on its panel or its stored presets, or read past the end of its settings table.
+// Read statically from the Akai ADVANCE firmware, whose display runtime the CTRL49 shares (the
+// second, ninth and eleventh readings in tools/ctrl49/README.md). Nothing CEditor uses is in it:
+// the session's own frames, VIP mode on (14 = 2) included, all pass. buildFrame refuses to build
+// these and Ctrl49Session refuses to send them.
+
+// The last id in the firmware's settings table (37, "Send Program"). 04/01 and 04/02 do not
+// check the id, so a larger one reads or writes past the table.
+inline constexpr std::uint8_t kLastSettingId = 37;
+
+// 05/00's last byte is the object's storage state, not a flag: 4 keeps the object in RAM,
+// 0-3 put it in a persistent flash area that 05/02 then writes. Only 4 may be sent.
+inline constexpr std::uint8_t kObjectStateRam = 0x04;
+
+// Why this type/command/payload must not be sent, or nullopt if it may be.
+std::optional<std::string> refusalReason (std::uint8_t type, std::uint8_t command, const Bytes& payload);
+
+// The same for a complete frame. Also refuses anything that is not one well-formed CTRL49 frame
+// (another device's SysEx, the Akai updater's F0 47 ..., a truncated or mislabelled frame).
+std::optional<std::string> refusalReason (const Bytes& frame);
 
 //==================================================================================================
 // Object upload (type 0x05): Lua source and PNG assets into device RAM.
@@ -72,9 +98,11 @@ struct ObjectKey
 
 Bytes objectKeyBytes (ObjectKey key);
 
-// 05/00: [key 4] [total raw size: 4 base-128 digits] [flags 1].
-// Flags 0x04 is the replay-proven Lua value; its independent meaning is unknown.
-Bytes buildObjectBegin (ObjectKey key, std::uint32_t totalRawSize, std::uint8_t flags = 0x04);
+// 05/00: [key 4] [total raw size: 4 base-128 digits] [storage state 1].
+// The last byte, once read as unexplained flags, is the object's storage state (the eleventh
+// reading in tools/ctrl49/README.md): kObjectStateRam, the replay-proven value, keeps the object
+// in RAM. Any other state would land it in the keyboard's flash, so buildFrame refuses it.
+Bytes buildObjectBegin (ObjectKey key, std::uint32_t totalRawSize, std::uint8_t flags = kObjectStateRam);
 
 // 05/01: [key 4] [raw chunk size 4] [raw destination offset 4] [encoded size 2] [MIDI-7 data].
 Bytes buildObjectChunk (ObjectKey key, const Bytes& rawChunk, std::uint32_t rawOffset);

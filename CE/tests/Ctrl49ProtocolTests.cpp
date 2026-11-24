@@ -195,6 +195,122 @@ int main()
                "a full 512-byte upload chunk fits the frame limit");
     }
 
+    // --- refusals (tools/ctrl49/README.md: second, ninth and eleventh readings) --------------------
+    {
+        // A setting write as the keyboard reads it: id, then the value + 2^27 in four digits.
+        const auto settingWrite = [] (std::uint8_t id, std::int64_t value)
+        {
+            Bytes payload { id };
+            const Bytes digits = encodeBase128 (static_cast<std::uint32_t> (value + 0x08000000), 4);
+            payload.insert (payload.end(), digits.begin(), digits.end());
+            return payload;
+        };
+        const auto refused = [] (std::uint8_t type, std::uint8_t command, const Bytes& payload)
+        {
+            bool threw = false;
+            try { buildFrame (type, command, payload); }
+            catch (const std::invalid_argument&) { threw = true; }
+            return refusalReason (type, command, payload).has_value() && threw;
+        };
+        const auto allowed = [] (std::uint8_t type, std::uint8_t command, const Bytes& payload)
+        {
+            if (refusalReason (type, command, payload)) return false;
+            try { buildFrame (type, command, payload); return true; }
+            catch (const std::invalid_argument&) { return false; }
+        };
+
+        // Restarts, update mode, flash writes: refused whatever they carry.
+        check (refused (0x03, 0x02, {}), "03/02 (restart) is refused");
+        check (refused (0x03, 0x06, {}), "03/06 (update mode) is refused");
+        check (refused (0x03, 0x07, {}), "03/07 (writes the requested mode back) is refused");
+        check (refused (0x06, 0x00, {}) && refused (0x06, 0x01, {}),
+               "06/00 and 06/01 (firmware renewal and restart) are refused");
+        check (refused (0x05, 0x02, objectKeyBytes ({ kObjectTypeLua, 0x0101 })),
+               "05/02 (write an object to flash) is refused");
+        check (refused (0x05, 0x04, { 0x02 }), "05/04 (erase a storage area) is refused");
+        check (refused (0x05, 0x06, {}), "05/06 (mark the asset flash valid) is refused");
+        check (refused (0x04, 0x00, { 0x00, 0x01, 0x00, 0x05 }), "04/00 (press a panel control) is refused");
+        check (refused (0x04, 0x04, objectKeyBytes ({ 0x0020, 0x0000 })), "04/04 (object into a preset) is refused");
+        check (refused (0x04, 0x07, { 0x7F, 0x01 }) && refused (0x04, 0x08, {}),
+               "04/07 and 04/08 (preset editing and saving) are refused");
+
+        // The object begin: only the RAM state goes out.
+        const ObjectKey lua { kObjectTypeLua, 0x0101 };
+        {
+            const Bytes begin = buildObjectBegin (lua, 3406);
+            check (allowed (0x05, 0x00, Bytes (begin.begin() + 10, begin.end() - 1)),
+                   "05/00 with storage state 4 (RAM) is built");
+        }
+        checkThrows ([&lua] { buildObjectBegin (lua, 3406, 0x02); },
+                     "05/00 with storage state 2 (a flash area) is refused");
+        check (refused (0x05, 0x00, { 0x00, 0x10, 0x02, 0x01, 0x00, 0x00, 0x1A, 0x4E }),
+               "and so is a 05/00 without its storage state");
+
+        // Settings: the session's own write, and the ones HoSTage could use, pass.
+        check (allowed (0x04, 0x01, { 0x0E, 0x40, 0x00, 0x00, 0x02 }),
+               "the session's own 04/01 (setting 14 = 2, VIP mode) is built byte for byte");
+        check (allowed (0x04, 0x01, settingWrite (14, 1)), "setting 14 = 1 (leave VIP mode) is allowed");
+        check (allowed (0x04, 0x01, settingWrite (15, 0)), "setting 15 = 0 (as VIP writes it) is allowed");
+        check (allowed (0x04, 0x01, settingWrite (16, 1)), "setting 16 = 1 (VIP timeout off) is allowed");
+        check (allowed (0x04, 0x01, settingWrite (20, 3)), "setting 20 = 3 (brightness) is allowed");
+        check (allowed (0x04, 0x01, settingWrite (22, -2)), "setting 22 = -2 (octave, a negative) is allowed");
+        check (allowed (0x04, 0x01, settingWrite (29, 120 << 16)), "setting 29 = 120.0 (tempo) is allowed");
+
+        // ... and every write that switches modes, writes flash, resets or reads past the table does not.
+        check (refused (0x04, 0x01, settingWrite (14, 3)), "setting 14 = 3 (toward update mode) is refused");
+        check (refused (0x04, 0x01, settingWrite (14, 0)), "setting 14 = 0 is refused");
+        check (refused (0x04, 0x01, settingWrite (15, 1)), "setting 15 = 1 is refused");
+        check (refused (0x04, 0x01, settingWrite (13, 2)), "setting 13 (firmware mode) is refused");
+        check (refused (0x04, 0x01, settingWrite (9, 0)), "setting 9 (no name) is refused");
+        bool flashOrReset = true;
+        for (std::uint8_t id = 33; id <= 37; ++id)
+            flashOrReset = flashOrReset && refused (0x04, 0x01, settingWrite (id, 1));
+        check (flashOrReset, "settings 33-37 (save, versions, factory reset, send program) are refused");
+        check (refused (0x04, 0x01, settingWrite (38, 0)) && refused (0x04, 0x01, settingWrite (127, 0)),
+               "setting ids past the table are refused");
+        check (refused (0x04, 0x01, { 0x14, 0x40 }), "a truncated setting write is refused");
+
+        // Setting reads: anything in the table, nothing past it.
+        check (allowed (0x04, 0x02, { 0x0A }), "the session's own 04/02 (read setting 10) is built");
+        check (allowed (0x04, 0x02, { kLastSettingId }), "reading the last setting (37) is allowed");
+        check (refused (0x04, 0x02, { 38 }) && refused (0x04, 0x02, {}),
+               "reading past the table, or with no id, is refused");
+
+        // Everything CEditor builds still builds.
+        check (allowed (0x01, 0x00, { 0x01, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
+               "01/00 (background colour), as the session sends it, is built");
+        check (! refusalReason (buildKeepalive()) && ! refusalReason (buildIdentityQuery())
+                 && ! refusalReason (buildLedLevel (kLedPadBankA, kLedOn))
+                 && ! refusalReason (buildPadRgb (1, 255, 165, 0)) && ! refusalReason (buildDraw (2, {})),
+               "keepalive, identity, LED, pad RGB and draw frames all pass the frame check");
+        {
+            bool uploadPasses = true;
+            for (const auto& frame : buildObjectUpload (lua, Bytes (3406, 0x2A)))
+                uploadPasses = uploadPasses && ! refusalReason (frame);
+            check (uploadPasses, "every frame of an object upload passes the frame check");
+        }
+
+        // The frame check also refuses what is not a CTRL49 frame at all.
+        check (refusalReason (Bytes { 0xF0, 0x47, 0x00, 0x2E, 0x70, 0x00, 0x00, 0xF7 }).has_value(),
+               "the Akai updater's F0 47 ... is refused");
+        {
+            auto truncated = buildKeepalive();
+            truncated.pop_back();
+            auto mislabelled = buildDraw (2, {});
+            mislabelled[9] = static_cast<std::uint8_t> (mislabelled[9] + 1);
+            check (refusalReason (truncated).has_value() && refusalReason (mislabelled).has_value()
+                     && refusalReason (Bytes {}).has_value(),
+                   "a truncated, mislabelled or empty frame is refused");
+        }
+        check (refusalReason (Bytes { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08, 0x06, 0x00, 0x00, 0x00, 0xF7 }).has_value()
+                 && refusalReason (Bytes { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08, 0x03, 0x02, 0x00, 0x00, 0xF7 }).has_value(),
+               "a hand-made 06/00 or 03/02 frame is refused");
+        {
+            const auto why = refusalReason (0x05, 0x06, {});
+            check (why && why->rfind ("05/06: ", 0) == 0, "a refusal names the command first");
+        }
+    }
+
     // --- replies ----------------------------------------------------------------------------------
     {   // captured from VIP's startup: draw acknowledged OK
         const Bytes ok { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08, 0x02, 0x3D, 0x00, 0x04, 0x0D, 0x02, 0x39, 0x40, 0xF7 };
