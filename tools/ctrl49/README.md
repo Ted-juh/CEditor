@@ -394,11 +394,16 @@ own header and ports (the table below); the VX49 very likely too. Untested: it n
    [the fourth reading](#fourth-reading-2026-11-23-the-usb-captures-of-vip): labels that cost no
    Lua, and octave and transpose shown by the keyboard itself.
 3. Settings over 04/01: octave, transpose, velocity curve, tempo, clock source and brightness per
-   song; the VIP timeout off during a heavy song load.
+   song; the VIP timeout off during a heavy song load. **The builders exist (2026-11-24):**
+   `buildSetSetting` and `buildReadSetting` in `Ctrl49Protocol`, the ids named in
+   `ctrl49::setting`, `parseSettingReply` for the answer, and the 16.16 tempo helpers; checked
+   against VIP's captured writes, reads and the keyboard's captured answers. Nothing in HoSTage
+   calls them yet.
 4. Pages that redraw themselves (`lua_widget_make_dirty` from `draw()`): meters, peak hold and
    marquees on the keyboard, the host sending only changes.
 5. A ping, so a dead keyboard is noticed; the keepalive's own reply already says whether the
-   keyboard is still in VIP mode.
+   keyboard is still in VIP mode. **Built (2026-11-24):** `buildPing` and `isPingReply`. What
+   remains is the app side: sending it and noticing when no answer comes back.
 6. LEDs set from Lua, for feedback that does not wait for the host.
 7. `load()` for patching a running page; a Lua drawing library; `print` and `mem_usage(7)` while
    developing pages.

@@ -17,6 +17,28 @@ namespace
         out.insert (out.end(), encoded.begin(), encoded.end());
     }
 
+    // A setting value on the wire: four base-128 digits, offset by 2^27 so negatives travel.
+    constexpr std::int64_t kSettingValueOffset = 0x08000000;
+
+    // The payload of a complete CTRL49 frame of this type and command, or nullopt.
+    std::optional<Bytes> framePayload (const Bytes& f, std::uint8_t type, std::uint8_t command)
+    {
+        constexpr std::size_t kOverhead = sizeof (kHeader) + 4 + 1;
+        if (f.size() < kOverhead || f.back() != kSysExEnd)
+            return std::nullopt;
+        for (std::size_t i = 0; i < sizeof (kHeader); ++i)
+            if (f[i] != kHeader[i])
+                return std::nullopt;
+        if (f[sizeof (kHeader)] != type || f[sizeof (kHeader) + 1] != command)
+            return std::nullopt;
+        for (std::size_t i = 1; i + 1 < f.size(); ++i)
+            if (f[i] >= 0x80)
+                return std::nullopt;
+        if (decodeBase128 (f.data() + sizeof (kHeader) + 2, 2) != f.size() - kOverhead)
+            return std::nullopt;
+        return Bytes (f.begin() + static_cast<std::ptrdiff_t> (sizeof (kHeader) + 4), f.end() - 1);
+    }
+
     std::string commandLabel (std::uint8_t type, std::uint8_t command)
     {
         static const char* hex = "0123456789ABCDEF";
@@ -32,29 +54,29 @@ namespace
             return std::string ("a setting write is an id and four value digits");
 
         const std::uint8_t id = payload[0];
-        const auto value = static_cast<std::int64_t> (decodeBase128 (payload.data() + 1, 4)) - 0x08000000;
-        const auto setting = "setting " + std::to_string (id);
+        const auto value = static_cast<std::int64_t> (decodeBase128 (payload.data() + 1, 4)) - kSettingValueOffset;
+        const auto name = "setting " + std::to_string (id);
 
         if (id > kLastSettingId)
-            return setting + " is past the firmware's settings table";
+            return name + " is past the firmware's settings table";
 
         switch (id)
         {
-            case 9:  return setting + " has no name in the firmware and is left alone";
-            case 13: return setting + " is the firmware mode";
-            case 14:
+            case 9:  return name + " has no name in the firmware and is left alone";
+            case setting::kFirmwareMode: return name + " is the firmware mode";
+            case setting::kRequestedMode:
                 if (value == 1 || value == 2)
                     return std::nullopt;  // leave VIP mode / VIP mode: what VIP and HoSTage send
-                return setting + " (requested firmware mode) may only be 1 or 2; 3 leads toward update mode";
-            case 15:
+                return name + " (requested firmware mode) may only be 1 or 2; 3 leads toward update mode";
+            case setting::kRequestedMode2:
                 if (value == 0)
                     return std::nullopt;  // VIP writes 0 at every start
-                return setting + " (requested firmware mode) may only be 0";
-            case 33: return setting + " saves the global settings to flash";
-            case 34: return setting + " is the firmware version, read only";
-            case 35: return setting + " is the boot ROM version, read only";
-            case 36: return setting + " is a factory reset";
-            case 37: return setting + " sends a program";
+                return name + " (requested firmware mode) may only be 0";
+            case 33: return name + " saves the global settings to flash";
+            case setting::kFirmwareVersion: return name + " is the firmware version, read only";
+            case setting::kBootRomVersion:  return name + " is the boot ROM version, read only";
+            case 36: return name + " is a factory reset";
+            case 37: return name + " sends a program";
             default: return std::nullopt;
         }
     }
@@ -420,6 +442,33 @@ Bytes buildPadRgb (std::uint8_t padId, std::uint8_t red, std::uint8_t green, std
 }
 
 //==================================================================================================
+// Device settings
+
+Bytes buildSetSetting (std::uint8_t id, std::int32_t value)
+{
+    const std::int64_t wire = static_cast<std::int64_t> (value) + kSettingValueOffset;
+    if (wire < 0 || wire >= (std::int64_t (1) << 28))
+        throw std::invalid_argument ("setting value does not fit the wire's 28 bits");
+
+    Bytes payload { id };
+    appendBase128 (payload, static_cast<std::uint32_t> (wire), 4);
+    return buildFrame (0x04, 0x01, payload);  // refuses what must not be written
+}
+
+Bytes buildReadSetting (std::uint8_t id)
+{
+    return buildFrame (0x04, 0x02, { id });   // refuses an id past the table
+}
+
+//==================================================================================================
+// Liveness
+
+Bytes buildPing()
+{
+    return buildFrame (0x06, 0x02, {});
+}
+
+//==================================================================================================
 // Replies
 
 std::optional<Ctrl49Ack> parseAck (const Bytes& f)
@@ -433,6 +482,21 @@ std::optional<Ctrl49Ack> parseAck (const Bytes& f)
     if (decodeBase128 (f.data() + 8, 2) < 4)
         return std::nullopt;
     return Ctrl49Ack { f[12], f[13] };
+}
+
+std::optional<Ctrl49SettingValue> parseSettingReply (const Bytes& frame)
+{
+    const auto payload = framePayload (frame, 0x04, 0x02);
+    if (! payload || payload->size() != 5)
+        return std::nullopt;
+    const auto value = static_cast<std::int64_t> (decodeBase128 (payload->data() + 1, 4)) - kSettingValueOffset;
+    return Ctrl49SettingValue { (*payload)[0], static_cast<std::int32_t> (value) };
+}
+
+bool isPingReply (const Bytes& frame)
+{
+    const auto payload = framePayload (frame, 0x06, 0x03);
+    return payload && payload->size() == 1 && (*payload)[0] == 0x00;
 }
 
 std::string ackStatusName (std::uint8_t status)

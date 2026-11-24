@@ -380,6 +380,20 @@ int main()
         for (const auto& frame : out.frames)
             allPass = allPass && ! refusalReason (frame);
         check (! threw && allPass, "a whole session, start to stop, sends nothing the refuse list refuses");
+
+        // The start-up's two setting frames, now built, are still the replay's bytes.
+        const Bytes vipMode { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08, 0x04, 0x01, 0x00, 0x05,
+                              0x0E, 0x40, 0x00, 0x00, 0x02, 0xF7 };
+        const Bytes readTen { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08, 0x04, 0x02, 0x00, 0x01, 0x0A, 0xF7 };
+        const auto startup = Ctrl49Session::buildStartupSequence (Bytes (100, static_cast<std::uint8_t> ('-')));
+        int vipModes = 0, readTens = 0;
+        for (const auto& step : startup)
+        {
+            vipModes += step.frame == vipMode ? 1 : 0;
+            readTens += step.frame == readTen ? 1 : 0;
+        }
+        check (vipModes == 1 && readTens == 1,
+               "the start-up still sends setting 14 = 2 and reads setting 10, byte for byte");
     }
 
     std::cout << "-------------------\n"

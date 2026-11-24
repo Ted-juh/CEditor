@@ -240,7 +240,9 @@ Code, in the order suggested:
    any value but 0; 33, 36, 37; ids outside the table), 04/01 and 04/02 builders, and a ping
    (06/02) so a silent keyboard is noticed. Not "settings 13–15" whole: HoSTage starts with
    14 = 2, as VIP does. The refuse list is built (2026-11-24, `refusalReason`), wider than this
-   line: the README's eleventh reading added restarts, flash writes and 05/00's storage state.
+   line: the README's eleventh reading added restarts, flash writes and 05/00's storage state. The
+   04/01 and 04/02 builders and the ping are built too (`buildSetSetting`, `buildReadSetting`,
+   `buildPing`, with their reply parsers); the app does not use them yet.
 4. What an idle worker spends about 3% of a fast core on, every block.
 5. LV2 hosting, if the Pi is the target.
 6. A Lua drawing library for pages, tested in the preview.

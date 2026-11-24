@@ -55,8 +55,8 @@ Ctrl49Session::buildStartupSequence (const Bytes& rawLua, const std::vector<PngA
     sequence.push_back ({ buildIdentityQuery(), 2 });
     sequence.push_back ({ buildKeepalive(), 2 });
 
-    // Replay-preserved setup frames; vendor names unknown, bytes proven.
-    sequence.push_back ({ buildFrame (0x04, 0x01, { 0x0E, 0x40, 0x00, 0x00, 0x02 }), 2 });
+    // Request VIP mode (setting 14 = 2), VIP's own first setting write; the bytes are the replay's.
+    sequence.push_back ({ buildSetSetting (setting::kRequestedMode, 2), 2 });
 
     sequence.push_back ({ buildSceneBegin (0x20), 2 });
     sequence.push_back ({ buildCreateTarget (kTarget), 2 });
@@ -75,7 +75,7 @@ Ctrl49Session::buildStartupSequence (const Bytes& rawLua, const std::vector<PngA
     sequence.push_back ({ buildLedLevel (kLedPadBankD, kLedOff), 1 });
     for (std::uint8_t pad = 1; pad <= 8; ++pad)
         sequence.push_back ({ padOrangeFrame (pad), 1 });
-    sequence.push_back ({ buildFrame (0x04, 0x02, { 0x0A }), 2 });
+    sequence.push_back ({ buildReadSetting (setting::kTimeDivState), 2 });  // as VIP reads it
 
     sequence.push_back ({ buildIdentityQuery(), 2 });
 

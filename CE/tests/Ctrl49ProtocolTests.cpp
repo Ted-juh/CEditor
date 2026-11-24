@@ -195,6 +195,70 @@ int main()
                "a full 512-byte upload chunk fits the frame limit");
     }
 
+    // --- device settings and the ping (VIP's frames from the USB captures, fourth reading) -----------
+    {
+        const Bytes h { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08 };
+        const auto frame = [&h] (std::uint8_t type, std::uint8_t command, const Bytes& payload)
+        {
+            Bytes f = h;
+            f.push_back (type);
+            f.push_back (command);
+            f.push_back (static_cast<std::uint8_t> (payload.size() >> 7));
+            f.push_back (static_cast<std::uint8_t> (payload.size() & 0x7F));
+            f.insert (f.end(), payload.begin(), payload.end());
+            f.push_back (0xF7);
+            return f;
+        };
+
+        checkBytes (buildSetSetting (setting::kRequestedMode, 2), frame (0x04, 0x01, { 0x0E, 0x40, 0x00, 0x00, 0x02 }),
+                    "04/01 setting 14 = 2: VIP's first setting write, byte for byte");
+        checkBytes (buildSetSetting (setting::kRequestedMode, 1), frame (0x04, 0x01, { 0x0E, 0x40, 0x00, 0x00, 0x01 }),
+                    "04/01 setting 14 = 1: what VIP sends when it closes");
+        checkBytes (buildSetSetting (setting::kRequestedMode2, 0), frame (0x04, 0x01, { 0x0F, 0x40, 0x00, 0x00, 0x00 }),
+                    "04/01 setting 15 = 0: what VIP writes at every start");
+        checkBytes (buildSetSetting (setting::kOctave, -2), frame (0x04, 0x01, { 0x16, 0x3F, 0x7F, 0x7F, 0x7E }),
+                    "04/01 octave -2: a negative travels as 2^27 - 2 (derived)");
+        check (tempoToSettingValue (120.0) == (120 << 16), "tempo 120 BPM is 120 << 16 (16.16)");
+        checkBytes (buildSetSetting (setting::kInternalTempo, tempoToSettingValue (120.0)),
+                    frame (0x04, 0x01, { 0x1D, 0x43, 0x60, 0x00, 0x00 }),
+                    "04/01 internal tempo 120.0 (derived)");
+        checkThrows ([] { buildSetSetting (setting::kOctave, 1 << 27); },
+                     "04/01 refuses a value past the wire's 28 bits");
+        checkThrows ([] { buildSetSetting (36, 1); }, "04/01 refuses a factory reset (setting 36)");
+        checkThrows ([] { buildSetSetting (setting::kRequestedMode, 3); }, "04/01 refuses setting 14 = 3");
+
+        checkBytes (buildReadSetting (setting::kTimeDivState), frame (0x04, 0x02, { 0x0A }),
+                    "04/02 read setting 10: VIP's first read, byte for byte");
+        checkBytes (buildReadSetting (setting::kInternalTempo), frame (0x04, 0x02, { 0x1D }),
+                    "04/02 read setting 29, as VIP reads the tempo");
+        checkThrows ([] { buildReadSetting (static_cast<std::uint8_t> (kLastSettingId + 1)); },
+                     "04/02 refuses an id past the table");
+
+        // The keyboard's answers, captured.
+        {
+            const auto channel = parseSettingReply (frame (0x04, 0x02, { 0x12, 0x40, 0x00, 0x00, 0x01 }));
+            const auto octave  = parseSettingReply (frame (0x04, 0x02, { 0x16, 0x40, 0x00, 0x00, 0x00 }));
+            const auto tempo   = parseSettingReply (frame (0x04, 0x02, { 0x1D, 0x41, 0x2C, 0x00, 0x00 }));
+            check (channel && channel->id == setting::kCommonChannel && channel->value == 1,
+                   "a captured answer: common channel (18) is 1");
+            check (octave && octave->id == setting::kOctave && octave->value == 0, "a captured answer: octave (22) is 0");
+            check (tempo && tempo->id == setting::kInternalTempo && settingValueToTempo (tempo->value) == 43.0,
+                   "a captured answer: the tempo (29) the CTRL49 reported, 43.0");
+            const auto negative = parseSettingReply (frame (0x04, 0x02, { 0x16, 0x3F, 0x7F, 0x7F, 0x7E }));
+            check (negative && negative->value == -2, "an answer of -2 reads back as -2");
+        }
+        check (! parseSettingReply (buildReadSetting (setting::kOctave)) && ! parseSettingReply (buildKeepalive())
+                 && ! parseSettingReply (frame (0x04, 0x02, { 0x16, 0x40, 0x00 })),
+               "a host's own read, another frame or a short answer is not a setting answer");
+
+        checkBytes (buildPing(), frame (0x06, 0x02, {}), "06/02 ping");
+        check (isPingReply (frame (0x06, 0x03, { 0x00 })), "06/03 with one zero byte is the ping's answer");
+        check (! isPingReply (buildPing()) && ! isPingReply (frame (0x03, 0x01, { 0x02 }))
+                 && ! isPingReply (frame (0x06, 0x03, {})),
+               "the ping itself, a keepalive answer or an empty 06/03 is not");
+        check (! refusalReason (buildPing()), "the ping passes the refuse list");
+    }
+
     // --- refusals (tools/ctrl49/README.md: second, ninth and eleventh readings) --------------------
     {
         // A setting write as the keyboard reads it: id, then the value + 2^27 in four digits.

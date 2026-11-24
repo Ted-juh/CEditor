@@ -165,6 +165,81 @@ Bytes buildLedLevel (std::uint8_t control, std::uint8_t level);
 Bytes buildPadRgb (std::uint8_t padId, std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
 //==================================================================================================
+// Device settings (04/01 sets, 04/02 reads)
+//
+// The firmware keeps a table of settings, each with an id, a range and a default (the second
+// reading in tools/ctrl49/README.md, its names confirmed in the eleventh). 04/01 is [id][value],
+// 04/02 is [id] and is answered 04/02 [id][value]. A value travels as four base-128 digits offset
+// by 2^27, so negatives work; the firmware clamps it to the setting's range and acts only on a
+// change. Ids and names are the Advance's: 18, 22 and 23 are proven on the CTRL49 (VIP shows them
+// as "MIDI Ch", "Oct" and "Trans"), the rest are very likely the same.
+namespace setting
+{
+    inline constexpr std::uint8_t kCurrentPage          = 0;
+    inline constexpr std::uint8_t kBank                 = 1;   // 0-3
+    inline constexpr std::uint8_t kCursorPreset         = 2;   // 0-31
+    inline constexpr std::uint8_t kActivePreset         = 3;   // 0-31
+    inline constexpr std::uint8_t kStopOrPlay           = 4;
+    inline constexpr std::uint8_t kArpState             = 5;
+    inline constexpr std::uint8_t kArpLatch             = 6;
+    inline constexpr std::uint8_t kNoteRepeat           = 7;
+    inline constexpr std::uint8_t kPadFullLevel         = 8;
+    inline constexpr std::uint8_t kTimeDivState         = 10;
+    inline constexpr std::uint8_t kShiftButtonState     = 11;
+    inline constexpr std::uint8_t kTimeDivValue         = 12;  // 0-7
+    inline constexpr std::uint8_t kFirmwareMode         = 13;  // read only here: refused as a write
+    inline constexpr std::uint8_t kRequestedMode        = 14;  // 1 normal, 2 VIP; nothing else may be sent
+    inline constexpr std::uint8_t kRequestedMode2       = 15;  // VIP writes 0 at every start
+    inline constexpr std::uint8_t kDisableVipTimeout    = 16;  // 1: a host stall no longer drops the screen
+    inline constexpr std::uint8_t kLuaHooks             = 17;
+    inline constexpr std::uint8_t kCommonChannel        = 18;  // 1-32
+    inline constexpr std::uint8_t kNoteDisplayType      = 19;
+    inline constexpr std::uint8_t kScreenBrightness     = 20;  // 1-10
+    inline constexpr std::uint8_t kTransportFormat      = 21;  // 0-4
+    inline constexpr std::uint8_t kOctave               = 22;  // -4..4
+    inline constexpr std::uint8_t kTranspose            = 23;  // -36..36
+    inline constexpr std::uint8_t kKeybedCurve          = 24;  // 0-4
+    inline constexpr std::uint8_t kKeybedSensitivity    = 25;  // 1-10
+    inline constexpr std::uint8_t kPadThreshold         = 26;  // 0-15
+    inline constexpr std::uint8_t kPadCurve             = 27;  // 0-4
+    inline constexpr std::uint8_t kPadSensitivity       = 28;  // 1-10
+    inline constexpr std::uint8_t kInternalTempo        = 29;  // 16.16 fixed point, 30-300 BPM
+    inline constexpr std::uint8_t kTapAverage           = 30;  // 2-4
+    inline constexpr std::uint8_t kTempoLed             = 31;
+    inline constexpr std::uint8_t kClockSource          = 32;
+    inline constexpr std::uint8_t kFirmwareVersion      = 34;  // read only
+    inline constexpr std::uint8_t kBootRomVersion       = 35;  // read only
+} // namespace setting
+
+// 04/01: sets a device setting. Throws std::invalid_argument for a value that does not fit the
+// wire's 28 bits (-2^27 .. 2^27-1) and, through buildFrame, for any write the refuse list refuses
+// (setting 13, 14 other than 1 or 2, 15 other than 0, 33-37, ids past the table).
+Bytes buildSetSetting (std::uint8_t id, std::int32_t value);
+
+// 04/02: asks for a device setting; the keyboard answers 04/02 with the id and the value
+// (parseSettingReply). Throws for an id past the table, which the firmware would read wild.
+Bytes buildReadSetting (std::uint8_t id);
+
+// The internal tempo is 16.16 fixed point: 120 BPM is 120 << 16.
+inline constexpr std::int32_t tempoToSettingValue (double bpm) noexcept
+{
+    return static_cast<std::int32_t> (bpm * 65536.0 + (bpm >= 0 ? 0.5 : -0.5));
+}
+inline constexpr double settingValueToTempo (std::int32_t value) noexcept
+{
+    return static_cast<double> (value) / 65536.0;
+}
+
+//==================================================================================================
+// Liveness (type 0x06)
+
+// 06/02: a ping. The keyboard answers 06/03 with one zero byte (isPingReply). A keepalive (03/00)
+// is answered too, by 03/01 with the current mode, so either tells a keyboard that has stopped
+// answering from one that is merely quiet. Beside it, 06/00 and 06/01 renew the firmware and are
+// refused.
+Bytes buildPing();
+
+//==================================================================================================
 // Device facts
 
 inline constexpr int kScreenWidth  = 480;
@@ -207,6 +282,20 @@ inline constexpr std::uint8_t kAckError       = 0x4E;
 
 // The acknowledgement in a complete frame, or nullopt for anything that is not a 02/3D.
 std::optional<Ctrl49Ack> parseAck (const Bytes& frame);
+
+// 04/02's answer: [id][value: four base-128 digits offset by 2^27].
+struct Ctrl49SettingValue
+{
+    std::uint8_t id = 0;
+    std::int32_t value = 0;
+};
+
+// The setting in a complete 04/02 answer, or nullopt for anything else. (A 04/02 the host sends
+// carries only the id, so it is not mistaken for an answer.)
+std::optional<Ctrl49SettingValue> parseSettingReply (const Bytes& frame);
+
+// True for the keyboard's answer to a ping: 06/03 with one zero byte.
+bool isPingReply (const Bytes& frame);
 
 // "OK", "bad argument", "out of memory", "not found", "Lua script error", "error", or
 // "status 0xNN" for a value the firmware was not seen to use.
