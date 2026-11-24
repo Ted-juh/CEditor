@@ -278,7 +278,7 @@ export function textEffectRules(effect, { phase = 'a', colourProperty = 'color' 
  * ones, nothing on white space, and the display that lets a transform apply to a piece of a line.
  * A shimmer that loops starts each piece in step with the others, so the light keeps travelling.
  */
-export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 'color', seedText = '' } = {}) {
+export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 'color', seedText = '', at = null } = {}) {
   const hash = textEffectHash(effect, colourProperty);
   const ranks = pieceRanks(pieces, effect.order, seedText);
   const count = effect.iterations === 'infinite' ? 'infinite' : String(effect.iterations);
@@ -288,8 +288,11 @@ export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 
     const display = moves ? 'display:inline-block;white-space:pre;' : '';
     if (ranks[index] < 0) return display;
     const variant = effect.effect === 'explode' ? hashText(`${seedText}:${index}`) % DIRECTIONS : 0;
-    const delay = effect.delay + ranks[index] * effect.stagger;
-    return `${display}animation:ce-tx-${hash}-${variant}-${phase} ${Math.round(effect.duration)}ms ${effect.easing} ${Math.round(delay)}ms ${count} normal ${fill};`;
+    // `at` poses the effect at that moment instead of playing it (the Animation Designer's playhead):
+    // every piece's delay moves back by it, and the pieces are paused (keyframeAnimation.js timing).
+    const posed = Number.isFinite(at);
+    const delay = effect.delay + ranks[index] * effect.stagger - (posed ? at : 0);
+    return `${display}animation:ce-tx-${hash}-${variant}-${phase} ${Math.round(effect.duration)}ms ${effect.easing} ${Math.round(delay)}ms ${count} normal ${fill}${posed ? ' paused' : ''};`;
   });
 }
 

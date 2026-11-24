@@ -221,10 +221,19 @@ export function keyframesRule(entry, phase = 'a') {
   return `@keyframes ce-kf-${framesHash(entry.frames)}-${phase}{${body}}`;
 }
 
-/** The timing after an animation's name: duration, easing, delay, count, direction, fill mode. */
-function timing(entry) {
+/**
+ * The timing after an animation's name: duration, easing, delay, count, direction, fill mode.
+ *
+ * `at` poses it rather than plays it (the Animation Designer's playhead, step 5): the delay moves
+ * back by `at` ms and the animation is paused, so the browser shows exactly where it is at that
+ * moment and nothing moves. `fill` is a scene clip's: it holds its first frame before it starts and
+ * its last after (`both`), where a control's own animation leaves the element as it was (`none`).
+ */
+function timing(entry, { at = null, fill = 'none' } = {}) {
   const count = entry.iterations === 'infinite' ? 'infinite' : String(entry.iterations);
-  return `${Math.round(entry.duration)}ms ${entry.easing} ${Math.round(entry.delay)}ms ${count} ${entry.direction} none`;
+  const posed = Number.isFinite(at);
+  const delay = Math.round(entry.delay - (posed ? at : 0));
+  return `${Math.round(entry.duration)}ms ${entry.easing} ${delay}ms ${count} ${entry.direction} ${fill}${posed ? ' paused' : ''}`;
 }
 
 /**
@@ -232,8 +241,8 @@ function timing(entry) {
  * Fill mode none: when a run ends, the element is its own style again — a pulse that ends at scale
  * 1.08 by mistake does not stick there.
  */
-export function animationValue(entry, phase = 'a') {
-  return `ce-kf-${framesHash(entry.frames)}-${phase} ${timing(entry)}`;
+export function animationValue(entry, phase = 'a', options = {}) {
+  return `ce-kf-${framesHash(entry.frames)}-${phase} ${timing(entry, options)}`;
 }
 
 /**
@@ -276,8 +285,8 @@ export function colourKeyframesRule(entry, channel, phase = 'a') {
 }
 
 /** A channel's `animation` value, on the same clock as the entry's motion: same timing, same phase. */
-export function colourAnimationValue(entry, channel, phase = 'a') {
-  return `ce-kf-${channel}-${framesHash(channelFrames(entry, channel))}-${phase} ${timing(entry)}`;
+export function colourAnimationValue(entry, channel, phase = 'a', options = {}) {
+  return `ce-kf-${channel}-${framesHash(channelFrames(entry, channel))}-${phase} ${timing(entry, options)}`;
 }
 
 /**

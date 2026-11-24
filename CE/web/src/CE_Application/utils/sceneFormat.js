@@ -1,0 +1,119 @@
+/**
+ * sceneFormat.js — a panel scene as data: what `panel.scenes` holds, checked as it is read (the
+ * Animation Designer, step 5; docs/design/animation-designer.md). What a scene does with that data —
+ * tracks, the controls' own animations as scenes, playing — is sceneModel.js.
+ *
+ * IT IMPORTS NOTHING, for the reason animationPresetFormat.js does not: the saved document
+ * (stores/panelModel.js) reads every scene a panel has, and the export tools run that under plain
+ * Node, where the animation model's imports do not resolve.
+ *
+ *   scene: { id, name,
+ *            trigger: { type: 'panelOpen' }               // when the panel is shown
+ *                   | { type: 'state', controlId, to }     // a control enters a state
+ *                   | { type: 'event', controlId, event }  // a click, a long press… on a control
+ *                   | { type: 'beat', every }              // every N beats while the transport runs
+ *                   | { type: 'script' },                  // only when ce.anim.play asks
+ *            length,                                      // ms: where the timeline ends
+ *            loop,                                        // plays again from the start
+ *            clips: [{ id, controlId, target, start, length, effect, label? }] }
+ *
+ * A CLIP is an effect on one place of one control for a stretch of the scene's time. `target` is
+ * where on the control, as a keyframe animation's target is: 'Transform' (the control), 'Text' (its
+ * words) or 'Parts.<name>'. `effect` is an animation as the control stores one, of kind keyframes or
+ * text, minus what the clip says itself (when, how long, where): what the keyframe and text players
+ * already read, so a scene plays through the engines every control's animations play through.
+ */
+
+export const SCENE_TRIGGER_TYPES = Object.freeze(['panelOpen', 'state', 'event', 'beat', 'script']);
+export const CLIP_KINDS = Object.freeze(['keyframes', 'text']);
+
+/** The longest a scene or a clip may be, ms: past this, a typo. */
+export const SCENE_MAX_LENGTH = 600000;
+const LIMITS = { name: 60, clips: 400, scenes: 200 };
+
+const deepCopy = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
+const text = (value, max) => String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
+const id = (value) => (/^[A-Za-z0-9_:-]{1,64}$/.test(String(value ?? '')) ? String(value) : '');
+const ms = (value, fallback, lo = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(SCENE_MAX_LENGTH, Math.max(lo, Math.round(n))) : fallback;
+};
+
+/** A new id: random, so two scenes, or two clips, never share one. */
+export function newSceneId(prefix = 'sc', random = Math.random) {
+  let out = '';
+  for (let i = 0; i < 10; i += 1) out += Math.floor(random() * 36).toString(36);
+  return `${prefix}_${out}`;
+}
+
+/** A trigger read with what it needs, or the script trigger when it makes no sense. */
+export function cleanTrigger(raw) {
+  const type = SCENE_TRIGGER_TYPES.includes(raw?.type) ? raw.type : 'script';
+  if (type === 'state') return { type, controlId: id(raw.controlId), to: text(raw.to, 40).toLowerCase() || 'hover' };
+  if (type === 'event') return { type, controlId: id(raw.controlId), event: text(raw.event, 24) || 'click' };
+  if (type === 'beat') return { type, every: Math.max(1, Math.min(64, Math.round(Number(raw.every) || 1))) };
+  return { type };
+}
+
+/** A clip read and checked, or null. Its effect keeps what an animation node may hold. */
+export function cleanClip(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const clipId = id(raw.id);
+  const controlId = id(raw.controlId);
+  const target = String(raw.target ?? '');
+  if (!clipId || !controlId) return null;
+  if (!(target === 'Transform' || target === 'Text' || /^Parts\.[A-Za-z0-9_-]+$/.test(target))) return null;
+  const effect = raw.effect && typeof raw.effect === 'object' ? deepCopy(raw.effect) : null;
+  if (!effect || !CLIP_KINDS.includes(String(effect.kind ?? ''))) return null;
+  // What the clip says itself is not the effect's to say. A keyframe effect lasts as long as its
+  // clip; a text effect keeps its own `duration`, which is each piece's (its whole length depends on
+  // how many letters the words have), and the clip's length is how much of the timeline it takes.
+  delete effect.trigger; delete effect.targets; delete effect.delay; delete effect.preset;
+  if (effect.kind === 'keyframes') delete effect.duration;
+  // The name it came with ("Fade in", "Typewriter in", a preset's), shown on the timeline.
+  const label = text(raw.label, 40);
+  return { id: clipId, controlId, target, start: ms(raw.start, 0), length: ms(raw.length, 600, 10), effect, ...(label ? { label } : {}) };
+}
+
+/** A scene read and checked, or null. Clips that do not read are dropped; the scene stays. */
+export function cleanScene(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const sceneId = id(raw.id);
+  if (!sceneId) return null;
+  const clips = (Array.isArray(raw.clips) ? raw.clips : []).slice(0, LIMITS.clips).map(cleanClip).filter(Boolean);
+  const span = clips.reduce((end, clip) => Math.max(end, clip.start + clip.length), 0);
+  return {
+    id: sceneId,
+    name: text(raw.name, LIMITS.name) || 'Scene',
+    trigger: cleanTrigger(raw.trigger),
+    length: Math.max(ms(raw.length, 2000, 100), span),
+    loop: raw.loop === true,
+    clips,
+  };
+}
+
+/** A panel's scenes, read; at most LIMITS.scenes, ids unique. */
+export function cleanSceneList(list) {
+  const seen = new Set();
+  const out = [];
+  for (const scene of (Array.isArray(list) ? list : []).slice(0, LIMITS.scenes)) {
+    const clean = cleanScene(scene);
+    if (!clean || seen.has(clean.id)) continue;
+    seen.add(clean.id);
+    out.push(clean);
+  }
+  return out;
+}
+
+/**
+ * The ids of every control a panel's scenes animate. Such a control is never folded into the still
+ * ground a panel's printed matter is drawn as (sceneryModel.js): a Label a scene types in has to be
+ * a Label that can be typed in, on the Designer's stage and in Preview and the plug-in alike.
+ */
+export function sceneControlIds(scenes) {
+  const ids = new Set();
+  for (const scene of Array.isArray(scenes) ? scenes : []) {
+    for (const clip of Array.isArray(scene?.clips) ? scene.clips : []) if (clip?.controlId) ids.add(String(clip.controlId));
+  }
+  return ids;
+}

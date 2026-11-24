@@ -20,7 +20,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export const CHECKS = [
   'run', 'textPlacement', 'playerInbound', 'playerHostKeys', 'playerKeys', 'playerIcons', 'learnChips', 'effectsTab', 'assetsTab',
-  'screenTab', 'apiTab', 'libraryTab', 'sourceLink', 'fromSelection', 'animationTab', 'panelMotion',
+  'screenTab', 'apiTab', 'libraryTab', 'sourceLink', 'fromSelection', 'animationTab', 'animationDesigner', 'panelMotion',
   'designerTab', 'profileDesigner', 'dockOpeners', 'propertyFilter', 'panelStrip', 'insertFlyout', 'panelShot',
   'releaseWorkflow', 'numberCellSelection', 'displayGapReview', 'ctrl49Screen', 'noteModules',
   'hostWorkspace', 'performanceTools', 'soundsPage', 'stageScreen', 'pluginPresets', 'songsPage',

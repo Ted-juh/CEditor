@@ -1289,6 +1289,51 @@ nothing"), or when two animations fight over the same property ("clashes").
 
 A new transition changes nothing until you add something under **What it eases**.
 
+### The Animation Designer
+
+The dock's **Animation** tool edits one control. The **Animation Designer** shows the whole panel:
+a **scene** is several controls' animations on one timeline, such as the panel's name typing itself
+in while the knobs fade up one after another. It opens in a tab of its own, "Animation · <panel>", in
+three ways:
+
+- **File › Animation Designer**, for the panel in front;
+- **+** at the end of the tabs › **Animation Designer**;
+- the **⤢** button at the top of the dock's **Animation** tool.
+
+There is one Designer per panel, and it closes with its panel.
+
+- **Library** (left). Effects by kind (**Text**, **Swap**, **Move**, **Paint**) and **Mine**, your
+  own presets. Drag one onto a control on the stage or onto a track, or pick a control and click
+  the effect.
+- **Stage** (middle). The panel as it looks, posed at the playhead. Click a control to pick it.
+  Nothing on the stage reaches the synth. **Try a trigger** holds **Hover** or **Press** for a
+  moment, so you can see a control's state animations.
+- **Clip** (right). The picked clip's settings:
+  - where it plays (the whole control, its text, or one of its parts);
+  - **Start** and **Length**;
+  - **Each piece**, for text effects;
+  - **Easing**;
+  - the effect itself, in the same editors the Animation tool uses.
+
+  **Save as preset** keeps the effect in your library.
+- **Scenes** (bottom left). **+ Scene** makes one. Give it a name, choose what starts it (the
+  panel opening, a state, an event, the beat, or a script), and tick **Loop** to repeat it. Under
+  **Controls' own** is every animation the controls already have, each shown as a scene of one
+  clip. It is the same animation, not a copy: move or stretch it here and the control's animation
+  changes.
+- **Timeline** (bottom). A track for each place a scene plays on.
+  - Drag the ruler to scrub.
+  - Drag a clip to move it, Alt+drag to copy it, or drag its right edge to make it longer.
+  - The arrow keys nudge a clip, and Delete removes it.
+  - **Snap** sets the grid.
+
+**Play scene** plays the scene at **1×**, **0.5×** or **0.25×**. The stage only moves under the
+playhead. While you are designing, a scene does not start by itself. Undo (Ctrl+Z) in the Designer
+undoes the Designer's own changes. Scenes are saved in the panel, and Ctrl+S in the Designer saves it.
+
+In this version, scenes play only in the Designer. Playing them on their trigger in Preview and in
+the exported plugin, and starting them from a script, come next.
+
 ## 9. Scripts
 
 When the ordinary settings are not enough — one knob moving three others, a display showing the
@@ -1874,6 +1919,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **Discover Device (MIDI-CI)...** | | Starts a new profile by asking a connected MIDI 2.0 device to describe itself. |
 | **New Script Workspace** | | Opens the scripts of the active panel in the Behavior Designer. |
 | **Open Script Workspace** | | Opens a saved script workspace file. |
+| **Animation Designer** | | Opens the panel in front's scenes and animations on one timeline, in a tab of its own; see [The Animation Designer](#the-animation-designer). |
 | **New CTRL49 Screen** | | Opens a new screen in the Screen Builder. |
 | **Open CTRL49 Screen...** | | Opens a saved screen (a `.assignment.json` file). |
 | **Save** | Ctrl+S | Saves the panel (or the script workspace or CTRL49 screen in front); with a component's own tab in front, opens **Export**. |

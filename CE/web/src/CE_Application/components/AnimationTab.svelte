@@ -73,7 +73,8 @@
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import PropertySelect from '../properties/PropertySelect.svelte';
-  import { activePanel, selectedComponentIds } from '../stores/panels.js';
+  import { activePanel, selectedComponentIds, openAnimationDesigner } from '../stores/panels.js';
+  import Maximize2 from 'lucide-svelte/icons/maximize-2';
   import { updateControlProperty, removeControlNode, getSection, applyControlPatch } from '../stores/controls.js';
   import { ANIMATION_PRESETS, PRESET_BY_ID, presetPatch, presetBlockedBecause } from '../utils/animationPresets.js';
   import { beginHistoryTransaction, commitHistoryTransaction } from '../stores/history.js';
@@ -659,6 +660,11 @@ onMount(() => {
             <i class="stale" title="Not the control that is selected now — the tab stays where you opened it">not selected</i>
           {/if}
           <span class="headtools">
+            <!-- The full editor, its own tab: scenes across controls, a timeline, the stage. -->
+            <button type="button" class="ic" data-open-designer disabled={$activePanel?.id == null}
+                    onclick={() => openAnimationDesigner($activePanel?.id)}
+                    title="Open the Animation Designer: this panel's scenes and every animation on one timeline, in a tab of its own"
+                    aria-label="Open the Animation Designer"><Maximize2 size={14} /></button>
             <button type="button" class="ic" disabled={!($selectedComponentIds?.size)} onclick={armFromSelection}
                     title="Use selection: point this tab at the control that is selected now" aria-label="Use selection"><Crosshair size={14} /></button>
             <button type="button" class="ic" onclick={clearEditorTarget} title="Clear: stop editing this control" aria-label="Clear"><X size={14} /></button>

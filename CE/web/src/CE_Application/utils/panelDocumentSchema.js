@@ -173,6 +173,8 @@ export const PANEL_DOCUMENT_SCHEMA = {
     cardPresets: array,
     // The animation presets the panel carries; each is checked as it is read (animationPresetModel.js).
     animationPresets: array,
+    // The panel's animation scenes; each is checked as it is read (sceneFormat.js).
+    animationScenes: array,
     snapshots: array,
     routes: array,
     programBank: nullable(object),

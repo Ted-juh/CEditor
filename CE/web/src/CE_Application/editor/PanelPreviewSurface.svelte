@@ -64,6 +64,7 @@
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
+  import { sceneControlIds } from '../utils/sceneFormat.js';
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
@@ -400,8 +401,13 @@
   // the lock has no meaning and holding the DOM elements open would buy nothing. `orderedControls`
   // is untouched, because every other thing in this file that reads it is asking about behaviour
   // rather than about paint.
+  // A control a scene animates stays live too (utils/sceneFormat.js sceneControlIds).
+  let neverFold = $derived.by(() => {
+    const scened = sceneControlIds(panel?.animationScenes);
+    return scened.size ? new Set([...($scriptTouchedControlIds ?? []), ...scened]) : $scriptTouchedControlIds;
+  });
   let previewPlan = $derived(buildSceneryRenderPlan(panel,
-    { preview: true, fold: true, neverFold: $scriptTouchedControlIds }));
+    { preview: true, fold: true, neverFold }));
 
   /**
    * Which folded controls are drawn live over their own ground.

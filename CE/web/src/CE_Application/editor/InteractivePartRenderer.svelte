@@ -133,7 +133,7 @@
   let textPieces = $derived.by(() => {
     if (!textEffect?.effect || !text) return null;
     const pieces = splitText(String(text.content ?? ''), textEffect.effect.split);
-    const styles = textPieceStyles(textEffect.effect, pieces, { phase: textEffect.phase, seedText: `${partName}:${textEffect.name}` });
+    const styles = textPieceStyles(textEffect.effect, pieces, { phase: textEffect.phase, seedText: `${partName}:${textEffect.name}`, at: textEffect.at ?? null });
     return pieces.map((piece, index) => ({ ...piece, style: styles[index] }));
   });
   let image = $derived(colouredPart?._children?.Image ?? null);

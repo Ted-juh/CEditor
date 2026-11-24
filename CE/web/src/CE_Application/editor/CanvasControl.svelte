@@ -159,6 +159,8 @@
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
   import { getContext, setContext, untrack } from 'svelte';
+  import { SCENE_STAGE } from '../stores/sceneStage.js';
+  import { sceneControlOutput, mergeKeyframeOutputs } from '../utils/sceneModel.js';
   import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
   import { pictureColour, pictureColourSources, withColourFollows, withPictureColourSources } from '../utils/pictureRecolour.js';
   import { activeControlSet, controlSetSources, CONTROL_SET_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../stores/controlSets.js';
@@ -1810,8 +1812,16 @@
     if (!keyframeEntries.length || !id) return undefined;
     return animationPlays.subscribe((all) => { playsNow = all?.[id] ?? {}; });
   });
-  let activeKeyframes = $derived(keyframePlayer.next(previewSessionOverride != null ? interactionRuntime : null,
+  let playerKeyframes = $derived(keyframePlayer.next(previewSessionOverride != null ? interactionRuntime : null,
     { reducedMotion: $systemReducedMotion, beats: beatsNow, plays: playsNow }));
+  // The Animation Designer's stage (stores/sceneStage.js): the scene it shows, posed at its playhead
+  // or playing, joins this control's own animations. Anywhere else there is no stage, and nothing.
+  const sceneStage = getContext(SCENE_STAGE) ?? null;
+  let stageFrame = $derived(sceneStage ? $sceneStage : null);
+  let sceneKeyframes = $derived(stageFrame?.scene && core?.id
+    ? sceneControlOutput(stageFrame.scene, core.id, { at: stageFrame.playing ? null : stageFrame.at, phase: stageFrame.phase ?? 'a' })
+    : null);
+  let activeKeyframes = $derived(mergeKeyframeOutputs(playerKeyframes, sceneKeyframes));
   $effect(() => {
     const fired = activeKeyframes?.fired;
     if (fired?.length) noteAnimationsFired(core?.id, fired);
@@ -1836,7 +1846,7 @@
     lines.forEach((line, index) => {
       for (const piece of splitText(line === '' ? '\u200B' : line, item.effect.split)) all.push({ ...piece, line: index });
     });
-    const styles = textPieceStyles(item.effect, all, { phase: item.phase, seedText: `${core?.id ?? ''}:${item.name}` });
+    const styles = textPieceStyles(item.effect, all, { phase: item.phase, seedText: `${core?.id ?? ''}:${item.name}`, at: item.at ?? null });
     const pieces = all.map((piece, index) => ({ ...piece, style: styles[index] }));
     return lines.map((_, index) => pieces.filter((piece) => piece.line === index));
   }

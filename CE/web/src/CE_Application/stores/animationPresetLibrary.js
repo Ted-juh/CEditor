@@ -28,6 +28,9 @@ import { flatControls } from '../utils/containment.js';
 import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
 import {
   LINK_KEY,
+  PRESET_FORMAT,
+  PRESET_FORMAT_VERSION,
+  newPresetId,
   applyPresetPatch,
   buildPreset,
   clearOverrides,
@@ -228,6 +231,22 @@ export function describePreset(id, { name, category, tags }) {
   if (carried) step('Rename animation preset', () => carryInPanel(change(carried)));
   const mine = get(animationPresetLibrary).find((preset) => preset.id === id);
   if (mine) keepInLibrary(change(mine));
+}
+
+/**
+ * Keep one animation — a clip of the Animation Designer, say — in your library as an effect of your
+ * own, to drop on any control. Nothing follows it: the clip stays as it was. `{ preset }` or
+ * `{ reason }`.
+ */
+export function saveEffectAsPreset(node, { name, category = '' } = {}) {
+  const key = String(name ?? '').replace(/[^A-Za-z0-9_]+/g, '') || 'effect';
+  const preset = cleanPreset({
+    format: PRESET_FORMAT, version: PRESET_FORMAT_VERSION, id: newPresetId(), name, category, tags: [],
+    colours: 'keep', revision: 1, animations: { [key]: { ...node, name: key } }, states: {}, fields: {},
+  });
+  if (!preset) return { reason: 'That effect could not be kept.' };
+  keepInLibrary(preset);
+  return { preset };
 }
 
 /** Take a preset out of your library. Every panel that carries it keeps its copy. */

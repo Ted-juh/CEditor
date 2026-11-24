@@ -79,7 +79,8 @@ The library is presets of five **engines**:
 | Value-drawn | What the value draws: pointer, arc, ring, fill. Takes over from the value for a moment, then hands back. | Not reachable: 42 renderers draw controls five different ways. |
 
 **Where it is stored.** Per-control animations stay where they are. Panel scenes go at the panel's
-root beside `scripts`, `fonts` and `icons` (`utils/panelDocumentSchema.js`) as `scenes`, and the
+root beside `scripts`, `fonts` and `icons` (`utils/panelDocumentSchema.js`) as `animationScenes` —
+not `scenes`, which HoSTage already means something by (step 5a says why) — and the
 presets a panel uses as `animationPresets`, carried the way `utils/documentFonts.js` carries fonts.
 The schema allows unknown keys, so an older CEditor opens such a panel and ignores both; a schema
 entry is added when a field earns one, as that file's header asks.
@@ -595,6 +596,77 @@ cannot know how many windows someone opens, so the Export note says each open wi
 player reads it as it loads the panel (`stores/patternFrameCap.js`) and moving patterns step thirty
 times a second, about 40 % less processor time in both engines; keyframe animations keep their
 easing, which steps would break. The editor's Preview always moves them every frame.
+
+## As built: step 5a (2026-11-24)
+
+The Animation Designer, the document tab of its own. Step 5 is three: **5a** the Designer, where a
+scene is made and posed under the playhead; **5b** panel scenes playing on their triggers in
+Preview and the plug-in; **5c** the scripting calls and the gesture clocks.
+
+- **A tab, one per panel** (`stores/panels.js`: `openAnimationDesigner`, `closeAnimationDesigner`).
+  It is reached from File › Animation Designer, from the tab strip's **+** tray, and from the
+  maximize button at the top of the dock's Animation tab. It shows as "Animation · Wave Demo", owns
+  the window's chrome as the device profile designer does (`utils/workspaceChrome.js`), and closes
+  with its panel. In front, it is **not the active panel**: `resolvePanelSelection` gives none, so
+  paste, insert and Delete never reach a panel nobody can see, and every write goes by the panel's
+  id (`updatePanel`, `applyControlPatchesById`). Save, with it in front, saves that panel.
+- **The model** (`utils/sceneModel.js`). A scene is a name, a trigger (panel opens, a state, an
+  event, the beat, a script — stored now, played in 5b), a length, a loop flag and clips; a clip is
+  one effect on one place of one control (the whole control, its text, or a part) with a start and
+  a length. The checking and the reading are `utils/sceneFormat.js`, which imports nothing, for the
+  reason step 4 found: the saved document is read under plain Node by the Windows export job.
+- **One animation, two views, never a copy.** The scenes list shows the panel's scenes and, under
+  them, **Controls' own**: every control's existing keyframe and text animations, each as a scene of
+  one clip (`controlScenes`). Moving or stretching that clip writes the animation's own delay and
+  duration, its settings write the animation; it takes no new clips, and says so.
+- **The library** is the built-in effects by category — Text, Swap, Move, Paint — and **Mine**, your
+  presets. Drag a card onto a control on the stage or onto a track; click it to put it on the picked
+  control. A text effect on a control with no text of its own is refused with the reason.
+- **The stage** is the panel's own preview surface, with Preview mode off, so nothing on it turns,
+  presses or sends; a layer above it picks controls and takes drops. **Try a trigger** holds Hover or
+  Press for a moment, which is how a control's state animations are seen without Preview.
+- **The timeline** (`SceneTimeline.svelte`): a ruler that scrubs, a track per place, clips that drag,
+  copy with Alt, stretch by the grip, nudge with the arrows and go with Delete, all snapped (10, 50 or
+  100 ms). A scene is never shorter than its clips.
+- **Clip settings** (`ClipSettings.svelte`): where it plays, start, length, each piece's length for
+  text, easing, and the effect itself in the same text effect editor and frames editor the dock tab
+  uses. **Save as preset** keeps the clip's effect in your library (`saveEffectAsPreset`), unlinked.
+- **Playing, which is only ever the playhead.** As the owner decided, the stage plays a scene by
+  posing it: the playhead's time is handed to every control through a context (`stores/sceneStage.js`),
+  and each clip becomes the same CSS keyframes the controls already play, held at that moment —
+  `animation-delay` set back by the time and `paused`, so the browser draws the exact frame with no
+  per-frame script (`timing(…, { at })` in `keyframeAnimation.js`, `textPieceStyles(…, { at })`). Play
+  moves the playhead at ¼, ½ or full speed. A control a scene moves is never folded into the panel's
+  still scenery, as a control a script touches is not.
+- **Undo is the Designer's own** (`registerHistoryContext`, kind `animationDesigner`), over the scenes
+  and the animations of the controls that have any — not the panel's whole history.
+
+**Why `animationScenes` and not `scenes`.** HoSTage, the instrument host, already has scenes: a
+snapshot of its parts. A panel key named `scenes` would read as one of those to anyone who met it in
+a file, and would collide the day a panel carries host state. Saved on the "right or absent" rule:
+a scene that does not read as one is not written, and a panel with none writes no key. Declared in
+the document schema, the validator regenerated.
+
+Not built in 5a: playing on a trigger outside the Designer (5b), the gesture clocks and
+`ce.anim.play` (5c), pattern and value-drawn clips (a pattern's scroll is still set on its layer),
+and scene presets.
+
+Verified locally: `npm run test:all`, `npm run build`, `npm run lint`, svelte-check over the whole
+project, and the browser checks, among them a new one, `animationDesigner` (12 checks): it makes a
+scene, picks a control on the stage and puts an effect on it, has a text effect on a knob refused,
+scrubs and finds the stage posed (paused, the delay moved back), drags a clip on the grid, undoes,
+copies with Alt, plays, retimes a control's own animation in place, and finds the scene in the saved
+document. The tab itself — opening, naming, closing with its panel, never the active panel — is held
+by `test/animationDesignerTab.test.js`. The same page in WebKitGTK 2.52 under Xvfb: the stage posed
+as in Chromium (the knob's fade paused 0.24 s in, each letter held the same way). No C++ changed.
+Not run: the Designer inside the real app, which waits for 5b, when there is something on a trigger
+to see.
+
+Found there, and left for a change of its own: in WebKitGTK the default knob draws as squares — the
+cap a square, the value arc a box. Its fills are HTML in an SVG `<foreignObject>` cut by an SVG
+`<mask>` (`editor/SliderShapeFill.svelte`), and WebKit does not apply a mask to a foreignObject. It is
+so before any scene touches the knob, and Chromium, so Windows, is unaffected; the Linux app and the
+Linux plug-ins are not.
 
 ## Open
 
