@@ -1098,7 +1098,38 @@ upload and no decode. `Start_CTRL49_Asset_Probe.cmd` finds out, read-only: its p
 (`CEditor_Asset_Probe.lua`) only asks `asset_get_valid(type, id)` for each type the ADVANCE
 uses (ids 0..600) and tries `draw_image` on the first few, plain and tinted orange. It writes
 nothing to the keyboard. Close HoSTage/CEditor, VIP and your DAW first; turn encoder 1 to step
-through the types that have images. Result: not yet run.
+through the types that have images.
+
+**Result (2026-11-24, on the CTRL49).** Three types answer valid; every other type the probe asks
+(3, 8, 13, 14, 16, 18, 19, 20) has nothing:
+
+| Type | Valid | What |
+|---|---|---|
+| 1 | id 14 only | not read yet; it does not draw as a plain image |
+| 11 | id 0 | the knob art, the same pieces as the ADVANCE's (below) |
+| 15 | 4 ids, between 1 and 15 | fonts, so nothing to draw |
+
+So the CTRL49 has the knob art and none of the ADVANCE's other pictures: no pad art (type 8), no
+button art (type 13), no PNGs (type 20). A native knob (02/12–1C) has its art; a native pad or button
+has none.
+
+The probe's picture page drew nothing for any of the three and reported no error. That is how
+`draw_image` works, not a fault: with up to nine arguments it draws only a plain image, data that
+starts with its width and height (the firmware returns 76 when the first byte is 0 or the asset is
+missing, 64 when it drew). Type 11 is a stack of frames, so it never takes that path. A tenth
+argument switches to a second form, read from the ADVANCE's `draw_image`:
+
+```lua
+draw_image(_, _, x, y, _, _, width, height, colour, frame)
+```
+
+It always draws from type 11 id 0, frame `frame`, tinted `colour`; arguments 1, 2, 5 and 6 are not
+read, and it returns 64 whether or not the frame exists. `Start_CTRL49_KnobArt_Probe.cmd`
+(`CEditor_KnobArt_Probe.lua`, read-only) draws frame 0 and one frame of each strip with it, and
+the base with the arc on it. On the CTRL49 every piece drew: base, value arc, its cover, ring and
+its cover, at the ADVANCE's sizes (74×71, 66×62, 48×45), and all four strips followed encoder 1
+from 0 to 127, one frame per value. A page can draw the keyboard's own knob art from Lua with no
+upload and no decode.
 
 What the probe should find, if the CTRL49's resource flash matches the ADVANCE's (read
 2026-11-21; each record is `type, id`, a checksum, then the data):
