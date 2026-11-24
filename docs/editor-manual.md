@@ -1257,6 +1257,19 @@ glide** and **Gradient sheen**. Shift+click a preset to add it to every selected
 **Name ↔ value** goes on a knob's name label: it shows the knob's name, and its value while the knob
 is touched, the value pushed in and the name typed back when you let go.
 
+Your own **animation presets**: **Save as preset…** (beside **Debug**) saves the selected animation,
+or all of the control's as a recipe, with a name, a category and tags, in **My library** or in
+**This panel only**, keeping its colours or leaving colour to the control it goes on. It takes the
+state changes the animation eases with it, and says before you save what it needs (a state, a part)
+and which kinds of control it goes on. **Library…** at the end of the presets lists **Mine** and
+**This panel**, each with **Apply**, **Export…** and **Remove**, and **Import…** for a `.ceanim`
+file. A preset is applied linked: the animation follows it. Change a setting on the animation and it
+is an override, marked with a blue bar in the card above **Kind**, with **Revert**; **Apply to
+preset** makes your change the preset's, for every animation that follows it; **Clear overrides**
+and **Detach** work as they do for a control set. A panel carries the presets it uses, so it plays
+on another computer and in the exported plugin; open one that carries presets you do not have, and
+the library offers to add them to yours.
+
 The **States** tab has a **Motion** section for the state you are editing: **Entering** (mouse over,
 for Hover), **While in** and **Leaving** (mouse exit), each showing the animations that fill it and
 **New** to make one. Under it, **Events** plays a keyframe animation on a click, a double-click, a

@@ -508,6 +508,67 @@ project (1,925 files; the one warning from before), the Animation tab and panel-
 in Chromium, the panel-motion fixture's Pattern and Paint controls in WebKitGTK, and the loop budget
 in both. No C++ changed. Not run: Windows, and WebView2 itself — Chromium is its engine, not it.
 
+## As built: step 4 (2026-11-24)
+
+Animation presets of your own: saved, kept, applied linked, carried, shared as files.
+
+- **The model** (`utils/animationPresetModel.js`). A preset is data, so it carries what its
+  animations depend on: the animations themselves (as the control stores them, without the link),
+  the state changes they ease — only those: a hover lift takes the Hover state's scale, not the fill
+  colour Hover also sets — and the settings a recipe needs (the name ↔ value swap's
+  `Text.shows`). Targets were already relative to the control, so "Cutoff › Labels › Title" is
+  "the control's title label" with nothing to translate; `presetNeeds` names the states, parts and
+  sections a control must have, and the save form says before saving which kinds of control those
+  are. Two sizes: an **effect** (one animation) and a **recipe** (all of a control's). A **scene**
+  waits for panel scenes, in step 5. **Colours**: keep them, or leave colour to the control, which
+  carries no colour at all — no frame colour, no colour a state sets.
+- **Linked, as a control set is, and as text styles are.** Applied linked, each animation is written
+  whole, so the player and an export need nothing new, with `preset: { id, revision, from }`. An
+  override is a setting that differs from the version it follows, worked out, not stored — the text
+  styles' way rather than the control set's pins. A new version reaches every follower but what
+  each overrode. Revert, Clear overrides, Detach and Apply to preset are each one undo step, which
+  puts every follower and the panel's copy back together.
+- **Where they live** (`stores/animationPresetLibrary.js`). Built-in: the code presets, applied as
+  before. Mine: this machine's storage (localStorage, as control sets, card presets and saved scripts
+  are; app settings drop keys they do not know). This panel: `animationPresets` at the document's
+  root, written as soon as a preset is used there, because the panel's copy is what its linked
+  animations follow — which is also how it reaches another machine and the plug-in, and why taking a
+  preset out of your library leaves every panel its copy. Saved on the "right or absent" rule, each
+  entry checked as it is read; declared in the document schema, the validator regenerated.
+- **Shared as a file.** `.ceanim`, JSON, through the typed-document bridge the CTRL49 screen uses —
+  one C++ line, the kind in `typedDocumentKind` — and in a plain browser a download and a file input.
+  A file from a newer CEditor, or one with a kind this one cannot play, is refused with the reason.
+  The same preset in the same or a newer version is not imported twice.
+- **Offered, not taken.** No other carried thing (fonts, icons, card presets, control sets) offers
+  itself to your library; the `adopt` functions that exist have no callers. A panel carrying presets
+  you lack says so in the library, with **Add to my library**. Your library's newer version of a
+  preset the panel carries is offered on the card ("Bring it in") and in the library ("Update
+  panel"), never applied by itself.
+- **The tab.** **Save as preset…** beside Debug; the card above Kind on a linked animation, its
+  overrides marked as the properties panel marks a control set's (the bar, the bold name), each with
+  Revert; **Library…** at the end of the presets, an overlay of Mine and This panel. And a Label,
+  which starts with no Animations section, now gets **Give it animations** where the tab used to say
+  only that it had none — steps 2 and 4 both put animations on Labels.
+
+Found on the way, and fixed: **preparing an export broke under plain Node.** The saved document
+reads every preset a panel carries, and the first version did it by importing the preset model —
+which brings the interaction runtime, which has an import only the bundler resolves. The Windows
+export job runs `prepare-export-panel.mjs` under plain Node, and it stopped at that import; the suite
+caught it (`exportToolsPlainNode.test.js`). The format — reading, checking, writing a preset — is now
+`utils/animationPresetFormat.js`, which imports nothing, with its two copied facts (the animation
+kinds, the rule for a name) held to the model's by a test.
+
+Not built: previews recorded from the stage on each card (the library shows name, category, size and
+version), scene presets (step 5), and an offer at the moment a panel opens rather than in the
+library. Built-in presets are not linkable; save the applied result as your own to link it.
+
+Verified locally: `npm run test:all`, `npm run build`, `npm run lint`, svelte-check over the whole
+project, the browser checks (the Animation tab check now saves a preset from the tab, overrides and
+reverts a setting, applies a linked copy from the library, exports a real `.ceanim` download and
+imports one through the file picker, and adopts a preset a panel carried), and the one C++ change
+compiled with GCC (`-fsyntax-only`, as `CLAUDE.md` gives it). Not run: MSVC, and the app's own file
+dialogs, which are the CTRL49 screen's already.
+
 ## Open
 
 - The loop budget's number and its two choices (above, step 3), the owner's.

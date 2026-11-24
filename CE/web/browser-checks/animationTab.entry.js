@@ -16,6 +16,8 @@ import { undo } from '../src/CE_Application/stores/history.js';
 import { debugDockState } from '../src/CE_Application/stores/debugDock.js';
 import { displayTabRequest } from '../src/CE_Application/stores/displayTab.js';
 import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
+import { updateControlProperty } from '../src/CE_Application/stores/controls.js';
+import { animationPresetLibrary } from '../src/CE_Application/stores/animationPresetLibrary.js';
 
 const CONTROL_ID = 'ctrl_anim';
 
@@ -254,6 +256,36 @@ window.__anim = {
 
   // --- making and unmaking ---------------------------------------------------------------
   storedNames: () => Object.keys(live()._children.Animations._children),
+
+  // --- animation presets (step 4) ------------------------------------------------------------
+  presetPanel: () => document.querySelector('[data-preset-library]')?.dataset.presetLibrary ?? null,
+  openSavePreset: () => document.querySelector('[data-save-preset]')?.click(),
+  typeSaveName: (value) => {
+    const input = document.querySelector('[aria-label="Preset name"]');
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+  saveNeeds: () => textOf(document.querySelector('[data-needs]')),
+  clickSave: () => document.querySelector('.lib .go')?.click(),
+  linkCard: () => {
+    const card = document.querySelector('[data-preset-link]');
+    return card ? { text: textOf(card.querySelector('.what')), overrides: [...card.querySelectorAll('[data-override]')].map((row) => row.dataset.override) } : null;
+  },
+  editByHand: (name, key, value) => updateControlProperty(CONTROL_ID, `Animations.${name}.${key}`, value),
+  revertOverride: (key) => document.querySelector(`[data-override="${key}"] .rv`)?.click(),
+  openLibrary: () => document.querySelector('[data-library]')?.click(),
+  libraryRows: () => ({
+    mine: [...document.querySelectorAll('[data-preset] .nm')].map(textOf),
+    panel: [...document.querySelectorAll('[data-panel-preset] .nm')].map(textOf),
+  }),
+  libraryButton: (id, label) => [...(document.querySelector(`[data-preset="${id}"], [data-panel-preset="${id}"]`)?.querySelectorAll('button') ?? [])]
+    .find((button) => textOf(button) === label)?.click(),
+  importClick: () => document.querySelector('.lib .imp')?.click(),
+  adoptNotice: () => textOf(document.querySelector('[data-adopt]')),
+  clickAdopt: () => document.querySelector('[data-adopt] button')?.click(),
+  panelPresets: () => JSON.parse(JSON.stringify(get(panels)[0].animationPresets ?? [])),
+  libraryPresets: () => JSON.parse(JSON.stringify(get(animationPresetLibrary))),
+  carryPreset: (preset) => panels.update((list) => list.map((panel) => ({ ...panel, animationPresets: [...(panel.animationPresets ?? []), preset] }))),
   typeNewName: (value) => {
     const input = [...document.querySelectorAll('.newrow input')][0];
     if (!input) return false;

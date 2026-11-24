@@ -15,6 +15,7 @@
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { extname, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -474,7 +475,7 @@ check('each working target says what it costs the browser, and a dead one says n
 });
 
 check('every preset is a button in the strip, and says what it does before you add it', async () => {});
-assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide', 'Gradient sheen', 'Name \u2194 value']);
+assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide', 'Gradient sheen', 'Name \u2194 value', 'Library\u2026']);
 assert.match(await ev(() => window.__anim.presetHint('Hover lift')), /Grows a little under the pointer/);
 await ev(() => window.__anim.addPreset('Hover lift'));
 await settle();
@@ -784,6 +785,85 @@ check('switching back keeps the tracks, takes the pose off, and says a channel n
 assert.equal((await ev(() => window.__anim.storedKeyframes('seqDemo')))[0].length, 1);
 assert.equal(await ev(() => window.__anim.overlay()), null, 'no pose once the animation is no longer a sequence');
 await ev(() => window.__anim.removeAnimation('seqDemo'));
+await settle();
+
+// --- Animation presets (step 4) --------------------------------------------------------------
+
+await ev(() => window.__anim.selectAnimation('pressEcho'));
+await settle();
+await ev(() => window.__anim.openSavePreset());
+await settle();
+check('Save as preset opens the form, which says what the preset needs before it is saved', async () => {});
+assert.equal(await ev(() => window.__anim.presetPanel()), 'save');
+// pressEcho is a hover scale on the component's own part by now (the checks above changed it), so it
+// needs that state and that part, and goes on a custom component that has one — said before saving.
+const needs = await ev(() => window.__anim.saveNeeds());
+assert.match(needs, /Needs the state Hover and the part background/, needs);
+assert.match(needs, /a custom component with the same parts/, needs);
+await ev(() => window.__anim.typeSaveName('Echo press'));
+await settle();
+await ev(() => window.__anim.clickSave());
+await settle();
+const savedPreset = (await ev(() => window.__anim.panelPresets()))[0];
+check('saved: the panel carries it, your library keeps it, and the animation follows it', () => {
+  assert.equal(savedPreset.name, 'Echo press');
+  assert.deepEqual(Object.keys(savedPreset.animations), ['pressEcho']);
+  assert.ok(savedPreset.states.Hover, 'with the state it plays on');
+});
+assert.equal((await ev(() => window.__anim.libraryPresets()))[0].id, savedPreset.id);
+assert.equal(await ev(() => window.__anim.presetPanel()), null, 'the form closes');
+assert.match((await ev(() => window.__anim.linkCard())).text, /Follows Echo press/);
+assert.match(await ev(() => window.__anim.presetReport()), /Echo press saved to your library/);
+
+await ev(() => window.__anim.editByHand('pressEcho', 'duration', 333));
+await settle();
+check('a setting changed here is an override, marked, with Revert', async () => {});
+assert.deepEqual((await ev(() => window.__anim.linkCard())).overrides, ['duration']);
+await ev(() => window.__anim.revertOverride('duration'));
+await settle();
+assert.deepEqual((await ev(() => window.__anim.linkCard())).overrides, []);
+assert.equal((await ev(() => window.__anim.storedAnimation('pressEcho'))).duration, 600, 'back to the preset\'s');
+
+await ev(() => window.__anim.openLibrary());
+await settle();
+check('the library lists it in Mine and in This panel, and Apply puts a linked copy on the control', async () => {});
+assert.deepEqual(await ev(() => window.__anim.libraryRows()), { mine: ['Echo press'], panel: ['Echo press'] });
+await ev((id) => window.__anim.libraryButton(id, 'Apply'), savedPreset.id);
+await settle();
+const copy = await ev(() => window.__anim.storedAnimation('pressEcho2'));
+assert.equal(copy.preset.id, savedPreset.id);
+assert.match(await ev(() => window.__anim.presetReport()), /on 1 control, linked/);
+
+const [download] = await Promise.all([
+  page.waitForEvent('download'),
+  ev((id) => window.__anim.libraryButton(id, 'Export…'), savedPreset.id),
+]);
+const exported = JSON.parse(readFileSync(await download.path(), 'utf8'));
+check('Export writes a .ceanim file of it', () => {
+  assert.equal(download.suggestedFilename(), 'Echo press.ceanim');
+  assert.equal(exported.format, 'ceditor-animation-preset');
+  assert.equal(exported.id, savedPreset.id);
+});
+
+const imported = { ...exported, id: 'ap_fromafriend', name: 'From a file', revision: 1 };
+const [chooser] = await Promise.all([page.waitForEvent('filechooser'), ev(() => window.__anim.importClick())]);
+await chooser.setFiles({ name: 'From a file.ceanim', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(imported)) });
+await page.waitForFunction(() => window.__anim.libraryPresets().some((preset) => preset.id === 'ap_fromafriend'));
+check('Import brings a .ceanim file into your library', async () => {});
+assert.deepEqual((await ev(() => window.__anim.libraryRows())).mine, ['Echo press', 'From a file']);
+assert.match(await ev(() => window.__anim.presetReport()), /From a file added in your library/);
+
+await ev((preset) => window.__anim.carryPreset(preset), { ...exported, id: 'ap_sharedpanel', name: 'Came with the panel' });
+await settle();
+check('a panel that carries a preset you lack offers it, and adds it when asked', async () => {});
+assert.match(await ev(() => window.__anim.adoptNotice()), /carries 1 preset you do not have/);
+await ev(() => window.__anim.clickAdopt());
+await settle();
+assert.ok((await ev(() => window.__anim.libraryPresets())).some((preset) => preset.id === 'ap_sharedpanel'));
+assert.equal(await ev(() => window.__anim.adoptNotice()), '');
+await ev(() => window.__anim.openLibrary());
+await settle();
+await ev(() => window.__anim.removeAnimation('pressEcho2'));
 await settle();
 
 // --- The rules --------------------------------------------------------------------------------

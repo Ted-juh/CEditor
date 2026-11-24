@@ -171,6 +171,8 @@ export const PANEL_DOCUMENT_SCHEMA = {
     requiredProfiles: array,
     parameterSnapshots: object,
     cardPresets: array,
+    // The animation presets the panel carries; each is checked as it is read (animationPresetModel.js).
+    animationPresets: array,
     snapshots: array,
     routes: array,
     programBank: nullable(object),

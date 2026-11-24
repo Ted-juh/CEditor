@@ -60,6 +60,8 @@
   import AnimationStage from './animation/AnimationStage.svelte';
   import BezierEditor from './animation/BezierEditor.svelte';
   import FramesEditor from './animation/FramesEditor.svelte';
+  import PresetLinkCard from './animation/PresetLinkCard.svelte';
+  import PresetLibrary from './animation/PresetLibrary.svelte';
   import SequenceTimeline from './animation/SequenceTimeline.svelte';
   import * as anime from '../utils/animeTimeline.js';
   import { addKeyframe, removeKeyframe, updateKeyframe, normalizeKeyframes, keyframesDuration, sampleKeyframes, isColourTarget } from '../utils/keyframeModel.js';
@@ -497,7 +499,19 @@ onMount(() => {
   // A preset is an animation AND the state change it animates (utils/animationPresets.js). It goes on
   // the armed control, or on every selected control at once — one undo step either way.
   let presetReport = $state('');
+  // The preset library or the save form (components/animation/PresetLibrary.svelte), or nothing.
+  let presetPanel = $state('');
+
+  /** A control without an Animations section (a Label) is given an empty one, so it can have some. */
+  function giveAnimations() {
+    if (!controlId || !control) return;
+    const step = beginHistoryTransaction();
+    applyControlPatch(controlId, animationsPatch(control, {}), { pin: true });
+    commitHistoryTransaction(step);
+  }
   let selectionIds = $derived([...($selectedComponentIds ?? [])]);
+  // What the library's Apply puts a preset on: every selected control, else the one the tab is on.
+  let presetTargets = $derived(selectionIds.length > 1 ? selectionIds : (controlId ? [controlId] : []));
 
   /**
    * The name ↔ value swap (utils/textEffects.js nameValueSwapPatch): on the armed Label if it shows a
@@ -628,7 +642,8 @@ onMount(() => {
   {:else if !section}
     <div class="empty">
       <strong>{controlName} has no animations.</strong>
-      <p>This tab edits a control's Animations section. Custom components have one.</p>
+      <p>This tab edits a control's Animations section. A Label starts without one: give it one to put a text effect or an animation preset on its words.</p>
+      <button type="button" class="arm" data-give-animations onclick={giveAnimations}>Give it animations</button>
       <button type="button" class="arm" onclick={armFromSelection}>Use the selection</button>
     </div>
   {:else}
@@ -720,6 +735,9 @@ onMount(() => {
         <!-- 2. Its settings: timing on the left, what starts it on the right -->
         <section class="col setcol">
           <div class="setbox">
+            {#if selected.animation?.preset}
+              <PresetLinkCard {controlId} name={selected.name} node={selected.animation} onreport={(text) => { presetReport = text; }} />
+            {/if}
             <div class="r kindrow">
                 <span class="lab" title="A transition eases between two styles when something changes; keyframes play a shape of their own on one part; a sequence runs a track per change along a time axis">Kind</span>
                 <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: KIND_LABELS[value], title: KIND_TITLES[value] }))}
@@ -782,8 +800,12 @@ onMount(() => {
                              onchange={(value) => setProp('iterations', value === 'infinite' ? 'infinite' : 1)} />
                 </div>
               {/if}
-              <button type="button" class="dbg" onclick={debugSelected}
-                      title="Show this animation as it is stored, in the Console tab's debug pane">Debug</button>
+              <span class="dbgrow">
+                <button type="button" class="dbg" onclick={debugSelected}
+                        title="Show this animation as it is stored, in the Console tab's debug pane">Debug</button>
+                <button type="button" class="dbg" data-save-preset onclick={() => { presetPanel = 'save'; }}
+                        title="Save this animation, or all of this control's, as an animation preset of your own">Save as preset…</button>
+              </span>
             </div>
 
             <div class="grpcol">
@@ -1150,8 +1172,15 @@ onMount(() => {
         <button type="button" class="preset" data-recipe="nameValue"
                 title="On a knob's name Label (or the Label itself): the name, and the value while the knob is touched — pushed in, then the name typed back"
                 onclick={addNameValueSwap}>Name ↔ value</button>
+        <button type="button" class="preset library" data-library aria-pressed={presetPanel === 'library'}
+                title="Your animation presets and this panel's: apply, import, export"
+                onclick={() => { presetPanel = presetPanel === 'library' ? '' : 'library'; }}>Library…</button>
       </div>
     </div>
+    {#if presetPanel}
+      <PresetLibrary mode={presetPanel} {control} selectedName={selected?.name ?? ''} targets={presetTargets}
+                     onclose={() => { presetPanel = ''; }} onreport={(text) => { presetReport = text; }} />
+    {/if}
   {/if}
 </div>
 
@@ -1160,6 +1189,7 @@ onMount(() => {
      is too tall for a short dock scrolls on its own, and the track list scrolls inside its box.
      Type is 13 to 14 px and never under 12; the old tab's labels were 8 to 10. */
   .anim-tab {
+    position: relative;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -1243,6 +1273,9 @@ onMount(() => {
     background: transparent; color: #AEB9C4; font: 400 12px/1 'IBM Plex Sans', system-ui, sans-serif; cursor: pointer;
   }
   .dbg:hover { color: #E8EEF3; border-color: #5B6670; }
+  .dbgrow { display: flex; gap: 6px; flex-wrap: wrap; }
+  .preset.library { border-color: #2E5677; background: #16314A; color: #D6ECFF; }
+  .preset.library[aria-pressed='true'] { border-color: #5AA9E6; }
 
   /* buttons */
   .mk {

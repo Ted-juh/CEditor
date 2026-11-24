@@ -1,0 +1,376 @@
+/**
+ * animationPresetModel.js — an animation preset a person saves, applies linked, and shares as a file:
+ * the Animation Designer's step 4 (docs/design/animation-designer.md, Presets).
+ *
+ * The built-in presets (animationPresets.js) are code: each knows the state change it animates and
+ * writes it. A person's preset is data, made from animations they built, so it has to carry what
+ * those animations depend on to work anywhere else:
+ *
+ *   { format: 'ceditor-animation-preset', version: 1,
+ *     id,                        // stable across machines: what a linked animation follows
+ *     name, category, tags,
+ *     size,                      // 'effect' (one animation) or 'recipe' (several, on one control)
+ *     colours,                   // 'keep' its colours, or leave colour to the 'control' it goes on
+ *     revision,                  // goes up each time the preset is changed
+ *     animations: { name: node },// as the control stores them, minus the link
+ *     states: { Key: { when, patches: { component, parts } } },  // the changes they ease
+ *     fields: { path: value } }  // settings a recipe needs (the name/value swap's Text.shows)
+ *
+ * TARGETS ARE ALREADY RELATIVE. A stored target is a path from the control down — `Parts.bodyCap…`,
+ * `Background.Fill.colour`, `Transform` — never the control's name, so "Cutoff › Labels › Title" is
+ * already "the control's title label". A preset goes on any control that has what its paths and
+ * triggers name, and `presetNeeds` says what that is.
+ *
+ * LINKED, AS A CONTROL SET IS. Applied linked, each animation is written whole — the player and an
+ * export need nothing they did not need before — with `preset: { id, revision, from }` naming what it
+ * follows (`from` is its name in the preset). A field that differs from the version it follows is an
+ * override. When the preset changes, a linked animation takes every field it has not overridden;
+ * Revert, Clear overrides and Detach work as they do for a control set; Apply to preset writes a
+ * control's overrides into the preset and every animation that follows it.
+ */
+import { uniqueAnimationName, animationsPatch } from './animationModel.js';
+import {
+  LINK_KEY, PRESET_FORMAT, PRESET_FORMAT_VERSION, cleanPreset,
+} from './animationPresetFormat.js';
+
+// The format — reading, checking and writing a preset — lives in animationPresetFormat.js, which
+// imports nothing, so the saved document (stores/panelModel.js) and the export tools that run under
+// plain Node can read it without the whole animation model.
+export {
+  PRESET_FORMAT, PRESET_FORMAT_VERSION, PRESET_FILE_EXTENSION, PRESET_SIZES, PRESET_COLOURS, LINK_KEY,
+  cleanPreset, readPresetFile, presetFileText, presetFileName,
+} from './animationPresetFormat.js';
+import { readTrigger } from './interactionRuntime.js';
+import { labelShows } from './labelShows.js';
+
+/** The fields of an animation that are its identity in a control, not a setting. */
+const IDENTITY = new Set(['_type', 'name', LINK_KEY]);
+
+const deepCopy = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
+
+/** Equal as data: object keys in any order, arrays in theirs. */
+export function sameValue(a, b) {
+  return stableText(a) === stableText(b);
+}
+
+function stableText(value) {
+  if (Array.isArray(value)) return `[${value.map(stableText).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().filter((key) => value[key] !== undefined).map((key) => `${JSON.stringify(key)}:${stableText(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/** A new preset id: random, so two people's presets never share one. */
+export function newPresetId(random = Math.random) {
+  let text = '';
+  for (let i = 0; i < 12; i += 1) text += Math.floor(random() * 36).toString(36);
+  return `ap_${text}`;
+}
+
+const COLOUR_PATH = /(^|\.)(colour|color|tint|gradient)$/i;
+
+/** A copy of an animation node with its colours taken out (frames, a text effect's colour). */
+function withoutColours(node) {
+  const copy = deepCopy(node);
+  if (Array.isArray(copy.frames)) {
+    copy.frames = copy.frames.map((frame) => {
+      const { fill, text, ...rest } = frame ?? {};
+      return rest;
+    });
+  }
+  if (copy.kind === 'text') copy.colour = null;
+  return copy;
+}
+
+/** A state's key in a control, matched as triggers match it: ignoring case. */
+function stateKey(states, name) {
+  const wanted = String(name ?? '').toLowerCase();
+  return Object.keys(states ?? {}).find((key) => key.toLowerCase() === wanted) ?? null;
+}
+
+/** The state names an animation's trigger depends on (not '*' or 'default'). */
+function triggerStates(node) {
+  const trigger = readTrigger(node);
+  if (trigger.type !== 'stateChange') return [];
+  return [...new Set([...trigger.to, ...(trigger.leaving ? trigger.from : [])])]
+    .filter((name) => name && name !== '*' && name !== 'default');
+}
+
+/** Whether a state patch path is one of the paths an animation's targets move. */
+function patchMoved(path, targets, part = '') {
+  return targets.some((target) => {
+    const targetPath = String(target?.path ?? '');
+    const full = part ? `Parts.${part}.${path}` : path;
+    return targetPath === full || targetPath.startsWith(`${full}.`) || full.startsWith(`${targetPath}.`);
+  });
+}
+
+/**
+ * A preset made from some of a control's animations. Only the state changes those animations ease
+ * go with them — a Hover state's scale for a hover lift, not everything Hover also does — and,
+ * with `colours: 'control'`, no colour at all.
+ */
+export function buildPreset(control, names, { id = newPresetId(), name = '', category = '', tags = [], colours = 'keep', revision = 1 } = {}) {
+  const all = control?._children?.Animations?._children ?? {};
+  const chosen = (Array.isArray(names) ? names : [names]).filter((key) => all[key]);
+  if (!chosen.length) return { preset: null, reason: 'Choose an animation to save.' };
+  const keepColours = colours !== 'control';
+  const animations = {};
+  for (const key of chosen) {
+    const { [LINK_KEY]: _link, ...node } = deepCopy(all[key]);
+    animations[key] = keepColours ? node : withoutColours(node);
+  }
+
+  const controlStates = control?._children?.States?._children ?? {};
+  const states = {};
+  for (const node of Object.values(animations)) {
+    const targets = Array.isArray(node.targets) ? node.targets : [];
+    for (const wanted of triggerStates(node)) {
+      const key = stateKey(controlStates, wanted);
+      if (!key) continue;
+      const source = controlStates[key];
+      const entry = states[key] ?? { when: deepCopy(source?.when ?? {}), patches: { component: {}, parts: {} } };
+      if (String(node.kind ?? 'transition') === 'transition') {
+        for (const [path, value] of Object.entries(source?.patches?.component ?? {})) {
+          if (!patchMoved(path, targets)) continue;
+          if (!keepColours && COLOUR_PATH.test(path)) continue;
+          entry.patches.component[path] = deepCopy(value);
+        }
+        for (const [part, patch] of Object.entries(source?.patches?.parts ?? {})) {
+          for (const [path, value] of Object.entries(patch ?? {})) {
+            if (!patchMoved(path, targets, part)) continue;
+            if (!keepColours && COLOUR_PATH.test(path)) continue;
+            entry.patches.parts[part] = { ...(entry.patches.parts[part] ?? {}), [path]: deepCopy(value) };
+          }
+        }
+      }
+      states[key] = entry;
+    }
+  }
+
+  // The name/value swap waits for its words to become the value or the name, which only a Label
+  // showing "name, value while touched" ever does.
+  const fields = {};
+  const waitsForWords = Object.values(animations).some((node) => node.kind === 'text'
+    && readTrigger(node).type === 'textChange' && readTrigger(node).to.some((to) => to === 'value' || to === 'name'));
+  if (waitsForWords && labelShows(control) === 'nameValue') fields['Text.shows'] = 'nameValue';
+
+  return {
+    preset: cleanPreset({
+      format: PRESET_FORMAT,
+      version: PRESET_FORMAT_VERSION,
+      id,
+      name: name || chosen[0],
+      category,
+      tags,
+      size: chosen.length > 1 ? 'recipe' : 'effect',
+      colours: keepColours ? 'keep' : 'control',
+      revision,
+      animations,
+      states,
+      fields,
+    }),
+  };
+}
+
+// --- What it needs, and what it goes on ---------------------------------------------------------
+
+/** What a control must have for a preset to work on it: parts, sections, states. */
+export function presetNeeds(preset) {
+  const parts = new Set();
+  const sections = new Set(['Animations']);
+  for (const node of Object.values(preset?.animations ?? {})) {
+    for (const target of node.targets ?? []) {
+      const path = String(target?.path ?? '');
+      if (path.startsWith('Parts.')) parts.add(path.split('.')[1]);
+      else if (path.startsWith('Background.')) sections.add('Background');
+      else if (path === 'Text' || path.startsWith('Text.')) sections.add('Text');
+    }
+  }
+  for (const [part, patch] of Object.values(preset?.states ?? {}).flatMap((state) => Object.entries(state.patches?.parts ?? {}))) {
+    if (patch && Object.keys(patch).length) parts.add(part);
+  }
+  if (Object.keys(preset?.fields ?? {}).some((path) => path.startsWith('Text.'))) sections.add('Text');
+  const states = Object.keys(preset?.states ?? {});
+  return { parts: [...parts].sort(), sections: [...sections].sort(), states };
+}
+
+/** The parts a control has, by name. */
+const partNamesOf = (control) => new Set(Object.keys(control?._children?.Parts?._children ?? {}));
+
+/**
+ * Why a preset cannot go on this control, or '' when it can. A control without an Animations section
+ * (a Label) is given one; a state it needs is made when the control has States to hold it.
+ */
+export function presetDoesNotFit(preset, control) {
+  if (!preset) return 'Nothing to apply.';
+  if (!control?._children) return 'Choose a control to put it on.';
+  const needs = presetNeeds(preset);
+  const missingParts = needs.parts.filter((part) => !partNamesOf(control).has(part));
+  if (missingParts.length) return `It moves ${missingParts.length > 1 ? 'parts' : 'a part'} this control does not have: ${missingParts.join(', ')}.`;
+  const missingSections = needs.sections.filter((section) => section !== 'Animations' && !control._children[section]);
+  if (missingSections.length) return `It animates this control's ${missingSections.join(' and ')}, and it has none.`;
+  if (needs.states.length && !control._children.States) return `It plays on ${needs.states.join(', ')}, and this control has no states.`;
+  return '';
+}
+
+/** The kinds of control a preset goes on, from the types' own defaults. `create(type)` makes one. */
+export function presetFitsTypes(preset, types, create) {
+  return types.filter((type) => {
+    try { return !presetDoesNotFit(preset, create(type)); } catch { return false; }
+  });
+}
+
+// --- Applying it --------------------------------------------------------------------------------
+
+/**
+ * The patch that puts a preset on a control: each animation under a name the control does not use,
+ * linked (`preset: { id, revision, from }`) unless `link` is false; each state merged into one the
+ * control has — it keeps everything, and gains only the values it does not set already, as the
+ * built-in presets merge — or made; and the recipe's fields. `{ patch, names }`, or
+ * `{ patch: null, reason }`.
+ */
+export function applyPresetPatch(control, preset, { link = true } = {}) {
+  const reason = presetDoesNotFit(preset, control);
+  if (reason) return { patch: null, reason };
+  const taken = Object.keys(control._children.Animations?._children ?? {});
+  const nodes = {};
+  const names = [];
+  for (const [from, node] of Object.entries(preset.animations)) {
+    const name = uniqueAnimationName([...taken, ...names], from);
+    names.push(name);
+    nodes[name] = { ...deepCopy(node), _type: 'Animation', name, ...(link ? { [LINK_KEY]: { id: preset.id, revision: preset.revision, from } } : {}) };
+  }
+  const patch = { ...animationsPatch(control, nodes) };
+
+  const states = control._children.States?._children ?? {};
+  for (const [key, wanted] of Object.entries(preset.states ?? {})) {
+    const existingKey = stateKey(states, key);
+    const current = existingKey ? deepCopy(states[existingKey]) : null;
+    const component = { ...(current?.patches?.component ?? {}) };
+    for (const [path, value] of Object.entries(wanted.patches?.component ?? {})) {
+      if (!(path in component)) component[path] = deepCopy(value);
+    }
+    const parts = { ...(current?.patches?.parts ?? {}) };
+    for (const [part, patchValues] of Object.entries(wanted.patches?.parts ?? {})) {
+      const merged = { ...(parts[part] ?? {}) };
+      for (const [path, value] of Object.entries(patchValues ?? {})) if (!(path in merged)) merged[path] = deepCopy(value);
+      parts[part] = merged;
+    }
+    patch[`States.${existingKey ?? key}`] = current
+      ? { ...current, patches: { ...(current.patches ?? {}), component, parts } }
+      : {
+        _type: 'State',
+        name: key,
+        group: 'interaction',
+        description: `${preset.name} (animation preset).`,
+        enabled: true,
+        when: deepCopy(wanted.when ?? {}),
+        patches: { component, parts },
+      };
+  }
+  for (const [path, value] of Object.entries(preset.fields ?? {})) patch[path] = value;
+  return { patch, names };
+}
+
+// --- Following it -------------------------------------------------------------------------------
+
+/** What an animation node follows, or null. */
+export function presetLink(node) {
+  const link = node?.[LINK_KEY];
+  return link && typeof link === 'object' && typeof link.id === 'string' ? link : null;
+}
+
+/** The animation in a preset that a linked node follows. */
+export function followedAnimation(node, preset) {
+  const link = presetLink(node);
+  if (!link || !preset || link.id !== preset.id) return null;
+  return preset.animations?.[link.from] ?? null;
+}
+
+const settingKeys = (a, b) => [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])].filter((key) => !IDENTITY.has(key)).sort();
+
+/** The settings of a linked node that differ from the animation it follows: its overrides. */
+export function presetOverrides(node, followed) {
+  if (!followed) return [];
+  return settingKeys(node, followed).filter((key) => !sameValue(node?.[key], followed?.[key]));
+}
+
+/** The node with one override put back to the preset's value. */
+export function revertOverride(node, followed, key) {
+  const next = deepCopy(node);
+  if (followed?.[key] === undefined) delete next[key];
+  else next[key] = deepCopy(followed[key]);
+  return next;
+}
+
+/** The node as the preset has it, still linked: every override gone. */
+export function clearOverrides(node, followed) {
+  const link = presetLink(node);
+  return { ...deepCopy(followed), _type: 'Animation', name: node.name, ...(link ? { [LINK_KEY]: { ...link } } : {}) };
+}
+
+/** The node on its own: the same settings, following nothing. */
+export function detachNode(node) {
+  const { [LINK_KEY]: _link, ...rest } = deepCopy(node);
+  return rest;
+}
+
+/**
+ * A linked node brought up to a preset's new version: every setting it had not overridden against
+ * the version it followed (`before`) takes the new one (`after`); its overrides stay.
+ */
+export function followNewVersion(node, before, after, revision) {
+  const overrides = new Set(presetOverrides(node, before));
+  const next = deepCopy(node);
+  for (const key of settingKeys(before, after)) {
+    if (overrides.has(key)) continue;
+    if (after?.[key] === undefined) delete next[key];
+    else next[key] = deepCopy(after[key]);
+  }
+  next[LINK_KEY] = { ...presetLink(node), revision };
+  return next;
+}
+
+/** The preset with one of its animations replaced by a control's version of it: Apply to preset. */
+export function presetWithAnimation(preset, from, node) {
+  const { [LINK_KEY]: _link, ...settings } = deepCopy(node);
+  return cleanPreset({
+    ...preset,
+    revision: (preset.revision ?? 1) + 1,
+    animations: { ...preset.animations, [from]: { ...settings, name: from } },
+  });
+}
+
+/**
+ * Every animation in these controls that follows `before`, brought to `after`: `[{ controlId, name,
+ * node }]`, the writes one undo step makes.
+ */
+export function followersUpdate(controls, before, after) {
+  const writes = [];
+  for (const control of controls ?? []) {
+    const id = control?._children?.Core?.id;
+    for (const [name, node] of Object.entries(control?._children?.Animations?._children ?? {})) {
+      const link = presetLink(node);
+      if (!link || link.id !== after.id) continue;
+      const was = before?.animations?.[link.from];
+      const now = after.animations?.[link.from];
+      if (!now) continue;
+      writes.push({ controlId: id, name, node: followNewVersion(node, was ?? now, now, after.revision) });
+    }
+  }
+  return writes;
+}
+
+/** The ids of the presets these controls' animations follow. */
+export function presetsInUse(controls) {
+  const ids = new Set();
+  for (const control of controls ?? []) {
+    for (const node of Object.values(control?._children?.Animations?._children ?? {})) {
+      const link = presetLink(node);
+      if (link) ids.add(link.id);
+    }
+  }
+  return ids;
+}

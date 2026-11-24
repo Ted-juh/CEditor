@@ -33,6 +33,10 @@ const TypedDocumentKind* typedDocumentKind (const juce::String& kind)
     // my.assignment.json): one file is both the document and what the keyboard runs.
     static const TypedDocumentKind ctrl49Screen { "CTRL49 Screen", "*.assignment.json", ".assignment.json" };
     if (kind == "ctrl49Screen") return &ctrl49Screen;
+    // An animation preset (the Animation tab's library): one preset, its animations and the state
+    // changes they ease, as JSON (CE/web/src/CE_Application/utils/animationPresetModel.js).
+    static const TypedDocumentKind animationPreset { "Animation Preset", "*.ceanim", ".ceanim" };
+    if (kind == "animationPreset") return &animationPreset;
     return nullptr;
 }
 

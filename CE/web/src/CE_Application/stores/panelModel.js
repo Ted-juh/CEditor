@@ -1,4 +1,5 @@
 import { get } from 'svelte/store';
+import { cleanPreset } from '../utils/animationPresetFormat.js';
 import { defaultControlSetId, defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
@@ -258,6 +259,13 @@ export function serializePanel(panel, options = {}) {
 
   // Text styles (utils/textStyles.js), same rule: deleting the last one leaves no empty key behind.
   if (!Array.isArray(data.textStyles) || data.textStyles.length === 0) delete data.textStyles;
+
+  // The animation presets the panel carries (stores/animationPresetLibrary.js), same rule. Each is
+  // read as data and checked (utils/animationPresetFormat.js cleanPreset); one that does not read is
+  // dropped rather than written back half-understood.
+  const animationPresets = Array.isArray(data.animationPresets) ? data.animationPresets.map(cleanPreset).filter(Boolean) : [];
+  if (animationPresets.length) data.animationPresets = animationPresets;
+  else delete data.animationPresets;
 
   // Routes, same rule. Only the panel's OWN routes are stored — the ones derived from Macro slots
   // and Router destinations are a view, and writing them here would give the panel a stale second
