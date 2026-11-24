@@ -5,14 +5,23 @@
    * or, for an inner one, over it. Its own component so the two that draw it draw the same filter:
    * EffectSurfaceActive, as a CSS `filter: url(#id)` on HTML, and SliderShapeFill, on an SVG group
    * (utils/svgFillEffects.js says why). `width` and `height` are the surface's, in the filter's units.
+   *
+   * The region is a fraction of the box it filters (objectBoundingBox, the default), never pixels in
+   * `userSpaceOnUse`: WebKit (the Linux app and plug-ins) places a user-space region on an HTML
+   * element somewhere other than the element, and the element — an LCD, a group frame, the Macro,
+   * an XY pad, whatever its control set gave a shadow — was not drawn at all. Measured in WebKitGTK
+   * 2.52; Chromium draws the same region either way. The primitives stay in pixels (primitiveUnits
+   * is user space by default), which both engines get right.
    */
   let { id, shadows = [], width = 0, height = 0 } = $props();
   let padding = $derived(Math.max(1, ...shadows.map((s) => Math.abs(s.x) + Math.abs(s.y) + Math.abs(s.spread) + s.blur * 3)));
+  let w = $derived(Math.max(1, Number(width) || 0));
+  let h = $derived(Math.max(1, Number(height) || 0));
 </script>
 
 <svg class="effect-defs" width="0" height="0" aria-hidden="true">
   <defs>
-    <filter {id} filterUnits="userSpaceOnUse" x={-padding} y={-padding} width={width + 2 * padding} height={height + 2 * padding} color-interpolation-filters="sRGB">
+    <filter {id} x={-padding / w} y={-padding / h} width={1 + (2 * padding) / w} height={1 + (2 * padding) / h} color-interpolation-filters="sRGB">
       {#each shadows as shadow, i}
         {#if shadow.inner}
           <feComponentTransfer in="SourceAlpha" result={`alpha${i}`}><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>

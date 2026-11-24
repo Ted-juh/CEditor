@@ -332,8 +332,8 @@ non-ASCII patch name desynchronised the pipe for good.
 
 **WebKitGTK draws SVG differently, and Chromium cannot show you how.** The browser checks run
 Chromium, which is what Windows draws with; Linux draws with WebKit, and on 2026-11-24 the default
-knob drew there as squares. Two rules came out of it, measured in WebKitGTK 2.52 and both held by
-`test/shapeClip.test.js` (the reasons are in `editor/SliderShapeFill.svelte`):
+knob drew there as squares. These rules came out of it, measured in WebKitGTK 2.52; the first two are
+held by `test/shapeClip.test.js` (the reasons are in `editor/SliderShapeFill.svelte`):
 
 - **Inside a `<foreignObject>`, nothing with a layer of its own** — positioned, clipped, translucent,
   transformed. WebKit paints such a layer outside the SVG: past a mask or clip on the foreignObject,
@@ -341,6 +341,11 @@ knob drew there as squares. Two rules came out of it, measured in WebKitGTK 2.52
 - **No `opacity` or `style` on the `<foreignObject>` itself**; put them on a `<g>` around it. WebKit
   fades it through a layer it places without the foreignObject's `x` and `y`, and cuts that much off
   its far side.
+- **A filter that HTML uses gives its region in fractions of the box** (`objectBoundingBox`, the
+  default), never `filterUnits="userSpaceOnUse"`: WebKit puts a user-space region somewhere other
+  than the element, and the element is not drawn at all. Every control a control set gave a shadow
+  was blank on Linux until `ShadowFilter.svelte` changed. Held by `test/webkitFilterRegions.test.js`;
+  filters on SVG elements inside an SVG are not affected.
 
 A CSS `filter` is a layer too, so a fill's material and shadows go on SVG groups around it instead,
 one group per filter: WebKit ignores a list of them on one (`utils/svgFillEffects.js`).

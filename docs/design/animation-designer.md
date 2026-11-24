@@ -669,7 +669,10 @@ so before any scene touches the knob, and Chromium, so Windows, is unaffected; t
 Linux plug-ins are not. Fixed in the two commits after this one: the fill is drawn with no layer of its
 own and cut by an SVG clip (`utils/shapeClip.js`, `editor/SliderShapeFill.svelte`), and `CLAUDE.md`
 now has the rules WebKit taught; a plate's material and shadows became SVG filters on groups round
-it, so all 1,515 slider fills of the 79 built-in sets draw in order.
+it, so all 1,515 slider fills of the 79 built-in sets draw in order. A third commit drew what a set
+gave a shadow — LCDs, group frames, the Macro, XY pads, dropdowns, blank on Linux until the shadow
+filter's region was given in fractions of its box — and every one of the 79 sets now draws in
+WebKitGTK as in Chromium.
 
 ## Open
 
