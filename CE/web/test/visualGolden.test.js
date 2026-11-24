@@ -92,8 +92,27 @@ function inlineBakedSvg(body) {
   });
 }
 
+/**
+ * A fill gradient is written to ease (utils/gradientPaint.js): `linear-gradient(calc(var(--ce-ga) + …),
+ * var(--ce-gc0) …)`, its angle, colours and stops set beside it in the same style. Put them back, so
+ * the baseline pins the gradient that is drawn — its angle and its stops — and not a template every
+ * gradient shares. The padding copies of the last stop are folded away with them: they draw nothing.
+ */
+function resolveGradientVars(body) {
+  return body.replace(/style="([^"]*)"/g, (whole, style) => {
+    if (!style.includes('var(--ce-g')) return whole;
+    const values = new Map([...style.matchAll(/(--ce-g[a-z0-9-]*):\s*([^;"]+)/g)].map(([, name, value]) => [name, value.trim()]));
+    const resolved = style
+      .replace(/(--ce-g[a-z0-9-]*):\s*([^;"]+);?\s*/g, '')
+      .replace(/var\((--ce-g[a-z0-9-]*)(?:,\s*([^()]*))?\)/g, (all, name, fallback) => values.get(name) ?? fallback?.trim() ?? all)
+      .replace(/calc\((-?[\d.]+)(deg|%) \+ 0\2\)/g, '$1$2')
+      .replace(/(, (#[0-9A-Fa-f]+ -?[\d.]+%))(?:, \2)+(?=\))/g, '$1');
+    return `style="${resolved}"`;
+  });
+}
+
 function paintSummary(rawBody) {
-  const body = inlineBakedSvg(rawBody);
+  const body = resolveGradientVars(inlineBakedSvg(rawBody));
   const strokes = [...body.matchAll(/stroke="([^"]+)"[^>]*?stroke-width="([^"]+)"/g)]
     .map(([, colour, width]) => `stroke ${colour} @ ${width}`);
   const fills = [...body.matchAll(/fill="(?!none)([^"]+)"/g)].map(([, colour]) => `fill ${colour}`);

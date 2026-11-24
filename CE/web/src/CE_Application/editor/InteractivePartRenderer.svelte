@@ -10,7 +10,7 @@
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
-  import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { gradientBackgroundCSS } from '../utils/gradientPaint.js';
   import { buildIconTintStyle, buildTextShadowValue, lineColourFor, lineGeometry, lineLayerFor, textAlignFor, textEffectColor, usesIconTint } from './canvasControlStyles.js';
   import { iconImageStyle } from './iconLook.js';
   import { storedIcons } from '../stores/appSettings.js';
@@ -332,8 +332,9 @@
       // Keyframe animations on this part (the control's player decides which are playing). A fill
       // absorbed onto this element is painted here, so its colour channel plays here too; the rest
       // travel to the layers inside as custom properties.
-      animationDeclaration(animationList, { extra: colourChannels && absorbedFillCSS ? colourChannels.paint : [] }),
-      colourChannels ? colourVariables(colourChannels, { skip: absorbedFillCSS ? ['paint'] : [] }) : '',
+      // An absorbed fill is a colour or a gradient (utils/gradientPaint.js), so one of the two channels.
+      animationDeclaration(animationList, { extra: colourChannels && absorbedFillCSS ? (colourChannels[absorbedChannel] ?? []) : [] }),
+      colourChannels ? colourVariables(colourChannels, { skip: absorbedFillCSS ? [absorbedChannel] : [] }) : '',
       shadowCSS,
       blendCSS,
       filterCSS,
@@ -350,6 +351,7 @@
   // and the 474 that are left over still wanted a div each just to hold a colour.
   // Not on a layer that casts a control's shadows: its fill must be inside the surface that casts
   // them, or only its border would.
+  let absorbedChannel = $derived(/gradient\(/.test(absorbedFillCSS ?? '') ? 'gradient' : 'paint');
   let absorbedFillCSS = $derived(
     background && !surfaceEffects && !renderedImage && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
       ? plainFillCSS(background, frame.width, frame.height)
@@ -693,7 +695,7 @@
     if (!shape.usesSimpleBackground && !(shape.rendersVectorShape && shape.polygonVerts && !shape.rendersOpenPath)) return '';
     const fill = background?._children?.Fill ?? null;
     if (fill?.gradientEnabled !== true || !(fill?.gradient?.stops?.length >= 2)) return '';
-    return `background: ${gradientToCSS(fill.gradient)}; opacity: ${(numberOr(fill.gradientOpacity, 100) / 100).toFixed(3)}; mix-blend-mode: ${fill.gradientBlend ?? 'normal'};`;
+    return `${gradientBackgroundCSS(fill.gradient)} opacity: ${(numberOr(fill.gradientOpacity, 100) / 100).toFixed(3)}; mix-blend-mode: ${fill.gradientBlend ?? 'normal'};`;
   });
 
   let simpleBackgroundStyle = $derived.by(() => {
@@ -1269,6 +1271,9 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
+    /* Eases with the part's colour timing, and plays its gradient's turn and shift frames. */
+    transition: var(--ce-colour-transition, none);
+    animation: var(--ce-kf-gradient, none);
   }
 
   .interactive-envelope-path,

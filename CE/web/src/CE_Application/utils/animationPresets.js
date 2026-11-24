@@ -81,6 +81,16 @@ export const ANIMATION_PRESETS = [
         { path: `Parts.${part}.Layout.y`, properties: ['transform'] },
       ]), 160, 'outCubic'),
   },
+  {
+    // The Paint engine (utils/gradientPaint.js): every stop of the fill gradient slides from a whole
+    // width before to a whole width after, so a chrome highlight sweeps across and comes round again.
+    id: 'gradientSheen',
+    label: 'Gradient sheen',
+    summary: 'A sheen sweeps across the fill gradient, over and over, while the control stays where it is.',
+    needsGradient: true,
+    animation: (name) => keyframes(name, { type: 'always' },
+      [{ at: 0, shift: -100 }, { at: 1, shift: 100 }], 2400, { iterations: 'infinite' }),
+  },
 ];
 
 export const PRESET_BY_ID = Object.fromEntries(ANIMATION_PRESETS.map((preset) => [preset.id, preset]));
@@ -117,6 +127,12 @@ export function presetBlockedBecause(control, preset) {
   if (preset.id === 'valueGlide') {
     const already = existingPointerGlide(control);
     if (already) return `It already glides its pointer with ${already}; a second would only clash with it.`;
+  }
+  if (preset.needsGradient) {
+    const fill = control._children?.Background?._children?.Fill;
+    if (!(fill?.gradientEnabled === true && fill?.gradient)) {
+      return 'It sweeps the fill gradient, and this control has none: switch on Gradient in its Background first.';
+    }
   }
   if (preset.signal && !reachesSignal(control, preset.signal)) {
     return 'It plays while the control is checked, and this control is never checked.';

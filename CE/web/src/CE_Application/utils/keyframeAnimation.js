@@ -18,7 +18,8 @@
  *                every },               // beat: once every N transport beats while it runs
  *     targets: [{ path }],              // only the part matters: 'Parts.<name>…', else the control
  *     frames: [{ at: 0..1, scale, rotate, x, y, opacity,
- *                fill, text }] }        // colours, AARRGGBB as everywhere else in the document
+ *                fill, text,            // colours, AARRGGBB as everywhere else in the document
+ *                turn, shift }] }       // the fill gradient's angle (deg) and its stops (%), added
  *
  * HOW IT DRAWS. Frames are written with the INDIVIDUAL transform properties — `scale`, `rotate`,
  * `translate` — not `transform`. A control is already scaled and rotated by its own `transform`
@@ -38,11 +39,18 @@
  * nothing, so a control's colour pulse does not leak into the parts drawn inside it. Where the
  * moving element is itself the painter (a part whose fill is absorbed onto it, a slider's pointer
  * shape) the renderer appends the channel's list to its own `animation` instead.
+ *
+ * AND A GRADIENT. `turn` and `shift` frames move a fill gradient's angle and every one of its stops
+ * (utils/gradientPaint.js: the registered `--ce-g-turn` and `--ce-g-shift` it is written with). They
+ * are the fifth channel, `gradient`, carried to the gradient layer as `--ce-kf-gradient` like the
+ * colours, so a sheen can sweep across a chrome fill or a conic gradient spin while the control does
+ * not move. 2026-11-24, the Animation Designer's step 3.
  */
 import { readTrigger } from './interactionRuntime.js';
 import { easingToCss } from './easing.js';
 import { describeChange, matchStrength } from './transitionSelection.js';
 import { textEffectRules } from './textEffects.js';
+import { GRADIENT_VARS } from './gradientPaint.js';
 
 // `event`: a gesture on the control — click, double-click, long press, flick, a wheel turn — played
 // on request from where the gesture is recognised, as `script` is from ce.anim.play. Its id is in
@@ -58,6 +66,10 @@ const FRAME_LIMITS = { scale: [0, 10], rotate: [-3600, 3600], x: [-2000, 2000], 
 
 /** The colours a frame can set: the fill it paints with, and its text. */
 export const FRAME_COLOURS = ['fill', 'text'];
+
+/** What a frame can do to a fill gradient: turn it (degrees) and shift its stops (percent). */
+export const FRAME_GRADIENT = ['turn', 'shift'];
+const GRADIENT_LIMITS = { turn: [-3600, 3600], shift: [-200, 200] };
 
 /**
  * A frame colour as the document stores colours — AARRGGBB, upper case — or null. Six digits are
@@ -86,7 +98,9 @@ export const COLOUR_CHANNELS = Object.freeze({
   stroke: { frame: 'fill', property: 'stroke' },
   text: { frame: 'text', property: 'color' },
 });
-const CHANNEL_NAMES = Object.keys(COLOUR_CHANNELS);
+/** The fifth channel: a fill gradient's turn and shift (see AND A GRADIENT). */
+export const GRADIENT_CHANNEL = 'gradient';
+const CHANNEL_NAMES = [...Object.keys(COLOUR_CHANNELS), GRADIENT_CHANNEL];
 
 /** A new keyframe animation's frames: a gentle pulse that ends where it starts. */
 export const PULSE_FRAMES = Object.freeze([
@@ -128,6 +142,12 @@ export function cleanFrames(frames) {
     for (const key of FRAME_COLOURS) {
       const colour = cleanFrameColour(frame[key]);
       if (colour) clean[key] = colour;
+    }
+    for (const key of FRAME_GRADIENT) {
+      const value = Number(frame[key]);
+      if (frame[key] === undefined || frame[key] === null || frame[key] === '' || !Number.isFinite(value)) continue;
+      const [lo, hi] = GRADIENT_LIMITS[key];
+      clean[key] = Math.min(hi, Math.max(lo, value));
     }
     out.push(clean);
   }
@@ -216,8 +236,20 @@ export function animationValue(entry, phase = 'a') {
   return `ce-kf-${framesHash(entry.frames)}-${phase} ${timing(entry)}`;
 }
 
-/** The frames that set a channel's colour, as [{ at, colour }] — empty when none do. */
+/**
+ * The frames that set a channel's colour, as [{ at, colour }] — empty when none do. For the gradient
+ * channel, the frames that turn or shift it, as [{ at, turn?, shift? }].
+ */
 export function channelFrames(entry, channel) {
+  if (channel === GRADIENT_CHANNEL) {
+    return entry.frames
+      .filter((frame) => frame.turn !== undefined || frame.shift !== undefined)
+      .map((frame) => ({
+        at: frame.at,
+        ...(frame.turn !== undefined ? { turn: frame.turn } : {}),
+        ...(frame.shift !== undefined ? { shift: frame.shift } : {}),
+      }));
+  }
   const key = COLOUR_CHANNELS[channel]?.frame;
   return key ? entry.frames.filter((frame) => frame[key] !== undefined).map((frame) => ({ at: frame.at, colour: frame[key] })) : [];
 }
@@ -229,6 +261,15 @@ export function channelFrames(entry, channel) {
  */
 export function colourKeyframesRule(entry, channel, phase = 'a') {
   const frames = channelFrames(entry, channel);
+  if (channel === GRADIENT_CHANNEL) {
+    const body = frames.map((frame) => {
+      const declarations = [];
+      if (frame.turn !== undefined) declarations.push(`${GRADIENT_VARS.turn}:${number(frame.turn)}deg`);
+      if (frame.shift !== undefined) declarations.push(`${GRADIENT_VARS.shift}:${number(frame.shift)}%`);
+      return `${number(frame.at * 100)}%{${declarations.join(';')}}`;
+    }).join('');
+    return `@keyframes ce-kf-${channel}-${framesHash(frames)}-${phase}{${body}}`;
+  }
   const { property } = COLOUR_CHANNELS[channel];
   const body = frames.map((frame) => `${number(frame.at * 100)}%{${property}:${colourCss(frame.colour)}}`).join('');
   return `@keyframes ce-kf-${channel}-${framesHash(frames)}-${phase}{${body}}`;
@@ -388,7 +429,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
   };
 }
 
-const emptyChannels = () => ({ paint: [], shape: [], stroke: [], text: [] });
+const emptyChannels = () => ({ paint: [], shape: [], stroke: [], text: [], gradient: [] });
 
 /**
  * The CSS for one part's (or the control's) animations: `animation:…;`, or ''.
@@ -405,7 +446,7 @@ export function animationDeclaration(list, { svg = false, extra = [] } = {}) {
 
 /**
  * The custom properties that carry one control's or part's colour animations to the layers that
- * paint it. All four, always — `none` where there is nothing — because they inherit: a part that
+ * paint it, and its gradient's turn and shift. All five, always — `none` where there is nothing — because they inherit: a part that
  * left them unset would paint with its control's pulse. `skip` names channels the element applies
  * itself and must not hand on (a part whose fill is absorbed onto it paints its own box).
  */

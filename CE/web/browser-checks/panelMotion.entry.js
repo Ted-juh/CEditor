@@ -26,6 +26,7 @@ import { createCustomComponentStarterPatch } from '../src/CE_Application/utils/c
 import { setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 import { animationsPatch } from '../src/CE_Application/utils/animationModel.js';
 import { nameValueSwapPatch, newTextEffectShape } from '../src/CE_Application/utils/textEffects.js';
+import { addPatternPatch } from '../src/CE_Application/utils/patternLayers.js';
 
 window.__JUCE__ = undefined;
 
@@ -152,17 +153,46 @@ const knobName = place(createControl('Label'), 'knobName', 200, 362, 160, 18);
 knobName._children.Core.attachedTo = 'knob';
 for (const [path, value] of Object.entries(nameValueSwapPatch(knobName, animationsPatch).patch)) setNestedValue(knobName, path, value);
 
+// Pattern and Paint (step 3, 2026-11-24). A Button whose Hover state turns its gradient and recolours
+// a stop, eased over a second; a Label whose gradient spins on a loop; and the owner's "Wave": a sine
+// wave in a row behind the words and dots drifting diagonally in front of them.
+const CHROME = { type: 'linear', angle: 90, edge: 0, stops: [{ color: 'FF333A40', position: 0 }, { color: 'FFE8EEF3', position: 50 }, { color: 'FF333A40', position: 100 }] };
+const chrome = place(createControl('Button'), 'chrome', 20, 400, 160, 40);
+Object.assign(chrome._children.Background._children.Fill, { solidEnabled: false, gradientEnabled: true, gradient: CHROME });
+chrome._children.States._children.Hover.patches.component = {
+  'Background.Fill.gradient': { ...CHROME, angle: 270, stops: [{ color: 'FF333A40', position: 0 }, { color: 'FFFF0000', position: 50 }, { color: 'FF333A40', position: 100 }] },
+};
+chrome._children.Animations._children = {
+  chromeTurn: animation('chromeTurn', { type: 'stateChange', from: ['*'], to: ['hover'] }, [{ path: 'Background.Fill.gradient', properties: ['colour'] }], 1000),
+};
+const spinner = place(createControl('Label'), 'spinner', 200, 400, 160, 40);
+spinner._children.Text.content = 'Spin';
+Object.assign(spinner._children.Background._children.Fill, { solidEnabled: false, gradientEnabled: true, gradient: { ...CHROME, type: 'conical' } });
+for (const [path, value] of Object.entries(animationsPatch(spinner, {
+  spin: { _type: 'Animation', name: 'spin', enabled: true, kind: 'keyframes', duration: 2000, delay: 0, easing: 'linear',
+    trigger: { type: 'always' }, targets: [{ path: 'Transform' }], frames: [{ at: 0, turn: 0 }, { at: 1, turn: 360 }] },
+}))) setNestedValue(spinner, path, value);
+const wave = place(createControl('Label'), 'wave', 380, 400, 200, 60);
+wave._children.Text.content = 'Wave';
+for (const fields of [
+  { src: 'builtin:sine', repeat: 'x', speed: 64, direction: 0, tint: 'FF14B8A6' },
+  { src: 'builtin:dots', repeat: 'both', speed: 40, direction: 45, tint: '80FFFFFF', place: 'front' },
+]) {
+  const { patch } = addPatternPatch(wave._children.Background, 'Background', fields);
+  for (const [path, value] of Object.entries(patch)) setNestedValue(wave, path, value);
+}
+
 // ce.anim is declared because this panel has no script of its own for the runtime to derive it from;
 // a panel whose script calls ce.anim.play gets the module from that script.
 const panel = {
   id: 'motion', name: 'Motion', width: 400, height: 380, bgColour: 'FF1E1E1E',
-  controls: [button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker, caption, knobName],
+  controls: [button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker, caption, knobName, chrome, spinner, wave],
   scripting: { modules: ['ce.core', 'ce.anim'] },
 };
 panels.set([]);
 addPanel(panel);
 setActivePanel(panel.id);
-panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker, caption, knobName].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
+panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted, clicker, caption, knobName, chrome, spinner, wave].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
 mount(GaiaPagesHarness, { target: document.getElementById('host'), props: { panelId: panel.id } });
 setPreviewModeEnabled(true);
 
@@ -230,6 +260,28 @@ window.__motion = {
   /** A script's ce.anim.play, through the real script API. */
   scriptPlay: (control, name) => scriptApiForTesting('', 'motion-script').animatePlay(control, name),
   stopTransport: () => stopTransport(),
+  /** The element of a control that paints its fill gradient, and what the browser computes for it. */
+  gradient: (id) => {
+    const el = [...(root(id)?.querySelectorAll('.control-content, .bg-fill-layer') ?? [])]
+      .find((node) => /gradient\(/.test(getComputedStyle(node).backgroundImage));
+    if (!el) return null;
+    const style = getComputedStyle(el);
+    return { image: style.backgroundImage, angle: style.getPropertyValue('--ce-ga').trim(), turn: style.getPropertyValue('--ce-g-turn').trim(), colour1: style.getPropertyValue('--ce-gc1').trim() };
+  },
+  /** A control's patterns as drawn: each layer's place, its movers' current offsets, its paint. */
+  patterns: (id) => [...(root(id)?.querySelectorAll('.pattern-layer') ?? [])].map((layer) => {
+    const paint = layer.querySelector('.pattern-paint');
+    const paintStyle = getComputedStyle(paint);
+    return {
+      name: layer.dataset.pattern,
+      place: layer.dataset.place,
+      moveX: (() => { const m = layer.querySelector('.pattern-move-x'); return m ? getComputedStyle(m).translate : null; })(),
+      moveY: (() => { const m = layer.querySelector('.pattern-move-y'); return m ? getComputedStyle(m).translate : null; })(),
+      tint: paintStyle.backgroundColor,
+      mask: (paintStyle.maskImage || paintStyle.webkitMaskImage || '').slice(0, 30),
+      afterText: !!root(id)?.querySelector('.text-span') && !!(root(id).querySelector('.text-span').compareDocumentPosition(layer) & Node.DOCUMENT_POSITION_FOLLOWING),
+    };
+  }),
   /** A control's words as drawn: the live pieces and their animations, and the ghost of a swap. */
   words: (id) => {
     const el = root(id);

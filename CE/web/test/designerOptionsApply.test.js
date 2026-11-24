@@ -82,7 +82,9 @@ test('the generated-names and hit-zone view toggles show only when there is some
 
 test('a round shape and a polygon draw their gradient, over their solid colour, as a box does', () => {
   const renderer = source('editor/InteractivePartRenderer.svelte');
-  assert.match(renderer, /return `background: \$\{gradientToCSS\(fill\.gradient\)\}; opacity: \$\{\(numberOr\(fill\.gradientOpacity, 100\) \/ 100\)\.toFixed\(3\)\}; mix-blend-mode: \$\{fill\.gradientBlend \?\? 'normal'\};`;/);
+  // Written to ease since the Paint engine (utils/gradientPaint.js): the same gradient, its numbers in
+  // registered properties, so a state that turns it glides.
+  assert.match(renderer, /return `\$\{gradientBackgroundCSS\(fill\.gradient\)\} opacity: \$\{\(numberOr\(fill\.gradientOpacity, 100\) \/ 100\)\.toFixed\(3\)\}; mix-blend-mode: \$\{fill\.gradientBlend \?\? 'normal'\};`;/);
   assert.match(renderer, /<div class="interactive-simple-background ce-colour-anim" style=\{simpleBackgroundStyle\}>\s*\{#if gradientLayerStyle\}<div class="interactive-gradient-layer"/);
   // The polygon's fill is a box clipped to the SVG polygon's own points; the SVG keeps the stroke.
   assert.match(renderer, /return `clip-path: polygon\(\$\{corners\.join\(', '\)\}\); background: \$\{solid\};`;/);

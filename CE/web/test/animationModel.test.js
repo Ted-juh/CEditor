@@ -50,6 +50,7 @@ import {
   EASING_NAMES,
   EASING_BEZIERS,
   targetStatus,
+  sequenceTargetStatus,
   describeAnimation,
   readAnimations,
   animationsEnabled,
@@ -556,12 +557,27 @@ test('every shipped control and starter names only states it has, and has no cla
   }
 });
 
-test('a working colour target says that only a solid colour fades', () => {
+test('a working colour target says what fades, what glides and what still switches', () => {
   // Phase 2 of the overhaul: colour animates, and the one thing it cannot do is said on the row.
+  // Since the Paint engine (gradientPaint.js, 2026-11-24) a gradient glides too; an image does not.
   const colour = targetStatus({ path: 'Parts.label.Background.Fill.colour' }, ['label']);
   assert.equal(colour.works, true);
-  assert.match(colour.note, /gradient, an image or a material switches/);
+  assert.match(colour.note, /a gradient glides/);
+  assert.match(colour.note, /An image or a material switches/);
+  const gradient = targetStatus({ path: 'Background.Fill.gradient' }, []);
+  assert.equal(gradient.works, true);
+  assert.equal(gradient.animates, 'colour');
   assert.equal(targetStatus({ path: 'Transform.scale' }, []).note, undefined, 'scale has nothing to warn about');
+});
+
+test('a gradient is a transition\'s target, not a sequence\'s, and a sequence says why', async () => {
+  const { offeredTargetsFor } = await import('../src/CE_Application/utils/animationModel.js');
+  const control = createControl('Label');
+  assert.ok(offeredTargetsFor(control, 'transition', { onControl: true }).some((entry) => entry.label === 'Gradient'));
+  assert.ok(!offeredTargetsFor(control, 'sequence', { onControl: true }).some((entry) => entry.label === 'Gradient'));
+  const status = sequenceTargetStatus({ path: 'Background.Fill.gradient' }, []);
+  assert.equal(status.works, false);
+  assert.match(status.detail, /a gradient is neither/);
 });
 
 // --- Phase 3: a curve you draw, and one that bounces ---------------------------------------------

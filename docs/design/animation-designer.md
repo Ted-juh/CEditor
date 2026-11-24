@@ -395,9 +395,119 @@ and releases a knob whose name Label carries the swap, and checks the value push
 name's ghost and the name typing back. Not run: the app under Xvfb, so WebKitGTK has not drawn an
 effect yet (see Open), and Windows.
 
+## As built: step 3 (2026-11-24)
+
+Pattern and Paint, and the loop budget's measurement.
+
+**Paint: a gradient that eases** (`utils/gradientPaint.js`). A fill gradient was one `background:
+linear-gradient(…)`, which CSS cannot blend, so a state that turned it swapped the picture at the
+end. It is now written with its angle, centre and stops in custom properties registered with a type
+(`<angle>`, `<color>`, `<percentage>`, not inherited), which interpolate: a transition on the colour
+timing glides the angle, the centre and every stop's colour and place. The stop list is padded with
+copies of its last stop to 4, 8 or 12, so two states of one gradient share their declaration and only
+the properties move. What still jumps: a change of type, a mesh or square ramp, more than twelve
+stops (with edge hardness, which triples them, five stops is already thirteen). All three painters
+write it — the background's gradient layer, a fill absorbed onto the control or a part, a round
+shape's gradient layer — through `gradientBackgroundCSS`, which falls back to `gradientToCSS`.
+
+- **A loop.** Keyframe frames gained `turn` (degrees added to the angle) and `shift` (percent added
+  to every stop), played on a fifth channel, `gradient`, beside paint, shape, stroke and text, and
+  carried as `--ce-kf-gradient` to the layer that paints the gradient. The frames editor shows them
+  where the control's fill has a gradient. The **Gradient sheen** preset is the one-click use.
+- **A target.** "Background › Gradient" for transitions, on the colour timing; the tab's note now
+  says a gradient glides. Not offered to a sequence, which moves numbers and colours along a track:
+  it says so if one is given.
+- **The same picture.** The visual golden's summary puts the properties back before it compares,
+  and the GAIA fader's gradient came out byte-identical: the eased form draws what the old one drew.
+  `gradientPaint.test.js` holds every type to `gradientToCSS` the same way.
+
+**Pattern: one tile, tinted, tiled, moving** (`utils/patternLayers.js`, `PatternLayers.svelte`,
+`sections/PatternsEditor.svelte`). `Background.Patterns` holds any number, each a tile (ten built in:
+four waveforms, dots, stripes, grid, checks, chevrons, scan lines; or an image read into the panel
+as a data URL — never a path, which would not reach the plug-in), a tint, opacity, size, repeat
+(everywhere, a row, a column), placement, offset, blend, flips, and **behind** the content or **in
+front** of it. The owner's "Wave" is a sine row behind the word and dots in front of it.
+
+- **Tinted** by being a mask: the element is filled with the tint and shows only where the tile is
+  opaque, which is "a single-colour image, tinted on the fly". The tint is `background-color` on the
+  colour timing, so it is a target too: "Background › Pattern 1 tint".
+- **Moving** without repainting: a mover one tile in size slides by its own width and starts again,
+  carrying a painted area a tile larger than the control on every side. A translate is composited;
+  a diagonal is two movers, each looping on its own axis. A row moves only along itself, a column
+  only down itself, and the editor says so when the direction would hold it still.
+- **Where it moves**: in Preview, on the Animation tab's stage, in the player. On the design canvas
+  it is drawn still (the owner's rule: the canvas never moves on its own), and under reduced motion,
+  the operating system's or the Preview's own.
+- **Never folded into a still.** A Label is scenery and scenery is a still picture; a Label with a
+  pattern is kept live (`sceneryModel.js`), and a custom component's part with one is never baked
+  (`staticPartBaking.js`).
+- Saved whole, as Animations are: the type's defaults have no Patterns, so nothing else in a saved
+  panel changed.
+
+**WebKitGTK, checked.** A probe of each feature, read mid-animation rather than asked of
+`CSS.supports`, in WebKitGTK 2.52.6 (Ubuntu 24.04's) and Chromium 158: registered properties
+interpolate inside a gradient and in keyframes, `clip-path: inset()` and the `translate` property
+animate, `mask-image` works both prefixed and not, `steps(n, jump-end)` is understood. Then the
+panel-motion fixture itself in WebKitGTK, the real components: the chrome button's gradient was at
+168.84° and a stop half-way to red mid-hover, then 270° and red; the conic gradient's turn moved; the
+Wave's sine drew behind the word and the dots in front, both movers advancing. Where registration is
+missing (WebKitGTK before 2.40) the same CSS draws the same gradient and jumps, as before.
+
+**The loop budget, measured** (`tools/scripts/measure-loop-budget.mjs`). Pages of 200 × 60 labels,
+each with one loop, written by the renderers' own functions; CPU of the browser's whole process tree
+as a percentage of one core, 8 s a sample, on a 4-thread container with no GPU — both engines draw in
+software here, which makes compositing dearer than on a desktop with a GPU, so read the numbers as an
+upper bound and the ratios as what carries over. Idle: Chromium 4.9 %, WebKitGTK 3.5 %.
+
+| Loops on a panel | 1 | 5 | 10 | 25 | 50 |
+|---|---|---|---|---|---|
+| Chromium, a moving pattern | 10.7 | 13.1 | 17.5 | 27.6 | 45.6 |
+| Chromium, the same at 30 fps | 8.1 | 10.2 | 12.1 | 19.1 | 29.3 |
+| Chromium, a diagonal (two movers) | 10.7 | 14.6 | 18.5 | 32.1 | 53.7 |
+| Chromium, a turning gradient | 14.2 | 21.4 | 27.2 | 51.1 | 87.1 |
+| Chromium, mask-position (not taken) | 13.9 | 22.7 | 29.4 | 47.5 | 82.8 |
+| WebKitGTK, a moving pattern | 15.9 | 22.7 | 33.2 | 64.3 | 100.9 |
+| WebKitGTK, the same at 30 fps | 10.7 | 14.5 | 19.5 | 34.5 | 58.5 |
+| WebKitGTK, a turning gradient | 15.5 | 22.4 | 32.4 | 58.9 | 100.8 |
+
+What it says. A still pattern costs nothing measurable, even fifty. The first moving loop costs the
+most — it keeps the window drawing sixty frames a second: +6 % of a core in Chromium, +12 % in
+WebKitGTK here — and each one after it about 0.7 % (Chromium) and 1.7 % (WebKitGTK). A 30 fps cap
+saves about 40 % in both. In Chromium, moving by translate costs half what moving the mask does, which
+is the reason for the movers; in software WebKitGTK they cost the same. A turning gradient is
+repainted every frame and costs about twice a pattern. Frame rate held at 60 up to 25 loops in both,
+and fell to 56 at 50 in WebKitGTK. And the rule the design began with holds: ten plug-in windows
+each with one loop pay the first loop's cost ten times (60 % and 120 % of a core here), where one
+window with ten pays it once.
+
+**The number, for the owner to decide**: ten moving loops a panel, a turning gradient counting as
+two. Under it the cost here is at most +13 % of a core in Chromium and +30 % in software WebKitGTK;
+over it the editor would say so, not refuse. With it, two choices: whether the exported plug-in caps
+loops at 30 frames a second (−40 %; the cap is built, `fps` on `PatternLayers`, and not switched on),
+and whether the warning counts windows as well as loops. Nothing enforces a number until the owner
+picks one.
+
+Found on the way, and fixed:
+
+- **The type check had stopped checking.** svelte-check, like TypeScript's editor service, disables a
+  project whose `.js` and `.svelte` files pass 20 MB, then reports success on the few files it
+  opened. This project was within a few hundred kilobytes of the line, and this step's code crossed it:
+  "1921 FILES 0 ERRORS" became "73 FILES 0 ERRORS". `jsconfig.json` now sets `disableSizeLimit`, a
+  test holds it there, and the first full run found a real slip in this step's own Patterns section.
+- **A part's absorbed fill** spread a colour list that some callers leave unset; the panel-motion
+  fixture failed to mount at all until it did not. An absorbed fill now plays the one channel its
+  fill needs: a colour's, or a gradient's.
+
+Not built: image fills that animate (Paint's last item), a pattern's opacity, size or speed easing
+between states (they switch; its tint fades), patterns in front of a part's content (behind works,
+through BackgroundRenderer), and `ce.anim.pattern` (step 5). A script can already set any pattern
+field by path: `set("Wave.Background.Patterns.pattern1.tint", "FFFF0000")`.
+
+Verified locally: `npm run test:all`, `npm run build`, `npm run lint`, svelte-check over the whole
+project (1,925 files; the one warning from before), the Animation tab and panel-motion browser checks
+in Chromium, the panel-motion fixture's Pattern and Paint controls in WebKitGTK, and the loop budget
+in both. No C++ changed. Not run: Windows, and WebView2 itself — Chromium is its engine, not it.
+
 ## Open
 
-- The performance budget's number, measured in step 3 and brought to the owner.
-- Whether `@property` and animated `clip-path` behave the same in WebKitGTK as in WebView2; both
-  are needed by steps 2 and 3. A check, not a decision. Step 2 uses `clip-path: inset()` (wipe)
-  and no `@property`.
+- The loop budget's number and its two choices (above, step 3), the owner's.

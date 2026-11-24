@@ -387,6 +387,57 @@ check('letting go brings the name back, typed in letter by letter, the value lea
   assert.equal(released.ghostText, pressed.text, JSON.stringify(released));
 });
 
+// --- Pattern and Paint: a gradient that eases, one that spins, and a wave -----------------------
+
+const restingChrome = await ev(() => window.__motion.gradient('chrome'));
+check('a gradient fill is written to ease: its angle is a registered property the gradient reads', () => {
+  assert.ok(restingChrome, 'the chrome button paints a gradient');
+  assert.equal(restingChrome.angle, '90deg', JSON.stringify(restingChrome));
+  assert.match(restingChrome.image, /^linear-gradient\(90deg, /, JSON.stringify(restingChrome));
+});
+await set('chrome', { hover: true });
+await wait(450);
+const midChrome = await ev(() => window.__motion.gradient('chrome'));
+check('on hover it turns and recolours over a second instead of jumping: mid-way it is between', () => {
+  const angle = parseFloat(midChrome.angle);
+  assert.ok(angle > 120 && angle < 240, JSON.stringify(midChrome));
+  assert.doesNotMatch(midChrome.colour1, /rgb\(255, 0, 0\)|rgb\(232, 238, 243\)/, `the middle stop is on its way to red: ${midChrome.colour1}`);
+});
+await wait(800);
+const endChrome = await ev(() => window.__motion.gradient('chrome'));
+check('and arrives where the Hover state put it', () => {
+  assert.equal(endChrome.angle, '270deg', JSON.stringify(endChrome));
+  assert.equal(endChrome.colour1, 'rgb(255, 0, 0)', JSON.stringify(endChrome));
+});
+await set('chrome', { hover: false });
+
+const spinA = await ev(() => window.__motion.gradient('spinner'));
+await wait(300);
+const spinB = await ev(() => window.__motion.gradient('spinner'));
+check('a keyframe loop turns a conic gradient while the control stays where it is', () => {
+  assert.match(spinA.image, /^conic-gradient/, JSON.stringify(spinA));
+  assert.notEqual(spinA.turn, spinB.turn, `${spinA.turn} then ${spinB.turn}`);
+  assert.match(spinB.turn, /deg$/);
+});
+
+const waveA = await ev(() => window.__motion.patterns('wave'));
+await wait(250);
+const waveB = await ev(() => window.__motion.patterns('wave'));
+check('the Wave label draws a sine row behind its words and dots in front of them', () => {
+  assert.deepEqual(waveA.map((layer) => `${layer.name}:${layer.place}`), ['pattern1:behind', 'pattern2:front']);
+  const [behind, front] = waveA;
+  assert.equal(behind.afterText, false, 'behind is before the words');
+  assert.equal(front.afterText, true, 'in front is after them');
+  assert.equal(behind.tint, 'rgb(20, 184, 166)');
+  assert.match(behind.mask, /^url\("data:image\/svg\+xml/);
+  assert.equal(behind.moveY, null, 'a row only moves along itself');
+  assert.ok(front.moveX !== null && front.moveY !== null, 'the diagonal has a mover on each axis');
+});
+check('and both move on their own, a tile at a time', () => {
+  assert.notEqual(waveA[0].moveX, waveB[0].moveX, `${waveA[0].moveX} then ${waveB[0].moveX}`);
+  assert.notEqual(waveA[1].moveY, waveB[1].moveY, `${waveA[1].moveY} then ${waveB[1].moveY}`);
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();

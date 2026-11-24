@@ -29,6 +29,7 @@ import {
 } from './interactionRuntime.js';
 import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt, cleanBezier } from './easing.js';
 import { TEXT_TRIGGER_TYPES, newTextEffectShape } from './textEffects.js';
+import { patternEntries, patternLabel } from './patternLayers.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import {
   KEYFRAME_TRIGGER_TYPES,
@@ -101,6 +102,9 @@ export const OFFERED_PROPERTIES = [
   { path: 'Background.Fill.colour', properties: ['background-color'], label: 'Fill colour' },
   { path: 'Text.Fill.colour', properties: ['color'], label: 'Text colour' },
   { path: 'Background.Border.colour', properties: ['colour'], label: 'Border colour' },
+  // A fill's gradient glides on the colour timing (utils/gradientPaint.js). Not a sequence's: a
+  // sequence moves a number or a colour along a track, and a gradient is neither.
+  { path: 'Background.Fill.gradient', properties: ['colour'], label: 'Gradient', sequence: false },
   { path: 'visible', properties: ['visibility'], label: 'Show / hide (fade)' },
 ];
 
@@ -112,14 +116,17 @@ export const OFFERED_ROOT_PROPERTIES = [
   { path: 'Background.Fill.colour', properties: ['colour'], label: 'Fill colour' },
   { path: 'Text.Fill.colour', properties: ['colour'], label: 'Text colour' },
   { path: 'Background.Border.colour', properties: ['colour'], label: 'Border colour' },
+  { path: 'Background.Fill.gradient', properties: ['colour'], label: 'Gradient', sequence: false },
 ];
 
 /**
- * What a working colour target cannot do. CSS fades one solid colour into another and nothing
- * else: a gradient, an image or a material swaps at the end of the duration instead. True of every
- * browser, so it is said on the row rather than discovered.
+ * What a working colour target cannot do. CSS fades one solid colour into another, and since the
+ * Paint engine (utils/gradientPaint.js, 2026-11-24) a gradient into the same gradient turned, moved
+ * or recoloured; an image or a material still swaps at the end of the duration, and so does a
+ * gradient that changes type or has more stops than are registered. Said on the row rather than
+ * discovered.
  */
-export const COLOUR_NOTE = 'A solid colour fades. A gradient, an image or a material switches at the end instead — CSS cannot blend between them.';
+export const COLOUR_NOTE = 'A solid colour fades, and a gradient glides: its angle, centre and stops, if it keeps its type and has at most twelve stops. An image or a material switches at the end instead.';
 
 /** The status of a target that works, with what it should know about the bucket it fills. */
 function working(buckets, part) {
@@ -305,6 +312,9 @@ export function sequenceTargetStatus(target, partNames = [], { triggerType = 'st
     }
     return { works: true, animates: 'channel', buckets: ['channel'], part: '', channel: channel[1] };
   }
+  if (path === 'Background.Fill.gradient' || path.endsWith('.Background.Fill.gradient')) {
+    return { works: false, reason: 'not a track', animates: 'colour', detail: 'A sequence moves a number or a colour along a track, and a gradient is neither. A transition glides it between states; a keyframe animation turns or shifts it.' };
+  }
   if (sequenceOnlyBucket(path) === 'frame') {
     const partName = path.split('.')[1];
     if (partNames.length && !partNames.includes(partName)) {
@@ -351,9 +361,16 @@ export function resolvedPartsOf(control) {
  * (`scope: 'control'`), so the Part picker does not apply to it.
  */
 export function offeredTargetsFor(control, kind = SEQUENCE_KIND, { onControl = false } = {}) {
-  const out = onControl
-    ? OFFERED_ROOT_PROPERTIES.map((entry) => ({ ...entry, scope: 'root' }))
-    : OFFERED_PROPERTIES.map((entry) => ({ ...entry, scope: 'part' }));
+  const offered = (onControl ? OFFERED_ROOT_PROPERTIES : OFFERED_PROPERTIES)
+    .filter((entry) => kind !== SEQUENCE_KIND || entry.sequence !== false);
+  const out = offered.map((entry) => ({ ...entry, scope: onControl ? 'root' : 'part' }));
+  // Each pattern on the control's background (utils/patternLayers.js): its tint is the colour it is
+  // painted in, on the colour timing like a fill. Named by the pattern, so only where there is one.
+  if (onControl) {
+    for (const [name] of patternEntries(control?._children?.Background)) {
+      out.push({ path: `Background.Patterns.${name}.tint`, properties: ['colour'], label: `${patternLabel(name)} tint`, scope: 'root', pattern: name });
+    }
+  }
   if (kind !== SEQUENCE_KIND) return out;
   const channels = control?._children?.ValueChannels?._children ?? {};
   for (const [name, channel] of Object.entries(channels)) {

@@ -442,6 +442,9 @@ export const PART_PATH_BUCKETS = {
   'Background.Fill.colour': 'colour',
   'Background.Border.colour': 'colour',
   'Text.Fill.colour': 'colour',
+  // A fill's gradient eases on the colour timing: its angle, centre and stops are registered
+  // properties (utils/gradientPaint.js), listed with the colours in utils/transitionCss.js.
+  'Background.Fill.gradient': 'colour',
   // A state that shows or hides a part — a tab group swapping its pages — used to make it pop. With
   // this target it fades: the renderer keeps such a part mounted while hidden, so there is a
   // `visibility: hidden; opacity: 0` to ease to and from (utils/transitionCss.js).
@@ -460,6 +463,7 @@ export const ROOT_PATH_BUCKETS = {
   'Background.Fill.colour': 'colour',
   'Background.Border.colour': 'colour',
   'Text.Fill.colour': 'colour',
+  'Background.Fill.gradient': 'colour',
 };
 
 /**

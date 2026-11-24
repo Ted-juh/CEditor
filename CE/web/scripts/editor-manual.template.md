@@ -663,6 +663,30 @@ puts the images inside.
 The dock's **Assets** tool manages the images of custom components, including **filmstrips**: one
 image holding every frame of a knob or switch, one after another.
 
+### Patterns
+
+A pattern is one small picture — a wave, dots, lines — repeated across a control and painted in a
+colour you choose, behind the control's text or in front of it. A control can have several. On the
+control's **Background** tab, press **Add a pattern** under **Patterns**; each pattern then has its
+own section:
+
+- **Tile** — the picture: a sine, triangle, saw or square wave, dots, stripes, a grid, checks,
+  chevrons or scan lines; or **Your image**, which reads a picture into the panel, so it travels with
+  it. Its opaque pixels are painted in the tint, so a one-colour PNG works best.
+- **Tint** and **Opacity** — its colour (with its own see-through amount) and how strongly it shows.
+- **Size** — 1 is the tile as drawn, 2 twice as large.
+- **Repeat** — everywhere, along **One row** or down **One column**; **Sits** puts a row at the top,
+  middle or bottom (a column at the left, centre or right), and **Offset** moves it from there.
+- **Place** — **Behind the content**, over the fill, or **In front of the content**, over the text.
+- **Speed** and **Direction** — set a speed, in pixels a second, and the pattern moves on its own:
+  right, left, up, down or at any angle. A row moves only left or right, and a column only up or
+  down. A moving pattern plays in Preview, on the Animation tool's stage and in the exported plugin;
+  on the design canvas it is drawn still, and it stops when the computer is set to reduce motion.
+- **Blend**, **Flip** and **Show** — how it mixes with what is under it, mirrored, or switched off.
+
+A pattern's tint can be animated like a fill colour: in the **Animation** tool it is
+**Background › Pattern 1 tint**.
+
 ### Shapes
 
 A **Shape** draws a rectangle, ellipse, line, triangle, star, arrow and more; choose the **Kind** on its
@@ -1206,19 +1230,37 @@ you hover over it, a light that pulses with the beat. Animations are edited in t
 **Animation** tool. Select a control and press **Edit the selected control's animations**; the tool
 stays on that control until you choose another.
 
-There are three kinds:
+There are four kinds:
 
 - **Transition** — eases from one state to another, for example from normal to hover. Choose
-  **From** and **To**, the **Duration**, and under **What it eases** which property changes: scale,
-  rotation, position, size, opacity, or a fill, text or border colour.
+  **From** and **To**, the **Duration**, and what it eases: scale, rotation, position, size,
+  opacity, a fill, text or border colour, a pattern's tint, or the fill's **Gradient** — its angle,
+  centre and stops glide from one state's gradient to the next, as long as it keeps its type and has
+  no more than twelve stops.
 - **Keyframes** — a little loop of poses, played all the time, in a state, when the value changes,
-  on the beat, or when a script asks for it.
+  on the beat, on a gesture, or when a script asks for it. Besides the poses, a frame can **turn**
+  the fill's gradient (degrees) and **shift** its stops (percent), so a sheen sweeps across or a
+  conic gradient spins while the control stays put.
 - **Sequence** — a timeline of keyframes on several tracks, which you can scrub with a playhead.
+- **Text** — an effect on the control's words themselves: **Typewriter**, **Explode**, **Roll**,
+  **Push**, **Wipe**, **Crossfade** and **Shimmer**, each **In** or **Out**, cut into letters, words
+  or lines that start one after another (**ms apart**), forwards, backwards, from the centre or in
+  a random order. It can wait for the words to change: to the value, or to the name.
+
+What an animation changes is picked as a path — **Knob01 › Body › Cap › Scale** — by stepping through
+the levels, typing (`text col`), or **Browse**, which shows them side by side.
 
 Below the editor, **Easing** sets the feel of the movement (linear, smooth in and out, overshooting
 "back" curves, a custom curve, or a spring), and **Presets** add ready-made animations: **Hover
-lift**, **Press squish**, **Fade when disabled**, **Blink while on**, **Beat pulse** and **Value
-glide**. Shift+click a preset to add it to every selected control at once.
+lift**, **Press squish**, **Fade when disabled**, **Blink while on**, **Beat pulse**, **Value
+glide** and **Gradient sheen**. Shift+click a preset to add it to every selected control at once.
+**Name ↔ value** goes on a knob's name label: it shows the knob's name, and its value while the knob
+is touched, the value pushed in and the name typed back when you let go.
+
+The **States** tab has a **Motion** section for the state you are editing: **Entering** (mouse over,
+for Hover), **While in** and **Leaving** (mouse exit), each showing the animations that fill it and
+**New** to make one. Under it, **Events** plays a keyframe animation on a click, a double-click, a
+long press, a flick or a turn of the wheel.
 
 The **Preview** side of the tool is a small stage where you can hover, press and drag the control
 and watch the animation, with **0.25×** slow motion. Animations also play in Preview mode and in the

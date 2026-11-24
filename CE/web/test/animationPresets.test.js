@@ -26,7 +26,7 @@ function apply(control, presetId) {
 const scaleOf = (control, session) => resolveInteractiveControl(control, session).control._children.Transform.scale ?? 1;
 
 test('the presets', () => {
-  assert.deepEqual(ANIMATION_PRESETS.map((p) => p.id), ['hoverLift', 'pressSquish', 'fadeWhenDisabled', 'blinkWhileOn', 'beatPulse', 'valueGlide']);
+  assert.deepEqual(ANIMATION_PRESETS.map((p) => p.id), ['hoverLift', 'pressSquish', 'fadeWhenDisabled', 'blinkWhileOn', 'beatPulse', 'valueGlide', 'gradientSheen']);
   for (const preset of ANIMATION_PRESETS) assert.ok(preset.label && preset.summary, preset.id);
 });
 
@@ -122,4 +122,24 @@ test('a preset that cannot go on a control says why instead of writing anything'
     assert.match(result.reason, /no Animations section/);
   }
   assert.equal(presetPatch(createControl('Button'), 'nonsense').patch, null);
+});
+
+test('gradient sheen sweeps the fill gradient on a loop, and only goes on a control that has one', () => {
+  const plain = createControl('Button');
+  assert.match(presetBlockedBecause(plain, PRESET_BY_ID.gradientSheen), /this control has none/);
+  const chrome = createControl('Button');
+  Object.assign(chrome._children.Background._children.Fill, {
+    gradientEnabled: true,
+    gradient: { type: 'linear', angle: 90, stops: [{ color: '333A40', position: 0 }, { color: 'E8EEF3', position: 50 }, { color: '333A40', position: 100 }] },
+  });
+  const name = apply(chrome, 'gradientSheen');
+  const node = chrome._children.Animations._children[name];
+  assert.equal(node.kind, 'keyframes');
+  assert.deepEqual(node.frames, [{ at: 0, shift: -100 }, { at: 1, shift: 100 }]);
+  // It plays on the gradient channel, not as motion: the control stays where it is.
+  const player = createKeyframePlayer({ now: () => 0 });
+  const runtime = resolveInteractiveControl(chrome, {}).runtime;
+  const out = player.next(runtime);
+  assert.equal(out.parts.size, 0);
+  assert.equal(out.colours.get('')?.gradient?.length, 1);
 });

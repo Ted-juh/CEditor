@@ -30,6 +30,7 @@ import {
   offeredTargetsFor,
   resolvedPartsOf,
 } from './animationModel.js';
+import { patternLabel } from './patternLayers.js';
 
 /** The role groups a slider-family part's name starts with, in the order they are listed. */
 export const PART_GROUPS = Object.freeze([
@@ -54,6 +55,7 @@ const ROOT_PLACES = Object.freeze({
   'Transform.opacity': { place: CONTROL_ITSELF, label: 'Opacity' },
   'Background.Fill.colour': { place: 'Background', label: 'Fill colour' },
   'Background.Border.colour': { place: 'Background', label: 'Border colour' },
+  'Background.Fill.gradient': { place: 'Background', label: 'Gradient' },
   'Text.Fill.colour': { place: 'Text', label: 'Colour' },
 });
 
@@ -63,6 +65,9 @@ const PLACE_LABELS = Object.freeze({
   Text: 'Text',
   Channels: 'Channels',
 });
+
+/** A pattern's tint (utils/patternLayers.js): listed under Background, by the pattern's name. */
+const PATTERN_TINT = /^Background\.Patterns\.([^.]+)\.tint$/;
 
 /** A filmstrip part's frame, which only a sequence animates (animationModel.js). */
 const FRAME_TAIL = 'Image.frameIndex';
@@ -124,6 +129,8 @@ export function targetSteps(target) {
   }
   const root = ROOT_PLACES[path];
   if (root) return root.place === CONTROL_ITSELF ? [PLACE_LABELS[CONTROL_ITSELF], root.label] : [PLACE_LABELS[root.place], root.label];
+  const pattern = PATTERN_TINT.exec(path);
+  if (pattern) return [PLACE_LABELS.Background, `${patternLabel(pattern[1])} tint`];
   return path.split('.');
 }
 
@@ -153,7 +160,9 @@ export function targetTree(control, kind = 'transition') {
 
   placeFor(CONTROL_ITSELF);
   for (const offered of rootOffered) {
-    if (offered.scope === 'root') {
+    if (offered.scope === 'root' && offered.pattern) {
+      placeFor('Background').properties.push(entry(buildTarget(CONTROL_ITSELF, offered), offered.label));
+    } else if (offered.scope === 'root') {
       const root = ROOT_PLACES[offered.path];
       // A Knob has no Background or Text section of its own (its words are its Labels parts), so
       // "Knob01 › Text › Colour" would name nothing. The flat list this replaced offered it anyway.

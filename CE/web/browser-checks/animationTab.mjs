@@ -88,7 +88,9 @@ check('and a target that works names what it animates — colour among them now'
 const notes = await ev(() => window.__anim.targetNotes());
 check('and a colour target says what a fade cannot do', () => {
   assert.equal(notes.length, 1, notes.join(' | '));
-  assert.match(notes[0], /gradient, an image or a material switches/);
+  // Since the Paint engine (gradientPaint.js) a gradient glides; an image or a material still switches.
+  assert.match(notes[0], /a gradient glides/);
+  assert.match(notes[0], /An image or a material switches/);
 });
 
 const alarm = await ev(() => window.__anim.alarm());
@@ -472,7 +474,7 @@ check('each working target says what it costs the browser, and a dead one says n
 });
 
 check('every preset is a button in the strip, and says what it does before you add it', async () => {});
-assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide', 'Name \u2194 value']);
+assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide', 'Gradient sheen', 'Name \u2194 value']);
 assert.match(await ev(() => window.__anim.presetHint('Hover lift')), /Grows a little under the pointer/);
 await ev(() => window.__anim.addPreset('Hover lift'));
 await settle();

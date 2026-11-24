@@ -1,12 +1,14 @@
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
+  import PatternLayers from '../../CE_Panel/components/PatternLayers.svelte';
+  import { hasPatterns } from '../utils/patternLayers.js';
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
   import CanvasControlNested from './CanvasControl.svelte';
   import { getChildControls, computeFlowLayout, controlPanelRect, panelToLocalPoint, selectionRoots, collectSubtreeIds, findControlById, buildControlIndex, getAncestorIds, flatControlsWithPanelRects } from '../utils/containment.js';
   import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { anchoredPositions, axisIsDerived, fitSettings, fitsAnyAxis, fittedSizeDeep } from '../utils/containerFit.js';
-  import { plainFillCSS } from '../utils/plainFillCSS.js';
+  import { plainFillCSS, fillShapeCSS } from '../utils/plainFillCSS.js';
   import { observeElementMetrics } from '../utils/batchedElementMetrics.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { drawnPartEntries } from '../utils/booleanGroups.js';
@@ -1922,6 +1924,16 @@
 
   // --- Effects CSS (applied to .canvas-control and .control-content) ---
   let separateBackground = $derived(hasBackgroundEffects(background));
+  // Patterns (utils/patternLayers.js): the ones behind are drawn by BackgroundRenderer, the ones in
+  // front here, after the text. They move in Preview, the player and the Animation tab's stage, and
+  // are drawn still on the design canvas, which never moves on its own (the owner's decision,
+  // docs/design/animation-designer.md) — and still under the Preview's Reduced motion switch as
+  // under the OS one.
+  let frontPatterns = $derived(!hasAnatomy && hasPatterns(background));
+  // A fill absorbed onto .control-content is a colour or a gradient, and plays that channel's frames.
+  let absorbedGradient = $derived(/gradient\(/.test(absorbedFillCSS ?? ''));
+  let frontPatternClip = $derived(frontPatterns ? fillShapeCSS(background?._children?.Corners, displayW, displayH) : '');
+  let patternsStill = $derived(editorInteractionEnabled !== false || interactionRuntime?.keyframes?.reducedMotion === true);
   let blendCSS  = $derived(buildBlendCSS(effects));
   let filterCSS = $derived(buildFilterCSS(effects));
 
@@ -3382,15 +3394,15 @@
   <EffectSurface effects={hasAnatomy ? null : effects} width={displayW} height={displayH} shadowsOnly target="component">
   {#if separateBackground && !hasAnatomy}
     <div class="control-background" style={filterCSS}>
-      <BackgroundRenderer {background} width={displayW} height={displayH} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} reducedMotion={patternsStill} />
     </div>
   {/if}
-  <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
+  <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
       <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
-      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} />
     {/if}
 
     {#if ownRenderer === 'LcdDisplay'}
@@ -4169,6 +4181,11 @@
     {#if hasText && showBlockLineDecorations}
       {@render blockLineDecorations('front')}
     {/if}
+
+    {#if frontPatterns}
+      <!-- Patterns in front of the content: over the text, clipped to the control's shape. -->
+      <PatternLayers {background} place="front" width={displayW} height={displayH} clip={frontPatternClip} reducedMotion={patternsStill} />
+    {/if}
   </div>
   </EffectSurface>
 
@@ -4450,8 +4467,10 @@
      and a container draws the controls inside it inside its own element, so every control starts
      from none; a control with colour frames sets its own inline, which wins. Then the fill where
      it is absorbed onto this element, and the control's text. */
-  .canvas-control { --ce-kf-paint: none; --ce-kf-shape: none; --ce-kf-stroke: none; --ce-kf-text: none; }
+  .canvas-control { --ce-kf-paint: none; --ce-kf-shape: none; --ce-kf-stroke: none; --ce-kf-text: none; --ce-kf-gradient: none; }
   .control-content.absorbs-fill { animation: var(--ce-kf-paint, none); }
+  /* An absorbed gradient plays its turn and shift frames instead (utils/gradientPaint.js). */
+  .control-content.absorbs-fill.absorbs-gradient { animation: var(--ce-kf-gradient, none); }
   .text-span { animation: var(--ce-kf-text, none); }
   .control-background { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 

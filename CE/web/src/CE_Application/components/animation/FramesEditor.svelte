@@ -8,6 +8,10 @@
    * and eases through it from the frames either side, which is how a pulse can scale without also
    * fading. utils/animationModel.js does the edits and utils/keyframeAnimation.js turns the frames
    * into CSS.
+   *
+   * Under the colours, a gradient's turn and shift (utils/gradientPaint.js): shown where the control
+   * paints a gradient (`gradient`), or a frame already sets one, and nowhere else, since on a solid
+   * fill they do nothing.
    */
   import Plus from 'lucide-svelte/icons/plus';
   import X from 'lucide-svelte/icons/x';
@@ -18,7 +22,14 @@
   let {
     frames = [],
     onchange = () => {},
+    gradient = false,
   } = $props();
+
+  const GRADIENT_CELLS = [
+    { key: 'turn', head: 'gradient turn °', step: 5, title: 'Degrees added to the fill gradient\'s angle: a linear sheen turns, a conic gradient spins' },
+    { key: 'shift', head: 'gradient shift %', step: 5, title: 'Percent added to every stop of the fill gradient: its bands slide along it' },
+  ];
+  let showGradient = $derived(gradient || frames.some((frame) => frame.turn !== undefined || frame.shift !== undefined));
 
   // The column heads name each value; the cells carry none of their own. Rotation is in degrees and
   // x/y in pixels, as the head says.
@@ -84,6 +95,18 @@
       <div class="colours">
         {#each COLOURS as colour (colour.key)}{@render colourCell(frame, index, colour)}{/each}
       </div>
+      {#if showGradient}
+        <div class="colours paints">
+          {#each GRADIENT_CELLS as cell (cell.key)}
+            <div class="ccell" title={cell.title}>
+              <span class="chead ghead">{cell.head}</span>
+              <div class="cell"><NumberCell value={frame[cell.key] ?? ''} allowEmpty step={cell.step}
+                ariaLabel={`Frame ${index + 1} gradient ${cell.key}`}
+                onchange={(value) => onchange(setFrameValue(frames, index, cell.key, value))} /></div>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/each}
   <button type="button" class="addframe" onclick={() => onchange(addFrame(frames))}>
@@ -124,6 +147,8 @@
   .frow { margin-top: 3px; padding-bottom: 3px; border-bottom: 1px solid #23282D; }
   .colours { grid-column: 2 / -2; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .ccell { min-width: 0; display: flex; align-items: center; gap: 4px; }
+  .ccell .cell { flex: 1; }
+  .chead.ghead { width: auto; flex: none; white-space: nowrap; }
   .chead {
     font: 400 12px/1 'IBM Plex Sans', system-ui, sans-serif;
     color: #AEB9C4; width: 34px; flex: none;

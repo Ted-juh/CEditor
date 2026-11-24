@@ -170,6 +170,16 @@
 
   let keyframes = $derived(selected?.kind === 'keyframes');
   let textKind = $derived(selected?.kind === 'text');
+  // Whether the place a keyframe animation plays on paints a fill gradient: its frames then offer
+  // the gradient's turn and shift (FramesEditor, utils/gradientPaint.js).
+  let paintsGradient = $derived.by(() => {
+    if (!keyframes) return false;
+    const path = String(selected?.targets?.[0]?.path ?? '');
+    const partName = path.startsWith('Parts.') ? path.split('.')[1] : '';
+    const owner = partName ? resolvedPartsOf(control)?.[partName] : control;
+    const fill = owner?._children?.Background?._children?.Fill;
+    return fill?.gradientEnabled === true && !!fill?.gradient;
+  });
   const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence', text: 'Text' };
   const KIND_TITLES = {
     transition: 'Eases between two styles when something changes',
@@ -963,7 +973,7 @@ onMount(() => {
                 {#if targets.some((entry) => !entry.status.works)}
                   <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
                 {/if}
-                <FramesEditor frames={selected.frames} onchange={(next) => setProp('frames', next)} />
+                <FramesEditor frames={selected.frames} gradient={paintsGradient} onchange={(next) => setProp('frames', next)} />
                 <p class="hint">Scale, turn, move and fade, and two colours: fill recolours a solid fill, a shape or a line; text, its text. A gradient or an image keeps its own colours.</p>
               </div>
             </div>

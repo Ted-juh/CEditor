@@ -21,6 +21,7 @@
 // on the GAIA panel: well under the 188 ms that also included process start and 4.8 MB of parsing.
 
 import { isBakeable, partsToSvg, svgToDataUrl, whyNotBakeable } from './partsToSvg.js';
+import { hasPatterns } from './patternLayers.js';
 
 /** The one part the bake produces. Named so it is obvious in a DOM inspector where it came from. */
 export const BAKED_PART_NAME = '__bakedStatic';
@@ -67,6 +68,9 @@ export function movingPartNames(control) {
   // Inline numeric inputs are live DOM controls, even without a visual binding.
   for (const [name, part] of Object.entries(control?._children?.Parts?._children ?? {})) {
     if (part.role === 'customValueField' || part.role === 'deviceSyncStatus') names.add(name);
+    // A pattern on a part's background moves on its own (utils/patternLayers.js): a picture of it
+    // would be a still. Kept live, the part draws it as BackgroundRenderer does every background.
+    if (hasPatterns(part?._children?.Background)) names.add(name);
   }
   for (const binding of Object.values(control?._children?.Bindings?._children ?? {})) {
     if (binding?.enabled === false) continue;

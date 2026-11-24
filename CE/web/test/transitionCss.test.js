@@ -16,12 +16,16 @@ import {
   rootTransitionDeclaration,
   colourTransitionVar,
 } from '../src/CE_Application/utils/transitionCss.js';
+import { GRADIENT_EASED_PROPERTIES } from '../src/CE_Application/utils/gradientPaint.js';
 
 const T = '120ms linear 0ms';
 
 test('each bucket lists its properties with the bucket\'s timing, in a fixed order', () => {
   const css = transitionDeclaration({ colour: 'c', transform: 't', opacity: null, size: 's' });
-  assert.equal(css, 'transition:transform t, translate t, rotate t, scale t, left t, top t, width s, height s, background-color c, color c, border-color c, fill c, stroke c;');
+  // The colour list ends with a fill gradient's registered properties (gradientPaint.js), so a
+  // gradient eases with the colours beside it.
+  const gradient = GRADIENT_EASED_PROPERTIES.map((name) => `${name} c`).join(', ');
+  assert.equal(css, `transition:transform t, translate t, rotate t, scale t, left t, top t, width s, height s, background-color c, color c, border-color c, fill c, stroke c, ${gradient};`);
   assert.equal(transitionDeclaration({ transform: null, opacity: null, size: null, colour: null }), '');
   assert.equal(transitionDeclaration(null), '');
 });

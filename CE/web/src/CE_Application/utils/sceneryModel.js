@@ -24,6 +24,7 @@
 
 import { COMPONENT_TYPES } from '../models/componentTypes.js';
 import { getControlCore } from './controlOrder.js';
+import { hasPatterns } from './patternLayers.js';
 
 /**
  * Sections whose presence means a control can change, be driven, or be touched.
@@ -94,6 +95,9 @@ export function isScenery(control) {
   // A Label that shows something of a control (utils/labelShows.js) reads that control's value as
   // it moves: never folded into the still picture.
   if (String(control?._children?.Text?.shows ?? '')) return false;
+  // A pattern (utils/patternLayers.js) moves on its own, and the ground is a still picture; one that
+  // does not move is rare enough to keep live rather than teach the ground to draw it. 2026-11-24.
+  if (hasPatterns(control?._children?.Background)) return false;
   return true;
 }
 

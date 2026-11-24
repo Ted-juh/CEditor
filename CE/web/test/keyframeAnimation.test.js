@@ -276,10 +276,11 @@ test('a restart flips the colour channels with the motion, so they stay in step'
   assert.deepEqual(phase(second), ['b', 'b']);
 });
 
-test('colour variables are all four, always, so a part never paints with its control\'s pulse', () => {
-  assert.equal(colourVariables(null), '--ce-kf-paint:none;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:none;');
+test('colour variables are all five, always, so a part never paints with its control\'s pulse', () => {
+  // The fifth is a fill gradient's turn and shift (gradientPaint.js), added with the Paint engine.
+  assert.equal(colourVariables(null), '--ce-kf-paint:none;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:none;--ce-kf-gradient:none;');
   assert.equal(colourVariables({ paint: ['p 1ms'], text: ['t 1ms', 'u 1ms'] }),
-    '--ce-kf-paint:p 1ms;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:t 1ms, u 1ms;');
+    '--ce-kf-paint:p 1ms;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:t 1ms, u 1ms;--ce-kf-gradient:none;');
   // A part whose fill is absorbed onto it plays paint itself, and must not hand it to its layers too.
   assert.match(colourVariables({ paint: ['p 1ms'] }, { skip: ['paint'] }), /^--ce-kf-paint:none;/);
   assert.equal(animationDeclaration(['m 1ms'], { extra: ['p 1ms'] }), 'animation:m 1ms, p 1ms;');

@@ -27,7 +27,7 @@
 
 import { normalizeCorner } from './cornerNormalization.js';
 import { resolveColourValue } from '../models/controlSets.js';
-import { gradientToCSS } from './gradientCSS.js';
+import { gradientBackgroundCSS } from './gradientPaint.js';
 import { buildLayerStyle, buildLayerStyleParts } from './backgroundCSS.js';
 import { buildFillClipPath } from './cornerPaths.js';
 import { numberOr } from './primitives.js';
@@ -298,8 +298,9 @@ export function plainFillCSS(background, width, height) {
   if (layer === 'image' || layer === 'overlay') {
     paint = absorbableImageStyle(fill, layer, String(fill[`${layer}Src`]), width, height);
   } else {
-    const colour = layer === 'solid' ? argbToCss(fill.colour) : gradientToCSS(fill.gradient);
-    paint = colour ? `background: ${colour};` : null;
+    // A gradient is written to ease (utils/gradientPaint.js), its properties beside it.
+    const colour = layer === 'solid' ? argbToCss(fill.colour) : null;
+    paint = layer === 'solid' ? (colour ? `background: ${colour};` : null) : gradientBackgroundCSS(fill.gradient);
   }
   if (!paint) return null;
 
