@@ -122,7 +122,10 @@ try {
     return page.evaluate(() => [...document.querySelectorAll('svg.slider-svg')].map((svg) => {
       const pointer = svg.querySelector('line[data-pointer="current"]');
       return {
-        arc: svg.querySelector('mask[id$="-bodyTrackFillArc"] path')?.getAttribute('d') ?? null,
+        // The value arc: the clip that cuts its fill keeps the stroked path (editor/SliderShapeFill.svelte),
+        // and a shape that cannot be clipped keeps the mask.
+        arc: svg.querySelector('clipPath[id$="-bodyTrackFillArc"]')?.getAttribute('data-shape-d')
+          ?? svg.querySelector('mask[id$="-bodyTrackFillArc"] path')?.getAttribute('d') ?? null,
         pointer: pointer ? ['x1', 'y1', 'x2', 'y2'].map((key) => Number(pointer.getAttribute(key))) : null,
       };
     }).filter((knob) => knob.pointer));

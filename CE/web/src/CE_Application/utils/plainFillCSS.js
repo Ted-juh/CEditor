@@ -310,3 +310,34 @@ export function plainFillCSS(background, width, height) {
 
   return `${paint}${shape ? ` ${shape}` : ''}`;
 }
+
+/**
+ * A colour under a gradient — the two layers the designed control sets give a knob's plate, cap and
+ * pointer — said as ONE element's background: the gradient its image, the colour beneath it its
+ * `background-color`, which is exactly the order the two layers paint in. Null for anything else.
+ *
+ * For SliderShapeFill, whose fill must not be two positioned layers: WebKit paints a layer inside an
+ * SVG foreignObject over whatever the SVG draws after it (the knob's pointer, its edge), and past the
+ * clip that shapes it. The wrappers above do not take two layers, for the reasons whyFillNotPlainCSS
+ * gives; this is the one pair that needs no opacity and no second image to say.
+ */
+export function colourUnderGradientCSS(background, width, height) {
+  if (hasBackgroundEffects(background)) return null;
+  if (!(width > 0 && height > 0)) return null;
+  const fill = background?._children?.Fill;
+  if (!fill) return null;
+  const order = fill.layerOrder?.length ? fill.layerOrder : DEFAULT_ORDER;
+  const visible = order.filter((id) => LAYERS.includes(id) && layerVisible(background, id));
+  if (visible.length !== 2 || visible[0] !== 'solid' || visible[1] !== 'gradient') return null;
+  const clipModes = new Set(visible.map((layer) => String(fill[`${layer}ClipMode`] ?? 'shape')));
+  if (clipModes.size !== 1) return null;
+  const [clipMode] = clipModes;
+  if (clipMode !== 'shape' && clipMode !== 'none') return null;
+  if (visible.some((layer) => String(fill[`${layer}Blend`] ?? 'normal') !== 'normal')) return null;
+  if (numberOr(fill.gradientOpacity, 100) !== 100) return null;
+  if (clipMode === 'shape' && cornersNeedClipPath(background._children?.Corners)) return null;
+  const colour = argbToCss(fill.colour);
+  if (!colour || !fill.gradient) return null;
+  const shape = clipMode === 'none' ? '' : fillShapeCSS(background._children?.Corners, width, height);
+  return `${gradientBackgroundCSS(fill.gradient)} background-color: ${colour};${shape ? ` ${shape}` : ''}`;
+}

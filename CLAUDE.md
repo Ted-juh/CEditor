@@ -145,7 +145,7 @@ The node suite takes about three and a half minutes here. `validate-script-expor
 failure, but do not read a run full of skips as coverage.
 
 `npm run test:browser` additionally drives Playwright over the built bundle and the editor's dev
-server: 46 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
+server: 48 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
 first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Windows, in a job of
 their own beside the web tests and the C++ build; run them locally when you touch rendering, the
 docks, the player inbound path or the learn chips.
@@ -329,6 +329,22 @@ plug-in's programs reached the library without the browser being told, and a plu
 its program on a thread of its own (Surge does) was measured before the sound existed. One lives
 in vendored JUCE: the Linux webview bridge framed messages in characters and sent bytes, so any
 non-ASCII patch name desynchronised the pipe for good.
+
+**WebKitGTK draws SVG differently, and Chromium cannot show you how.** The browser checks run
+Chromium, which is what Windows draws with; Linux draws with WebKit, and on 2026-11-24 the default
+knob drew there as squares. Two rules came out of it, measured in WebKitGTK 2.52 and both held by
+`test/shapeClip.test.js` (the reasons are in `editor/SliderShapeFill.svelte`):
+
+- **Inside a `<foreignObject>`, nothing with a layer of its own** — positioned, clipped, translucent,
+  transformed. WebKit paints such a layer outside the SVG: past a mask or clip on the foreignObject,
+  and over everything the SVG draws after it (the knob's pointer).
+- **No `opacity` or `style` on the `<foreignObject>` itself**; put them on a `<g>` around it. WebKit
+  fades it through a layer it places without the foreignObject's `x` and `y`, and cuts that much off
+  its far side.
+
+To see WebKit draw a fixture page: serve `dist-scenery/`, load it in a WebKit2 4.1 `WebView` from
+`/usr/bin/python3.12` with `gi` under `Xvfb` (the three environment variables in "Running it",
+above), and grab the window with ImageMagick's `import -window root`.
 
 Note that the eleven C++ test targets, the Windows-only `#if JUCE_WINDOWS` branches and MSVC's
 opinion of the source are still what they were: a green run here is not a Windows run.
