@@ -1,0 +1,531 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "872b92a0-f11d-4fe5-a5e5-872b92a0872b",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Psycho",
+  "scriptId": "film_psycho",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF000000",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Bar1","id":"ctrl_1717779744000","controlType":"Label"},
+        "Transform": {"y":70,"width":720,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"FFBDBDBD"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bar2","id":"ctrl_1717779744001","controlType":"Label"},
+        "Transform": {"y":110,"width":720,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bar3","id":"ctrl_1717779744002","controlType":"Label"},
+        "Transform": {"y":158,"width":720,"height":10},
+        "Background": {"_children":{"Fill":{"colour":"FFBDBDBD"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bar4","id":"ctrl_1717779744003","controlType":"Label"},
+        "Transform": {"y":262,"width":720,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bar5","id":"ctrl_1717779744004","controlType":"Label"},
+        "Transform": {"y":300,"width":720,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FFBDBDBD"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bar6","id":"ctrl_1717779744005","controlType":"Label"},
+        "Transform": {"y":350,"width":720,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1717779744006","controlType":"Label"},
+        "Transform": {"x":60,"y":160,"width":600,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PSYCHO","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":88}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_psycho",
+      "name": "Slash",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 5200,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_psycho_1",
+          "controlId": "ctrl_1717779744000",
+          "target": "Transform",
+          "start": 0,
+          "length": 600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": -760
+              },
+              {
+                "at": 1,
+                "x": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_2",
+          "controlId": "ctrl_1717779744000",
+          "target": "Transform",
+          "start": 3000,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0
+              },
+              {
+                "at": 1,
+                "x": 760
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_3",
+          "controlId": "ctrl_1717779744001",
+          "target": "Transform",
+          "start": 150,
+          "length": 600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 760
+              },
+              {
+                "at": 1,
+                "x": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_4",
+          "controlId": "ctrl_1717779744001",
+          "target": "Transform",
+          "start": 3110,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0
+              },
+              {
+                "at": 1,
+                "x": -760
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_5",
+          "controlId": "ctrl_1717779744002",
+          "target": "Transform",
+          "start": 300,
+          "length": 600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": -760
+              },
+              {
+                "at": 1,
+                "x": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_6",
+          "controlId": "ctrl_1717779744002",
+          "target": "Transform",
+          "start": 3220,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0
+              },
+              {
+                "at": 1,
+                "x": 760
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_7",
+          "controlId": "ctrl_1717779744003",
+          "target": "Transform",
+          "start": 450,
+          "length": 600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 760
+              },
+              {
+                "at": 1,
+                "x": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_8",
+          "controlId": "ctrl_1717779744003",
+          "target": "Transform",
+          "start": 3330,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0
+              },
+              {
+                "at": 1,
+                "x": -760
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_9",
+          "controlId": "ctrl_1717779744004",
+          "target": "Transform",
+          "start": 600,
+          "length": 600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": -760
+              },
+              {
+                "at": 1,
+                "x": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_10",
+          "controlId": "ctrl_1717779744004",
+          "target": "Transform",
+          "start": 3440,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0
+              },
+              {
+                "at": 1,
+                "x": 760
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_11",
+          "controlId": "ctrl_1717779744005",
+          "target": "Transform",
+          "start": 750,
+          "length": 600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 760
+              },
+              {
+                "at": 1,
+                "x": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_12",
+          "controlId": "ctrl_1717779744005",
+          "target": "Transform",
+          "start": 3550,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0
+              },
+              {
+                "at": 1,
+                "x": -760
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_psycho_13",
+          "controlId": "ctrl_1717779744006",
+          "target": "Text",
+          "start": 900,
+          "length": 700,
+          "effect": {
+            "kind": "text",
+            "effect": "wipe",
+            "way": "in",
+            "iterations": 1,
+            "duration": 700,
+            "direction": "right"
+          }
+        },
+        {
+          "id": "cl_psycho_14",
+          "controlId": "ctrl_1717779744006",
+          "target": "Text",
+          "start": 3100,
+          "length": 700,
+          "effect": {
+            "kind": "text",
+            "effect": "part",
+            "way": "out",
+            "iterations": 1,
+            "duration": 700,
+            "easing": "inCubic"
+          }
+        }
+      ]
+    }
+  ]
+}
