@@ -96,9 +96,12 @@ function panel(prefix) {
     _type: 'Animation', name: 'needle', enabled: true, kind: 'value', duration: 1000, delay: 0, iterations: 1, easing: 'inOutCubic',
     frames: sceneEffect('value:sweep').effect.frames, trigger: { type: 'script' }, targets: [{ path: 'Value' }],
   } } };
+  // Two clips on one place: fades in then out, types in then out (sceneModel.js, SEVERAL CLIPS ON ONE PLACE).
+  const sign = place(createControl('Label'), `${prefix}sign`, 'Sign', 460, 480, 140, 40);
+  sign._children.Text.content = 'OPEN';
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale, strip],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale, strip, sign],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -146,6 +149,9 @@ function panel(prefix) {
       // A pattern clip: Wave's pattern pulsed, its scroll going on underneath.
       { id: 'sc_shimmer', name: 'Shimmer', trigger: { type: 'script' }, length: 800, loop: false,
         clips: [clip('c13', `${prefix}wave`, 'Patterns.pattern1', 0, 800, sceneEffect('pattern:pulse').effect)] },
+      { id: 'sc_in_out', name: 'In and out', trigger: { type: 'script' }, length: 2000, loop: false,
+        clips: [clip('c24', `${prefix}sign`, 'Text', 1000, 1000, sceneEffect('text:typewriter:out').effect), clip('c25', `${prefix}sign`, 'Text', 0, 900, typewriter),
+          clip('c27', `${prefix}sign`, 'Transform', 0, 500, fade), clip('c26', `${prefix}sign`, 'Transform', 1300, 500, sceneEffect('move:fadeOut').effect)] },
       // Step 6: what the Level knob's value draws, swept round to full and handed back.
       { id: 'sc_sweep', name: 'Sweep', trigger: { type: 'script' }, length: 1200, loop: false,
         clips: [clip('c8', `${prefix}level`, 'Value', 0, 1200, ringSweep), clip('c9', `${prefix}dial`, 'Value', 0, 1200, ringSweep), clip('c10', `${prefix}fader`, 'Value', 0, 1200, ringSweep),
@@ -171,7 +177,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'scale', 'strip', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'scale', 'strip', 'sign', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -261,6 +267,8 @@ window.__scenes = {
     return { piece: text.hasAttribute('data-word-piece'), name: style.animationName, fill: text.getAttribute('fill'), transform: style.transform,
       clipped: !!clip && !!document.getElementById(/#([^)]+)/.exec(clip)?.[1] ?? '') };
   },
+  /** A control's opacity as drawn now. */
+  opacity: (id) => Number(getComputedStyle(root(id)).opacity),
   /** What the markers have called, in order, and when (ms on the page's clock). */
   markerCalls: () => markerCalls.map((entry) => [...entry]),
   /** The console lines a scene's marker left: one naming an action no script defines. */

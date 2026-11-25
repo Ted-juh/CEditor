@@ -1528,6 +1528,48 @@ Verified locally:
 - WebKitGTK is not run again: the readout and ticks are SVG elements with a CSS animation and
   `currentColor`, which the knob's scale numbers already showed it draws.
 
+## As built: several clips on one place (2026-11-25)
+
+A bug, found while recording demo GIFs: a second clip on the same place of a control hid the
+first. Fade in, then fade out: the fade in was never seen. Type the words in, then out: they sat
+there in full until the out began. The Designer's stage showed it as Preview and the plug-in did.
+
+There were two causes.
+- **A clip's held first frame.** Every clip holds its first frame before it starts (`fill: both`),
+  so a control that fades in at 1.2 s is not seen before it. The second clip held its first frame
+  too, from the scene's start, and came later in the element's animation list. So it won over the
+  first.
+- **Words draw one text effect at a time.** Each renderer drew the last text item it was given, so
+  the out was drawn and the in never was.
+
+The rule now is the one value clips already followed (`valueDrawn.js`): **the clip that started last
+decides.**
+- **Keyframes, colours, patterns** (`sceneControlOutput`): an element's clips are laid down in the
+  order they start. A clip that moves a property an earlier clip on that element already moves
+  (opacity, translate, scale, rotate; a paint colour; a gradient's turn or shift; a picture's pan,
+  zoom or spin) holds only its last frame (`forwards`). The earlier clip holds until it takes over.
+  A clip that moves nothing an earlier one moves still holds its first frame. So a pulse at 0 and a
+  fade in at 1.2 s leave the knob unseen until 1.2 s, as before.
+- **Text.** Of a run of words' text clips, the one that has started is drawn, or the first, which
+  holds its first frame until it starts.
+  - Posed, the playhead says which.
+  - While a scene runs, `CanvasControl` moves the words on at each later clip's start
+    (`textSwitchTimes`). It counts from when it first saw the play, as the play's CSS animations
+    do, and starts the new clip's animation from that moment, so a late timer starts it that much
+    in.
+  - Merging the clips into one animation per letter was the other way. It was dropped: a push
+    moves by its piece's own width and a wipe clips its piece's own box, so a whole-word wipe after
+    a letter-by-letter typewriter would have drawn wrong.
+
+Verified locally:
+- `test/sceneOverlap.test.js` (new): fade in then out, clips out of order in the scene, properties
+  that meet and that do not, colours, a gradient's two properties, patterns, and text posed and
+  running.
+- The browser check `scenePlayback` has a label that fades in then out while its words type in then
+  out. Without the fix it fails on both halves.
+- The browser checks `animationDesigner`, `animationTab`, `panelMotion`, `anatomyForms` and
+  `macroSetKnob` pass.
+
 ## Open
 
 Nothing for the owner at present.

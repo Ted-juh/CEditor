@@ -160,7 +160,7 @@
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
   import { getContext, setContext, untrack } from 'svelte';
   import { SCENE_STAGE } from '../stores/sceneStage.js';
-  import { sceneControlOutput, mergeKeyframeOutputs } from '../utils/sceneModel.js';
+  import { sceneControlOutput, mergeKeyframeOutputs, textSwitchTimes } from '../utils/sceneModel.js';
   import { drawnValueFor, ownValuePlay, liveDrawnValue } from '../utils/valueDrawn.js';
   import { VALUE_TARGET } from '../utils/sceneFormat.js';
   import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
@@ -1824,9 +1824,51 @@
   let stageFrame = $derived(sceneStage ? $sceneStage : null);
   let stagePlays = $derived(stageFrame?.plays
     ?? (stageFrame?.scene ? [{ scene: stageFrame.scene, at: stageFrame.playing ? null : stageFrame.at, phase: stageFrame.phase ?? 'a' }] : []));
+  // Words with more than one text clip in a running scene draw the one that started last
+  // (sceneModel.js): as each later clip starts, this control moves the words on to it, counted from
+  // then. Its clock starts when it first sees the play, as the play's CSS animations do; a posed play
+  // (the playhead, a seek, a hand) says its moment itself.
+  const textStarts = new Map();
+  const textSwitched = new Map();
+  let textElapsed = $state({});
+  const textPlayKey = (play) => `${play.scene?.id}:${play.phase ?? 'a'}`;
+  $effect(() => {
+    const plays = stagePlays;
+    const id = core?.id;
+    const timers = [];
+    untrack(() => {
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const passed = {};
+      const seen = new Set();
+      for (const play of plays) {
+        if (Number.isFinite(play.at)) continue;
+        const times = textSwitchTimes(play.scene, id);
+        if (!times.length) continue;
+        const key = textPlayKey(play);
+        seen.add(key);
+        if (!textStarts.has(key)) textStarts.set(key, now);
+        const since = now - textStarts.get(key);
+        const due = times.filter((ms) => ms <= since).at(-1);
+        if (due !== undefined && textSwitched.get(key)?.[0] !== due) textSwitched.set(key, [due, since]);
+        passed[key] = due === undefined ? 0 : textSwitched.get(key)[1];
+        for (const ms of times) {
+          if (ms <= since) continue;
+          timers.push(setTimeout(() => {
+            const at = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - (textStarts.get(key) ?? 0);
+            textSwitched.set(key, [ms, at]);
+            textElapsed = { ...textElapsed, [key]: at };
+          }, ms - since));
+        }
+      }
+      for (const key of [...textStarts.keys()]) if (!seen.has(key)) { textStarts.delete(key); textSwitched.delete(key); }
+      textElapsed = passed;
+    });
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  });
   let sceneKeyframes = $derived(core?.id && stagePlays.length
     ? stagePlays.reduce((drawn, play) => {
-      const output = sceneControlOutput(play.scene, core.id, { at: play.at, phase: play.phase });
+      const elapsed = Number.isFinite(play.at) ? null : (textElapsed[textPlayKey(play)] ?? 0);
+      const output = sceneControlOutput(play.scene, core.id, { at: play.at, phase: play.phase, elapsed });
       return output ? mergeKeyframeOutputs(drawn, output) : drawn;
     }, null)
     : null);

@@ -20,6 +20,7 @@
  *   - a scene drifts a background image — zoomed and panned inside its clip — and not the control
  *   - a clip on a part's pattern pulses that pattern, and not the part or the control
  *   - a scene's markers call the scripts' actions as it passes them; one no script defines is said
+ *   - two clips on one place: a fade in then out, and words typed in then out, each seen in turn
  *   - a knob drawn as a form takes a text effect on its readout, whole
  *   - a scene types a knob's scale numbers round the dial, one number at a time, and rolls them each through a box of its
  *     own (utils/anatomyWords.js)
@@ -401,6 +402,24 @@ try {
     assert.ok(beamAt >= 380 && beamAt < 650, `beam at about 400 ms: ${beamAt}`);
     assert.equal(cueTrace.length, 1, JSON.stringify(cueTrace));
     assert.match(cueTrace[0], /a marker calls "nobody", and no script defines that action\. The actions: lights, beam/);
+  });
+
+  // Two clips on one place: the earlier is seen, then the later takes over and holds its end.
+  await page.evaluate(() => window.__scenes.script('animatePlay', ['In and out', {}]));
+  await page.waitForTimeout(150);
+  const signIn = { opacity: await s('opacity', 'sign'), letter: await s('letters', 'sign') };
+  await page.waitForTimeout(1100);
+  const signOut = { letter: await s('letters', 'sign') };
+  await page.waitForTimeout(900);
+  const signEnd = { opacity: await s('opacity', 'sign') };
+  check('fade in then out, type in then out: the first clip is seen, and the later one takes over', () => {
+    assert.ok(signIn.opacity > 0.05 && signIn.opacity < 0.95, `fading in, not held at the fade out's first frame: ${signIn.opacity}`);
+    assert.notEqual(signIn.letter?.name ?? 'none', 'none', JSON.stringify(signIn));
+    assert.equal(signIn.letter.state, 'running');
+    assert.notEqual(signOut.letter?.name ?? 'none', 'none', JSON.stringify(signOut));
+    assert.notEqual(signOut.letter.name, signIn.letter.name, `the words moved on to the out clip as it started: ${JSON.stringify({ signIn, signOut })}`);
+    assert.ok(Math.abs(parseFloat(signOut.letter.delay)) < 400, `counted from when it took over: ${signOut.letter.delay}`);
+    assert.ok(signEnd.opacity < 0.05, `held faded out at the end: ${signEnd.opacity}`);
   });
 
   // A knob's own words: a typewriter on its scale numbers, one number at a time round the dial.

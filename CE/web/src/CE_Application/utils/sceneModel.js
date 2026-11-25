@@ -14,6 +14,15 @@
  * at the scene's start and waits its delay; posed (`at`, the playhead), each is paused at that
  * moment. A clip holds its first frame before it starts and its last after (fill `both`), so a
  * control that fades in at 1.2 s is not seen before it.
+ *
+ * SEVERAL CLIPS ON ONE PLACE. The clip that started last decides, as a control's value clips already
+ * do (valueDrawn.js): fade in, then fade out; type the words in, then out. Each element's clips are
+ * laid down in the order they start, so a later one wins while it plays and after; and a clip that
+ * moves a property an earlier one on the same element already moves holds only its last frame
+ * (`forwards`), not its first before it starts — that frame belonged to the earlier clip, and was
+ * hiding it. Words draw one text effect at a time, so of a run of words' text clips the one that has
+ * started is drawn: by the playhead when posed, and while a scene runs, by `elapsed`, which the
+ * control moves on as each later clip starts (textSwitchTimes), its animation counted from then.
  */
 import { newSceneId, cleanClip, cleanScene, SCENE_MAX_LENGTH, VALUE_TARGET, PATTERN_PLACE, patternPlace } from './sceneFormat.js';
 import {
@@ -273,15 +282,62 @@ export function clipAnimation(clip) {
 
 const partOf = (target) => (String(target).startsWith('Parts.') ? String(target).split('.')[1] : '');
 
+// The CSS properties a clip's frames move, so two clips on one element are known to meet.
+const MOVED = { scale: 'scale', rotate: 'rotate', x: 'translate', y: 'translate', opacity: 'opacity' };
+const IMAGE_MOVED = { panX: 'translate', panY: 'translate', zoom: 'scale', spin: 'rotate' };
+const movedBy = (frames, table) => new Set(frames.flatMap((frame) => Object.keys(table).filter((key) => frame[key] !== undefined).map((key) => table[key])));
+function channelMoves(entry, channel) {
+  const frames = channelFrames(entry, channel);
+  if (channel === IMAGE_CHANNEL) return movedBy(frames, IMAGE_MOVED);
+  if (channel === GRADIENT_CHANNEL) return movedBy(frames, { turn: 'turn', shift: 'shift' });
+  return new Set(frames.length ? [channel] : []);
+}
+
+/**
+ * The fill of a clip on one element (`key`) that moves `moves`: its first frame held before it starts,
+ * unless a clip before it there moves one of the same properties — then that clip holds until this
+ * one takes over. `seen` remembers, element by element, what the clips so far move.
+ */
+function fillAfter(seen, key, moves) {
+  const before = seen.get(key) ?? new Set();
+  const meets = [...moves].some((property) => before.has(property));
+  for (const property of moves) before.add(property);
+  seen.set(key, before);
+  return meets ? 'forwards' : 'both';
+}
+
+/**
+ * The moments, ms into a running scene, at which a run of a control's words changes text clip: the
+ * start of each text clip on words that have an earlier one. A control draws its words' current clip
+ * (sceneControlOutput, `elapsed`) and moves on at each.
+ */
+export function textSwitchTimes(scene, controlId) {
+  const starts = new Map();
+  for (const clip of scene?.clips ?? []) {
+    if (clip.controlId !== controlId || clip.effect?.kind !== 'text') continue;
+    const part = partOf(clip.target);
+    starts.set(part, [...(starts.get(part) ?? []), Number(clip.start) || 0]);
+  }
+  const times = new Set();
+  for (const list of starts.values()) if (list.length > 1) list.sort((a, b) => a - b).slice(1).forEach((ms) => times.add(ms));
+  return [...times].sort((a, b) => a - b);
+}
+
 /**
  * What one control draws of a scene: `{ parts, colours, texts, patterns, partPatterns, rules }` as the
  * keyframe player gives the first four (patterns by name; a part's, by part and then name), or null
  * when the scene has nothing on it. `at` (ms) poses every clip at that moment, paused;
  * without it the clips play from the moment this is applied. `phase` restarts a played scene.
  */
-export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } = {}) {
-  const clips = (scene?.clips ?? []).filter((clip) => clip.controlId === controlId);
+export function sceneControlOutput(scene, controlId, { at = null, phase = 'a', elapsed = null } = {}) {
+  // In the order they start: on one element, the later clip is laid over the earlier.
+  const clips = (scene?.clips ?? [])
+    .map((clip, index) => [clip, index])
+    .filter(([clip]) => clip.controlId === controlId)
+    .sort((a, b) => ((Number(a[0].start) || 0) - (Number(b[0].start) || 0)) || a[1] - b[1])
+    .map(([clip]) => clip);
   if (!clips.length) return null;
+  const seen = new Map();
   const parts = new Map();
   const colours = new Map();
   const texts = new Map();
@@ -300,7 +356,8 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
       if (pattern.part && !partPatterns.has(pattern.part)) partPatterns.set(pattern.part, new Map());
       const byName = pattern.part ? partPatterns.get(pattern.part) : patterns;
       const list = byName.get(pattern.name) ?? [];
-      list.push(animationValue(entry, phase, options));
+      const fill = fillAfter(seen, `pattern:${pattern.part ?? ''}:${pattern.name}`, movedBy(entry.frames, MOVED));
+      list.push(animationValue(entry, phase, { ...options, fill }));
       byName.set(pattern.name, list);
       rules.push(keyframesRule(entry, phase));
       continue;
@@ -311,7 +368,7 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
       const effect = readTextEffect(node, clip.id);
       if (!effect) continue;
       const list = texts.get(part) ?? [];
-      list.push({ name: clip.id, effect, phase, trigger: node.trigger, at: options.at });
+      list.push({ name: clip.id, effect, phase, trigger: node.trigger, at: options.at, start: Number(clip.start) || 0 });
       texts.set(part, list);
       rules.push(textEffectRules(effect, { phase }));
       continue;
@@ -320,17 +377,29 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
     if (!entry) continue;
     if (entry.moves) {
       const list = parts.get(part) ?? [];
-      list.push(animationValue(entry, phase, options));
+      const fill = fillAfter(seen, `moves:${part}`, movedBy(entry.frames, MOVED));
+      list.push(animationValue(entry, phase, { ...options, fill }));
       parts.set(part, list);
       rules.push(keyframesRule(entry, phase));
     }
     for (const channel of CHANNELS) {
       if (!channelFrames(entry, channel).length) continue;
       const lists = colours.get(part) ?? { paint: [], shape: [], stroke: [], text: [], gradient: [], image: [] };
-      lists[channel].push(colourAnimationValue(entry, channel, phase, options));
+      const fill = fillAfter(seen, `${channel}:${part}`, channelMoves(entry, channel));
+      lists[channel].push(colourAnimationValue(entry, channel, phase, { ...options, fill }));
       colours.set(part, lists);
       rules.push(colourKeyframesRule(entry, channel, phase));
     }
+  }
+  // Words draw one text effect at a time: the clip that has started, else the first, which holds its
+  // first frame until it does. While the scene runs, one that takes over is counted from then.
+  const moment = Number.isFinite(at) ? at : (Number.isFinite(elapsed) ? elapsed : 0);
+  for (const [part, list] of texts) {
+    if (list.length < 2) continue;
+    let current = list[0];
+    for (const item of list) if (item.start <= moment) current = item;
+    if (current !== list[0] && !Number.isFinite(at)) current = { ...current, effect: { ...current.effect, delay: current.effect.delay - moment } };
+    texts.set(part, [current]);
   }
   return { parts, colours, texts, patterns, partPatterns, rules: [...new Set(rules)].join('\n') };
 }
