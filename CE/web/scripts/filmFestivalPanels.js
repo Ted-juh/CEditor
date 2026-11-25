@@ -33,93 +33,12 @@
 // effects or frames written out; nothing needs a script. The looks are homages in plain type and
 // shapes, not any film's own lettering or artwork.
 
-import { createControl } from '../src/CE_Application/models/componentTypes.js';
-import { createPanel } from '../src/CE_Application/stores/panelModel.js';
-import { normalizeControlSet } from '../src/CE_Application/models/controlSets.js';
-import { sceneEffect } from '../src/CE_Application/utils/sceneModel.js';
-import { addPatternPatch } from '../src/CE_Application/utils/patternLayers.js';
+import {
+  W, H, svg, fx, frames, text, panelMaker, FILM_KIND, pattern, gradient, picture, glow, seeded, starTile, RING, jitter,
+} from './festivalKit.js';
 
-const W = 720;
-const H = 405;
-
-const svg = (body, w, h) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`)}`;
-const fx = (id, over = {}) => ({ ...sceneEffect(id).effect, ...over });
-const frames = (list, over = {}) => ({ kind: 'keyframes', easing: 'linear', iterations: 1, direction: 'normal', frames: list, ...over });
-const text = (effect, way, over = {}) => ({ kind: 'text', effect, way, iterations: 1, ...over });
-
-/** One film's panel, its controls numbered from a hash of its id so the file only changes when the film does. */
-function film(id, name, { set = 'carbon-pro', bg = 'FF000000' } = {}) {
-  let hash = 5381;
-  for (const ch of `ceditor-film:${id}`) hash = ((hash * 33) ^ ch.charCodeAt(0)) >>> 0;
-  let n = 1_700_000_000_000 + (hash % 90_000_000) * 1000;
-  const controls = [];
-  const clips = [];
-  const ids = {};
-  const add = (type, cname, x, y, w, h, over = {}) => {
-    const control = createControl(type, { Transform: { x, y, width: w, height: h }, ...over });
-    control._children.Core.id = `ctrl_${n++}`;
-    control._children.Core.name = cname;
-    ids[cname] = control._children.Core.id;
-    controls.push(control);
-    return control;
-  };
-  /** A Label: its words in a face, a size and a colour; no border; a fill only when given one. */
-  const label = (cname, words, x, y, w, h, { size = 14, colour = 'FFFFFFFF', family = 'Space Grotesk', weight = 700, fill = null, radius = 0, align = null, spacing = null, lineHeight = null, rotation = null } = {}) => {
-    const control = add('Label', cname, x, y, w, h, {
-      Text: { content: words, _children: { Font: { family, size, weight: weight >= 700 ? 'Bold' : weight >= 500 ? 'Medium' : weight >= 400 ? 'Regular' : 'Light', weightValue: weight }, Fill: { colour } } },
-    });
-    const bgc = control._children.Background._children;
-    bgc.Fill = { ...bgc.Fill, colour: fill ?? '00000000' };
-    bgc.Border = { ...(bgc.Border ?? {}), enabled: false };
-    bgc.Corners = { ...(bgc.Corners ?? {}), radius };
-    const words_ = control._children.Text._children;
-    if (align) words_.Position = { ...words_.Position, justification: align };
-    if (spacing !== null) words_.Font = { ...words_.Font, letterSpacing: spacing };
-    if (lineHeight !== null) words_.Multiline = { ...words_.Multiline, lineHeight };
-    if (rotation !== null) control._children.Transform.rotation = rotation;
-    return control;
-  };
-  const clip = (cname, target, start, effect, length) => {
-    clips.push({ id: `cl_${id}_${clips.length + 1}`, controlId: ids[cname], target, start, length, effect });
-  };
-  const done = (sceneName, length) => {
-    const panel = createPanel(name);
-    const h = (hash >>> 0).toString(16).padStart(8, '0');
-    Object.assign(panel, {
-      name, width: W, height: H, bgColour: bg, controls,
-      panelGuid: `${h}-f11d-4fe5-a5e5-${h}${h.slice(0, 4)}`,
-      scriptId: `film_${id}`,
-      filePath: null,
-      controlSet: normalizeControlSet(set),
-      animationScenes: [{ id: `sc_${id}`, name: sceneName, trigger: { type: 'panelOpen' }, length, loop: true, clips }],
-    });
-    return panel;
-  };
-  return { add, label, clip, done };
-}
-
-/** A pattern on a control's background (or a part's), with these settings. */
-function pattern(control, fields) {
-  const background = control._children.Background;
-  const { patch } = addPatternPatch(background, 'Background', fields);
-  const key = Object.keys(patch)[0];
-  if (key.endsWith('.Patterns')) background._children.Patterns = patch[key];
-  else background._children.Patterns._children[key.split('.').pop()] = patch[key];
-  return control;
-}
-const gradient = (control, angle, stops) => {
-  Object.assign(control._children.Background._children.Fill, { solidEnabled: false, gradientEnabled: true,
-    gradient: { type: 'linear', angle, stops: stops.map(([position, color]) => ({ position, color })) } });
-  return control;
-};
-const picture = (control, src, fit = 'cover') => {
-  Object.assign(control._children.Background._children.Fill, { imageEnabled: true, imageSrc: src, imageFit: fit });
-  return control;
-};
-const glow = (control, colour, blur = 14) => {
-  control._children.Effects._children.Shadows = { _type: 'Shadows', items: [{ enabled: true, type: 'outer-glow', offsetX: 0, offsetY: 0, blur, spread: 1, colour }] };
-  return control;
-};
+/** One film's panel (festivalKit.js panelMaker), numbered as the films always were. */
+const film = (id, name, options = {}) => panelMaker(id, name, { ...options, kind: FILM_KIND });
 
 // --- The films --------------------------------------------------------------------------------
 
@@ -331,18 +250,8 @@ function missionImpossible() {
 
 // --- The second reel ------------------------------------------------------------------------------
 
-/** A seeded run of numbers, so a picture draws the same every export. */
-function seeded(seed) {
-  let n = seed >>> 0;
-  return () => { n = (n * 1664525 + 1013904223) >>> 0; return n / 4294967296; };
-}
-function starTile(seed, count, rmin, rmax, w, h) {
-  const next = seeded(seed);
-  return svg(Array.from({ length: count }, () => `<circle cx="${(2 + next() * (w - 4)).toFixed(1)}" cy="${(2 + next() * (h - 4)).toFixed(1)}" r="${(rmin + next() * (rmax - rmin)).toFixed(2)}" fill="#fff"/>`).join(''), w, h);
-}
 const STARS_NEAR = starTile(3, 9, 1.0, 2.0, 190, 130);
 const STARS_FAR = starTile(5, 12, 0.4, 0.9, 110, 80);
-const RING = svg('<circle cx="50" cy="50" r="46" fill="none" stroke="#fff" stroke-width="3"/>', 100, 100);
 /** A sky of stars that does not move: two tiles, near and far. */
 function starSky(f, cname) {
   const sky = f.label(cname, '', 0, 0, W, H);
@@ -350,7 +259,6 @@ function starSky(f, cname) {
   pattern(sky, { src: STARS_NEAR, tint: 'FFFFFFFF', opacity: 95, repeat: 'both', speed: 0, offsetX: 37, offsetY: 21 });
   return sky;
 }
-const jitter = (amp, extra = {}) => frames([{ at: 0, x: 0, y: 0 }, { at: 0.2, x: -amp, y: amp / 2 }, { at: 0.4, x: amp, y: -amp / 2 }, { at: 0.6, x: -amp / 2, y: amp }, { at: 0.8, x: amp / 2, y: -amp / 2 }, { at: 1, x: 0, y: 0 }], extra);
 
 function starWars() {
   const f = film('starwars', 'Star Wars');

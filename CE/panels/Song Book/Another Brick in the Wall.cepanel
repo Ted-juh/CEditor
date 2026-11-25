@@ -1,0 +1,2285 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "e21ec73f-50e9-4b00-8c5d-e21ec73fe21e",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Another Brick in the Wall",
+  "scriptId": "song_anotherbrick",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF5B6470",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Sky","id":"ctrl_1713667903000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#9aa4b0"},{"position":100,"color":"#5b6470"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Mortar","id":"ctrl_1713667903001","controlType":"Label"},
+        "Transform": {"y":105,"width":720,"height":300},
+        "Background": {"_children":{"Fill":{"colour":"FFB9B0A2"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_1","id":"ctrl_1713667903002","controlType":"Label"},
+        "Transform": {"x":2,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF9E5539"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_2","id":"ctrl_1713667903003","controlType":"Label"},
+        "Transform": {"x":82,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF9E5539"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_3","id":"ctrl_1713667903004","controlType":"Label"},
+        "Transform": {"x":162,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_4","id":"ctrl_1713667903005","controlType":"Label"},
+        "Transform": {"x":242,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_5","id":"ctrl_1713667903006","controlType":"Label"},
+        "Transform": {"x":322,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_6","id":"ctrl_1713667903007","controlType":"Label"},
+        "Transform": {"x":402,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF9E5539"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_7","id":"ctrl_1713667903008","controlType":"Label"},
+        "Transform": {"x":482,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_8","id":"ctrl_1713667903009","controlType":"Label"},
+        "Transform": {"x":562,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF9E5539"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick1_9","id":"ctrl_1713667903010","controlType":"Label"},
+        "Transform": {"x":642,"y":357,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_1","id":"ctrl_1713667903011","controlType":"Label"},
+        "Transform": {"x":-38,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF8D4A32"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_2","id":"ctrl_1713667903012","controlType":"Label"},
+        "Transform": {"x":42,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_3","id":"ctrl_1713667903013","controlType":"Label"},
+        "Transform": {"x":122,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF7A3F2B"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_4","id":"ctrl_1713667903014","controlType":"Label"},
+        "Transform": {"x":202,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_5","id":"ctrl_1713667903015","controlType":"Label"},
+        "Transform": {"x":282,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF9E5539"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_6","id":"ctrl_1713667903016","controlType":"Label"},
+        "Transform": {"x":362,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_7","id":"ctrl_1713667903017","controlType":"Label"},
+        "Transform": {"x":442,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF7A3F2B"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_8","id":"ctrl_1713667903018","controlType":"Label"},
+        "Transform": {"x":522,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_9","id":"ctrl_1713667903019","controlType":"Label"},
+        "Transform": {"x":602,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF7A3F2B"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick2_10","id":"ctrl_1713667903020","controlType":"Label"},
+        "Transform": {"x":682,"y":307,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF7A3F2B"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_1","id":"ctrl_1713667903021","controlType":"Label"},
+        "Transform": {"x":2,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF94503A"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_2","id":"ctrl_1713667903022","controlType":"Label"},
+        "Transform": {"x":82,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_3","id":"ctrl_1713667903023","controlType":"Label"},
+        "Transform": {"x":162,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF94503A"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_4","id":"ctrl_1713667903024","controlType":"Label"},
+        "Transform": {"x":242,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF8D4A32"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_5","id":"ctrl_1713667903025","controlType":"Label"},
+        "Transform": {"x":322,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_6","id":"ctrl_1713667903026","controlType":"Label"},
+        "Transform": {"x":402,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF8D4A32"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_7","id":"ctrl_1713667903027","controlType":"Label"},
+        "Transform": {"x":482,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF9E5539"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_8","id":"ctrl_1713667903028","controlType":"Label"},
+        "Transform": {"x":562,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF8D4A32"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick3_9","id":"ctrl_1713667903029","controlType":"Label"},
+        "Transform": {"x":642,"y":257,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_1","id":"ctrl_1713667903030","controlType":"Label"},
+        "Transform": {"x":-38,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_2","id":"ctrl_1713667903031","controlType":"Label"},
+        "Transform": {"x":42,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_3","id":"ctrl_1713667903032","controlType":"Label"},
+        "Transform": {"x":122,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_4","id":"ctrl_1713667903033","controlType":"Label"},
+        "Transform": {"x":202,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF94503A"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_5","id":"ctrl_1713667903034","controlType":"Label"},
+        "Transform": {"x":282,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_6","id":"ctrl_1713667903035","controlType":"Label"},
+        "Transform": {"x":362,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF8D4A32"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_7","id":"ctrl_1713667903036","controlType":"Label"},
+        "Transform": {"x":442,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_8","id":"ctrl_1713667903037","controlType":"Label"},
+        "Transform": {"x":522,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_9","id":"ctrl_1713667903038","controlType":"Label"},
+        "Transform": {"x":602,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick4_10","id":"ctrl_1713667903039","controlType":"Label"},
+        "Transform": {"x":682,"y":207,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF7A3F2B"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_1","id":"ctrl_1713667903040","controlType":"Label"},
+        "Transform": {"x":2,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF8D4A32"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_2","id":"ctrl_1713667903041","controlType":"Label"},
+        "Transform": {"x":82,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF94503A"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_3","id":"ctrl_1713667903042","controlType":"Label"},
+        "Transform": {"x":162,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_4","id":"ctrl_1713667903043","controlType":"Label"},
+        "Transform": {"x":242,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_5","id":"ctrl_1713667903044","controlType":"Label"},
+        "Transform": {"x":322,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_6","id":"ctrl_1713667903045","controlType":"Label"},
+        "Transform": {"x":402,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_7","id":"ctrl_1713667903046","controlType":"Label"},
+        "Transform": {"x":482,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_8","id":"ctrl_1713667903047","controlType":"Label"},
+        "Transform": {"x":562,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF8D4A32"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick5_9","id":"ctrl_1713667903048","controlType":"Label"},
+        "Transform": {"x":642,"y":157,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_1","id":"ctrl_1713667903049","controlType":"Label"},
+        "Transform": {"x":-38,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_2","id":"ctrl_1713667903050","controlType":"Label"},
+        "Transform": {"x":42,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF9E5539"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_3","id":"ctrl_1713667903051","controlType":"Label"},
+        "Transform": {"x":122,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_4","id":"ctrl_1713667903052","controlType":"Label"},
+        "Transform": {"x":202,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF94503A"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_5","id":"ctrl_1713667903053","controlType":"Label"},
+        "Transform": {"x":282,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF7A3F2B"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_6","id":"ctrl_1713667903054","controlType":"Label"},
+        "Transform": {"x":362,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_7","id":"ctrl_1713667903055","controlType":"Label"},
+        "Transform": {"x":442,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FFA65F42"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_8","id":"ctrl_1713667903056","controlType":"Label"},
+        "Transform": {"x":522,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF8D4A32"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_9","id":"ctrl_1713667903057","controlType":"Label"},
+        "Transform": {"x":602,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF9E5539"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brick6_10","id":"ctrl_1713667903058","controlType":"Label"},
+        "Transform": {"x":682,"y":107,"width":76,"height":46},
+        "Background": {"_children":{"Fill":{"colour":"FF84452F"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1713667903059","controlType":"Label"},
+        "Transform": {"y":220,"width":720,"height":70},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ANOTHER BRICK IN THE WALL","_children":{"Fill":{"colour":"FFF4EEE2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":34,"letterSpacing":4}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_anotherbrick",
+      "name": "Built",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6800,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_anotherbrick_1",
+          "controlId": "ctrl_1713667903002",
+          "target": "Transform",
+          "start": 150,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_2",
+          "controlId": "ctrl_1713667903003",
+          "target": "Transform",
+          "start": 202,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_3",
+          "controlId": "ctrl_1713667903004",
+          "target": "Transform",
+          "start": 254,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_4",
+          "controlId": "ctrl_1713667903005",
+          "target": "Transform",
+          "start": 306,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_5",
+          "controlId": "ctrl_1713667903006",
+          "target": "Transform",
+          "start": 358,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_6",
+          "controlId": "ctrl_1713667903007",
+          "target": "Transform",
+          "start": 410,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_7",
+          "controlId": "ctrl_1713667903008",
+          "target": "Transform",
+          "start": 462,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_8",
+          "controlId": "ctrl_1713667903009",
+          "target": "Transform",
+          "start": 514,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_9",
+          "controlId": "ctrl_1713667903010",
+          "target": "Transform",
+          "start": 566,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_10",
+          "controlId": "ctrl_1713667903011",
+          "target": "Transform",
+          "start": 790,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_11",
+          "controlId": "ctrl_1713667903012",
+          "target": "Transform",
+          "start": 842,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_12",
+          "controlId": "ctrl_1713667903013",
+          "target": "Transform",
+          "start": 894,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_13",
+          "controlId": "ctrl_1713667903014",
+          "target": "Transform",
+          "start": 946,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_14",
+          "controlId": "ctrl_1713667903015",
+          "target": "Transform",
+          "start": 998,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_15",
+          "controlId": "ctrl_1713667903016",
+          "target": "Transform",
+          "start": 1050,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_16",
+          "controlId": "ctrl_1713667903017",
+          "target": "Transform",
+          "start": 1102,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_17",
+          "controlId": "ctrl_1713667903018",
+          "target": "Transform",
+          "start": 1154,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_18",
+          "controlId": "ctrl_1713667903019",
+          "target": "Transform",
+          "start": 1206,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_19",
+          "controlId": "ctrl_1713667903020",
+          "target": "Transform",
+          "start": 1258,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_20",
+          "controlId": "ctrl_1713667903021",
+          "target": "Transform",
+          "start": 1430,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_21",
+          "controlId": "ctrl_1713667903022",
+          "target": "Transform",
+          "start": 1482,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_22",
+          "controlId": "ctrl_1713667903023",
+          "target": "Transform",
+          "start": 1534,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_23",
+          "controlId": "ctrl_1713667903024",
+          "target": "Transform",
+          "start": 1586,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_24",
+          "controlId": "ctrl_1713667903025",
+          "target": "Transform",
+          "start": 1638,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_25",
+          "controlId": "ctrl_1713667903026",
+          "target": "Transform",
+          "start": 1690,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_26",
+          "controlId": "ctrl_1713667903027",
+          "target": "Transform",
+          "start": 1742,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_27",
+          "controlId": "ctrl_1713667903028",
+          "target": "Transform",
+          "start": 1794,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_28",
+          "controlId": "ctrl_1713667903029",
+          "target": "Transform",
+          "start": 1846,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_29",
+          "controlId": "ctrl_1713667903030",
+          "target": "Transform",
+          "start": 2070,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_30",
+          "controlId": "ctrl_1713667903031",
+          "target": "Transform",
+          "start": 2122,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_31",
+          "controlId": "ctrl_1713667903032",
+          "target": "Transform",
+          "start": 2174,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_32",
+          "controlId": "ctrl_1713667903033",
+          "target": "Transform",
+          "start": 2226,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_33",
+          "controlId": "ctrl_1713667903034",
+          "target": "Transform",
+          "start": 2278,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_34",
+          "controlId": "ctrl_1713667903035",
+          "target": "Transform",
+          "start": 2330,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_35",
+          "controlId": "ctrl_1713667903036",
+          "target": "Transform",
+          "start": 2382,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_36",
+          "controlId": "ctrl_1713667903037",
+          "target": "Transform",
+          "start": 2434,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_37",
+          "controlId": "ctrl_1713667903038",
+          "target": "Transform",
+          "start": 2486,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_38",
+          "controlId": "ctrl_1713667903039",
+          "target": "Transform",
+          "start": 2538,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_39",
+          "controlId": "ctrl_1713667903040",
+          "target": "Transform",
+          "start": 2710,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_40",
+          "controlId": "ctrl_1713667903041",
+          "target": "Transform",
+          "start": 2762,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_41",
+          "controlId": "ctrl_1713667903042",
+          "target": "Transform",
+          "start": 2814,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_42",
+          "controlId": "ctrl_1713667903043",
+          "target": "Transform",
+          "start": 2866,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_43",
+          "controlId": "ctrl_1713667903044",
+          "target": "Transform",
+          "start": 2918,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_44",
+          "controlId": "ctrl_1713667903045",
+          "target": "Transform",
+          "start": 2970,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_45",
+          "controlId": "ctrl_1713667903046",
+          "target": "Transform",
+          "start": 3022,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_46",
+          "controlId": "ctrl_1713667903047",
+          "target": "Transform",
+          "start": 3074,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_47",
+          "controlId": "ctrl_1713667903048",
+          "target": "Transform",
+          "start": 3126,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_48",
+          "controlId": "ctrl_1713667903049",
+          "target": "Transform",
+          "start": 3350,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_49",
+          "controlId": "ctrl_1713667903050",
+          "target": "Transform",
+          "start": 3402,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_50",
+          "controlId": "ctrl_1713667903051",
+          "target": "Transform",
+          "start": 3454,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_51",
+          "controlId": "ctrl_1713667903052",
+          "target": "Transform",
+          "start": 3506,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_52",
+          "controlId": "ctrl_1713667903053",
+          "target": "Transform",
+          "start": 3558,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_53",
+          "controlId": "ctrl_1713667903054",
+          "target": "Transform",
+          "start": 3610,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_54",
+          "controlId": "ctrl_1713667903055",
+          "target": "Transform",
+          "start": 3662,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_55",
+          "controlId": "ctrl_1713667903056",
+          "target": "Transform",
+          "start": 3714,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_56",
+          "controlId": "ctrl_1713667903057",
+          "target": "Transform",
+          "start": 3766,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_57",
+          "controlId": "ctrl_1713667903058",
+          "target": "Transform",
+          "start": 3818,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": -460
+              },
+              {
+                "at": 0.8,
+                "y": 4
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_anotherbrick_58",
+          "controlId": "ctrl_1713667903059",
+          "target": "Text",
+          "start": 4700,
+          "length": 900,
+          "effect": {
+            "kind": "text",
+            "effect": "explode",
+            "way": "in",
+            "iterations": 1,
+            "scatter": 60,
+            "scale": 2.2,
+            "stagger": 18,
+            "duration": 420
+          }
+        },
+        {
+          "id": "cl_anotherbrick_59",
+          "controlId": "ctrl_1713667903059",
+          "target": "Transform",
+          "start": 0,
+          "length": 4700,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

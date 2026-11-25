@@ -1,0 +1,691 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "cf87ec46-50e9-4b00-8c5d-cf87ec46cf87",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Row, Row, Row Your Boat",
+  "scriptId": "song_rowyourboat",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF2D7FB5",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"BankTop","id":"ctrl_1761791558000","controlType":"Label"},
+        "Transform": {"width":720,"height":70},
+        "Background": {"_children":{"Fill":{"colour":"FF5A9E3C"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"River","id":"ctrl_1761791558001","controlType":"Label"},
+        "Transform": {"y":70,"width":720,"height":275},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#3d93c9"},{"position":100,"color":"#1f6a9c"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BankFoot","id":"ctrl_1761791558002","controlType":"Label"},
+        "Transform": {"y":345,"width":720,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"FF4C8A30"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Waves1","id":"ctrl_1761791558003","controlType":"Label"},
+        "Transform": {"y":88,"width":720,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FFCDE8F8","opacity":45,"blend":"normal","scale":1,"repeat":"x","align":"center","offsetX":0,"offsetY":8,"place":"behind","speed":30,"direction":180,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Waves2","id":"ctrl_1761791558004","controlType":"Label"},
+        "Transform": {"y":152,"width":720,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FFCDE8F8","opacity":45,"blend":"normal","scale":1,"repeat":"x","align":"center","offsetX":0,"offsetY":8,"place":"behind","speed":38,"direction":180,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Waves3","id":"ctrl_1761791558005","controlType":"Label"},
+        "Transform": {"y":216,"width":720,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FFCDE8F8","opacity":45,"blend":"normal","scale":1,"repeat":"x","align":"center","offsetX":0,"offsetY":8,"place":"behind","speed":46,"direction":180,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Waves4","id":"ctrl_1761791558006","controlType":"Label"},
+        "Transform": {"y":280,"width":720,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FFCDE8F8","opacity":45,"blend":"normal","scale":1,"repeat":"x","align":"center","offsetX":0,"offsetY":8,"place":"behind","speed":54,"direction":180,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Boat1","id":"ctrl_1761791558007","controlType":"Label"},
+        "Transform": {"x":-90,"y":80,"width":76,"height":38},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2276%22%20height%3D%2238%22%20viewBox%3D%220%200%2076%2038%22%3E%3Cpath%20d%3D%22M4%2022%20L%2072%2022%20L%2062%2034%20L%2014%2034%20Z%22%20fill%3D%22%238d5a2b%22%2F%3E%3Cpath%20d%3D%22M4%2022%20L%2072%2022%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2238%22%20cy%3D%2210%22%20r%3D%225%22%20fill%3D%22%232b2b2b%22%2F%3E%3Cpath%20d%3D%22M33%2022%20L%2035%2014%20L%2041%2014%20L%2043%2022%20Z%22%20fill%3D%22%23d84315%22%2F%3E%3Cpath%20d%3D%22M14%2030%20L%2058%208%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M8%2034%20L%2018%2026%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Boat2","id":"ctrl_1761791558008","controlType":"Label"},
+        "Transform": {"x":-90,"y":144,"width":76,"height":38},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2276%22%20height%3D%2238%22%20viewBox%3D%220%200%2076%2038%22%3E%3Cpath%20d%3D%22M4%2022%20L%2072%2022%20L%2062%2034%20L%2014%2034%20Z%22%20fill%3D%22%238d5a2b%22%2F%3E%3Cpath%20d%3D%22M4%2022%20L%2072%2022%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2238%22%20cy%3D%2210%22%20r%3D%225%22%20fill%3D%22%232b2b2b%22%2F%3E%3Cpath%20d%3D%22M33%2022%20L%2035%2014%20L%2041%2014%20L%2043%2022%20Z%22%20fill%3D%22%23d84315%22%2F%3E%3Cpath%20d%3D%22M14%2030%20L%2058%208%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M8%2034%20L%2018%2026%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Boat3","id":"ctrl_1761791558009","controlType":"Label"},
+        "Transform": {"x":-90,"y":208,"width":76,"height":38},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2276%22%20height%3D%2238%22%20viewBox%3D%220%200%2076%2038%22%3E%3Cpath%20d%3D%22M4%2022%20L%2072%2022%20L%2062%2034%20L%2014%2034%20Z%22%20fill%3D%22%238d5a2b%22%2F%3E%3Cpath%20d%3D%22M4%2022%20L%2072%2022%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2238%22%20cy%3D%2210%22%20r%3D%225%22%20fill%3D%22%232b2b2b%22%2F%3E%3Cpath%20d%3D%22M33%2022%20L%2035%2014%20L%2041%2014%20L%2043%2022%20Z%22%20fill%3D%22%23d84315%22%2F%3E%3Cpath%20d%3D%22M14%2030%20L%2058%208%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M8%2034%20L%2018%2026%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Boat4","id":"ctrl_1761791558010","controlType":"Label"},
+        "Transform": {"x":-90,"y":272,"width":76,"height":38},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2276%22%20height%3D%2238%22%20viewBox%3D%220%200%2076%2038%22%3E%3Cpath%20d%3D%22M4%2022%20L%2072%2022%20L%2062%2034%20L%2014%2034%20Z%22%20fill%3D%22%238d5a2b%22%2F%3E%3Cpath%20d%3D%22M4%2022%20L%2072%2022%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2238%22%20cy%3D%2210%22%20r%3D%225%22%20fill%3D%22%232b2b2b%22%2F%3E%3Cpath%20d%3D%22M33%2022%20L%2035%2014%20L%2041%2014%20L%2043%2022%20Z%22%20fill%3D%22%23d84315%22%2F%3E%3Cpath%20d%3D%22M14%2030%20L%2058%208%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M8%2034%20L%2018%2026%22%20stroke%3D%22%235a3714%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Part1","id":"ctrl_1761791558011","controlType":"Label"},
+        "Transform": {"x":10,"y":88,"width":24,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"66000000"},"Border":{"enabled":false},"Corners":{"radius":12}}},
+        "Text": {"content":"1","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":13}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Part2","id":"ctrl_1761791558012","controlType":"Label"},
+        "Transform": {"x":10,"y":152,"width":24,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"66000000"},"Border":{"enabled":false},"Corners":{"radius":12}}},
+        "Text": {"content":"2","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":13}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Part3","id":"ctrl_1761791558013","controlType":"Label"},
+        "Transform": {"x":10,"y":216,"width":24,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"66000000"},"Border":{"enabled":false},"Corners":{"radius":12}}},
+        "Text": {"content":"3","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":13}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Part4","id":"ctrl_1761791558014","controlType":"Label"},
+        "Transform": {"x":10,"y":280,"width":24,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"66000000"},"Border":{"enabled":false},"Corners":{"radius":12}}},
+        "Text": {"content":"4","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":13}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1761791558015","controlType":"Label"},
+        "Transform": {"y":14,"width":720,"height":44},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ROW, ROW, ROW YOUR BOAT","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":26,"letterSpacing":4}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Caption","id":"ctrl_1761791558016","controlType":"Label"},
+        "Transform": {"y":360,"width":720,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a round for four voices, each one entering after the one before","_children":{"Fill":{"colour":"FFE8F5DC"},"Font":{"family":"Barlow","weight":"Medium","weightValue":500,"size":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_rowyourboat",
+      "name": "Round",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 8000,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_rowyourboat_1",
+          "controlId": "ctrl_1761791558007",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.125,
+                "x": 102.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.25,
+                "x": 205,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.375,
+                "x": 307.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.5,
+                "x": 410,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.625,
+                "x": 512.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.75,
+                "x": 615,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.875,
+                "x": 717.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 1,
+                "x": 820,
+                "y": 0,
+                "rotate": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_rowyourboat_2",
+          "controlId": "ctrl_1761791558011",
+          "target": "Transform",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.6,
+                "fill": "FFFFB300"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "66000000"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_rowyourboat_3",
+          "controlId": "ctrl_1761791558008",
+          "target": "Transform",
+          "start": 1100,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.125,
+                "x": 102.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.25,
+                "x": 205,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.375,
+                "x": 307.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.5,
+                "x": 410,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.625,
+                "x": 512.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.75,
+                "x": 615,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.875,
+                "x": 717.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 1,
+                "x": 820,
+                "y": 0,
+                "rotate": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_rowyourboat_4",
+          "controlId": "ctrl_1761791558012",
+          "target": "Transform",
+          "start": 1100,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.6,
+                "fill": "FFFFB300"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "66000000"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_rowyourboat_5",
+          "controlId": "ctrl_1761791558009",
+          "target": "Transform",
+          "start": 2200,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.125,
+                "x": 102.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.25,
+                "x": 205,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.375,
+                "x": 307.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.5,
+                "x": 410,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.625,
+                "x": 512.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.75,
+                "x": 615,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.875,
+                "x": 717.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 1,
+                "x": 820,
+                "y": 0,
+                "rotate": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_rowyourboat_6",
+          "controlId": "ctrl_1761791558013",
+          "target": "Transform",
+          "start": 2200,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.6,
+                "fill": "FFFFB300"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "66000000"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_rowyourboat_7",
+          "controlId": "ctrl_1761791558010",
+          "target": "Transform",
+          "start": 3300,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.125,
+                "x": 102.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.25,
+                "x": 205,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.375,
+                "x": 307.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.5,
+                "x": 410,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.625,
+                "x": 512.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 0.75,
+                "x": 615,
+                "y": 0,
+                "rotate": 2
+              },
+              {
+                "at": 0.875,
+                "x": 717.5,
+                "y": -3,
+                "rotate": -3
+              },
+              {
+                "at": 1,
+                "x": 820,
+                "y": 0,
+                "rotate": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_rowyourboat_8",
+          "controlId": "ctrl_1761791558014",
+          "target": "Transform",
+          "start": 3300,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.6,
+                "fill": "FFFFB300"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "66000000"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

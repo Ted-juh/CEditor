@@ -1,0 +1,641 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "0a26dfb7-50e9-4b00-8c5d-0a26dfb70a26",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Stairway to Heaven",
+  "scriptId": "song_stairway",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF07080C",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Dark","id":"ctrl_1780319799000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#0b0d18"},{"position":100,"color":"#050507"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step1","id":"ctrl_1780319799001","controlType":"Label"},
+        "Transform": {"x":40,"y":338,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF262833"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step2","id":"ctrl_1780319799002","controlType":"Label"},
+        "Transform": {"x":118,"y":298,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF262833"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step3","id":"ctrl_1780319799003","controlType":"Label"},
+        "Transform": {"x":196,"y":258,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF262833"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step4","id":"ctrl_1780319799004","controlType":"Label"},
+        "Transform": {"x":274,"y":218,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF262833"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step5","id":"ctrl_1780319799005","controlType":"Label"},
+        "Transform": {"x":352,"y":178,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF262833"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step6","id":"ctrl_1780319799006","controlType":"Label"},
+        "Transform": {"x":430,"y":138,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF262833"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step7","id":"ctrl_1780319799007","controlType":"Label"},
+        "Transform": {"x":508,"y":98,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF262833"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step8","id":"ctrl_1780319799008","controlType":"Label"},
+        "Transform": {"x":586,"y":58,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF262833"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lit1","id":"ctrl_1780319799009","controlType":"Label"},
+        "Transform": {"x":40,"y":338,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FFF6D27A"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lit2","id":"ctrl_1780319799010","controlType":"Label"},
+        "Transform": {"x":118,"y":298,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FFF6D27A"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lit3","id":"ctrl_1780319799011","controlType":"Label"},
+        "Transform": {"x":196,"y":258,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FFF6D27A"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lit4","id":"ctrl_1780319799012","controlType":"Label"},
+        "Transform": {"x":274,"y":218,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FFF6D27A"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lit5","id":"ctrl_1780319799013","controlType":"Label"},
+        "Transform": {"x":352,"y":178,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FFF6D27A"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lit6","id":"ctrl_1780319799014","controlType":"Label"},
+        "Transform": {"x":430,"y":138,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FFF6D27A"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lit7","id":"ctrl_1780319799015","controlType":"Label"},
+        "Transform": {"x":508,"y":98,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FFF6D27A"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lit8","id":"ctrl_1780319799016","controlType":"Label"},
+        "Transform": {"x":586,"y":58,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FFF6D27A"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Heaven","id":"ctrl_1780319799017","controlType":"Label"},
+        "Transform": {"x":-104,"y":-692,"width":1500,"height":1500},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":50,"stops":[{"position":0,"color":"#ffffff"},{"position":40,"color":"#fffaf0"},{"position":72,"color":"#fff6e4"},{"position":100,"color":"#00FFF6E4"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1780319799018","controlType":"Label"},
+        "Transform": {"y":170,"width":720,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"STAIRWAY TO HEAVEN","_children":{"Fill":{"colour":"FF8A7448"},"Font":{"family":"Space Grotesk","weight":"Light","weightValue":300,"size":36,"letterSpacing":10}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_stairway",
+      "name": "Climb",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 7000,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_stairway_1",
+          "controlId": "ctrl_1780319799009",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.06818181818181818,
+                "opacity": 0
+              },
+              {
+                "at": 0.10909090909090909,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_2",
+          "controlId": "ctrl_1780319799010",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.16363636363636364,
+                "opacity": 0
+              },
+              {
+                "at": 0.20454545454545456,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_3",
+          "controlId": "ctrl_1780319799011",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.2590909090909091,
+                "opacity": 0
+              },
+              {
+                "at": 0.3,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_4",
+          "controlId": "ctrl_1780319799012",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.35454545454545455,
+                "opacity": 0
+              },
+              {
+                "at": 0.39545454545454545,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_5",
+          "controlId": "ctrl_1780319799013",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.45,
+                "opacity": 0
+              },
+              {
+                "at": 0.4909090909090909,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_6",
+          "controlId": "ctrl_1780319799014",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.5454545454545454,
+                "opacity": 0
+              },
+              {
+                "at": 0.5863636363636363,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_7",
+          "controlId": "ctrl_1780319799015",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.6409090909090909,
+                "opacity": 0
+              },
+              {
+                "at": 0.6818181818181818,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_8",
+          "controlId": "ctrl_1780319799016",
+          "target": "Transform",
+          "start": 0,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.7363636363636363,
+                "opacity": 0
+              },
+              {
+                "at": 0.7772727272727272,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_9",
+          "controlId": "ctrl_1780319799017",
+          "target": "Transform",
+          "start": 0,
+          "length": 6200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 0.2
+              },
+              {
+                "at": 0.58,
+                "opacity": 0,
+                "scale": 0.2
+              },
+              {
+                "at": 0.8,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_stairway_10",
+          "controlId": "ctrl_1780319799018",
+          "target": "Text",
+          "start": 4900,
+          "length": 1400,
+          "effect": {
+            "kind": "text",
+            "effect": "crossfade",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "order": "centre",
+            "stagger": 45,
+            "duration": 700
+          }
+        }
+      ]
+    }
+  ]
+}

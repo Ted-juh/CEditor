@@ -1,0 +1,1295 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "6c98cfb6-50e9-4b00-8c5d-6c98cfb66c98",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Ten Green Bottles",
+  "scriptId": "song_tengreenbottles",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1E2A36",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Night","id":"ctrl_1721953974000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#24364a"},{"position":100,"color":"#131c26"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wall","id":"ctrl_1721953974001","controlType":"Label"},
+        "Transform": {"y":250,"width":720,"height":155},
+        "Background": {"_children":{"Fill":{"colour":"FF7D4A34"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2224%22%20viewBox%3D%220%200%2040%2024%22%3E%3Cpath%20d%3D%22M0%200.5%20H%2040%20M0%2012.5%20H%2040%20M0.5%200%20V%2012%20M20.5%2012%20V%2024%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22%20fill%3D%22none%22%2F%3E%3C%2Fsvg%3E","tint":"FFB9A08A","opacity":70,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ledge","id":"ctrl_1721953974002","controlType":"Label"},
+        "Transform": {"y":244,"width":720,"height":10},
+        "Background": {"_children":{"Fill":{"colour":"FF9A8C7A"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle1","id":"ctrl_1721953974003","controlType":"Label"},
+        "Transform": {"x":40,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle2","id":"ctrl_1721953974004","controlType":"Label"},
+        "Transform": {"x":90,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle3","id":"ctrl_1721953974005","controlType":"Label"},
+        "Transform": {"x":140,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle4","id":"ctrl_1721953974006","controlType":"Label"},
+        "Transform": {"x":190,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle5","id":"ctrl_1721953974007","controlType":"Label"},
+        "Transform": {"x":240,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle6","id":"ctrl_1721953974008","controlType":"Label"},
+        "Transform": {"x":290,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle7","id":"ctrl_1721953974009","controlType":"Label"},
+        "Transform": {"x":340,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle8","id":"ctrl_1721953974010","controlType":"Label"},
+        "Transform": {"x":390,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle9","id":"ctrl_1721953974011","controlType":"Label"},
+        "Transform": {"x":440,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bottle10","id":"ctrl_1721953974012","controlType":"Label"},
+        "Transform": {"x":490,"y":168,"width":32,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2276%22%20viewBox%3D%220%200%2032%2076%22%3E%3Crect%20x%3D%2211%22%20y%3D%220%22%20width%3D%2210%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%232e5d2e%22%2F%3E%3Cpath%20d%3D%22M12%205%20H20%20V18%20C%2020%2022%2028%2024%2028%2032%20V70%20C%2028%2074%2026%2076%2022%2076%20H10%20C%206%2076%204%2074%204%2070%20V32%20C%204%2024%2012%2022%2012%2018%20Z%22%20fill%3D%22%232f8f3a%22%20fill-opacity%3D%22.9%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2234%22%20width%3D%224%22%20height%3D%2234%22%20rx%3D%222%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count10","id":"ctrl_1721953974013","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"10","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count9","id":"ctrl_1721953974014","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"9","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count8","id":"ctrl_1721953974015","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"8","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count7","id":"ctrl_1721953974016","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"7","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count6","id":"ctrl_1721953974017","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"6","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count5","id":"ctrl_1721953974018","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"5","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count4","id":"ctrl_1721953974019","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"4","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count3","id":"ctrl_1721953974020","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"3","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count2","id":"ctrl_1721953974021","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"2","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count1","id":"ctrl_1721953974022","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"1","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count0","id":"ctrl_1721953974023","controlType":"Label"},
+        "Transform": {"x":560,"y":120,"width":140,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"0","_children":{"Fill":{"colour":"FFB9F0B0"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1721953974024","controlType":"Label"},
+        "Transform": {"y":20,"width":720,"height":50},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TEN GREEN BOTTLES","_children":{"Fill":{"colour":"FFDDF5D8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":30,"letterSpacing":6}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Caption","id":"ctrl_1721953974025","controlType":"Label"},
+        "Transform": {"y":66,"width":720,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a traditional counting song","_children":{"Fill":{"colour":"FF9FB4C8"},"Font":{"family":"Barlow","weight":"Medium","weightValue":500,"size":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_tengreenbottles",
+      "name": "Countdown",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 7400,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_tengreenbottles_1",
+          "controlId": "ctrl_1721953974012",
+          "target": "Transform",
+          "start": 500,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_2",
+          "controlId": "ctrl_1721953974011",
+          "target": "Transform",
+          "start": 1100,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_3",
+          "controlId": "ctrl_1721953974010",
+          "target": "Transform",
+          "start": 1700,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_4",
+          "controlId": "ctrl_1721953974009",
+          "target": "Transform",
+          "start": 2300,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_5",
+          "controlId": "ctrl_1721953974008",
+          "target": "Transform",
+          "start": 2900,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_6",
+          "controlId": "ctrl_1721953974007",
+          "target": "Transform",
+          "start": 3500,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_7",
+          "controlId": "ctrl_1721953974006",
+          "target": "Transform",
+          "start": 4100,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_8",
+          "controlId": "ctrl_1721953974005",
+          "target": "Transform",
+          "start": 4700,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_9",
+          "controlId": "ctrl_1721953974004",
+          "target": "Transform",
+          "start": 5300,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_10",
+          "controlId": "ctrl_1721953974003",
+          "target": "Transform",
+          "start": 5900,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "y": 6,
+                "rotate": 30
+              },
+              {
+                "at": 1,
+                "y": 230,
+                "rotate": 150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_11",
+          "controlId": "ctrl_1721953974013",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.00013513513513513514,
+                "opacity": 1
+              },
+              {
+                "at": 0.10797297297297297,
+                "opacity": 1
+              },
+              {
+                "at": 0.10810810810810811,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_12",
+          "controlId": "ctrl_1721953974014",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.10810810810810811,
+                "opacity": 0
+              },
+              {
+                "at": 0.10824324324324325,
+                "opacity": 1
+              },
+              {
+                "at": 0.18905405405405407,
+                "opacity": 1
+              },
+              {
+                "at": 0.1891891891891892,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_13",
+          "controlId": "ctrl_1721953974014",
+          "target": "Text",
+          "start": 800,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_14",
+          "controlId": "ctrl_1721953974015",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.1891891891891892,
+                "opacity": 0
+              },
+              {
+                "at": 0.18932432432432433,
+                "opacity": 1
+              },
+              {
+                "at": 0.27013513513513515,
+                "opacity": 1
+              },
+              {
+                "at": 0.2702702702702703,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_15",
+          "controlId": "ctrl_1721953974015",
+          "target": "Text",
+          "start": 1400,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_16",
+          "controlId": "ctrl_1721953974016",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.2702702702702703,
+                "opacity": 0
+              },
+              {
+                "at": 0.2704054054054054,
+                "opacity": 1
+              },
+              {
+                "at": 0.35121621621621624,
+                "opacity": 1
+              },
+              {
+                "at": 0.35135135135135137,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_17",
+          "controlId": "ctrl_1721953974016",
+          "target": "Text",
+          "start": 2000,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_18",
+          "controlId": "ctrl_1721953974017",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.35135135135135137,
+                "opacity": 0
+              },
+              {
+                "at": 0.3514864864864865,
+                "opacity": 1
+              },
+              {
+                "at": 0.4322972972972973,
+                "opacity": 1
+              },
+              {
+                "at": 0.43243243243243246,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_19",
+          "controlId": "ctrl_1721953974017",
+          "target": "Text",
+          "start": 2600,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_20",
+          "controlId": "ctrl_1721953974018",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.43243243243243246,
+                "opacity": 0
+              },
+              {
+                "at": 0.4325675675675676,
+                "opacity": 1
+              },
+              {
+                "at": 0.5133783783783784,
+                "opacity": 1
+              },
+              {
+                "at": 0.5135135135135135,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_21",
+          "controlId": "ctrl_1721953974018",
+          "target": "Text",
+          "start": 3200,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_22",
+          "controlId": "ctrl_1721953974019",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.5135135135135135,
+                "opacity": 0
+              },
+              {
+                "at": 0.5136486486486487,
+                "opacity": 1
+              },
+              {
+                "at": 0.5944594594594594,
+                "opacity": 1
+              },
+              {
+                "at": 0.5945945945945946,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_23",
+          "controlId": "ctrl_1721953974019",
+          "target": "Text",
+          "start": 3800,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_24",
+          "controlId": "ctrl_1721953974020",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.5945945945945946,
+                "opacity": 0
+              },
+              {
+                "at": 0.5947297297297297,
+                "opacity": 1
+              },
+              {
+                "at": 0.6755405405405406,
+                "opacity": 1
+              },
+              {
+                "at": 0.6756756756756757,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_25",
+          "controlId": "ctrl_1721953974020",
+          "target": "Text",
+          "start": 4400,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_26",
+          "controlId": "ctrl_1721953974021",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.6756756756756757,
+                "opacity": 0
+              },
+              {
+                "at": 0.6758108108108108,
+                "opacity": 1
+              },
+              {
+                "at": 0.7566216216216216,
+                "opacity": 1
+              },
+              {
+                "at": 0.7567567567567568,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_27",
+          "controlId": "ctrl_1721953974021",
+          "target": "Text",
+          "start": 5000,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_28",
+          "controlId": "ctrl_1721953974022",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.7567567567567568,
+                "opacity": 0
+              },
+              {
+                "at": 0.7568918918918919,
+                "opacity": 1
+              },
+              {
+                "at": 0.8377027027027028,
+                "opacity": 1
+              },
+              {
+                "at": 0.8378378378378378,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_29",
+          "controlId": "ctrl_1721953974022",
+          "target": "Text",
+          "start": 5600,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_30",
+          "controlId": "ctrl_1721953974023",
+          "target": "Transform",
+          "start": 0,
+          "length": 7400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.8378378378378378,
+                "opacity": 0
+              },
+              {
+                "at": 0.837972972972973,
+                "opacity": 1
+              },
+              {
+                "at": 0.9998648648648648,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tengreenbottles_31",
+          "controlId": "ctrl_1721953974023",
+          "target": "Text",
+          "start": 6200,
+          "length": 260,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "direction": "down",
+            "duration": 220
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,778 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "14536f19-50e9-4b00-8c5d-14536f191453",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Here Comes the Sun",
+  "scriptId": "song_herecomesthesun",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF0B1026",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Knob1.value",
+      "label": "Knob1",
+      "controlName": "Knob1",
+      "path": "Knob1.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Knob2.value",
+      "label": "Knob2",
+      "controlName": "Knob2",
+      "path": "Knob2.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Knob3.value",
+      "label": "Knob3",
+      "controlName": "Knob3",
+      "path": "Knob3.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Knob4.value",
+      "label": "Knob4",
+      "controlName": "Knob4",
+      "path": "Knob4.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Knob5.value",
+      "label": "Knob5",
+      "controlName": "Knob5",
+      "path": "Knob5.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Dawn","id":"ctrl_1771012249000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#7ec8ff"},{"position":55,"color":"#ffd6a0"},{"position":100,"color":"#ff9a5a"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Night","id":"ctrl_1771012249001","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#060a1c"},{"position":100,"color":"#141b3c"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sun","id":"ctrl_1771012249002","controlType":"Label"},
+        "Transform": {"x":280,"y":230,"width":160,"height":160},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":50,"stops":[{"position":0,"color":"#ffffff"},{"position":30,"color":"#fff3c4"},{"position":60,"color":"#ffc04a"},{"position":100,"color":"#00FF8A1A"}]}},"Border":{"enabled":false},"Corners":{"radius":80}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":40,"spread":1,"colour":"FFFFD27A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ground","id":"ctrl_1771012249003","controlType":"Label"},
+        "Transform": {"y":300,"width":720,"height":105},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#2c2a40"},{"position":100,"color":"#121020"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Knob1","id":"ctrl_1771012249004","controlType":"Knob"},
+        "Transform": {"x":70,"y":296,"width":90,"height":90},
+        "Behavior": {"defaultValue":0.2}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Knob2","id":"ctrl_1771012249005","controlType":"Knob"},
+        "Transform": {"x":194,"y":296,"width":90,"height":90},
+        "Behavior": {"defaultValue":0.35}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Knob3","id":"ctrl_1771012249006","controlType":"Knob"},
+        "Transform": {"x":318,"y":296,"width":90,"height":90}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Knob4","id":"ctrl_1771012249007","controlType":"Knob"},
+        "Transform": {"x":442,"y":296,"width":90,"height":90},
+        "Behavior": {"defaultValue":0.6499999999999999}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Knob5","id":"ctrl_1771012249008","controlType":"Knob"},
+        "Transform": {"x":566,"y":296,"width":90,"height":90},
+        "Behavior": {"defaultValue":0.8}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Light","id":"ctrl_1771012249009","controlType":"Label"},
+        "Transform": {"width":260,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":90,"stops":[{"position":0,"color":"#00FFF2C4"},{"position":50,"color":"#66FFF2C4"},{"position":100,"color":"#00FFF2C4"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1771012249010","controlType":"Label"},
+        "Transform": {"y":40,"width":720,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HERE COMES THE SUN","_children":{"Fill":{"colour":"FF3A2410"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":40,"letterSpacing":4}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_herecomesthesun",
+      "name": "Sunrise",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6600,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_herecomesthesun_1",
+          "controlId": "ctrl_1771012249001",
+          "target": "Transform",
+          "start": 300,
+          "length": 2600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_2",
+          "controlId": "ctrl_1771012249002",
+          "target": "Transform",
+          "start": 0,
+          "length": 3600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 140,
+                "scale": 0.7
+              },
+              {
+                "at": 1,
+                "y": -118,
+                "scale": 1.1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_3",
+          "controlId": "ctrl_1771012249009",
+          "target": "Transform",
+          "start": 1200,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": -260
+              },
+              {
+                "at": 1,
+                "x": 720
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_4",
+          "controlId": "ctrl_1771012249004",
+          "target": "Transform",
+          "start": 0,
+          "length": 1800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18
+              },
+              {
+                "at": 1,
+                "opacity": 0.18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_5",
+          "controlId": "ctrl_1771012249004",
+          "target": "Transform",
+          "start": 1800,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18,
+                "scale": 1
+              },
+              {
+                "at": 0.5,
+                "opacity": 1,
+                "scale": 1.12
+              },
+              {
+                "at": 1,
+                "opacity": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_6",
+          "controlId": "ctrl_1771012249004",
+          "target": "Value",
+          "start": 1800,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "outCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_7",
+          "controlId": "ctrl_1771012249005",
+          "target": "Transform",
+          "start": 0,
+          "length": 2104,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18
+              },
+              {
+                "at": 1,
+                "opacity": 0.18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_8",
+          "controlId": "ctrl_1771012249005",
+          "target": "Transform",
+          "start": 2104,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18,
+                "scale": 1
+              },
+              {
+                "at": 0.5,
+                "opacity": 1,
+                "scale": 1.12
+              },
+              {
+                "at": 1,
+                "opacity": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_9",
+          "controlId": "ctrl_1771012249005",
+          "target": "Value",
+          "start": 2104,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "outCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_10",
+          "controlId": "ctrl_1771012249006",
+          "target": "Transform",
+          "start": 0,
+          "length": 2407,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18
+              },
+              {
+                "at": 1,
+                "opacity": 0.18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_11",
+          "controlId": "ctrl_1771012249006",
+          "target": "Transform",
+          "start": 2407,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18,
+                "scale": 1
+              },
+              {
+                "at": 0.5,
+                "opacity": 1,
+                "scale": 1.12
+              },
+              {
+                "at": 1,
+                "opacity": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_12",
+          "controlId": "ctrl_1771012249006",
+          "target": "Value",
+          "start": 2407,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "outCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_13",
+          "controlId": "ctrl_1771012249007",
+          "target": "Transform",
+          "start": 0,
+          "length": 2711,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18
+              },
+              {
+                "at": 1,
+                "opacity": 0.18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_14",
+          "controlId": "ctrl_1771012249007",
+          "target": "Transform",
+          "start": 2711,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18,
+                "scale": 1
+              },
+              {
+                "at": 0.5,
+                "opacity": 1,
+                "scale": 1.12
+              },
+              {
+                "at": 1,
+                "opacity": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_15",
+          "controlId": "ctrl_1771012249007",
+          "target": "Value",
+          "start": 2711,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "outCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_16",
+          "controlId": "ctrl_1771012249008",
+          "target": "Transform",
+          "start": 0,
+          "length": 3015,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18
+              },
+              {
+                "at": 1,
+                "opacity": 0.18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_17",
+          "controlId": "ctrl_1771012249008",
+          "target": "Transform",
+          "start": 3015,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.18,
+                "scale": 1
+              },
+              {
+                "at": 0.5,
+                "opacity": 1,
+                "scale": 1.12
+              },
+              {
+                "at": 1,
+                "opacity": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_18",
+          "controlId": "ctrl_1771012249008",
+          "target": "Value",
+          "start": 3015,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "outCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_herecomesthesun_19",
+          "controlId": "ctrl_1771012249010",
+          "target": "Text",
+          "start": 3600,
+          "length": 1200,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 55,
+            "duration": 200
+          }
+        }
+      ]
+    }
+  ]
+}

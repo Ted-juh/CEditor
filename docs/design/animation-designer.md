@@ -1707,6 +1707,53 @@ Verified locally:
   typed trails and the slot reels.
 - Each new film recorded frame by frame in Chromium, its frames checked by eye.
 
+## As built: the Song Book (2026-11-25)
+
+After the films, the owner asked what songs could do, and chose the fun half of the answer: panels
+named after songs, not a lyrics track. **No lyrics.** A song's words are its own, so each panel
+carries its title, drawings made for it and motion, and nothing sung. The three traditional songs
+keep to their shape (a round, a countdown, a ride), not their words. `test/songBook.test.js` holds
+every panel to its title and a few words of its own at most.
+
+Fifteen panels in `CE/panels/Song Book/`. Songs have a tempo and films do not, so two of them follow
+something other than the clock, which no film did:
+- **Every Breath You Take:** two eyes that follow the pointer. A scene driven by `pointerX` over a
+  panel-sized Label laid on top of everything, on a spring, with a blink by the clock beside it.
+- **Blue Monday:** a step sequencer of 64 lamps and a playhead, a scene of one bar started again on
+  every fourth beat of the transport. With the transport stopped, only the title and a hint play.
+
+The rest, each leaning on one corner:
+- **Paint It Black:** pads turning black in turn (`fill` frames).
+- **Purple Rain:** rain as two picture patterns, puddles rippling.
+- **Here Comes the Sun:** night lifting off a dawn gradient, a band of light waking five Knobs as it
+  passes, each rising to its value (value clips).
+- **Under Pressure:** a Meter forced into the red in surges, the plate shaking harder each time.
+  The Meter is pinned to the default set (`Core.controlSetId`), which draws it as a long segmented
+  bar; carbon-pro draws a meter as a small LED strip.
+- **Stairway to Heaven:** steps lighting one by one, a radial glow growing from the top step until
+  the panel is white.
+- **Another Brick in the Wall:** 57 bricks dropped row by row.
+- **Ring of Fire:** a chase round 22 flames, a Knob's arc sweeping in the middle.
+- **Video Killed the Radio Star:** a radio tuning, its needle and knob together, until a television
+  clicks on to static and grows over it.
+- **99 Luftballons:** ninety-nine balloons rising, then popping one at a time.
+- **Bolero:** one figure repeated, a row of lamps joining each time round, to a flash.
+- **Row, Row, Row Your Boat:** four boats setting off one after another, a round.
+- **Ten Green Bottles:** a bottle falls each verse, the count rolling down.
+- **Daisy Bell:** a bicycle made for two crossing a meadow, daisies opening behind it.
+
+The two collections share `scripts/festivalKit.js`: the panel maker (now with several scenes, a
+clock or a beat trigger on each), the Label helper, the paint, and the seeded drawings. The films
+moved onto it unchanged, which their `--check` confirms byte for byte. The songs are written in
+`scripts/songBookPanels.js` and exported by `scripts/export-song-book.mjs`.
+
+Verified locally:
+- `test/songBook.test.js` (new): the files are the script's; each opens with every clip, in every
+  scene, on a control it has. The pointer scene and the beat scene are what they say. Every title
+  is its song's name, and no Label says more than twelve words.
+- Each song recorded frame by frame in Chromium, its frames checked by eye: the eyes following a
+  moving pointer, and the sequencer playing from a running transport at 120 BPM.
+
 ## Open
 
 Nothing for the owner at present.

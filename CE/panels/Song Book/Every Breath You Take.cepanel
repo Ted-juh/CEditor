@@ -1,0 +1,362 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "2a4dc670-50e9-4b00-8c5d-2a4dc6702a4d",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Every Breath You Take",
+  "scriptId": "song_everybreath",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF15181C",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Eye1","id":"ctrl_1779740144000","controlType":"Label"},
+        "Transform": {"x":150,"y":110,"width":160,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22160%22%20height%3D%22100%22%20viewBox%3D%220%200%20160%20100%22%3E%3Cellipse%20cx%3D%2280%22%20cy%3D%2250%22%20rx%3D%2276%22%20ry%3D%2244%22%20fill%3D%22%23f4f1ea%22%2F%3E%3Cellipse%20cx%3D%2280%22%20cy%3D%2250%22%20rx%3D%2276%22%20ry%3D%2244%22%20fill%3D%22none%22%20stroke%3D%22%23c9c2b4%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Eye2","id":"ctrl_1779740144001","controlType":"Label"},
+        "Transform": {"x":410,"y":110,"width":160,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22160%22%20height%3D%22100%22%20viewBox%3D%220%200%20160%20100%22%3E%3Cellipse%20cx%3D%2280%22%20cy%3D%2250%22%20rx%3D%2276%22%20ry%3D%2244%22%20fill%3D%22%23f4f1ea%22%2F%3E%3Cellipse%20cx%3D%2280%22%20cy%3D%2250%22%20rx%3D%2276%22%20ry%3D%2244%22%20fill%3D%22none%22%20stroke%3D%22%23c9c2b4%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Iris1","id":"ctrl_1779740144002","controlType":"Label"},
+        "Transform": {"x":200,"y":130,"width":60,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%2228%22%20fill%3D%22%232f7d6d%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%2228%22%20fill%3D%22none%22%20stroke%3D%22%231b4a40%22%20stroke-width%3D%223%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%2212%22%20fill%3D%22%230b0d0e%22%2F%3E%3Ccircle%20cx%3D%2238%22%20cy%3D%2221%22%20r%3D%225%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.85%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Iris2","id":"ctrl_1779740144003","controlType":"Label"},
+        "Transform": {"x":460,"y":130,"width":60,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%2228%22%20fill%3D%22%232f7d6d%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%2228%22%20fill%3D%22none%22%20stroke%3D%22%231b4a40%22%20stroke-width%3D%223%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%2212%22%20fill%3D%22%230b0d0e%22%2F%3E%3Ccircle%20cx%3D%2238%22%20cy%3D%2221%22%20r%3D%225%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.85%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lid1","id":"ctrl_1779740144004","controlType":"Label"},
+        "Transform": {"x":150,"y":10,"width":160,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22160%22%20height%3D%22100%22%20viewBox%3D%220%200%20160%20100%22%3E%3Cpath%20d%3D%22M0%200%20H160%20V52%20Q80%20112%200%2052%20Z%22%20fill%3D%22%2315181c%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lid2","id":"ctrl_1779740144005","controlType":"Label"},
+        "Transform": {"x":410,"y":10,"width":160,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22160%22%20height%3D%22100%22%20viewBox%3D%220%200%20160%20100%22%3E%3Cpath%20d%3D%22M0%200%20H160%20V52%20Q80%20112%200%2052%20Z%22%20fill%3D%22%2315181c%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1779740144006","controlType":"Label"},
+        "Transform": {"y":300,"width":720,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EVERY BREATH YOU TAKE","_children":{"Fill":{"colour":"FFB8C2CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":22,"letterSpacing":8}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Hint","id":"ctrl_1779740144007","controlType":"Label"},
+        "Transform": {"y":344,"width":720,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"move the pointer","_children":{"Fill":{"colour":"FF6B7682"},"Font":{"family":"JetBrains Mono","size":13}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Watch","id":"ctrl_1779740144008","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_everybreath",
+      "name": "Blink",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 3400,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_everybreath_1",
+          "controlId": "ctrl_1779740144004",
+          "target": "Transform",
+          "start": 2800,
+          "length": 260,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.5,
+                "y": 96
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_everybreath_2",
+          "controlId": "ctrl_1779740144005",
+          "target": "Transform",
+          "start": 2800,
+          "length": 260,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.5,
+                "y": 96
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_everybreath_2",
+      "name": "Watching",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_everybreath_3",
+          "controlId": "ctrl_1779740144002",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": -44
+              },
+              {
+                "at": 1,
+                "x": 44
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_everybreath_4",
+          "controlId": "ctrl_1779740144003",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": -44
+              },
+              {
+                "at": 1,
+                "x": 44
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "pointerX",
+        "controlId": "ctrl_1779740144008",
+        "span": 130,
+        "direction": "up",
+        "follow": "spring",
+        "release": "stay"
+      }
+    }
+  ]
+}
