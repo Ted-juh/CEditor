@@ -1460,6 +1460,26 @@ A script can do the same:
 
 The scripting manual has the details.
 
+#### Showcases
+
+CEditor installs four folders of example panels next to the **Control set starters**, in
+`CE/panels/`. Each panel shows off something the Designer can do. Open one with **File › Open**,
+then choose **Preview** to play it, or open the **Animation Designer** to see how it is made.
+
+- **Film Festival:** title sequences in the manner of well-known films.
+- **Song Book:** panels named after songs, acting out what each is about.
+- **Mechanisms:** gears, a tape machine, a music box, a domino run and a clock.
+- **Gallery:** art movements set moving.
+
+Most of them play by themselves. A few wait for you:
+
+- **Blue Monday** and **Tape Machine** follow the transport: press Play.
+- **Every Breath You Take** follows the pointer, and **Gear Train** turns with its knob.
+- **Domino Run** and **Clockwork** run scripts of their own. A panel opened from a file runs no
+  script until you trust it, so choose **Enable scripts for this session** in the bar at the foot
+  of the window. Until then, a marker that calls one of the scripts' actions says so in the script
+  console.
+
 ## 9. Scripts
 
 When the ordinary settings are not enough — one knob moving three others, a display showing the

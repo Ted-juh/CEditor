@@ -1816,6 +1816,42 @@ Verified locally:
   - the domino chain going round through its markers and the real script;
   - the clock at the page's time, its second hand ticking.
 
+## As built: the showcases in the editor (2026-11-26)
+
+The owner asked for the showcases to work in the editor itself, not only in the recordings. Each of
+the 49 was opened as File > Open opens a `.cepanel` and played in the editor's Preview. 48 played
+with no page, console or script error; Domino Run did not. Three things changed:
+
+- **They are installed.** The CMake install and the Windows installer took only `Control set
+  starters` from `CE/panels`, so an installed CEditor had none of the four folders. Both now
+  install all four; `test/showcaseInstall.test.js` holds both lists to `showcaseCollections.js`.
+- **A marker whose scripts are paused says so.** A panel opened from a file runs no code until it
+  is trusted (the trust banner). Domino Run's first marker therefore found no action and said "no
+  script defines that action", which sent people looking for a script that was there. When the
+  panel's scripts are waiting for that approval, the marker now says it once, as a warning: the
+  scripts are paused, and "Enable scripts for this session" will let it call its action.
+- **Domino Run starts its own run.** Enabling scripts restarts the scripts, not the scenes. The
+  opening run had passed its marker before the script could answer it, and the dominoes lay where
+  they fell. The script now plays the run as it starts, which does nothing while no Preview is
+  live (`animatePlay` returns false).
+
+The user manual's Animation Designer section now says where the showcases are and which wait for
+the transport, the pointer, a knob or trusted scripts.
+
+Not changed: the editor draws its grid over a panel's plain background in Preview when the grid is
+on. That is the view setting, and the exported plug-in and the player never draw it.
+
+Verified locally:
+- The browser check `showcases` (new) opens panels as File > Open does, in the real editor's
+  Preview. One film, song, mechanism and gallery panel each play with no error, and:
+  - the pointer moves Every Breath You Take's eyes;
+  - Blue Monday plays only while the transport runs;
+  - a drag on Gear Train's knob turns the gears;
+  - Domino Run waits behind the banner, its marker warning once and logging no error; once
+    enabled, the dominoes' marker plays the ball and the ball's the bell;
+  - Clockwork's hands are held at the time of day once its script is enabled.
+- `test/showcaseCollections.test.js`: the domino script starts a run as it starts.
+
 ## Open
 
 Nothing for the owner at present.

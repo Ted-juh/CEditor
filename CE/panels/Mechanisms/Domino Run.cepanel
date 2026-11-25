@@ -131,7 +131,7 @@
       "id": "mechanism_dominorun_1",
       "name": "Domino run",
       "language": "javascript",
-      "source": "// The domino run: each scene ends on a marker, and the marker's action starts the next scene.\ndefineAction('roll', function () { animatePlay('Ball'); });\ndefineAction('ring', function () { animatePlay('Bell'); });\ndefineAction('again', function () { animatePlay('Dominoes'); });\n"
+      "source": "// The domino run: each scene ends on a marker, and the marker's action starts the next scene.\ndefineAction('roll', function () { animatePlay('Ball'); });\ndefineAction('ring', function () { animatePlay('Bell'); });\ndefineAction('again', function () { animatePlay('Dominoes'); });\n// And start a run when the script starts: a panel opened from a file runs no script until it is\n// trusted, and by then the opening run has passed its marker with nothing to answer it.\nanimatePlay('Dominoes');\n"
     }
   ],
   "scripting": {

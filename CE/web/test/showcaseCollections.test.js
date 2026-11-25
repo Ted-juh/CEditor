@@ -90,6 +90,7 @@ test('the domino run\'s script answers every marker, each action starting a scen
   const panel = collectionPanel('mechanisms', 'dominorun');
   assert.equal(panel.scripts[0].source, DOMINO_SCRIPT);
   const { calls, actions } = runScript(DOMINO_SCRIPT);
+  assert.deepEqual(calls.splice(0), [['play', 'Dominoes']], 'it starts a run as it starts, so scripts enabled after the panel opened still run it');
   const sceneNames = new Set(panel.animationScenes.map((scene) => scene.name));
   const markers = panel.animationScenes.flatMap((scene) => (scene.markers ?? []).map((marker) => [scene.name, marker.action]));
   assert.deepEqual(markers, [['Dominoes', 'roll'], ['Ball', 'ring'], ['Bell', 'again']], 'each scene ends on a marker');

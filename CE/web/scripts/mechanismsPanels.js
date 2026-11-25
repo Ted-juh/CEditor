@@ -188,6 +188,9 @@ const DOMINO_SCRIPT = `// The domino run: each scene ends on a marker, and the m
 defineAction('roll', function () { animatePlay('Ball'); });
 defineAction('ring', function () { animatePlay('Bell'); });
 defineAction('again', function () { animatePlay('Dominoes'); });
+// And start a run when the script starts: a panel opened from a file runs no script until it is
+// trusted, and by then the opening run has passed its marker with nothing to answer it.
+animatePlay('Dominoes');
 `;
 function dominoRun() {
   const f = mechanism('dominorun', 'Domino Run', { bg: 'FF1D2229' });

@@ -4840,6 +4840,9 @@ function runAction(ref, args) {
   return undefined;
 }
 
+/** The markers already told that the panel's scripts are paused (runMarkerAction), until they run. */
+const pausedMarkersSaid = new Set();
+
 /**
  * A scene's timeline marker (utils/sceneRuntime.js) calls its action as the scene passes it, as run()
  * calls one: an action a script registered with ce.core.action, or a function a script defines by
@@ -4850,6 +4853,17 @@ export function runMarkerAction(action, { scene = '' } = {}) {
   if (!name) return undefined;
   const defined = actions.has(name.toLowerCase())
     || activeScripts().some((s) => s.enabled !== false && typeof handlerCache.get(s.id)?.handlers?.[name] === 'function');
+  // A panel opened from a file runs no code until it is trusted (the trust banner), so its actions
+  // are not defined yet: that is not a missing action, and saying "no script defines" sent people
+  // looking for a script that was there. Said once for each marker until the scripts are enabled.
+  if (!defined && !ensurePanelExecutionApproved()) {
+    const key = `${scene}\u0000${name}`;
+    if (!pausedMarkersSaid.has(key)) {
+      pausedMarkersSaid.add(key);
+      addScriptTrace('warn', '', `Scene "${scene}": a marker calls "${name}", and this panel's scripts are paused. Choose "Enable scripts for this session" and the marker will call it.`);
+    }
+    return undefined;
+  }
   if (!defined) {
     const names = [...actions.values()].map((a) => a.name);
     addScriptTrace('error', '', `Scene "${scene}": a marker calls "${name}", and no script defines that action${names.length ? `. The actions: ${names.join(', ')}` : ''}. Register one with ce.core.action("${name}", function).`);
@@ -11670,6 +11684,7 @@ export function approveCurrentPanelScripts(extraScript = pendingApprovalScript, 
   const request = executionRequest(extraScript);
   approveExecution(request.key, request.fingerprint, allowNative);
   pendingApprovalScript = null;
+  pausedMarkersSaid.clear();
   if (!ensurePanelExecutionApproved(extraScript)) return;
   if (live.inited && get(previewModeEnabled) === true) {
     live.prevPreviewOn = false;
