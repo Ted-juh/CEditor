@@ -378,6 +378,16 @@ try {
     assert.equal(dialTyping.fill, 'currentColor', 'its colour through currentColor, so the effect\'s colour reaches it');
   });
 
+  // Rolled: held half way, the readout part way up inside a box that clips it.
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Dial roll', 130 / 600]));
+  await page.waitForTimeout(80);
+  const dialRolled = await s('formReadout', 'dial');
+  check('a roll on a knob form\'s readout moves it through a box about itself', () => {
+    assert.equal(dialRolled.clipped, true, JSON.stringify(dialRolled));
+    const dy = Number(/matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*([^)]+)\)/.exec(dialRolled.transform)?.[1]);
+    assert.ok(dy > 0.5, `part way up: ${dialRolled.transform}`);
+  });
+
   // Markers: a script-started scene calls the actions its markers name, in order, as it passes them.
   const cuesFrom = await page.evaluate(() => performance.now());
   await page.evaluate(() => window.__scenes.script('animatePlay', ['Cues', {}]));

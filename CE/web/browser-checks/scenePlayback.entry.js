@@ -127,6 +127,9 @@ function panel(prefix) {
       // A knob drawn as a form (the Dial, a disc): its readout typed in, whole, as SVG text is.
       { id: 'sc_dial_words', name: 'Dial words', trigger: { type: 'script' }, length: 600, loop: false,
         clips: [clip('c22', `${prefix}dial`, 'Parts.labelCurrent', 0, 600, typewriter)] },
+      // And rolled in: the readout moving up through a box about itself, the box still.
+      { id: 'sc_dial_roll', name: 'Dial roll', trigger: { type: 'script' }, length: 600, loop: false,
+        clips: [clip('c23', `${prefix}dial`, 'Parts.labelCurrent', 0, 600, sceneEffect('text:roll:in').effect)] },
       // Markers (sceneFormat.js): moments that call a script's action as the scene passes them.
       { id: 'sc_cues', name: 'Cues', trigger: { type: 'script' }, length: 600, loop: false,
         clips: [clip('c21', `${prefix}lamp`, 'Transform', 0, 600, fade)],
@@ -254,7 +257,9 @@ window.__scenes = {
     const text = [...(root(id)?.querySelectorAll('svg.anatomy text') ?? [])].find((el) => el.textContent.trim() !== '');
     if (!text) return null;
     const style = getComputedStyle(text);
-    return { piece: text.hasAttribute('data-word-piece'), name: style.animationName, fill: text.getAttribute('fill') };
+    const clip = text.parentElement?.getAttribute('clip-path') ?? '';
+    return { piece: text.hasAttribute('data-word-piece'), name: style.animationName, fill: text.getAttribute('fill'), transform: style.transform,
+      clipped: !!clip && !!document.getElementById(/#([^)]+)/.exec(clip)?.[1] ?? '') };
   },
   /** What the markers have called, in order, and when (ms on the page's clock). */
   markerCalls: () => markerCalls.map((entry) => [...entry]),

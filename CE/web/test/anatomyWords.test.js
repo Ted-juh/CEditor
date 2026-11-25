@@ -11,6 +11,7 @@ import {
 import ControlAnatomy from '../src/CE_Application/editor/ControlAnatomy.svelte';
 import InteractivePartRenderer from '../src/CE_Application/editor/InteractivePartRenderer.svelte';
 import { sliderControlSnapshot } from '../src/CE_Application/utils/sliderControlPart.js';
+import { anatomyOptions, isIllustratedForm } from '../src/CE_Application/models/controlAnatomy.js';
 import { readTextEffect, textEffectRules } from '../src/CE_Application/utils/textEffects.js';
 import { sceneControlOutput } from '../src/CE_Application/utils/sceneModel.js';
 import { describeTargets, deadTargetCount } from '../src/CE_Application/utils/animationModel.js';
@@ -174,4 +175,19 @@ test('a knob carried by a component\'s part plays an effect on that part on its 
   }).body;
   const numbers = [...html.matchAll(/<text data-scale-number="" data-word-piece=""[^>]*>([^<]*)<\/text>/g)].map((match) => match[1]);
   assert.deepEqual(numbers, ['0', '2', '4', '6', '8', '10']);
+});
+
+test('a roll or a push moves a form\'s tick or readout through a box about it, on a group that stays still', () => {
+  const draw = (form, texts) => render(ControlAnatomy, { props: { control: formKnob(form), width: 120, height: 128,
+    partTexts: new Map(Object.entries(texts).map(([part, fields]) => [part, [{ name: 'fx', phase: 'a', effect: effect(fields) }]])) } }).body;
+  const rolled = draw('pointer', { tickMajor: { effect: 'roll' } });
+  const tickClips = [...rolled.matchAll(/<g clip-path="url\(#([^)]+-tk62-\d+)\)"[^>]*><clipPath id="\1"><rect [^>]*><\/rect><\/clipPath>\s*<line [^>]*data-word-piece=""/g)];
+  assert.equal(tickClips.length, 13, 'each tick in a box of its own');
+  const pushed = draw('disc', { labelCurrent: { effect: 'push' } });
+  assert.match(pushed, /<g clip-path="url\(#([^)]+-ro164)\)"[^>]*><clipPath id="\1"><rect [^>]*><\/rect><\/clipPath><text [^>]*data-word-piece=""/);
+  const typed = draw('pointer', { tickMajor: { effect: 'typewriter' }, labelCurrent: { effect: 'typewriter' } });
+  assert.doesNotMatch(typed, /-tk62-|-ro164/, 'a typewriter moves nothing, so nothing is clipped');
+  const illustrated = anatomyOptions('Knob').map(([id]) => id).find((id) => isIllustratedForm(id));
+  const design = draw(illustrated, { labelCurrent: { effect: 'roll' } });
+  assert.match(design, /clip-path="url\(#[^)]+-ro16\d\)"/, `${illustrated}'s readout clipped too`);
 });

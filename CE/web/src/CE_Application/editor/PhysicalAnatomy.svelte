@@ -1,10 +1,14 @@
 <script>
+  import { markClipBox } from '../utils/anatomyWords.js';
   import SynthExpansionAnatomy from './SynthExpansionAnatomy.svelte';
   import SculptedSynthAnatomy from './SculptedSynthAnatomy.svelte';
   import {PHYSICAL_DIRECTIONS} from '../models/physicalControlSets.js';
-  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true,readoutFx=''} = $props();
+  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true,readoutFx='',readoutClip=false} = $props();
   // A text effect on the knob's readout (utils/anatomyWords.js): the words played whole, in the
   // readout's colour through currentColor, so the effect's colour frames reach SVG text.
+  // A roll or a push on the readout moves it through a box about itself, as a Label's box clips its
+  // words: a clip on a group that stays still, the text moving inside it (utils/anatomyWords.js).
+  const readoutBox = (x, y, size) => markClipBox({ text: readout, x, y: y - size * 0.35, size });
   const readoutAttrs = (colour) => (readoutFx ? { fill: 'currentColor', style: `color:${colour};${readoutFx}`, 'data-word-piece': '' } : { fill: colour });
   const uid=$props.id(), paint=name=>`url(#${uid}-${name})`;
   let style=$derived(PHYSICAL_DIRECTIONS.find(d=>d.id===design)?.style??'flat');
@@ -26,9 +30,9 @@
   {#if numbers}{#each [0,2,4,6,8,10] as n}{@const v=pt(-135+n*27,radius+12)}<text x={v[0]} y={v[1]+3} fill={legend} text-anchor="middle" font-size="7">{n}</text>{/each}{/if}
 {/snippet}
 {#if PHYSICAL_DIRECTIONS.find(d=>d.id===design)?.series===3}
-  <SculptedSynthAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue} {caption} {readoutFx}/>
+  <SculptedSynthAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue} {caption} {readoutFx} {readoutClip}/>
 {:else if PHYSICAL_DIRECTIONS.find(d=>d.id===design)?.series===2}
-  <SynthExpansionAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue} {caption} {readoutFx}/>
+  <SynthExpansionAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue} {caption} {readoutFx} {readoutClip}/>
 {:else if knob}
   <g transform={`translate(${80*(1-size)} ${76*(1-size)}) scale(${size})`} data-synth-profile={style}>
   {#if style==='vintage'}
@@ -58,7 +62,7 @@
     {#each Array.from({length:24}) as _,i}<path d="M80 13v7" transform={`rotate(${-135+i*270/23} 80 76)`} stroke={i/23<=p?accent:face} stroke-width="3"/>{/each}<circle cx="80" cy="78" r="49" fill="#090e15"/><circle cx="80" cy="76" r="46" fill={face} stroke="#7c929f" stroke-width=".8"/><circle cx="80" cy="76" r="39" fill={housing}/><path d="M78 32h4v22h-4Z" transform={`rotate(${angle} 80 76)`} fill={accent}/><path d="M57 107h46" stroke={face}/>
   {/if}
   </g>
-  {#if showValue}<text x="80" y="163" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{readout}</text>{/if}
+  {#if showValue}{#if readoutClip}{@const rb = readoutBox(80, 163, 12)}<g clip-path={`url(#${uid}-ro163)`}><clipPath id={`${uid}-ro163`}><rect x={rb.x} y={rb.y} width={rb.width} height={rb.height}/></clipPath><text x="80" y="163" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{readout}</text></g>{:else}<text x="80" y="163" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{readout}</text>{/if}{/if}
 {:else if meter}
   {#if ['vintage','console'].includes(style)}
     <rect x="4" y="10" width="152" height="72" rx="3" fill={paint('edge')} stroke="#101719"/>

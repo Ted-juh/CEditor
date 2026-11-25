@@ -1504,8 +1504,19 @@ The knob-words item's two left-out cases.
   knob's own parts inside it. So an effect on that part plays on the carried knob's first words:
   its numbers, else its ticks or its readout, as an effect on the knob itself would
   (`InteractivePartRenderer` hands it to the knob's `SliderFamilyRenderer` or `ControlAnatomy`).
-- **Not done:** a roll or a push on a form's ticks or readout is not clipped to a box per mark, as a
-  parts-drawn knob's are.
+- **Clipped as a parts-drawn knob's marks are** (a commit of its own, after). A roll or a push on a
+  form's ticks or readout moves each through a box about itself (`markClipBox`).
+  - The clip is on a group that stays still, with the tick or the text moving inside it; a clip on
+    the moving element would move with it.
+  - The group carries its own `clipPath`. Chromium and WebKitGTK 2.52 both clip by a `clipPath`
+    inside the group that names it.
+  - A knob's readout is wrapped where an effect clips it, in `ControlAnatomy` and in the four design
+    components. A meter's or a button's reading is not.
+  - With no effect the markup is as it was.
+  - Held by `test/anatomyWords.test.js`: thirteen ticks in thirteen boxes, a disc's readout, an
+    illustrated design's, a typewriter clipping nothing.
+  - The `scenePlayback` check holds a roll on the Dial's readout half way, inside its box.
+  - Screenshots in both engines show the readout cut at the box's edge on its way up.
 
 Verified locally:
 - `test/anatomyWords.test.js`: a form's words and their order, its refusals, its tick count; a
