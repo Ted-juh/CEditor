@@ -14,6 +14,7 @@
  *   - a knob's own value animation loops while it is hovered, and hands back when the pointer leaves
  *   - the Macro's ring and a meter sweep with the scene, and a meter's own needle test plays from a script
  *   - a pattern clip pulses a control's pattern while its scroll goes on underneath
+ *   - MIDI in starts scenes: a kick drum's note, and the sustain pedal as it goes down, once
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -269,6 +270,34 @@ try {
     assert.equal(patternPulsing.scroll.state, 'running', 'still scrolling');
     assert.equal(patternHeld.clip.state, 'paused');
     assert.match(patternHeld.clip.delay, /^-0\.4s$/, `held half way: ${patternHeld.clip.delay}`);
+  });
+
+  // MIDI in: the kick's note starts its scene; the pedal starts its own going down, not while held.
+  const kickBefore = kf(await s('box', 'kick')).length;
+  await page.evaluate(() => window.__scenes.midiIn('90 26 64'));
+  await page.waitForTimeout(60);
+  const afterOtherNote = kf(await s('box', 'kick')).length;
+  await page.evaluate(() => window.__scenes.midiIn('99 24 7F'));
+  await page.waitForTimeout(60);
+  const kicked = kf(await s('box', 'kick'));
+  await page.evaluate(() => window.__scenes.midiIn('B0 40 7F'));
+  await page.waitForTimeout(60);
+  const pedalDown = kf(await s('box', 'pedal'))[0]?.name;
+  await page.evaluate(() => window.__scenes.midiIn('B0 40 7F'));
+  await page.waitForTimeout(60);
+  const pedalHeld = kf(await s('box', 'pedal'))[0]?.name;
+  await page.evaluate(() => window.__scenes.midiIn('B0 40 00'));
+  await page.evaluate(() => window.__scenes.midiIn('B0 40 7F'));
+  await page.waitForTimeout(60);
+  const pedalAgain = kf(await s('box', 'pedal'))[0]?.name;
+  check('MIDI in starts scenes: a kick drum\'s note, and the sustain pedal as it goes down, once', () => {
+    assert.equal(kickBefore, 0);
+    assert.equal(afterOtherNote, 0, 'another note starts nothing');
+    assert.equal(kicked.length, 1, JSON.stringify(kicked));
+    assert.equal(kicked[0].state, 'running');
+    assert.match(pedalDown ?? '', /^ce-kf-/);
+    assert.equal(pedalHeld, pedalDown, 'held down: not started again');
+    assert.notEqual(pedalAgain, pedalDown, 'up and down again: started again');
   });
 
   // A meter's own value animation, from a script: the needle test.

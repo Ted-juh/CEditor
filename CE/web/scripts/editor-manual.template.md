@@ -1349,6 +1349,9 @@ There is one Designer per panel, and it closes with its panel.
     over it), **Pressed**, a state of its own, or **Back to Base** (when no state holds any more);
   - **A gesture on a control**: a click, double-click, long press, flick or wheel turn;
   - **The beat**: every so many beats while the transport runs;
+  - **MIDI in**: a note (one, or any), a controller going past a point (a sustain pedal pressed:
+    once as it goes down, not again while it is held), or a program change, on one channel or
+    any. It hears what the panel's MIDI input brings, in Preview and in the plugin;
   - **A script asks**: `ce.anim.play("Intro")` from a script.
 
   **Driven by** can hand the scene's playhead to a control instead of time. The scene then sits

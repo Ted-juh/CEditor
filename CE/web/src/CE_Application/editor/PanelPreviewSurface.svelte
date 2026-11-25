@@ -7200,6 +7200,8 @@
     const stop = untrack(() => latestMidiInputMessage.subscribe((payload) => {
       if (!payload?.hex || payload === lastInboundPayload) return;
       lastInboundPayload = payload;
+      // A scene that starts on MIDI in (utils/sceneMidi.js) hears it too.
+      sceneRun?.midi(payload.hex);
       // The assembler runs even with nothing bound, so its channel selections stay in step with the
       // stream; an NRPN begun before a binding existed still resolves once one does.
       const assembly = applyNrpnEvents(nrpnState, expressionEventsFromHex(payload.hex));

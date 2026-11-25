@@ -12,6 +12,8 @@
  *                   | { type: 'state', controlId, to }     // a control enters a state
  *                   | { type: 'event', controlId, event }  // a click, a long press… on a control
  *                   | { type: 'beat', every }              // every N beats while the transport runs
+ *                   | { type: 'midi', message, channel,    // MIDI in (utils/sceneMidi.js): a note-on,
+ *                       note | cc, above | program }       //   a controller past a point, a program
  *                   | { type: 'script' },                  // only when ce.anim.play asks
  *            length,                                      // ms: where the timeline ends
  *            loop,                                        // plays again from the start
@@ -39,7 +41,9 @@
  * play there.
  */
 
-export const SCENE_TRIGGER_TYPES = Object.freeze(['panelOpen', 'state', 'event', 'beat', 'script']);
+export const SCENE_TRIGGER_TYPES = Object.freeze(['panelOpen', 'state', 'event', 'beat', 'midi', 'script']);
+/** What a MIDI trigger hears: a note played, a controller pushed past a point, a program change. */
+export const MIDI_TRIGGER_MESSAGES = Object.freeze(['note', 'cc', 'program']);
 export const CLIP_KINDS = Object.freeze(['keyframes', 'text', 'value']);
 /** The clip target that is what a control's value draws (step 6). */
 export const VALUE_TARGET = 'Value';
@@ -64,12 +68,30 @@ export function newSceneId(prefix = 'sc', random = Math.random) {
   return `${prefix}_${out}`;
 }
 
+/**
+ * A MIDI trigger read: `channel` 1 to 16, or 0 for any; a note-on of `note` (0 to 127, or -1 for any);
+ * a controller `cc` going past `above` on its way up; or a program change to `program` (or -1, any).
+ */
+function cleanMidiTrigger(raw) {
+  const whole = (value, lo, hi, fallback) => {
+    const n = Math.round(Number(value));
+    return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : fallback;
+  };
+  const message = MIDI_TRIGGER_MESSAGES.includes(raw?.message) ? raw.message : 'note';
+  const channelRead = whole(raw?.channel, 0, 99, 0);
+  const channel = channelRead > 16 ? 0 : channelRead;
+  if (message === 'cc') return { type: 'midi', message, channel, cc: whole(raw?.cc, 0, 119, 64), above: whole(raw?.above, 0, 126, 63) };
+  if (message === 'program') return { type: 'midi', message, channel, program: whole(raw?.program, -1, 127, -1) };
+  return { type: 'midi', message, channel, note: whole(raw?.note, -1, 127, -1) };
+}
+
 /** A trigger read with what it needs, or the script trigger when it makes no sense. */
 export function cleanTrigger(raw) {
   const type = SCENE_TRIGGER_TYPES.includes(raw?.type) ? raw.type : 'script';
   if (type === 'state') return { type, controlId: id(raw.controlId), to: text(raw.to, 40).toLowerCase() || 'hover' };
   if (type === 'event') return { type, controlId: id(raw.controlId), event: text(raw.event, 24) || 'click' };
   if (type === 'beat') return { type, every: Math.max(1, Math.min(64, Math.round(Number(raw.every) || 1))) };
+  if (type === 'midi') return cleanMidiTrigger(raw);
   return { type };
 }
 

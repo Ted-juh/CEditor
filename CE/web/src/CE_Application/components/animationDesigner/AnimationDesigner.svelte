@@ -38,6 +38,7 @@
   import { MOTION_EVENTS } from '../../utils/stateMotion.js';
   import { isRangeBehavior } from '../../utils/rangeBehavior.js';
   import { controlDrawsValue } from '../../utils/valueDrawn.js';
+  import { midiTriggerText, midiNoteName } from '../../utils/sceneMidi.js';
   import ScenePresetPanel from './ScenePresetPanel.svelte';
   import { scenePresetLibrary, allScenePresets, saveScenePreset, removeScenePreset } from '../../stores/scenePresetLibrary.js';
   import { buildStateTargetOptions } from '../../utils/stateTargets.js';
@@ -186,7 +187,12 @@
     clipId = '';
     at = 0;
   }
-  const TRIGGER_LABELS = { panelOpen: 'Panel opens', state: 'A control enters a state', event: 'A gesture on a control', beat: 'The beat', script: 'A script asks' };
+  const TRIGGER_LABELS = { panelOpen: 'Panel opens', state: 'A control enters a state', event: 'A gesture on a control', beat: 'The beat', midi: 'MIDI in', script: 'A script asks' };
+  // MIDI in (utils/sceneMidi.js): what it listens for, and the choices for each.
+  const MIDI_MESSAGE_LABELS = { note: 'A note', cc: 'A controller past', program: 'A program change' };
+  const MIDI_CHANNELS = [{ value: 0, label: 'Any channel' }, ...Array.from({ length: 16 }, (_, i) => ({ value: i + 1, label: `Channel ${i + 1}` }))];
+  const MIDI_NOTES = [{ value: -1, label: 'Any note' }, ...Array.from({ length: 128 }, (_, n) => ({ value: n, label: `${midiNoteName(n)} (${n})` }))];
+  const MIDI_PROGRAMS = [{ value: -1, label: 'Any program' }, ...Array.from({ length: 128 }, (_, n) => ({ value: n, label: `Program ${n + 1}` }))];
   const controlLabel = (id) => {
     const control = flat.find((entry) => entry._children.Core.id === id);
     return String(control?._children?.Core?.name || id || 'a control');
@@ -211,6 +217,7 @@
       return `${gesture?.label ?? trigger.event} on ${controlLabel(trigger.controlId)}`;
     }
     if (trigger?.type === 'beat') return Number(trigger.every) > 1 ? `Every ${trigger.every} beats` : 'Every beat';
+    if (trigger?.type === 'midi') return midiTriggerText(trigger);
     return TRIGGER_LABELS[trigger?.type] ?? '';
   }
   const setTrigger = (patch) => changeScene({ ...scene, trigger: { ...scene.trigger, ...patch } }, 'scene:trigger');
@@ -578,6 +585,30 @@
               <input class="txt num" type="number" min="1" max="64" step="1" value={scene.trigger.every ?? 1} aria-label="Beats between plays" data-trigger-beats
                      onchange={(event) => setTrigger({ every: Math.max(1, Math.min(64, Math.round(Number(event.currentTarget.value) || 1))) })} />
               beats</label>
+          {:else if scene.trigger.type === 'midi'}
+            <select class="txt" value={scene.trigger.message ?? 'note'} aria-label="MIDI message" data-trigger-midi
+                    onchange={(event) => setTrigger({ message: event.currentTarget.value })}>
+              {#each Object.entries(MIDI_MESSAGE_LABELS) as [value, label] (value)}<option {value}>{label}</option>{/each}
+            </select>
+            {#if scene.trigger.message === 'cc'}
+              <label class="beats">CC
+                <input class="txt num" type="number" min="0" max="119" step="1" value={scene.trigger.cc ?? 64} aria-label="Controller number" data-trigger-cc
+                       onchange={(event) => setTrigger({ cc: Number(event.currentTarget.value) })} />
+                past
+                <input class="txt num" type="number" min="0" max="126" step="1" value={scene.trigger.above ?? 63} aria-label="Fires when the controller passes this, going up" data-trigger-above
+                       onchange={(event) => setTrigger({ above: Number(event.currentTarget.value) })} /></label>
+            {:else if scene.trigger.message === 'program'}
+              <select class="txt" value={scene.trigger.program ?? -1} aria-label="Program" onchange={(event) => setTrigger({ program: Number(event.currentTarget.value) })}>
+                {#each MIDI_PROGRAMS as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+              </select>
+            {:else}
+              <select class="txt" value={scene.trigger.note ?? -1} aria-label="Note" data-trigger-note onchange={(event) => setTrigger({ note: Number(event.currentTarget.value) })}>
+                {#each MIDI_NOTES as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+              </select>
+            {/if}
+            <select class="txt" value={scene.trigger.channel ?? 0} aria-label="MIDI channel" data-trigger-channel onchange={(event) => setTrigger({ channel: Number(event.currentTarget.value) })}>
+              {#each MIDI_CHANNELS as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+            </select>
           {/if}
           {/if}
           <span class="srowtools">

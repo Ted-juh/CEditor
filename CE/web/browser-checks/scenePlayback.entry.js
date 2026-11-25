@@ -14,6 +14,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { sceneEffect } from '../src/CE_Application/utils/sceneModel.js';
 import { setRuntimeHost, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { addPatternPatch } from '../src/CE_Application/utils/patternLayers.js';
+import { latestMidiInputMessage } from '../src/CE_Application/stores/deviceProfileStores.js';
 
 function place(control, id, name, x, y, w, h) {
   control._children.Core.id = id;
@@ -56,13 +57,18 @@ function panel(prefix) {
   // A Macro and a meter, which draw a value of their own; the meter has its own needle test too.
   const macro = place(createControl('Macro'), `${prefix}macro`, 'Macro', 20, 300, 160, 160);
   const vu = place(createControl('Meter'), `${prefix}vu`, 'VU', 220, 300, 200, 40);
+  // Two scenes on MIDI in: a kick drum's note, and the sustain pedal going down.
+  const kick = place(createControl('Label'), `${prefix}kick`, 'Kick', 460, 250, 120, 30);
+  kick._children.Text.content = 'Kick';
+  const pedal = place(createControl('Label'), `${prefix}pedal`, 'Pedal', 460, 290, 120, 30);
+  pedal._children.Text.content = 'Pedal';
   vu._children.Animations = { _type: 'Animations', enabled: true, _children: { needle: {
     _type: 'Animation', name: 'needle', enabled: true, kind: 'value', duration: 1000, delay: 0, iterations: 1, easing: 'inOutCubic',
     frames: sceneEffect('value:sweep').effect.frames, trigger: { type: 'script' }, targets: [{ path: 'Value' }],
   } } };
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 480, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 480, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -79,6 +85,10 @@ function panel(prefix) {
       { id: 'sc_value', name: 'Follow', trigger: { type: 'script' }, length: 1000, loop: false,
         clock: exactly('value', `${prefix}level`),
         clips: [clip('c7', `${prefix}gauge`, 'Transform', 0, 1000, fade)] },
+      { id: 'sc_kick', name: 'Kick', trigger: { type: 'midi', message: 'note', note: 36, channel: 0 }, length: 400, loop: false,
+        clips: [clip('c14', `${prefix}kick`, 'Transform', 0, 400, pop)] },
+      { id: 'sc_pedal', name: 'Pedal', trigger: { type: 'midi', message: 'cc', cc: 64, above: 63, channel: 0 }, length: 400, loop: false,
+        clips: [clip('c15', `${prefix}pedal`, 'Transform', 0, 400, pop)] },
       // A pattern clip: Wave's pattern pulsed, its scroll going on underneath.
       { id: 'sc_shimmer', name: 'Shimmer', trigger: { type: 'script' }, length: 800, loop: false,
         clips: [clip('c13', `${prefix}wave`, 'Patterns.pattern1', 0, 800, sceneEffect('pattern:pulse').effect)] },
@@ -103,7 +113,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -155,6 +165,8 @@ window.__scenes = {
     return script[name](...list);
   },
   dones: {},
+  /** A MIDI message arriving, where the editor's and the plug-in's MIDI input put it. */
+  midiIn: (hex) => latestMidiInputMessage.set({ hex, messageType: 'midi', at: performance.now() }),
   writes: () => textWrites.slice(),
 };
 window.__scenesMounted = true;

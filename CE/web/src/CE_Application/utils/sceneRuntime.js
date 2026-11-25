@@ -27,6 +27,7 @@
  */
 
 import { createClockState, clockInput, clockStep } from './sceneClock.js';
+import { midiTriggerMatches } from './sceneMidi.js';
 
 const DEFAULT_TIMERS = {
   set: (fn, ms) => setTimeout(fn, ms),
@@ -42,6 +43,8 @@ const DEFAULT_FRAMES = {
 export function sceneWaitsFor(scene, trigger) {
   if (scene?.clock) return false;
   const wants = scene?.trigger;
+  // MIDI in: the message the surface heard, `{ type: 'midi', event }` (sceneMidi.js).
+  if (wants?.type === 'midi' || trigger?.type === 'midi') return wants?.type === 'midi' && trigger?.type === 'midi' && midiTriggerMatches(wants, trigger.event);
   if (!wants || !trigger || wants.type !== trigger.type) return false;
   if (wants.type === 'state') {
     return wants.controlId === trigger.controlId && String(wants.to ?? '').toLowerCase() === String(trigger.to ?? '').toLowerCase();

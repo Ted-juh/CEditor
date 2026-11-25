@@ -19,6 +19,7 @@
  */
 import { writable } from 'svelte/store';
 import { createSceneRuntime, sceneListeners } from '../utils/sceneRuntime.js';
+import { createMidiTriggerReader } from '../utils/sceneMidi.js';
 
 export const SCENE_STAGE = 'ce.sceneStage';
 
@@ -30,6 +31,8 @@ export function createSceneRunStore({ timers, frames } = {}) {
   runtime = createSceneRuntime({ onChange: publish, ...(timers ? { timers } : {}), ...(frames ? { frames } : {}) });
   let scenesKey = '';
   let beatWanted = false;
+  let midiWanted = false;
+  const midiReader = createMidiTriggerReader();
   return {
     subscribe: store.subscribe,
     /** The panel's scenes. Unchanged ones are not published again, so the controls do not redraw. */
@@ -41,6 +44,7 @@ export function createSceneRunStore({ timers, frames } = {}) {
       runtime.setScenes(scenes);
       listeners = sceneListeners(scenes);
       beatWanted = scenes.some((scene) => scene?.trigger?.type === 'beat');
+      midiWanted = scenes.some((scene) => scene?.trigger?.type === 'midi' && !scene?.clock);
       publish();
     },
     setReducedMotion: (flag) => runtime.setReducedMotion(flag),
@@ -55,6 +59,15 @@ export function createSceneRunStore({ timers, frames } = {}) {
     input: (controlId, kind, payload) => runtime.input(controlId, kind, payload),
     /** Whether some scene hears this kind of input from this control: 'value', 'pointer', 'drag', 'wheel'. */
     listens: (kind, controlId) => !!listeners[kind]?.has?.(controlId),
+    /**
+     * MIDI in (utils/sceneMidi.js): each message the surface heard, as hex. Read only while some
+     * scene waits on MIDI; a controller's history is kept regardless of which scene wants it.
+     */
+    midi(hex) {
+      if (!midiWanted || !hex) return;
+      for (const event of midiReader.read(hex)) runtime.fire({ type: 'midi', event });
+    },
+    wantsMidi: () => midiWanted,
     /** Whether any scene waits on the beat: only then is the transport listened to. */
     wantsBeat: () => beatWanted,
     destroy: () => runtime.destroy(),

@@ -1028,6 +1028,37 @@ Verified locally:
   - `panelMotion` and `effectsTab`;
 - WebKitGTK 2.52: the pulse held half way, larger and fainter, its scroll running.
 
+## As built: MIDI in as a scene trigger (2026-11-25)
+
+The model's trigger list has always included "MIDI in", and step 5b built the others. It is built
+now.
+
+- **The trigger** (`cleanTrigger`, type `midi`): a note-on of a note or any, a controller `cc` going
+  past `above`, or a program change to one program or any; on `channel` 1 to 16, or 0 for any.
+- **A controller fires as it passes its point going up**, and not again while it stays above it: a
+  sustain pedal held down sends the same value again and again, and each must not restart the scene.
+  The reader (`createMidiTriggerReader`, `utils/sceneMidi.js`) keeps each controller's last value per
+  channel, and an event carries where it was before.
+- **Decoding** is its own, small and pure: the expression decoder the panel's bindings use drops a
+  note-on's number and program changes, which a trigger needs. A note-on at velocity 0 is a release,
+  as MIDI says.
+- **Where it comes from.** Both surfaces hear MIDI through `latestMidiInputMessage`:
+  `initDeviceProfileBridge` sets it in the editor and in the plug-in alike, after `ce.midi.interceptIn`'s
+  filter. So `PanelPreviewSurface`'s existing subscription hands each message to the run store's `midi`,
+  which reads it only while some scene waits on MIDI. `Player.svelte` needs nothing of its own;
+  feeding it there too would have fired every scene twice.
+- **The Designer** offers MIDI in among the triggers. Its fields are the message, the note by name
+  (60 is C4, as elsewhere in CEditor), the controller and its point, or the program, and the channel.
+  The scene list says it in words: "Note C2", "CC 64 past 63".
+
+Verified locally:
+- `test/sceneMidi.test.js` (new): the trigger read with defaults, what a trigger hears and what it
+  does not, a note by number and channel, a controller passing its point once per press, the words,
+  and the runtime starting only the scene a message is for;
+- the browser checks `scenePlayback` (a kick drum's note starts its scene and another note does not;
+  the pedal starts its own going down, not while held, and again after it is let up and pressed) and
+  `animationDesigner` (the trigger set to a note, saved, and named in the scene list).
+
 ## Open
 
 Nothing for the owner at present.

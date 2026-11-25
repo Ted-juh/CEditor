@@ -188,6 +188,20 @@ check('a scene can be driven by a drag on a control instead of time, and set bac
   assert.equal(timedAgain.clips.length, 3, 'with its clips as they were');
 });
 
+// MIDI in as the trigger: a kick drum's note, then the scene list says so.
+await page.selectOption('[aria-label="Scene trigger"]', 'midi');
+await wait(100);
+await page.selectOption('[data-trigger-note]', '36');
+await wait(150);
+const midiScene = (await d('saved'))[0];
+const midiRow = await page.evaluate((id) => document.querySelector(`[data-scene="${id}"] .st`)?.textContent ?? '', saved[0].id);
+await page.selectOption('[aria-label="Scene trigger"]', 'panelOpen');
+await wait(100);
+check('a scene can wait for MIDI in: a note, any channel, and the scene list names it', () => {
+  assert.deepEqual(midiScene.trigger, { type: 'midi', message: 'note', channel: 0, note: 36 });
+  assert.equal(midiRow, 'Note C2');
+});
+
 // Step 6: a value effect on what the knob's value draws, in a scene of its own.
 await d('addScene');
 await wait(150);
