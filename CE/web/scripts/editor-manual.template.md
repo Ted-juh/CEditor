@@ -1310,9 +1310,15 @@ three ways:
 
 There is one Designer per panel, and it closes with its panel.
 
-- **Library** (left). Effects by kind (**Text**, **Swap**, **Move**, **Paint**, **Value**) and
-  **Mine**, your own presets. Drag one onto a control on the stage or onto a track, or pick a
-  control and click the effect.
+- **Library** (left). Effects by kind (**Text**, **Swap**, **Move**, **Paint**, **Pattern**,
+  **Value**) and **Mine**, your own presets. Drag one onto a control on the stage or onto a track,
+  or pick a control and click the effect.
+
+  **Pattern** effects (fades in or out, rises in, a pulse, a flicker) play on one of the control's
+  patterns, the first unless you drop one on another pattern's track. The pattern moves and fades
+  as a whole while its own scroll goes on underneath. A pattern takes moves and fades only; a control
+  with no pattern says so. Any move or fade from **Move** can go on a pattern too: choose it under
+  **Plays on**.
 
   **Value** effects move what a knob's or a slider's value draws (its arc, ring, pointer or fill)
   for a moment, then hand back to the value: **Ring sweep** runs round to full and settles on the

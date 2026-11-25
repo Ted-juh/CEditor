@@ -5627,12 +5627,22 @@ function animateEffectImpl(target, effectName, opts, scriptId = '') {
   // value effect on what its value draws (step 6).
   const named = sceneTarget(verb, target);
   if (!named) return false;
-  const place = isText && named.place === 'Transform' ? 'Text' : isValue && named.place === 'Transform' ? 'Value' : named.place;
+  // A Pattern effect on the control alone goes on its first pattern.
+  const firstPattern = Object.keys(named.control?._children?.Background?._children?.Patterns?._children ?? {})[0];
+  if (entry.target === 'Patterns' && named.place === 'Transform' && !firstPattern) {
+    addScriptTrace('error', '', `${verb}: "${entry.label}" plays on a pattern, and ${named.controlName} has none.`);
+    return false;
+  }
+  const place = isText && named.place === 'Transform' ? 'Text'
+    : isValue && named.place === 'Transform' ? 'Value'
+      : entry.target === 'Patterns' && named.place === 'Transform' ? `Patterns.${firstPattern}`
+        : named.place;
   if (isValue && (place !== 'Value' || !controlDrawsValue(named.control))) {
     addScriptTrace('error', '', `${verb}: "${entry.label}" moves what a value draws — on a knob, a slider, a Macro or a meter; ${named.controlName} draws none there.`);
     return false;
   }
   if (!isValue && place === 'Value') { addScriptTrace('error', '', `${verb}: "${entry.label}" does not play on what a value draws; give ${named.controlName} or one of its parts.`); return false; }
+  if (place.startsWith('Patterns.') && entry.effect?.kind !== 'keyframes') { addScriptTrace('error', '', `${verb}: "${entry.label}" does not play on a pattern; a pattern takes a move or a fade.`); return false; }
   if (isText && place !== 'Text') { addScriptTrace('error', '', `${verb}: "${entry.label}" plays on words; give ${named.controlName} or ${named.controlName}.Text.`); return false; }
   if (isText && !named.control._children?.Text) { addScriptTrace('error', '', `${verb}: ${named.controlName} has no words of its own for "${entry.label}".`); return false; }
   const length = animTiming(verb, opts, 'duration', isText ? textSpanFor(entry.effect, named.control._children?.Text?.content) : entry.length);

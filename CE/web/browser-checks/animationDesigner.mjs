@@ -216,6 +216,28 @@ check('a ring sweep on a knob plays on what its value draws, and the stage is po
   assert.match(valueNote, /Wave draws no value to move: a value effect plays on a knob, a slider, a Macro or a meter/);
 });
 
+// Pattern clips: refused on a control with no pattern, placed on Wave's.
+await d('addScene');
+await wait(150);
+await d('showCategory', 'Pattern');
+await wait(100);
+await d('pickAt', 380, 90);
+await wait(50);
+await d('clickEffect', 'pattern:pulse');
+await wait(80);
+const noPatternNote = await d('note');
+await d('pickAt', 100, 70);
+await wait(50);
+await d('clickEffect', 'pattern:pulse');
+await wait(150);
+const pulsed = (await d('scenes')).at(-1);
+check('a Pattern effect goes on the picked control\'s pattern, and is refused on one with none', () => {
+  assert.match(noPatternNote, /Cutoff has no pattern: add one on its Background tab/);
+  assert.deepEqual(pulsed.clips.map((c) => [c.controlId, c.target]), [['wave', 'Patterns.pattern1']]);
+});
+await d('showCategory', 'All');
+await wait(50);
+
 // Scene presets: a built-in one repeated over every knob, and the first scene kept and put back.
 const scenesBefore = (await d('scenes')).length;
 await d('showCategory', 'Scenes');

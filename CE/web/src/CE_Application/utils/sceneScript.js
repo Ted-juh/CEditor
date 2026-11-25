@@ -6,7 +6,8 @@
  * Names are the ones the Designer shows: a library effect by its label ("Fade in", "Typewriter in")
  * or id ("move:fadeIn"), a preset by its name, any case. A target is a control's name, then
  * `.Text` for its words or a part's name (`Knob01.bodyCap`, or `Knob01.Parts.bodyCap`); the control
- * alone is its whole box. `.Value` is what a knob's value draws (step 6), where a value effect plays.
+ * alone is its whole box. `.Value` is what a knob's value draws (step 6), where a value effect plays;
+ * `.Patterns.<name>` one of its own background patterns.
  */
 import { SCENE_EFFECTS, effectFromPreset } from './sceneModel.js';
 import { TEXT_EFFECTS, TEXT_EFFECT_NAMES, splitText, textEffectSpan } from './textEffects.js';
@@ -45,13 +46,19 @@ export function effectNames({ panelPresets = [], myPresets = [] } = {}) {
 
 /**
  * Where on a control a path after its name points: 'Transform' (nothing: the box), 'Text',
- * 'Value' (what its value draws), or 'Parts.<name>' for a part it has. Null when it names nothing there.
+ * 'Value' (what its value draws), 'Patterns.<name>' for a pattern it has, or 'Parts.<name>' for a part
+ * it has. Null when it names nothing there.
  */
 export function resolvePlace(control, rest) {
   const steps = (Array.isArray(rest) ? rest : String(rest ?? '').split('.')).map((step) => String(step).trim()).filter(Boolean);
   if (!steps.length) return 'Transform';
   if (steps.length === 1 && lower(steps[0]) === 'text') return control?._children?.Text ? 'Text' : null;
   if (steps.length === 1 && lower(steps[0]) === 'value') return controlDrawsValue(control) ? 'Value' : null;
+  if (steps.length === 2 && lower(steps[0]) === 'patterns') {
+    const patterns = Object.keys(control?._children?.Background?._children?.Patterns?._children ?? {});
+    const key = patterns.find((name) => lower(name) === lower(steps[1]));
+    return key ? `Patterns.${key}` : null;
+  }
   const parts = control?._children?.Parts?._children ?? {};
   const name = lower(steps[0]) === 'parts' ? steps[1] : steps[0];
   if (steps.length > (lower(steps[0]) === 'parts' ? 2 : 1)) return null;

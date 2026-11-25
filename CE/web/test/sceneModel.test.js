@@ -62,7 +62,8 @@ test('the library: every text effect in and out, moves and paint, each going whe
   assert.equal(sceneEffect('text:push:out').category, 'Swap');
   assert.equal(sceneEffect('text:explode:in').category, 'Text');
   assert.equal(sceneEffect('paint:sheen').effect.frames[1].shift, 100);
-  for (const entry of SCENE_EFFECTS) assert.ok(cleanClip({ id: 'c', controlId: 'k', target: entry.target, effect: entry.effect }), entry.id);
+  // A Pattern effect's place is a pattern of the control's, named when it is placed ('Patterns' alone).
+  for (const entry of SCENE_EFFECTS) assert.ok(cleanClip({ id: 'c', controlId: 'k', target: entry.target === 'Patterns' ? 'Patterns.pattern1' : entry.target, effect: entry.effect }), entry.id);
   const mine = effectFromPreset({ animations: { glow: { _type: 'Animation', kind: 'keyframes', duration: 900, trigger: { type: 'always' }, targets: [{ path: 'Parts.cap' }], frames: [{ at: 0, opacity: 1 }] } } });
   assert.equal(mine.length, 900);
   assert.equal(mine.target, 'Parts.cap');

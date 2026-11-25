@@ -13,6 +13,7 @@
  *   - a ring sweep moves what a knob's value draws round to full and hands back to the value (step 6)
  *   - a knob's own value animation loops while it is hovered, and hands back when the pointer leaves
  *   - the Macro's ring and a meter sweep with the scene, and a meter's own needle test plays from a script
+ *   - a pattern clip pulses a control's pattern while its scroll goes on underneath
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -249,6 +250,25 @@ try {
   check('held by a script mid-sweep, the knob draws full; at the end, its value', () => {
     assert.equal(sweepHeld.drawn, 1);
     assert.equal(sweepEnd.drawn, level0.drawn);
+  });
+
+  // A pattern clip: Wave's pattern pulsed by a scene a script starts; its scroll keeps going.
+  const patternBefore = await s('pattern', 'wave', 'pattern1');
+  await page.evaluate(() => window.__scenes.script('animatePlay', ['Shimmer', {}]));
+  await page.waitForTimeout(120);
+  const patternPulsing = await s('pattern', 'wave', 'pattern1');
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Shimmer', 0.5]));
+  await page.waitForTimeout(80);
+  const patternHeld = await s('pattern', 'wave', 'pattern1');
+  check('a pattern clip pulses a control\'s pattern, and its scroll goes on underneath', () => {
+    assert.equal(patternBefore?.clip.name, 'none', JSON.stringify(patternBefore));
+    assert.match(patternBefore.scroll?.name ?? '', /ce-pattern-x$/, 'it scrolls (the name is Svelte\'s, scoped)');
+    assert.match(patternPulsing.clip.name, /^ce-kf-/, JSON.stringify(patternPulsing));
+    assert.equal(patternPulsing.clip.state, 'running');
+    assert.equal(patternPulsing.scroll.name, patternBefore.scroll.name);
+    assert.equal(patternPulsing.scroll.state, 'running', 'still scrolling');
+    assert.equal(patternHeld.clip.state, 'paused');
+    assert.match(patternHeld.clip.delay, /^-0\.4s$/, `held half way: ${patternHeld.clip.delay}`);
   });
 
   // A meter's own value animation, from a script: the needle test.

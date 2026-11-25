@@ -31,7 +31,15 @@
     // A cap on how often a pattern moves, frames a second; 0 is every frame the browser draws, or the
     // page's own cap (stores/patternFrameCap.js: 30 in a plug-in exported with it on).
     fps = 0,
+    // A scene's clips on these patterns (utils/sceneModel.js sceneControlOutput): pattern name ->
+    // CSS animation values, played on a wrapper inside the layer — its fade multiplies the pattern's
+    // own opacity, its moves carry the scrolling tile — so the scroll goes on underneath.
+    animations = null,
   } = $props();
+  const animationOf = (name) => {
+    const list = animations?.get?.(name);
+    return list?.length ? `animation:${list.join(', ')};` : '';
+  };
 
   let sizes = $state({});
 
@@ -78,6 +86,8 @@
 
 {#each drawn as layer (layer.name)}
   <div class="pattern-layer" data-pattern={layer.name} data-place={place} style="{layer.layer};{clip}">
+    <!-- Always there, so a clip starting does not rebuild the movers and jump the scroll. -->
+    <div class="pattern-clip" style={animationOf(layer.name)}>
     {#if layer.moveX && layer.moveY}
       <div class="pattern-move-x" style={layer.moveX}>
         <div class="pattern-move-y" style={layer.moveY}>
@@ -91,6 +101,7 @@
     {:else}
       <div class="pattern-paint" style={layer.paint}></div>
     {/if}
+    </div>
   </div>
 {/each}
 
@@ -101,6 +112,10 @@
     overflow: hidden;
     pointer-events: none;
     box-sizing: border-box;
+  }
+  .pattern-clip {
+    position: absolute;
+    inset: 0;
   }
   /* A mover is one tile in size and slides by its own width or height, forever (see HOW IT MOVES). */
   .pattern-move-x,

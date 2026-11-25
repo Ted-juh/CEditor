@@ -13,6 +13,7 @@ import SceneStageHost from './SceneStageHost.svelte';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { sceneEffect } from '../src/CE_Application/utils/sceneModel.js';
 import { setRuntimeHost, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { addPatternPatch } from '../src/CE_Application/utils/patternLayers.js';
 
 function place(control, id, name, x, y, w, h) {
   control._children.Core.id = id;
@@ -29,6 +30,9 @@ const clip = (id, controlId, target, start, length, effect) => ({ id, controlId,
 function panel(prefix) {
   const wave = place(createControl('Label'), `${prefix}wave`, 'Wave', 30, 30, 220, 60);
   wave._children.Text.content = 'Wave';
+  // A pattern behind its words, scrolling, for a pattern clip.
+  const { patch: wavePattern } = addPatternPatch(wave._children.Background, 'Background', { speed: 40 });
+  wave._children.Background._children.Patterns = wavePattern['Background.Patterns'];
   const cutoff = place(createControl('Knob'), `${prefix}cutoff`, 'Cutoff', 300, 20, 120, 120);
   // Its own value animation (the Animation tab's Value kind): a wiggle that loops while it is hovered.
   cutoff._children.Animations = { _type: 'Animations', enabled: true, _children: { wiggle: {
@@ -75,6 +79,9 @@ function panel(prefix) {
       { id: 'sc_value', name: 'Follow', trigger: { type: 'script' }, length: 1000, loop: false,
         clock: exactly('value', `${prefix}level`),
         clips: [clip('c7', `${prefix}gauge`, 'Transform', 0, 1000, fade)] },
+      // A pattern clip: Wave's pattern pulsed, its scroll going on underneath.
+      { id: 'sc_shimmer', name: 'Shimmer', trigger: { type: 'script' }, length: 800, loop: false,
+        clips: [clip('c13', `${prefix}wave`, 'Patterns.pattern1', 0, 800, sceneEffect('pattern:pulse').effect)] },
       // Step 6: what the Level knob's value draws, swept round to full and handed back.
       { id: 'sc_sweep', name: 'Sweep', trigger: { type: 'script' }, length: 1200, loop: false,
         clips: [clip('c8', `${prefix}level`, 'Value', 0, 1200, ringSweep), clip('c9', `${prefix}dial`, 'Value', 0, 1200, ringSweep), clip('c10', `${prefix}fader`, 'Value', 0, 1200, ringSweep),
@@ -115,6 +122,17 @@ window.__scenes = {
     return { name: style.animationName, delay: style.animationDelay, state: style.animationPlayState };
   },
   rect: (id) => { const r = root(id).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; },
+  /** A pattern's clip animation, and its scroll's (PatternLayers.svelte). */
+  pattern: (id, name) => {
+    const layer = root(id)?.querySelector(`.pattern-layer[data-pattern="${name}"]`);
+    if (!layer) return null;
+    const clipStyle = getComputedStyle(layer.querySelector('.pattern-clip'));
+    const mover = layer.querySelector('.pattern-move-x, .pattern-move-y');
+    return {
+      clip: { name: clipStyle.animationName, state: clipStyle.animationPlayState, delay: clipStyle.animationDelay },
+      scroll: mover ? { name: getComputedStyle(mover).animationName, state: getComputedStyle(mover).animationPlayState } : null,
+    };
+  },
   /** Where a knob draws its value (step 6), and where its pointer is. */
   drawn: (id) => {
     const svg = root(id)?.querySelector('svg.slider-svg');

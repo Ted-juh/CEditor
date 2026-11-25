@@ -26,7 +26,8 @@
   //
   // `reducedMotion` — the Preview's own Reduced motion switch, for the patterns behind the content
   // (PatternLayers.svelte), which read the operating system's setting themselves.
-  let { background = null, width = 0, height = 0, absorbFill = false, outline = null, reducedMotion = false } = $props();
+  // `patternAnimations`: a scene's clips on its patterns, by name (PatternLayers.svelte).
+  let { background = null, width = 0, height = 0, absorbFill = false, outline = null, reducedMotion = false, patternAnimations = null } = $props();
 
   // The two border drawings that need SVG, the segmented one and the one along an outline, are
   // components of their own (SegmentedBorder.svelte, OutlineBorder.svelte), made only for a
@@ -229,7 +230,7 @@
 
 <!-- Patterns behind the content: tinted, tiled, moving (PatternLayers.svelte). -->
 {#if drawsPatterns}
-  <PatternLayers {background} place="behind" {width} {height} clip={patternClip} {reducedMotion} />
+  <PatternLayers {background} place="behind" {width} {height} clip={patternClip} {reducedMotion} animations={patternAnimations} />
 {/if}
 
 <!-- Border (CSS) — the plain case, one element instead of eleven -->

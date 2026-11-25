@@ -43,6 +43,7 @@
   import { buildStateTargetOptions } from '../../utils/stateTargets.js';
   import {
     SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
+    patternPlacesOf, effectOnlyMoves,
     resizeClip, removeClip, duplicateClip, setClipEffect, setClipTarget, tracksOf, controlScenes, clipAnimation,
   } from '../../utils/sceneModel.js';
   import { flatControls, flatControlsWithPanelRects } from '../../utils/containment.js';
@@ -267,9 +268,20 @@
     if (!entry || !control) return;
     if (scene?.own) { note = 'A control\'s own animation has one clip. Make a scene (+ Scene) to put effects together.'; return; }
     let place = target ?? entry.target ?? 'Transform';
+    const controlName = control._children.Core.name || controlId;
     // What the value draws takes a value effect and nothing else, and a value effect plays nowhere else.
     if (entry.effect.kind === 'value') place = 'Value';
     else if (place === 'Value') place = entry.target && entry.target !== 'Value' ? entry.target : 'Transform';
+    // A Pattern effect goes on the control's first pattern, unless dropped on another's track.
+    if (place === 'Patterns') {
+      place = patternPlacesOf(control)[0] ?? '';
+      if (!place) { note = `${controlName} has no pattern: add one on its Background tab, then put the effect on it.`; return; }
+    }
+    // A pattern shows a move or a fade, nothing else: words, a value, a colour or a gradient go on their own place.
+    if (String(place).startsWith('Patterns.') && !effectOnlyMoves(entry.effect)) {
+      if (entry.effect.kind === 'keyframes') { note = `“${entry.label}” paints a fill; a pattern takes a move or a fade.`; return; }
+      place = entry.target && entry.target !== 'Patterns' ? entry.target : 'Transform';
+    }
     if (entry.effect.kind === 'text' && !String(place).startsWith('Parts.')) place = 'Text';
     if (place === 'Text' && !control._children?.Text) { note = `${control._children.Core.name || controlId} has no words of its own: a text effect plays on a Label, or on a part with text.`; return; }
     if (place === 'Value' && !controlDrawsValue(control)) { note = `${control._children.Core.name || controlId} draws no value to move: a value effect plays on a knob, a slider, a Macro or a meter.`; return; }

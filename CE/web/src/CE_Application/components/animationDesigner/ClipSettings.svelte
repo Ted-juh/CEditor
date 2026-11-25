@@ -12,7 +12,7 @@
   import ValueFramesEditor from './ValueFramesEditor.svelte';
   import { EASING_NAMES } from '../../utils/easing.js';
   import { resolvedPartsOf } from '../../utils/animationModel.js';
-  import { targetLabel } from '../../utils/sceneModel.js';
+  import { targetLabel, patternPlacesOf, effectOnlyMoves } from '../../utils/sceneModel.js';
 
   let {
     clip = null,
@@ -35,6 +35,8 @@
     const out = [{ value: 'Transform', label: 'Whole control' }];
     if (control._children?.Text) out.push({ value: 'Text', label: 'Text' });
     for (const name of Object.keys(resolvedPartsOf(control) ?? {})) out.push({ value: `Parts.${name}`, label: targetLabel(`Parts.${name}`) });
+    // A clip that only moves and fades can play on one of the control's patterns too.
+    if (effectOnlyMoves(clip?.effect)) for (const place of patternPlacesOf(control)) out.push({ value: place, label: targetLabel(place) });
     return out;
   });
   let isText = $derived(clip?.effect?.kind === 'text');

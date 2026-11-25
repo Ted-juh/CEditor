@@ -38,14 +38,16 @@ const slotIndex = (value) => (Number.isInteger(value) && value >= 0 && value < L
 /** What a slot's clips ask of the control that takes it. */
 function needsOf(clips) {
   const parts = new Set();
+  const patterns = new Set();
   let words = false;
   let value = false;
   for (const clip of clips) {
     if (clip.target === 'Text') words = true;
     else if (clip.target === VALUE_TARGET) value = true;
     else if (String(clip.target).startsWith('Parts.')) parts.add(String(clip.target).split('.')[1]);
+    else if (String(clip.target).startsWith('Patterns.')) patterns.add(String(clip.target).split('.')[1]);
   }
-  return { text: words, value, parts: [...parts].sort() };
+  return { text: words, value, parts: [...parts].sort(), patterns: [...patterns].sort() };
 }
 
 /**
@@ -101,6 +103,7 @@ export function cleanScenePreset(raw) {
       text: slot?.needs?.text === true,
       value: slot?.needs?.value === true,
       parts: (Array.isArray(slot?.needs?.parts) ? slot.needs.parts : []).map((part) => text(part, 64)).filter((part) => /^[A-Za-z0-9_-]+$/.test(part)),
+      patterns: (Array.isArray(slot?.needs?.patterns) ? slot.needs.patterns : []).map((name) => text(name, 64)).filter((name) => /^[A-Za-z0-9_-]+$/.test(name)),
     },
   }));
   if (!slots.length) return null;
@@ -153,6 +156,9 @@ export function slotDoesNotFit(slot, control) {
   const parts = partNamesOf(control);
   const missing = (slot.needs?.parts ?? []).filter((part) => !parts.has(part));
   if (missing.length) return `${name} has no ${missing.length > 1 ? 'parts' : 'part'} ${missing.join(', ')}.`;
+  const patterns = new Set(Object.keys(control?._children?.Background?._children?.Patterns?._children ?? {}));
+  const noPattern = (slot.needs?.patterns ?? []).filter((pattern) => !patterns.has(pattern));
+  if (noPattern.length) return `${name} has no pattern ${noPattern.join(', ')} for its pattern clip.`;
   return '';
 }
 

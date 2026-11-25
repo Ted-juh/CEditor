@@ -15,6 +15,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { undo, flushHistory, initHistory } from '../src/CE_Application/stores/history.js';
 import { serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { valueEffectAt } from '../src/CE_Application/utils/valueDrawn.js';
+import { addPatternPatch } from '../src/CE_Application/utils/patternLayers.js';
 import { sceneEffect } from '../src/CE_Application/utils/sceneModel.js';
 
 function place(control, id, name, x, y, w, h) {
@@ -24,6 +25,9 @@ function place(control, id, name, x, y, w, h) {
   return control;
 }
 const wave = place(createControl('Label'), 'wave', 'Wave', 40, 40, 220, 60);
+// A pattern behind its words, for the Pattern effects.
+const { patch: wavePattern } = addPatternPatch(wave._children.Background, 'Background', { speed: 30 });
+wave._children.Background._children.Patterns = wavePattern['Background.Patterns'];
 wave._children.Text.content = 'Wave';
 const cutoff = place(createControl('Knob'), 'cutoff', 'Cutoff', 320, 30, 120, 120);
 const start = place(createControl('Button'), 'start', 'Start', 40, 160, 160, 44);

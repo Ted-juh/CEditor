@@ -986,6 +986,48 @@ Verified locally:
 - WebKitGTK 2.52: the Macro 0.28 → 0.998 → 0.28 and the meter 0.72 → 0.997 → 0.72, the number holding at
   28.
 
+## As built: pattern clips (2026-11-25)
+
+Step 5a left pattern clips out: a pattern's scroll was set on its layer, and the timeline could not
+reach it. It can now.
+
+- **The place.** A clip may play on `Patterns.<name>`, one of the control's own background
+  patterns. Only a keyframe effect plays there (`cleanClip`), and only its moves and fades show: a
+  pattern has no fill or gradient of its own to recolour (`effectOnlyMoves`).
+- **How it draws.** `sceneControlOutput` gives a pattern's clips as `patterns`, by name, beside
+  `parts`, and `mergeKeyframeOutputs` carries them. `CanvasControl` hands them to
+  `BackgroundRenderer`, and to the front `PatternLayers`.
+  - Each pattern layer has a wrapper, `.pattern-clip`, between the layer and its movers. The
+    clip's CSS animation plays there: its fade multiplies the pattern's own opacity, and its moves
+    carry the scrolling tile, so the scroll goes on underneath.
+  - The wrapper is always there, so a clip starting does not rebuild the movers and make the
+    scroll jump.
+  - These are HTML layers, not inside an SVG, so none of the WebKitGTK `foreignObject` rules
+    apply. WebKitGTK draws the pulse held half way as Chromium does.
+- **The library**, a **Pattern** category: fades in, fades out, rises in, pulse and flicker. Their
+  target is `Patterns`, meaning the control's first pattern, unless the effect is dropped on
+  another pattern's track. Any move from **Move** can be put on a pattern under **Plays on**.
+  - On a control with no pattern the effect is refused, with the way to add one.
+  - A paint effect is refused on a pattern track; words and values go to their own places.
+- **Scripts.** `ce.anim.effect("Wave", "Pattern pulse")` goes on Wave's first pattern. A pattern is
+  named by its path, `Wave.Patterns.pattern1`.
+- **Scene presets.** A slot needs the patterns its clips play on, and a control without them does
+  not fit it.
+
+Left out: patterns on a control's parts (`Parts.<p>.Background.Patterns`). The Pattern tab can put
+them there, but the timeline reaches only the control's own.
+
+Verified locally:
+- `test/patternClips.test.js` (new): the place and what plays there, the library, a scene's output
+  per pattern with nothing on the control itself, merging, a script's path, and a preset's needs;
+- the browser checks:
+  - `scenePlayback`: a script-started scene pulses Wave's pattern, running, and its scroll keeps
+    running. A seek holds it paused half way;
+  - `animationDesigner`: a Pattern effect on a knob with no pattern is refused with the reason, and
+    on Wave it lands on `Patterns.pattern1`;
+  - `panelMotion` and `effectsTab`;
+- WebKitGTK 2.52: the pulse held half way, larger and fainter, its scroll running.
+
 ## Open
 
 Nothing for the owner at present.

@@ -22,6 +22,7 @@ import {
 } from './keyframeAnimation.js';
 import { readTextEffect, textEffectRules, TEXT_EFFECTS, TEXT_EFFECT_NAMES } from './textEffects.js';
 import { flatControls } from './containment.js';
+import { patternEntries, patternLabel } from './patternLayers.js';
 import { partPlace } from './targetPaths.js';
 
 const CHANNELS = [...Object.keys(COLOUR_CHANNELS), GRADIENT_CHANNEL];
@@ -56,13 +57,32 @@ export const SCENE_EFFECTS = Object.freeze([
   { id: 'paint:sheen', label: 'Gradient sheen', category: 'Paint', target: 'Transform', length: 1600, effect: keyframesEffect([{ at: 0, shift: -100 }, { at: 1, shift: 100 }], { easing: 'linear' }) },
   { id: 'paint:turn', label: 'Gradient turn', category: 'Paint', target: 'Transform', length: 2000, effect: keyframesEffect([{ at: 0, turn: 0 }, { at: 1, turn: 360 }], { easing: 'linear' }) },
   { id: 'paint:flash', label: 'Colour flash', category: 'Paint', target: 'Transform', length: 400, effect: keyframesEffect([{ at: 0, fill: 'FFFFFFFF' }, { at: 1 }], { easing: 'outQuad' }) },
+  // On one of the control's patterns (target 'Patterns': its first, unless dropped on another's track):
+  // the pattern as a whole, faded or moved, its own scroll going on underneath.
+  { id: 'pattern:fadeIn', label: 'Pattern fades in', category: 'Pattern', target: 'Patterns', length: 700, effect: keyframesEffect([{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }]) },
+  { id: 'pattern:fadeOut', label: 'Pattern fades out', category: 'Pattern', target: 'Patterns', length: 700, effect: keyframesEffect([{ at: 0, opacity: 1 }, { at: 1, opacity: 0 }]) },
+  { id: 'pattern:rise', label: 'Pattern rises in', category: 'Pattern', target: 'Patterns', length: 800, effect: keyframesEffect([{ at: 0, y: 14, opacity: 0 }, { at: 1, y: 0, opacity: 1 }]) },
+  { id: 'pattern:pulse', label: 'Pattern pulse', category: 'Pattern', target: 'Patterns', length: 600, effect: keyframesEffect([{ at: 0, scale: 1, opacity: 1 }, { at: 0.5, scale: 1.12, opacity: 0.6 }, { at: 1, scale: 1, opacity: 1 }], { easing: 'inOutQuad' }) },
+  { id: 'pattern:flicker', label: 'Pattern flicker', category: 'Pattern', target: 'Patterns', length: 500, effect: keyframesEffect([{ at: 0, opacity: 1 }, { at: 0.2, opacity: 0.2 }, { at: 0.4, opacity: 0.9 }, { at: 0.6, opacity: 0.3 }, { at: 1, opacity: 1 }], { easing: 'linear' }) },
   { id: 'value:sweep', label: 'Ring sweep', category: 'Value', target: VALUE_TARGET, length: 1200, effect: valueEffect([{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]) },
   { id: 'value:rise', label: 'Rise to value', category: 'Value', target: VALUE_TARGET, length: 800, effect: valueEffect([{ at: 0, value: 0 }, { at: 1 }], 'outCubic') },
   { id: 'value:fall', label: 'Fall to value', category: 'Value', target: VALUE_TARGET, length: 800, effect: valueEffect([{ at: 0, value: 1 }, { at: 1 }], 'outCubic') },
   { id: 'value:reach', label: 'Reach full and back', category: 'Value', target: VALUE_TARGET, length: 900, effect: valueEffect([{ at: 0 }, { at: 0.45, value: 1 }, { at: 1 }]) },
   { id: 'value:wiggle', label: 'Wiggle', category: 'Value', target: VALUE_TARGET, length: 700, effect: valueEffect([{ at: 0 }, { at: 0.2, by: 0.06 }, { at: 0.4, by: -0.05 }, { at: 0.6, by: 0.03 }, { at: 0.8, by: -0.015 }, { at: 1 }], 'inOutQuad') },
 ]);
-export const SCENE_EFFECT_CATEGORIES = Object.freeze(['All', 'Text', 'Swap', 'Move', 'Paint', 'Value', 'Mine']);
+export const SCENE_EFFECT_CATEGORIES = Object.freeze(['All', 'Text', 'Swap', 'Move', 'Paint', 'Pattern', 'Value', 'Mine']);
+
+/** The places a control's own patterns give a clip: `Patterns.<name>`, in the background's order. */
+export function patternPlacesOf(control) {
+  return patternEntries(control?._children?.Background).map(([name]) => `Patterns.${name}`);
+}
+
+/** Whether a keyframe effect only moves and fades, which is all a pattern clip can show. */
+export function effectOnlyMoves(effect) {
+  if (effect?.kind !== 'keyframes') return false;
+  const moves = new Set(['at', 'scale', 'rotate', 'x', 'y', 'opacity']);
+  return (effect.frames ?? []).every((frame) => Object.keys(frame ?? {}).every((key) => moves.has(key)));
+}
 const EFFECT_BY_ID = new Map(SCENE_EFFECTS.map((entry) => [entry.id, entry]));
 
 /** A library effect by id. */
@@ -123,6 +143,7 @@ export function duplicateClip(scene, clipId, start, snap = 10) {
 export function targetLabel(target) {
   if (target === 'Transform') return 'Whole control';
   if (target === VALUE_TARGET) return 'What the value draws';
+  if (String(target).startsWith('Patterns.')) return `Pattern › ${patternLabel(String(target).slice('Patterns.'.length))}`;
   if (target === 'Text') return 'Text';
   const part = String(target).split('.')[1] ?? '';
   const place = partPlace(part);
@@ -233,11 +254,23 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
   const parts = new Map();
   const colours = new Map();
   const texts = new Map();
+  const patterns = new Map();         // pattern name -> animation values, for PatternLayers
   const rules = [];
   const options = { at: Number.isFinite(at) ? at : null, fill: 'both' };
   for (const clip of clips) {
     // What the value draws is not CSS: valueDrawn.js works it out a frame at a time.
     if (clip.effect.kind === 'value') continue;
+    if (String(clip.target).startsWith('Patterns.')) {
+      // A pattern moves and fades as a whole; it has no colours of its own to animate here.
+      const entry = readKeyframes(clipAnimation(clip), clip.id);
+      if (!entry?.moves) continue;
+      const name = String(clip.target).slice('Patterns.'.length);
+      const list = patterns.get(name) ?? [];
+      list.push(animationValue(entry, phase, options));
+      patterns.set(name, list);
+      rules.push(keyframesRule(entry, phase));
+      continue;
+    }
     const node = clipAnimation(clip);
     const part = partOf(clip.target);
     if (clip.effect.kind === 'text') {
@@ -265,7 +298,7 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
       rules.push(colourKeyframesRule(entry, channel, phase));
     }
   }
-  return { parts, colours, texts, rules: [...new Set(rules)].join('\n') };
+  return { parts, colours, texts, patterns, rules: [...new Set(rules)].join('\n') };
 }
 
 /**
@@ -290,6 +323,7 @@ export function mergeKeyframeOutputs(own, scene) {
     parts: mergeLists(own.parts, scene.parts),
     colours,
     texts: mergeLists(own.texts, scene.texts),
+    patterns: mergeLists(own.patterns, scene.patterns),
     rules: [own.rules, scene.rules].filter(Boolean).join('\n'),
   };
 }

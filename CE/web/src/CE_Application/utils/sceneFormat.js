@@ -33,6 +33,10 @@
  *
  * A frame with neither is the live value, wherever it is at that moment. The two go together: a
  * 'value' effect plays only on 'Value', and nothing else does.
+ *
+ * And 'Patterns.<name>': one of the control's own background patterns (utils/patternLayers.js), which
+ * a keyframe effect moves and fades as a whole while its scroll goes on underneath. Only keyframes
+ * play there.
  */
 
 export const SCENE_TRIGGER_TYPES = Object.freeze(['panelOpen', 'state', 'event', 'beat', 'script']);
@@ -139,10 +143,11 @@ export function cleanClip(raw) {
   const controlId = id(raw.controlId);
   const target = String(raw.target ?? '');
   if (!clipId || !controlId) return null;
-  if (!(target === 'Transform' || target === 'Text' || target === VALUE_TARGET || /^Parts\.[A-Za-z0-9_-]+$/.test(target))) return null;
+  if (!(target === 'Transform' || target === 'Text' || target === VALUE_TARGET || /^(Parts|Patterns)\.[A-Za-z0-9_-]+$/.test(target))) return null;
   let effect = raw.effect && typeof raw.effect === 'object' ? deepCopy(raw.effect) : null;
   if (!effect || !CLIP_KINDS.includes(String(effect.kind ?? ''))) return null;
   if ((effect.kind === 'value') !== (target === VALUE_TARGET)) return null;
+  if (target.startsWith('Patterns.') && effect.kind !== 'keyframes') return null;
   if (effect.kind === 'value') effect = cleanValueEffect(effect);
   if (!effect) return null;
   // What the clip says itself is not the effect's to say. A keyframe effect lasts as long as its

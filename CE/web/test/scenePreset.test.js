@@ -38,8 +38,8 @@ test('a scene kept as a preset names slots, not controls: what each was, and wha
   assert.equal(preset.format, SCENE_PRESET_FORMAT);
   assert.equal(preset.name, 'Intro');
   assert.deepEqual(preset.slots.map((slot) => [slot.type, slot.label]), [['Label', 'Title'], ['Knob', 'Cutoff'], ['Button', 'Go']], 'in the order they first play (the scene\'s order at a tie), the trigger\'s last');
-  assert.deepEqual(preset.slots[0].needs, { text: true, value: false, parts: [] });
-  assert.deepEqual(preset.slots[1].needs, { text: false, value: true, parts: [] });
+  assert.deepEqual(preset.slots[0].needs, { text: true, value: false, parts: [], patterns: [] });
+  assert.deepEqual(preset.slots[1].needs, { text: false, value: true, parts: [], patterns: [] });
   assert.deepEqual(preset.trigger, { type: 'event', event: 'click', slot: 2 });
   assert.equal(preset.clips.find((c) => c.target === 'Value').slot, 1);
   assert.ok(!JSON.stringify(preset).includes('"k1"'), 'no control ids left in it');
