@@ -1238,7 +1238,7 @@ you hover over it, a light that pulses with the beat. Animations are edited in t
 **Animation** tool. Select a control and press **Edit the selected control's animations**; the tool
 stays on that control until you choose another.
 
-There are four kinds:
+There are four kinds, and a fifth on a knob or a slider:
 
 - **Transition** — eases from one state to another, for example from normal to hover. Choose
   **From** and **To**, the **Duration**, and what it eases: scale, rotation, position, size,
@@ -1254,6 +1254,13 @@ There are four kinds:
   **Push**, **Wipe**, **Crossfade** and **Shimmer**, each **In** or **Out**, cut into letters, words
   or lines that start one after another (**ms apart**), forwards, backwards, from the centre or in
   a random order. It can wait for the words to change: to the value, or to the name.
+- **Value** (knobs and sliders) — moves what the value draws, its arc, ring and pointer, then hands
+  back to the value: a new one is a ring sweep, round to full and back. It plays on the same
+  triggers as **Keyframes** except **all the time**, and with **Loop** it repeats while its state
+  holds (a wiggle while the pointer is over the knob). Each frame is the value itself, a point of
+  the range, or so far from the value. Only the drawing moves: the value, its readout and what it
+  sends stay as they are, and while you turn the knob it shows where you turned it to. A looping
+  one counts two against the panel's ten loops.
 
 What an animation changes is picked as a path — **Knob01 › Body › Cap › Scale** — by stepping through
 the levels, typing (`text col`), or **Browse**, which shows them side by side.
@@ -1313,7 +1320,9 @@ There is one Designer per panel, and it closes with its panel.
   **Wiggle**. Only the drawing moves: the value, its readout and what it sends stay as they are.
   A clip always ends on the value, wherever the value went meanwhile, and while you turn the
   knob it shows where you turned it to. Each frame of a value clip is the value itself, a point
-  of the range, or so far from the value. They play on knobs and on sliders with one value.
+  of the range, or so far from the value. They play on knobs and on sliders with one value. A
+  knob's own **Value** animations (the Animation tool's fifth kind) show under **Controls' own**,
+  and **Save as preset** keeps a value clip in your library, to drop on any knob or slider.
 - **Stage** (middle). The panel as it looks, posed at the playhead. Click a control to pick it.
   Nothing on the stage reaches the synth. **Try a trigger** holds **Hover** or **Press** for a
   moment, so you can see a control's state animations.

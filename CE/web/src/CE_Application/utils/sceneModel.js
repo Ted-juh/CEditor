@@ -69,14 +69,16 @@ const EFFECT_BY_ID = new Map(SCENE_EFFECTS.map((entry) => [entry.id, entry]));
 export const sceneEffect = (id) => EFFECT_BY_ID.get(id) ?? null;
 
 /**
- * A clip effect from one of your animation presets (animationPresetModel.js): its first keyframe or
- * text animation, without the trigger, targets and timing a clip gives it. Null for anything else.
+ * A clip effect from one of your animation presets (animationPresetModel.js): its first keyframe,
+ * text or value animation, without the trigger, targets and timing a clip gives it. Null for
+ * anything else. A value animation's place is always what the value draws.
  */
 export function effectFromPreset(preset) {
-  const node = Object.values(preset?.animations ?? {}).find((entry) => ['keyframes', 'text'].includes(String(entry?.kind)));
+  const node = Object.values(preset?.animations ?? {}).find((entry) => ['keyframes', 'text', 'value'].includes(String(entry?.kind)));
   if (!node) return null;
   const { _type, name, trigger, targets, delay, enabled, preset: _link, ...effect } = deepCopy(node);
-  return { effect, length: Math.max(100, Number(node.duration) || 600), target: String(targets?.[0]?.path ?? (effect.kind === 'text' ? 'Text' : 'Transform')) };
+  const target = effect.kind === 'value' ? VALUE_TARGET : String(targets?.[0]?.path ?? (effect.kind === 'text' ? 'Text' : 'Transform'));
+  return { effect, length: Math.max(100, Number(node.duration) || 600), target };
 }
 
 // --- Scenes and clips -----------------------------------------------------------------------------
@@ -161,7 +163,7 @@ export function tracksOf(scene, controls) {
 }
 
 /**
- * The controls' own animations, as scenes: each keyframe animation and text effect, one clip at its
+ * The controls' own animations, as scenes: each keyframe animation, text effect and value animation, one clip at its
  * delay for its duration. `{ id: 'own:<control>:<name>', own: true, controlId, animation, … }`.
  */
 export function controlScenes(controls) {
@@ -172,8 +174,8 @@ export function controlScenes(controls) {
     if (!controlId || !section) continue;
     for (const [name, node] of Object.entries(section._children ?? {})) {
       const kind = String(node?.kind ?? 'transition');
-      if (kind !== 'keyframes' && kind !== 'text') continue;
-      const target = String(node.targets?.[0]?.path ?? (kind === 'text' ? 'Text' : 'Transform'));
+      if (kind !== 'keyframes' && kind !== 'text' && kind !== 'value') continue;
+      const target = kind === 'value' ? VALUE_TARGET : String(node.targets?.[0]?.path ?? (kind === 'text' ? 'Text' : 'Transform'));
       const start = Math.max(0, Number(node.delay) || 0);
       const length = Math.max(10, Number(node.duration) || 600);
       const { _type, name: _name, trigger, targets, delay, duration, preset, ...effect } = deepCopy(node);
@@ -186,7 +188,7 @@ export function controlScenes(controls) {
         trigger: node.trigger ?? { type: 'script' },
         length: Math.max(start + length, 1000),
         loop: node.iterations === 'infinite',
-        clips: [{ id: `own:${name}`, controlId, target: target.startsWith('Parts.') ? `Parts.${target.split('.')[1]}` : (target === 'Text' ? 'Text' : 'Transform'), start, length, effect: { ...effect, ...(kind === 'text' ? { duration } : {}) } }],
+        clips: [{ id: `own:${name}`, controlId, target: target === VALUE_TARGET ? VALUE_TARGET : target.startsWith('Parts.') ? `Parts.${target.split('.')[1]}` : (target === 'Text' ? 'Text' : 'Transform'), start, length, effect: { ...effect, ...(kind === 'text' ? { duration } : {}) } }],
       });
     }
   }

@@ -30,6 +30,8 @@ import {
 import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt, cleanBezier } from './easing.js';
 import { TEXT_TRIGGER_TYPES, newTextEffectShape } from './textEffects.js';
 import { patternEntries, patternLabel } from './patternLayers.js';
+import { cleanValueFrames, VALUE_TARGET } from './sceneFormat.js';
+import { controlDrawsValue } from './valueDrawn.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import {
   KEYFRAME_TRIGGER_TYPES,
@@ -63,6 +65,19 @@ export const PANEL_EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic
 // `text`: real text, whole or a piece at a time (utils/textEffects.js), step 2 of the Animation
 // Designer, 2026-11-24.
 export const ANIMATION_KINDS = ['transition', 'keyframes', 'sequence', 'text'];
+
+/**
+ * `value`: what a knob's or a slider's value draws — its arc, its pointer — moved for a moment, then
+ * handed back to the value (utils/valueDrawn.js; step 6 of the Animation Designer). Offered only on a
+ * control that draws a value, so it is not in the list every control gets.
+ */
+export const VALUE_KIND = 'value';
+/** The kinds an animation on this control may be: a knob or a slider has the value kind too. */
+export function animationKindsFor(control) {
+  return controlDrawsValue(control) ? [...ANIMATION_KINDS, VALUE_KIND] : ANIMATION_KINDS;
+}
+/** A new value animation's frames: the ring sweep — nothing, round to full, back to the value. */
+export const VALUE_SWEEP_FRAMES = Object.freeze([{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]);
 
 /** The kind whose targets are tracks. */
 export const SEQUENCE_KIND = 'sequence';
@@ -241,6 +256,8 @@ export function describeAnimation(name, animation) {
       : (Number(animation?.iterations) >= 1 ? Math.round(Number(animation.iterations)) : defaultIterations(trigger.type)),
     direction: animation?.direction === 'alternate' ? 'alternate' : 'normal',
     frames: kind === 'keyframes' ? cleanFrames(animation?.frames) : [],
+    // Value animations only: where the value is drawn, frame by frame (sceneFormat.js).
+    valueFrames: kind === VALUE_KIND ? (cleanValueFrames(animation?.frames) ?? []) : [],
     animation,
   };
 }
@@ -272,6 +289,12 @@ function textTargetStatus(target, partNames) {
     return { works: true, animates: 'text', buckets: [], part };
   }
   return { works: true, animates: 'text', buckets: [], part: '' };
+}
+
+/** A value animation plays on what the value draws, and nowhere else. */
+function valueTargetStatus(target) {
+  if (String(target?.path ?? '') === VALUE_TARGET) return { works: true, animates: 'value', buckets: [], part: '' };
+  return { works: false, reason: 'not the value', part: '', detail: 'A value animation moves what the value draws; it plays nowhere else.' };
 }
 
 function keyframeTargetStatus(target, partNames) {
@@ -409,8 +432,10 @@ export function describeTargets(row, partNames = []) {
   const keyframes = row?.kind === 'keyframes';
   const sequence = row?.kind === SEQUENCE_KIND;
   const words = row?.kind === 'text';
+  const drawn = row?.kind === VALUE_KIND;
   const context = { triggerType: String(row?.triggerType ?? row?.trigger?.type ?? 'stateChange') };
   const statusOf = (target) => {
+    if (drawn) return valueTargetStatus(target);
     if (keyframes) return keyframeTargetStatus(target, partNames);
     if (words) return textTargetStatus(target, partNames);
     if (sequence) return sequenceTargetStatus(target, partNames, context);
@@ -657,8 +682,26 @@ export function kindPatch(row, kind, control = null) {
     if (!(Number(animation.duration) >= 200)) patch.duration = 1000;
     return patch;
   }
+  if (kind === VALUE_KIND) {
+    // What the value draws: the frames it had as a value animation, or the ring sweep; a trigger a
+    // keyframe animation answers, except "all the time", which would never let the value be seen —
+    // that, and anything else, becomes "entering Hover".
+    const frames = animation.kind === VALUE_KIND ? cleanValueFrames(animation.frames) : null;
+    const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) && trigger.type !== 'always' ? trigger.type : null;
+    const patch = {
+      kind: VALUE_KIND,
+      frames: frames ?? VALUE_SWEEP_FRAMES.map((frame) => ({ ...frame })),
+      trigger: type ? { ...trigger, type } : { type: 'stateChange', from: ['*'], to: ['hover'] },
+      targets: [{ path: VALUE_TARGET }],
+      iterations: 1,
+    };
+    if (!(Number(animation.duration) >= 200)) patch.duration = 1200;
+    if (!animation.easing || animation.kind !== VALUE_KIND) patch.easing = 'inOutCubic';
+    return patch;
+  }
   if (kind === 'keyframes') {
-    const frames = cleanFrames(animation.frames);
+    // A value animation's frames are not shapes: switching from one starts from a pulse.
+    const frames = animation.kind === VALUE_KIND ? [] : cleanFrames(animation.frames);
     const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'always';
     const patch = {
       kind: 'keyframes',
@@ -772,7 +815,7 @@ export function triggerSummary(row) {
     const to = (t.to ?? []).filter((state) => state !== '*');
     return to.length ? `when the ${to.join(' or ')} arrives` : 'when its words change';
   }
-  if (row?.kind === 'keyframes' || row?.kind === 'text') {
+  if (row?.kind === 'keyframes' || row?.kind === 'text' || row?.kind === VALUE_KIND) {
     if (t.type === 'always') return 'all the time';
     if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
     if (t.type === 'script') return 'from a script';
@@ -781,7 +824,7 @@ export function triggerSummary(row) {
   if (t.type === 'valueChange') return `when ${t.source} changes`;
   if (t.leaving === true) return `leaving ${!t.from?.length || t.from.includes('*') ? 'any state' : t.from.join(', ')}`;
   const to = !t.to?.length || t.to.includes('*') ? 'any state' : t.to.join(', ');
-  return row?.kind === 'keyframes' && row?.iterations === 'infinite' ? `while ${to}` : `entering ${to}`;
+  return (row?.kind === 'keyframes' || row?.kind === VALUE_KIND) && row?.iterations === 'infinite' ? `while ${to}` : `entering ${to}`;
 }
 
 /** The smallest of 1, 2 or 5 times a power of ten that is at least `ms`. */

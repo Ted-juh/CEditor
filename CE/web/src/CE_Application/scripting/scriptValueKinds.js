@@ -979,8 +979,9 @@ export function readAnimation(value, { panel, controls, controlName }) {
   // The control's id and the animation's own key, for the row's Open (the Animation tab, on it).
   meaning.controlId = control._children?.Core?.id ?? null;
   const all = control._children?.Animations?._children ?? {};
-  // As ce.anim.play takes them (panelRuntime.js animatePlayImpl): keyframe animations and text effects.
-  const canPlay = (a) => ['keyframes', 'text'].includes(String(a?.kind ?? ''));
+  // As ce.anim.play takes them (panelRuntime.js animatePlayImpl): keyframe animations, text effects
+  // and value animations.
+  const canPlay = (a) => ['keyframes', 'text', 'value'].includes(String(a?.kind ?? ''));
   const playable = Object.entries(all).filter(([, a]) => canPlay(a)).map(([k]) => k);
   meaning.choices = playable;
   const key = Object.keys(all).find((k) => k.toLowerCase() === value.toLowerCase());

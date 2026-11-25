@@ -60,6 +60,7 @@
   import AnimationStage from './animation/AnimationStage.svelte';
   import BezierEditor from './animation/BezierEditor.svelte';
   import FramesEditor from './animation/FramesEditor.svelte';
+  import ValueFramesEditor from './animationDesigner/ValueFramesEditor.svelte';
   import PresetLinkCard from './animation/PresetLinkCard.svelte';
   import PresetLibrary from './animation/PresetLibrary.svelte';
   import { panelLoopSummary, panelLoopLines, showNextLoop } from '../stores/loopBudgetStore.js';
@@ -104,7 +105,8 @@
     SPRING_LIMITS,
     easingPatch,
     cleanSpring,
-    ANIMATION_KINDS,
+    animationKindsFor,
+    VALUE_KIND,
     SEQUENCE_KIND,
     EASING_NAMES,
     offeredTargetsFor,
@@ -174,6 +176,12 @@
 
   let keyframes = $derived(selected?.kind === 'keyframes');
   let textKind = $derived(selected?.kind === 'text');
+  // What a knob's or slider's value draws (step 6): offered on a control that draws one.
+  let valueKind = $derived(selected?.kind === VALUE_KIND);
+  let kinds = $derived.by(() => {
+    const list = animationKindsFor(control);
+    return valueKind && !list.includes(VALUE_KIND) ? [...list, VALUE_KIND] : list;
+  });
   // Whether the place a keyframe animation plays on paints a fill gradient: its frames then offer
   // the gradient's turn and shift (FramesEditor, utils/gradientPaint.js).
   let paintsGradient = $derived.by(() => {
@@ -184,12 +192,13 @@
     const fill = owner?._children?.Background?._children?.Fill;
     return fill?.gradientEnabled === true && !!fill?.gradient;
   });
-  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence', text: 'Text' };
+  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence', text: 'Text', value: 'Value' };
   const KIND_TITLES = {
     transition: 'Eases between two styles when something changes',
     keyframes: 'Plays a shape of its own on one part — a pulse, a blink — looping, on the beat, or from a script',
     sequence: 'Tracks along a time axis, one per change, each with its own keyframes; a value trigger scrubs it',
     text: 'Real words, whole or a piece at a time: typewriter, explode, roll, push, wipe, crossfade, shimmer',
+    value: 'What the value draws — its arc, its pointer — moved for a moment, then handed back to the value: a ring sweep',
   };
 
   const ORIGIN_LABELS = { any: 'Any', user: 'Mine', external: 'Outside' };
@@ -754,8 +763,8 @@ onMount(() => {
             {/if}
             <div class="r kindrow">
                 <span class="lab" title="A transition eases between two styles when something changes; keyframes play a shape of their own on one part; a sequence runs a track per change along a time axis">Kind</span>
-                <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: KIND_LABELS[value], title: KIND_TITLES[value] }))}
-                           value={ANIMATION_KINDS.includes(selected.kind) ? selected.kind : 'transition'} ariaLabel="Kind"
+                <Segmented options={kinds.map((value) => ({ value, label: KIND_LABELS[value], title: KIND_TITLES[value] }))}
+                           value={kinds.includes(selected.kind) ? selected.kind : 'transition'} ariaLabel="Kind"
                            onchange={(value) => { stopPlaying(); selectedKeyframe = null; setProps(kindPatch(selected, value, control)); }} />
             </div>
             <div class="grpcol">
@@ -785,7 +794,7 @@ onMount(() => {
                     onchange={(value) => setProp('delay', Math.max(0, Math.round(value)))} /></div>
                 </div>
               {/if}
-              {#if keyframes}
+              {#if keyframes || valueKind}
                 <div class="r">
                   <span class="lab">Repeat</span>
                   <Segmented options={[{ value: 'count', label: 'Count' }, { value: 'infinite', label: 'Loop' }]}
@@ -799,12 +808,14 @@ onMount(() => {
                       onchange={(value) => setProp('iterations', Math.max(1, Math.round(value)))} /></div>
                   </div>
                 {/if}
-                <div class="r">
-                  <span class="lab">Direction</span>
-                  <Segmented options={[{ value: 'normal', label: 'Forward' }, { value: 'alternate', label: 'Back and forth' }]}
-                             value={selected.direction} ariaLabel="Direction"
-                             onchange={(value) => setProp('direction', value)} />
-                </div>
+                {#if keyframes}
+                  <div class="r">
+                    <span class="lab">Direction</span>
+                    <Segmented options={[{ value: 'normal', label: 'Forward' }, { value: 'alternate', label: 'Back and forth' }]}
+                               value={selected.direction} ariaLabel="Direction"
+                               onchange={(value) => setProp('direction', value)} />
+                  </div>
+                {/if}
               {/if}
               {#if textKind}
                 <div class="r">
@@ -824,10 +835,11 @@ onMount(() => {
 
             <div class="grpcol">
               <div class="grp">Runs when</div>
-              {#if keyframes || textKind}
+              {#if keyframes || textKind || valueKind}
                 <div class="r">
                   <span class="lab">Trigger</span>
-                  <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES).map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] }))}
+                  <!-- A value animation "all the time" would never let the value be seen: not offered. -->
+                  <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES.filter((type) => !valueKind || type !== 'always')).map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] }))}
                                   value={selected.triggerType} ariaLabel="Keyframe trigger"
                                   onchange={(value) => setProps({ trigger: {
                                     ...(selected.animation.trigger ?? {}),
@@ -1023,6 +1035,20 @@ onMount(() => {
                   <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
                 {/if}
                 <TextEffectEditor row={selected} {control} onpatch={(patch) => setProps(patch)} />
+              </div>
+            </div>
+          {:else if valueKind}
+            <div class="pane">
+              <div class="panehead">
+                <b>Where the value is drawn</b>
+                <span class="count">{selected.valueFrames.length}</span>
+              </div>
+              <div class="panebody" data-value-animation>
+                {#if targets.some((entry) => !entry.status.works)}
+                  <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
+                {/if}
+                <ValueFramesEditor frames={selected.valueFrames} onchange={(next) => setProp('frames', next)} />
+                <p class="hint">It moves the drawing, not the value: nothing is sent, and the readout still says what the value is. It ends on the value, and while {controlName} is turned it shows where it is turned to.</p>
               </div>
             </div>
           {:else if sequence}

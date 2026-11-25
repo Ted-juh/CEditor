@@ -51,6 +51,7 @@ import { easingToCss } from './easing.js';
 import { describeChange, matchStrength } from './transitionSelection.js';
 import { textEffectRules } from './textEffects.js';
 import { GRADIENT_VARS } from './gradientPaint.js';
+import { cleanValueFrames } from './sceneFormat.js';
 
 // `event`: a gesture on the control — click, double-click, long press, flick, a wheel turn — played
 // on request from where the gesture is recognised, as `script` is from ce.anim.play. Its id is in
@@ -193,6 +194,38 @@ export function readKeyframes(animation, key = '', { timeScale = 1 } = {}) {
   };
 }
 
+/**
+ * A value animation (step 6, utils/valueDrawn.js) as the keyframe player plays it: the same triggers,
+ * runs and restarts, with `value` holding the effect instead of CSS frames. It moves what a knob's or
+ * a slider's value draws, which CanvasControl works out a frame at a time from the run's start.
+ */
+export function readValueAnimation(animation, key = '', { timeScale = 1 } = {}) {
+  if (!animation || typeof animation !== 'object' || animation.enabled === false) return null;
+  if (String(animation.kind ?? '') !== 'value') return null;
+  const frames = cleanValueFrames(animation.frames);
+  if (!frames) return null;
+  const trigger = readTrigger(animation);
+  const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
+  const duration = Math.max(10, Number.isFinite(Number(animation.duration)) ? Number(animation.duration) : 1200) * scale;
+  const delay = Math.max(0, Number.isFinite(Number(animation.delay)) ? Number(animation.delay) : 0) * scale;
+  const iterations = readIterations(animation, trigger.type);
+  const effect = { kind: 'value', easing: String(animation.easing ?? 'inOutCubic'), frames };
+  if (animation.bezier !== undefined) effect.bezier = animation.bezier;
+  if (animation.spring !== undefined) effect.spring = animation.spring;
+  return {
+    name: String(animation.name ?? key),
+    value: effect,
+    moves: false,
+    part: '',
+    duration,
+    delay,
+    iterations,
+    trigger,
+    frames: [],
+    span: iterations === 'infinite' ? Infinity : delay + duration * iterations,
+  };
+}
+
 const number = (value) => Number(Number(value).toFixed(4)).toString();
 
 /** One frame as CSS declarations, using the individual transform properties. */
@@ -317,7 +350,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
   let previousPlays = {};
   const heldBefore = new Map();         // name -> whether a looping state animation's state held
   const runs = new Map();               // name -> { phase, startedAt } for anything that has played
-  let last = { parts: new Map(), colours: new Map(), texts: new Map(), rules: '', fired: [], key: '' };
+  let last = { parts: new Map(), colours: new Map(), texts: new Map(), values: [], rules: '', fired: [], key: '' };
 
   const flip = (name, t) => {
     const run = runs.get(name);
@@ -386,11 +419,19 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
       const parts = new Map();
       const colours = new Map();          // part -> { paint, shape, stroke, text } animation lists
       const texts = new Map();            // part -> [{ name, effect, phase, trigger }]: text effects
+      const values = [];                  // [{ name, effect, phase, startedAt, delay, duration, iterations }]
       const rules = [];
       const keyParts = [];
       for (const entry of entries) {
         const phase = playing.get(entry.name);
         if (!phase) continue;
+        if (entry.value) {
+          // What the value draws (step 6): no CSS; CanvasControl works it out from when the run began.
+          const startedAt = runs.get(entry.name)?.startedAt ?? t;
+          values.push({ name: entry.name, effect: entry.value, phase, startedAt, delay: entry.delay, duration: entry.duration, iterations: entry.iterations });
+          keyParts.push(`v:${entry.name}:${phase}:${startedAt}`);
+          continue;
+        }
         if (entry.text) {
           // A text effect (utils/textEffects.js): the renderer cuts the text and gives each piece its
           // animation; here, which effect plays on which text, in which phase, and its rules.
@@ -424,7 +465,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
         last = { ...last, fired };
         return last;
       }
-      last = { parts, colours, texts, rules: [...new Set(rules)].join('\n'), fired, key };
+      last = { parts, colours, texts, values, rules: [...new Set(rules)].join('\n'), fired, key };
       return last;
     },
     reset() {
@@ -433,7 +474,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
       previousPlays = {};
       heldBefore.clear();
       runs.clear();
-      last = { parts: new Map(), colours: new Map(), texts: new Map(), rules: '', fired: [], key: '' };
+      last = { parts: new Map(), colours: new Map(), texts: new Map(), values: [], rules: '', fired: [], key: '' };
     },
   };
 }

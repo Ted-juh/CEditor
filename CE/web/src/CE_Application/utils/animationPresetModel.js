@@ -29,6 +29,7 @@
  * control's overrides into the preset and every animation that follows it.
  */
 import { uniqueAnimationName, animationsPatch } from './animationModel.js';
+import { controlDrawsValue } from './valueDrawn.js';
 import {
   LINK_KEY, PRESET_FORMAT, PRESET_FORMAT_VERSION, cleanPreset,
 } from './animationPresetFormat.js';
@@ -212,6 +213,9 @@ export function presetDoesNotFit(preset, control) {
   const missingSections = needs.sections.filter((section) => section !== 'Animations' && !control._children[section]);
   if (missingSections.length) return `It animates this control's ${missingSections.join(' and ')}, and it has none.`;
   if (needs.states.length && !control._children.States) return `It plays on ${needs.states.join(', ')}, and this control has no states.`;
+  if (Object.values(preset.animations ?? {}).some((node) => node?.kind === 'value') && !controlDrawsValue(control)) {
+    return 'It moves what a value draws, and this control draws none: it goes on a knob or a slider.';
+  }
   return '';
 }
 

@@ -4866,7 +4866,7 @@ Good to know:
 
 #### `ce.anim.play(control, animation) | animatePlay(scene [, opts])`
 
-Play one of a control's keyframe animations or text effects from its start; or, given one name, a panel scene.
+Play one of a control's keyframe animations, text effects or value animations from its start; or, given one name, a panel scene.
 
 Example: `animatePlay("Lamp", "flash")` plays Lamp's flash animation; `animatePlay("Intro")` plays the panel's Intro scene.
 
@@ -4876,7 +4876,7 @@ Example: `animatePlay("Lamp", "flash")` plays Lamp's flash animation; `animatePl
 
 Good to know:
 
-- Returns true if the control has a keyframe animation or a text effect of that name. Already playing: restarts.
+- Returns true if the control has a keyframe animation, a text effect or a value animation (a knob's ring sweep) of that name. Already playing: restarts.
 - A transition cannot be played this way: rejected with a console error listing the animations it can play.
 - One name is a scene from the Animation Designer, whatever starts it there. Already playing: starts again from the beginning, and the run it cut short reports done(false).
 - A scene that ends holds its last frame. With the panel's window closed: returns false, and nothing waits.

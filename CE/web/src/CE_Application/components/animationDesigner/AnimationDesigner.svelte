@@ -114,7 +114,7 @@
     for (const control of flatControls(current.controls ?? [])) {
       const section = control?._children?.Animations;
       if (!section) continue;
-      if (Object.values(section._children ?? {}).some((node) => ['keyframes', 'text'].includes(String(node?.kind)))) {
+      if (Object.values(section._children ?? {}).some((node) => ['keyframes', 'text', 'value'].includes(String(node?.kind)))) {
         animations[control._children.Core.id] = section;
       }
     }
@@ -352,8 +352,9 @@
   // --- Clip settings --------------------------------------------------------------------------------
   function savePreset(name) {
     if (!clip) return;
-    const { preset, reason } = saveEffectAsPreset(clipAnimation(clip), { name, category: clip.effect.kind === 'text' ? 'Text' : 'Move' });
-    note = reason ?? `${preset.name} is in your library (Mine), to drop on any control.`;
+    const kind = clip.effect.kind;
+    const { preset, reason } = saveEffectAsPreset(clipAnimation(clip), { name, category: kind === 'text' ? 'Text' : kind === 'value' ? 'Value' : 'Move' });
+    note = reason ?? `${preset.name} is in your library (Mine), to drop on any ${kind === 'value' ? 'knob or slider' : 'control'}.`;
   }
 </script>
 

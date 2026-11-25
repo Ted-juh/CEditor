@@ -5533,12 +5533,13 @@ function animatePlayImpl(controlName, animationName, opts, scriptId = '') {
   const control = controlNamed(controlName);
   if (!control) { addScriptTrace('error', '', `ce.anim.play: no control named "${controlName}".`); return false; }
   const all = control?._children?.Animations?._children ?? {};
-  // Keyframe animations and text effects play on request; a transition plays when its trigger does.
-  const canPlay = (a) => ['keyframes', 'text'].includes(String(a?.kind ?? ''));
+  // Keyframe animations, text effects and value animations play on request; a transition plays when
+  // its trigger does.
+  const canPlay = (a) => ['keyframes', 'text', 'value'].includes(String(a?.kind ?? ''));
   const playable = Object.entries(all).filter(([, a]) => canPlay(a)).map(([k]) => k);
   const have = playable.length
     ? `The animations it can play: ${playable.join(', ')}.`
-    : 'It has no keyframe animations or text effects — make one in the Animation tab.';
+    : 'It has no keyframe animations, text effects or value animations — make one in the Animation tab.';
   if (!given(animationName)) { addScriptTrace('error', '', `ce.anim.play: no animation name was given. ${have}`); return false; }
   const wanted = String(animationName).toLowerCase();
   const key = Object.keys(all).find((k) => k.toLowerCase() === wanted);

@@ -37,6 +37,8 @@ export function animationLoopWeight(node) {
   const kind = String(node.kind ?? 'transition');
   if (kind === 'sequence') return node.loop === true ? 1 : 0;
   if (kind === 'text') return node.iterations === 'infinite' ? 1 : 0;
+  // What a value draws, looping: redrawn by script every frame, as a scene's value clip is (2).
+  if (kind === 'value') return node.iterations === 'infinite' || node.iterations === Infinity ? 2 : 0;
   if (kind !== 'keyframes') return 0;
   const iterations = node.iterations === undefined || node.iterations === null || node.iterations === ''
     ? defaultIterations(String(node.trigger?.type ?? 'stateChange'))

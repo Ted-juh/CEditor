@@ -161,7 +161,7 @@
   import { getContext, setContext, untrack } from 'svelte';
   import { SCENE_STAGE } from '../stores/sceneStage.js';
   import { sceneControlOutput, mergeKeyframeOutputs } from '../utils/sceneModel.js';
-  import { drawnValueFor } from '../utils/valueDrawn.js';
+  import { drawnValueFor, ownValuePlay } from '../utils/valueDrawn.js';
   import { VALUE_TARGET } from '../utils/sceneFormat.js';
   import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
   import { pictureColour, pictureColourSources, withColourFollows, withPictureColourSources } from '../utils/pictureRecolour.js';
@@ -1834,10 +1834,16 @@
   // `d` and a pointer's angle are attributes CSS cannot animate, so a running clip is worked out here
   // a frame at a time. A running play's clock starts when this control first sees it — when its CSS
   // animations start too — and a play started again (its phase flipped) starts it again. Posed plays
-  // (the Designer's playhead, a seek, a scene a hand drives) say their moment themselves.
-  let valuePlays = $derived(core?.id && stagePlays.length
+  // (the Designer's playhead, a seek, a scene a hand drives) say their moment themselves. The
+  // control's own value animations come from its keyframe player, each with the moment its run began;
+  // a scene's are drawn over them, as a scene's animations are.
+  let ownValuePlays = $derived(core?.id && playerKeyframes?.values?.length
+    ? playerKeyframes.values.map((run) => ownValuePlay(core.id, run))
+    : []);
+  let sceneValuePlays = $derived(core?.id && stagePlays.length
     ? stagePlays.filter((play) => play.scene?.clips?.some?.((clip) => clip.controlId === core.id && clip.target === VALUE_TARGET))
     : []);
+  let valuePlays = $derived(ownValuePlays.length ? [...ownValuePlays, ...sceneValuePlays] : sceneValuePlays);
   const valueStarts = new Map();
   let valueNow = $state(0);
   let valueFrame = 0;
@@ -1846,7 +1852,7 @@
   let liveNormalized = $derived(numberOr(interactionRuntime?.signals?.currentValueNormalized, numberOr(interactionRuntime?.signals?.valueNormalized, 0)));
   let drawnValueState = $derived(valuePlays.length
     ? drawnValueFor(valuePlays, core.id, liveNormalized, {
-      elapsedOf: (play) => Math.max(0, valueNow - (valueStarts.get(valuePlayKey(play)) ?? valueNow)),
+      elapsedOf: (play) => Math.max(0, valueNow - (Number.isFinite(play.startedAt) ? play.startedAt : (valueStarts.get(valuePlayKey(play)) ?? valueNow))),
       dragging: previewSession?.dragging === true || interactionRuntime?.signals?.dragging === true,
     })
     : { value: null, running: false });
@@ -1856,14 +1862,16 @@
     untrack(() => {
       const seen = new Set();
       const now = nowMs();
+      let fresh = false;
       for (const play of plays) {
         if (Number.isFinite(play.at)) continue;
+        if (Number.isFinite(play.startedAt)) { fresh = true; continue; }
         const key = valuePlayKey(play);
         seen.add(key);
         if (!valueStarts.has(key)) valueStarts.set(key, now);
       }
       for (const key of [...valueStarts.keys()]) if (!seen.has(key)) valueStarts.delete(key);
-      if (seen.size) valueNow = now;
+      if (seen.size || fresh) valueNow = now;
     });
   });
   $effect(() => {

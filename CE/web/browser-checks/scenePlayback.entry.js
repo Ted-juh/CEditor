@@ -30,6 +30,11 @@ function panel(prefix) {
   const wave = place(createControl('Label'), `${prefix}wave`, 'Wave', 30, 30, 220, 60);
   wave._children.Text.content = 'Wave';
   const cutoff = place(createControl('Knob'), `${prefix}cutoff`, 'Cutoff', 300, 20, 120, 120);
+  // Its own value animation (the Animation tab's Value kind): a wiggle that loops while it is hovered.
+  cutoff._children.Animations = { _type: 'Animations', enabled: true, _children: { wiggle: {
+    _type: 'Animation', name: 'wiggle', enabled: true, kind: 'value', duration: 700, delay: 0, iterations: 'infinite', easing: 'inOutQuad',
+    frames: sceneEffect('value:wiggle').effect.frames, trigger: { type: 'stateChange', from: ['*'], to: ['hover'] }, targets: [{ path: 'Value' }],
+  } } };
   const start = place(createControl('Button'), `${prefix}start`, 'Start', 30, 150, 160, 44);
   const lamp = place(createControl('Label'), `${prefix}lamp`, 'Lamp', 460, 30, 120, 40);
   lamp._children.Text.content = 'Lamp';

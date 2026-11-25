@@ -101,3 +101,82 @@ test('a looping value clip counts two against the loop budget, as a moving gradi
   const summary = panelLoops([knob], undefined, { scenes: [{ id: 's', name: 'Idle', trigger: { type: 'panelOpen' }, loop: true, length: 1000, clips: [clip({ label: 'Wiggle' })] }] });
   assert.equal(summary.count, 2);
 });
+
+// --- A control's own value animations (the Animation tab), and presets -----------------------------
+
+import { readValueAnimation, createKeyframePlayer } from '../src/CE_Application/utils/keyframeAnimation.js';
+import { ownValuePlay } from '../src/CE_Application/utils/valueDrawn.js';
+import { animationKindsFor, kindPatch, describeAnimation, describeTargets, triggerSummary, VALUE_KIND } from '../src/CE_Application/utils/animationModel.js';
+import { controlScenes, effectFromPreset } from '../src/CE_Application/utils/sceneModel.js';
+import { cleanPreset, PRESET_FORMAT } from '../src/CE_Application/utils/animationPresetFormat.js';
+import { presetDoesNotFit } from '../src/CE_Application/utils/animationPresetModel.js';
+import { animationLoopWeight } from '../src/CE_Application/utils/loopBudget.js';
+
+const ownSweep = (over = {}) => ({ _type: 'Animation', name: 'sweep', kind: 'value', duration: 1000, delay: 0, easing: 'inOutCubic', frames: sweep.effect.frames, trigger: { type: 'script' }, targets: [{ path: VALUE_TARGET }], ...over });
+
+test('the Animation tab offers the value kind on a knob or a slider, and switching to it makes a ring sweep', () => {
+  assert.ok(animationKindsFor(createControl('Knob')).includes(VALUE_KIND));
+  assert.ok(!animationKindsFor(createControl('Label')).includes(VALUE_KIND));
+  const fromPulse = kindPatch(describeAnimation('a', { kind: 'keyframes', trigger: { type: 'always' }, duration: 600, frames: [{ at: 0, scale: 1 }, { at: 1, scale: 1.1 }] }), VALUE_KIND);
+  assert.equal(fromPulse.kind, VALUE_KIND);
+  assert.deepEqual(fromPulse.targets, [{ path: VALUE_TARGET }]);
+  assert.deepEqual(fromPulse.trigger, { type: 'stateChange', from: ['*'], to: ['hover'] }, '"all the time" would never let the value be seen');
+  assert.equal('duration' in fromPulse, false, 'a pulse\'s 600 ms is kept: the patch leaves it');
+  assert.equal(kindPatch(describeAnimation('t', { kind: 'transition', duration: 120 }), VALUE_KIND).duration, 1200, 'a transition\'s blink becomes a sweep\'s length');
+  assert.equal(valueEffectAt({ ...fromPulse, frames: fromPulse.frames }, 0.55, 0.3), 1, 'the ring sweep');
+  const back = kindPatch(describeAnimation('a', ownSweep()), 'keyframes');
+  assert.ok(back.frames.length >= 2 && back.frames.every((frame) => frame.value === undefined), 'back to keyframes: a pulse, not value frames');
+  const row = describeAnimation('sweep', ownSweep({ iterations: 'infinite', trigger: { type: 'stateChange', to: ['hover'] } }));
+  assert.equal(row.valueFrames.length, 3);
+  assert.equal(triggerSummary(row), 'while hover');
+  assert.equal(describeTargets(row)[0].status.works, true);
+  assert.equal(describeTargets({ ...row, targets: [{ path: 'Transform' }] })[0].status.works, false);
+});
+
+test('the keyframe player plays a control\'s own value animation, and reports when its run began', () => {
+  const entry = readValueAnimation(ownSweep({ delay: 100 }), 'sweep');
+  assert.equal(entry.value.kind, 'value');
+  assert.equal(entry.span, 1100);
+  assert.equal(readValueAnimation(ownSweep({ frames: [{ at: 0 }] }), 'x'), null, 'one frame is not an animation');
+  let clock = 5000;
+  const player = createKeyframePlayer({ now: () => clock });
+  const runtime = { keyframes: { enabled: true, reducedMotion: false, entries: [entry] }, activeStates: [], signals: {} };
+  assert.equal(player.next(runtime).values.length, 0, 'a script animation waits to be asked');
+  clock = 6000;
+  const out = player.next(runtime, { plays: { sweep: 1 } });
+  assert.equal(out.values.length, 1);
+  assert.equal(out.values[0].startedAt, 6000);
+  const play = ownValuePlay('knob', out.values[0]);
+  assert.equal(drawnValueFor([play], 'knob', 0.3, { elapsedOf: () => 100 + 550 }).value, 1, 'its delay, then the sweep');
+  assert.equal(drawnValueFor([play], 'knob', 0.3, { elapsedOf: () => 1200 }).value, null, 'and handed back');
+  assert.equal(player.next(runtime, { plays: { sweep: 1 }, reducedMotion: true }).values.length, 0, 'with reduced motion it does not play');
+});
+
+test('a looping value animation runs round again, and counts two against the loop budget', () => {
+  const play = ownValuePlay('knob', { name: 'w', effect: sweep.effect, phase: 'a', startedAt: 0, delay: 0, duration: 1000, iterations: 'infinite' });
+  assert.equal(drawnValueFor([play], 'knob', 0.3, { elapsedOf: () => 2550 }).value, 1, 'the third run, at its peak');
+  assert.equal(drawnValueFor([play], 'knob', 0.3, { elapsedOf: () => 99999 }).running, true);
+  assert.equal(animationLoopWeight(ownSweep({ iterations: 'infinite' })), 2);
+  assert.equal(animationLoopWeight(ownSweep()), 0);
+});
+
+test('a control\'s own value animation shows in the Designer as a scene, on what its value draws', () => {
+  const knob = createControl('Knob');
+  knob._children.Animations = { _type: 'Animations', enabled: true, _children: { sweep: ownSweep({ delay: 200 }) } };
+  const [own] = controlScenes([knob]);
+  assert.equal(own.clips[0].target, VALUE_TARGET);
+  assert.equal(own.clips[0].start, 200);
+  assert.equal(own.clips[0].effect.kind, 'value');
+});
+
+test('a value effect saved as a preset goes on a knob or a slider, and back into the Designer\'s library', () => {
+  const preset = cleanPreset({ format: PRESET_FORMAT, version: 1, id: 'p_sweep', name: 'My sweep', animations: { sweep: ownSweep() }, states: {}, fields: {} });
+  assert.ok(preset, 'the format keeps a value animation');
+  assert.equal(presetDoesNotFit(preset, createControl('Knob')), '');
+  assert.equal(presetDoesNotFit(preset, createControl('Slider')), '');
+  assert.match(presetDoesNotFit(preset, createControl('Label')), /draws none: it goes on a knob or a slider/);
+  const entry = effectFromPreset(preset);
+  assert.equal(entry.target, VALUE_TARGET);
+  assert.equal(entry.effect.kind, 'value');
+  assert.ok(cleanClip({ id: 'c', controlId: 'k', target: entry.target, start: 0, length: entry.length, effect: entry.effect }), 'and it makes a clip');
+});

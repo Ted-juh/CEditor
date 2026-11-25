@@ -855,7 +855,7 @@ for a moment, then hands back to the value.
 - **The loop budget** counts a looping value clip as two, since it is redrawn every frame, as a
   moving gradient is repainted. That is reasoning, not a measurement.
 
-Left out, for now:
+Left out, for now (the first two are built since: see "As built: value effects, finished"):
 - **Saving a value clip as a preset.** Presets hold a control's own animations, and a value effect
   is not one of those yet; the button is hidden on a value clip rather than saving something that
   would not apply.
@@ -877,6 +877,42 @@ Verified locally:
 - the checks over what the change touched: `anatomyForms`, `macroSetKnob`, `shapeClip`, `panelMotion`,
   `animationTab` and `playerInbound`, and the component harness's knob and slider cases;
 - the same sweep in WebKitGTK 2.52 under Xvfb: 0.5, 0.999 at the peak, 0.5 after, for both knobs.
+
+## As built: value effects, finished (2026-11-25)
+
+The first of the things step 6 left out, taken up one at a time at the owner's request.
+
+- **A control's own value animations.** The Animation tab offers a fifth kind, **Value**, on a
+  control that draws a value (`animationKindsFor`); on anything else it is not offered.
+  - It plays on the triggers a keyframe animation does, except "all the time", which would never
+    let the value be seen. Switching to it makes a ring sweep on the place `Value`.
+  - Repeat is a count or a loop, so a wiggle can run while the knob is hovered.
+  - Its frames use the Designer's value frame editor.
+  - The runtime reads it into the control's keyframe catalogue (`readValueAnimation`), and the keyframe
+    player plays it like any other entry. It reports each value animation playing with the moment its
+    run began. `CanvasControl` turns those into plays of a one-clip scene (`ownValuePlay`) and draws
+    them under any scene's value clips.
+  - The engine gained repeats for this: a clip may run a number of times, or loop.
+  - `ce.anim.play("Cutoff", "sweep")` plays one, as it plays a keyframe animation; the script
+    console's value check knows it.
+  - The Designer shows each one under **Controls' own**, on the knob's Value track.
+- **Presets.** The preset format holds the value kind. A CEditor from before step 6 refuses such a
+  file, as the format means it to.
+  - A value preset fits only a control that draws a value, and says so on anything else.
+  - The Designer's **Save as preset** works on a value clip (category Value), and **Mine** gives it
+    back as a value effect.
+- **The loop budget** counts a looping value animation as two, as it does a looping value clip.
+
+Verified locally:
+- `test/valueDrawn.test.js`: the kind offered and switched to, the player reporting a run and its
+  start, a delay then a sweep then the hand-back, a loop's third run, the Designer's view, a preset
+  fitting a knob and a slider and refusing a Label, and the loop weight;
+- `test/animationPresetFormat.test.js`: the preset kinds are the model's, the value kind included;
+- the browser checks `animationTab` (a knob is offered Value and a custom component is not; picking it
+  makes a ring sweep with its three frames in the value editor) and `scenePlayback` (Cutoff's own
+  wiggle loops while hovered, within its 6 %, and hands back exactly when the pointer leaves); and
+  `panelMotion`, `animationDesigner` and `anatomyForms`, which exercise the keyframe player and the
+  knob drawers.
 
 ## Open
 

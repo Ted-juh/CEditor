@@ -11,6 +11,7 @@
  *   - a drag on a control moves the scene it drives, and stays where it was let go (step 5c)
  *   - a control's value moves the scene it drives, from where the value was at the start (step 5c)
  *   - a ring sweep moves what a knob's value draws round to full and hands back to the value (step 6)
+ *   - a knob's own value animation loops while it is hovered, and hands back when the pointer leaves
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -233,6 +234,21 @@ try {
   check('held by a script mid-sweep, the knob draws full; at the end, its value', () => {
     assert.equal(sweepHeld.drawn, 1);
     assert.equal(sweepEnd.drawn, level0.drawn);
+  });
+
+  // A knob's own value animation: the wiggle loops while Cutoff is hovered.
+  const cutoffValue = (await s('drawn', 'cutoff')).drawn;
+  const cutoffBox = await s('rect', 'cutoff');
+  await page.mouse.move(cutoffBox.x + cutoffBox.w / 2, cutoffBox.y + cutoffBox.h / 2, { steps: 3 });
+  const wiggled = [];
+  for (let i = 0; i < 10; i += 1) { await page.waitForTimeout(90); wiggled.push((await s('drawn', 'cutoff')).drawn); }
+  await page.mouse.move(680, 5);
+  await page.waitForTimeout(150);
+  const cutoffAfter = (await s('drawn', 'cutoff')).drawn;
+  check('a knob\'s own value animation loops while it is hovered, and hands back when the pointer leaves', () => {
+    assert.ok(wiggled.some((value) => Math.abs(value - cutoffValue) > 0.02), `wiggling about ${cutoffValue}: ${wiggled.join(' ')}`);
+    assert.ok(wiggled.every((value) => Math.abs(value - cutoffValue) <= 0.061), 'by no more than the wiggle\'s 6 %');
+    assert.equal(cutoffAfter, cutoffValue);
   });
 
   const still = { wave: await s('letters', 'still_wave'), cutoff: kf(await s('box', 'still_cutoff')) };

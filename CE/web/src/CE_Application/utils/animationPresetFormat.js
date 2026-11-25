@@ -12,8 +12,11 @@
  * equal to the model's: the animation kinds, and the rule for an animation's name.
  */
 
-/** The animation kinds a preset may hold: animationModel.js ANIMATION_KINDS. */
-export const PRESET_KINDS = Object.freeze(['transition', 'keyframes', 'sequence', 'text']);
+/**
+ * The animation kinds a preset may hold: animationModel.js ANIMATION_KINDS, and VALUE_KIND (what a
+ * knob's value draws, step 6). A CEditor from before step 6 refuses a value preset, as it should.
+ */
+export const PRESET_KINDS = Object.freeze(['transition', 'keyframes', 'sequence', 'text', 'value']);
 
 /** An animation's name as a path segment: animationModel.js cleanAnimationName. */
 export function cleanPresetAnimationName(wanted) {

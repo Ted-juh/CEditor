@@ -56,24 +56,44 @@ export function valueClipsOf(scene, controlId) {
     .sort((a, b) => a.start - b.start);
 }
 
+/** How many times a clip plays: a scene clip once; a control's own animation as often as it says. */
+const timesOf = (clip) => (clip?.iterations === 'infinite' ? Infinity : Math.max(1, Math.round(Number(clip?.iterations) || 1)));
+/** When a clip's last run ends, ms: Infinity for one that loops. */
+const clipEnd = (clip) => clip.start + clip.length * timesOf(clip);
+
 /**
  * What a scene draws for a control's value `elapsed` ms in, or null to draw the value itself. The
- * clip playing then; before the first starts, its first frame (a clip holds its first frame before
- * it starts, as every clip does); after the last ends, nothing: the value is handed back.
+ * clip playing then, in whichever of its runs; before the first starts, its first frame (a clip
+ * holds its first frame before it starts, as every clip does); after the last ends, nothing: the
+ * value is handed back.
  */
 export function sceneDrawnValue(scene, controlId, elapsed, live) {
   const clips = valueClipsOf(scene, controlId);
   if (!clips.length || !Number.isFinite(elapsed)) return null;
   let playing = null;
-  for (const clip of clips) if (elapsed >= clip.start && elapsed < clip.start + clip.length) playing = clip;
-  if (playing) return valueEffectAt(playing.effect, (elapsed - playing.start) / playing.length, live);
+  for (const clip of clips) if (elapsed >= clip.start && elapsed < clipEnd(clip)) playing = clip;
+  if (playing) return valueEffectAt(playing.effect, ((elapsed - playing.start) % playing.length) / playing.length, live);
   if (elapsed < clips[0].start) return valueEffectAt(clips[0].effect, 0, live);
   return null;
 }
 
-/** When a scene's last value clip on a control ends, ms; 0 when it has none. */
+/** When a scene's last value clip on a control ends, ms; 0 when it has none, Infinity for a loop. */
 export function valueClipsEnd(scene, controlId) {
-  return valueClipsOf(scene, controlId).reduce((end, clip) => Math.max(end, clip.start + clip.length), 0);
+  return valueClipsOf(scene, controlId).reduce((end, clip) => Math.max(end, clipEnd(clip)), 0);
+}
+
+/**
+ * A control's own value animation, as the keyframe player reports one playing
+ * (`{ name, effect, phase, startedAt, delay, duration, iterations }`), as a play of a scene of one
+ * clip, which is how drawnValueFor reads it. `startedAt` stays on the play: its clock.
+ */
+export function ownValuePlay(controlId, run) {
+  return {
+    scene: { id: `own:${run.name}`, clips: [{ id: `own:${run.name}`, controlId, target: VALUE_TARGET, start: run.delay ?? 0, length: Math.max(10, run.duration ?? 1200), iterations: run.iterations ?? 1, effect: run.effect }] },
+    phase: run.phase ?? 'a',
+    at: null,
+    startedAt: run.startedAt,
+  };
 }
 
 /**

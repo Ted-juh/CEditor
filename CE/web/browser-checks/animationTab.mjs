@@ -887,6 +887,28 @@ await ev(() => window.__anim.dropLoops());
 await settle();
 assert.equal(await ev(() => window.__anim.loopAlarm()), '');
 
+// --- The Value kind (step 6): only on a control that draws a value ------------------------------
+
+const customKinds = await ev(() => window.__anim.kindLabels());
+await ev(() => window.__anim.selectKnob());
+await settle();
+await ev(() => window.__anim.addAnimationNamed('sweep'));
+await settle();
+const knobKinds = await ev(() => window.__anim.kindLabels());
+await ev(() => window.__anim.pickKind('value'));
+await settle();
+const sweepNode = await ev(() => window.__anim.knobAnimation('sweep'));
+const sweepRows = await ev(() => window.__anim.valueFrameRows());
+check('a knob is offered the Value kind, and picking it makes a ring sweep on what its value draws', () => {
+  assert.ok(!customKinds.includes('Value'), `not on a custom component: ${customKinds.join(', ')}`);
+  assert.ok(knobKinds.includes('Value'), knobKinds.join(', '));
+  assert.equal(sweepNode.kind, 'value');
+  assert.deepEqual(sweepNode.targets, [{ path: 'Value' }]);
+  assert.deepEqual(sweepNode.frames, [{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]);
+  assert.equal(sweepNode.trigger.type, 'stateChange');
+  assert.equal(sweepRows, 3, 'its frames, in the value editor');
+});
+
 // --- The rules --------------------------------------------------------------------------------
 
 check('there is not one slider in the tab', async () => {});

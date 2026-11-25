@@ -41,7 +41,7 @@
   let gradient = $derived(!!(control?._children?.Background?._children?.Fill?.gradientEnabled));
   let controlName = $derived(String(control?._children?.Core?.name || clip?.controlId || ''));
   let presetName = $state('');
-  $effect(() => { presetName = clip ? `${controlName} ${isText ? (clip.effect.effect ?? 'text') : 'effect'}` : ''; });
+  $effect(() => { presetName = clip ? `${controlName} ${isText ? (clip.effect.effect ?? 'text') : isValue ? (clip.label || 'value') : 'effect'}` : ''; });
 
   /** The text effect editor writes animation fields; `targets` is this clip's place. */
   function textPatch(patch) {
@@ -96,11 +96,9 @@
     <p class="mono" title="What a script names this place by">{controlName}{clip.target === 'Transform' || clip.target === 'Value' ? '' : `.${clip.target}`}</p>
     {#if !own && sceneName}<p class="mono dim" title="What a script plays this scene with">ce.anim.play("{sceneName}")</p>{/if}
     <div class="acts">
-      {#if !isValue}
       <input class="txt" type="text" bind:value={presetName} aria-label="Preset name" />
       <button type="button" class="tb" data-save-clip-preset disabled={!presetName.trim()} onclick={() => onsavepreset(presetName.trim())}
-              title="Keep this effect in your library, to drop on any control">Save as preset</button>
-      {/if}
+              title={isValue ? 'Keep this effect in your library, to drop on any knob or slider' : 'Keep this effect in your library, to drop on any control'}>Save as preset</button>
       {#if !own}<button type="button" class="tb danger" onclick={ondelete}>Remove clip</button>{/if}
     </div>
   </div>

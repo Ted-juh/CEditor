@@ -41,7 +41,7 @@ import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
 import { easingToCss } from './easing.js';
 // A cycle, and a safe one: keyframeAnimation.js reads readTrigger from here, and this file reads
 // readKeyframes from there, each only when called — never while either module is loading.
-import { readKeyframes } from './keyframeAnimation.js';
+import { readKeyframes, readValueAnimation } from './keyframeAnimation.js';
 import { readTextEffect } from './textEffects.js';
 
 function getNodeChild(node, key) {
@@ -643,7 +643,8 @@ function buildKeyframeCatalog(control, previewSession) {
   const entries = [];
   for (const [key, animation] of Object.entries(animations?._children ?? {})) {
     const entry = readKeyframes(animation, key, { timeScale: previewSession?.animationTimeScale })
-      ?? textEffectEntry(animation, key, previewSession?.animationTimeScale);
+      ?? textEffectEntry(animation, key, previewSession?.animationTimeScale)
+      ?? readValueAnimation(animation, key, { timeScale: previewSession?.animationTimeScale });
     if (entry) entries.push(entry);
   }
   return { enabled: true, reducedMotion, entries };

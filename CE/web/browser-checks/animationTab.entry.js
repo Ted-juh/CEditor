@@ -18,7 +18,7 @@ import { displayTabRequest } from '../src/CE_Application/stores/displayTab.js';
 import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
 import { updateControlProperty } from '../src/CE_Application/stores/controls.js';
 import { animationPresetLibrary } from '../src/CE_Application/stores/animationPresetLibrary.js';
-import { editorTarget } from '../src/CE_Application/stores/editorTarget.js';
+import { editorTarget, activateEditorTarget } from '../src/CE_Application/stores/editorTarget.js';
 
 const CONTROL_ID = 'ctrl_anim';
 
@@ -96,7 +96,13 @@ control._children.Animations = {
   },
 };
 
-panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [control] }]);
+// A knob beside it, for the Value kind (step 6), which only a control that draws a value is offered.
+const knob = createControl('Knob');
+knob._children.Core.id = 'ctrl_knob';
+knob._children.Core.name = 'Cutoff';
+knob._children.Transform.x = 600;
+
+panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [control, knob] }]);
 activePanelId.set('p1');
 selectedComponentIds.set(new Set([CONTROL_ID]));
 
@@ -107,6 +113,17 @@ const live = () => get(panels)[0].controls[0];
 const animation = (name) => live()._children.Animations._children[name];
 
 window.__anim = {
+  kindLabels: () => [...document.querySelectorAll('[aria-label="Kind"] button')].map(textOf),
+  // The tab follows its own target, not the selection (stores/editorTarget.js): open it on the knob.
+  selectKnob: () => { selectedComponentIds.set(new Set(['ctrl_knob'])); activateEditorTarget('animation', 'ctrl_knob'); },
+  addAnimationNamed: (name) => {
+    const input = document.querySelector('input[aria-label="New animation name"]');
+    input.value = name;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  },
+  knobAnimation: (name) => JSON.parse(JSON.stringify(get(panels)[0].controls.find((c) => c._children.Core.id === 'ctrl_knob')._children.Animations?._children?.[name] ?? null)),
+  valueFrameRows: () => document.querySelectorAll('[data-value-animation] [data-value-frame]').length,
   head: () => textOf(document.querySelector('.who')),
   alarm: () => textOf(document.querySelector('.alarm')),
 
