@@ -1,0 +1,1038 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "025f9d98-f11d-4fe5-a5e5-025f9d98025f",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Jurassic Park",
+  "scriptId": "film_jurassic",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF050805",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Jungle","id":"ctrl_1739820696000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#0b1a0e"},{"position":100,"color":"#020402"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Fronds","id":"ctrl_1739820696001","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22720%22%20height%3D%22405%22%20viewBox%3D%220%200%20720%20405%22%3E%3Cpath%20d%3D%22M0%200%20Q%2085%20-30.599999999999998%20170%200%20Q%2085%2030.599999999999998%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2040)%20rotate(-40)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20100%20-36%20200%200%20Q%20100%2036%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2046)%20rotate(-29)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20115%20-41.4%20230%200%20Q%20115%2041.4%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2052)%20rotate(-18)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%2085%20-30.599999999999998%20170%200%20Q%2085%2030.599999999999998%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2058)%20rotate(-7)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20100%20-36%20200%200%20Q%20100%2036%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2064)%20rotate(4)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20115%20-41.4%20230%200%20Q%20115%2041.4%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2070)%20rotate(15)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%2085%20-30.599999999999998%20170%200%20Q%2085%2030.599999999999998%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2076)%20rotate(26)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20100%20-36%20200%200%20Q%20100%2036%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2082)%20rotate(37)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20115%20-41.4%20230%200%20Q%20115%2041.4%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(-10%2088)%20rotate(48)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%2080%20-28.799999999999997%20160%200%20Q%2080%2028.799999999999997%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2020)%20rotate(220)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%2097.5%20-35.1%20195%200%20Q%2097.5%2035.1%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2027)%20rotate(209)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20115%20-41.4%20230%200%20Q%20115%2041.4%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2034)%20rotate(198)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%2080%20-28.799999999999997%20160%200%20Q%2080%2028.799999999999997%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2041)%20rotate(187)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%2097.5%20-35.1%20195%200%20Q%2097.5%2035.1%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2048)%20rotate(176)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20115%20-41.4%20230%200%20Q%20115%2041.4%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2055)%20rotate(165)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%2080%20-28.799999999999997%20160%200%20Q%2080%2028.799999999999997%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2062)%20rotate(154)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%2097.5%20-35.1%20195%200%20Q%2097.5%2035.1%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2069)%20rotate(143)%22%2F%3E%3Cpath%20d%3D%22M0%200%20Q%20115%20-41.4%20230%200%20Q%20115%2041.4%200%200%20Z%22%20fill%3D%22%23173d1d%22%20transform%3D%22translate(730%2076)%20rotate(132)%22%2F%3E%3C%2Fsvg%3E","imageFit":"cover"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Dash","id":"ctrl_1739820696002","controlType":"Label"},
+        "Transform": {"y":300,"width":720,"height":105},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#1c1a16"},{"position":100,"color":"#0a0908"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Cup","id":"ctrl_1739820696003","controlType":"Label"},
+        "Transform": {"x":300,"y":190,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","stops":[{"position":0,"color":"#6f8fa0"},{"position":70,"color":"#3a5868"},{"position":100,"color":"#cfd8dc"}]}},"Border":{"enabled":false},"Corners":{"radius":60}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple1","id":"ctrl_1739820696004","controlType":"Label"},
+        "Transform": {"x":300,"y":190,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2246%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple2","id":"ctrl_1739820696005","controlType":"Label"},
+        "Transform": {"x":300,"y":190,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2246%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple3","id":"ctrl_1739820696006","controlType":"Label"},
+        "Transform": {"x":300,"y":190,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2246%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple4","id":"ctrl_1739820696007","controlType":"Label"},
+        "Transform": {"x":300,"y":190,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2246%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1739820696008","controlType":"Label"},
+        "Transform": {"x":40,"y":44,"width":640,"height":80},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"JURASSIC PARK","_children":{"Fill":{"colour":"FFF2C14E"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":58,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_jurassic",
+      "name": "Footsteps",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6600,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_jurassic_1",
+          "controlId": "ctrl_1739820696004",
+          "target": "Transform",
+          "start": 500,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.15,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1.05,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_2",
+          "controlId": "ctrl_1739820696003",
+          "target": "Transform",
+          "start": 500,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -1.5,
+                "y": 0.75
+              },
+              {
+                "at": 0.4,
+                "x": 1.5,
+                "y": -0.75
+              },
+              {
+                "at": 0.6,
+                "x": -0.75,
+                "y": 1.5
+              },
+              {
+                "at": 0.8,
+                "x": 0.75,
+                "y": -0.75
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_3",
+          "controlId": "ctrl_1739820696001",
+          "target": "Transform",
+          "start": 500,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -1.5,
+                "y": 0.75
+              },
+              {
+                "at": 0.4,
+                "x": 1.5,
+                "y": -0.75
+              },
+              {
+                "at": 0.6,
+                "x": -0.75,
+                "y": 1.5
+              },
+              {
+                "at": 0.8,
+                "x": 0.75,
+                "y": -0.75
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_4",
+          "controlId": "ctrl_1739820696002",
+          "target": "Transform",
+          "start": 500,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -1.5,
+                "y": 0.75
+              },
+              {
+                "at": 0.4,
+                "x": 1.5,
+                "y": -0.75
+              },
+              {
+                "at": 0.6,
+                "x": -0.75,
+                "y": 1.5
+              },
+              {
+                "at": 0.8,
+                "x": 0.75,
+                "y": -0.75
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_5",
+          "controlId": "ctrl_1739820696005",
+          "target": "Transform",
+          "start": 1700,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.15,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1.05,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_6",
+          "controlId": "ctrl_1739820696003",
+          "target": "Transform",
+          "start": 1700,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -3,
+                "y": 1.5
+              },
+              {
+                "at": 0.4,
+                "x": 3,
+                "y": -1.5
+              },
+              {
+                "at": 0.6,
+                "x": -1.5,
+                "y": 3
+              },
+              {
+                "at": 0.8,
+                "x": 1.5,
+                "y": -1.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_7",
+          "controlId": "ctrl_1739820696001",
+          "target": "Transform",
+          "start": 1700,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -3,
+                "y": 1.5
+              },
+              {
+                "at": 0.4,
+                "x": 3,
+                "y": -1.5
+              },
+              {
+                "at": 0.6,
+                "x": -1.5,
+                "y": 3
+              },
+              {
+                "at": 0.8,
+                "x": 1.5,
+                "y": -1.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_8",
+          "controlId": "ctrl_1739820696002",
+          "target": "Transform",
+          "start": 1700,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -3,
+                "y": 1.5
+              },
+              {
+                "at": 0.4,
+                "x": 3,
+                "y": -1.5
+              },
+              {
+                "at": 0.6,
+                "x": -1.5,
+                "y": 3
+              },
+              {
+                "at": 0.8,
+                "x": 1.5,
+                "y": -1.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_9",
+          "controlId": "ctrl_1739820696006",
+          "target": "Transform",
+          "start": 2900,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.15,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1.05,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_10",
+          "controlId": "ctrl_1739820696003",
+          "target": "Transform",
+          "start": 2900,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -5,
+                "y": 2.5
+              },
+              {
+                "at": 0.4,
+                "x": 5,
+                "y": -2.5
+              },
+              {
+                "at": 0.6,
+                "x": -2.5,
+                "y": 5
+              },
+              {
+                "at": 0.8,
+                "x": 2.5,
+                "y": -2.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_11",
+          "controlId": "ctrl_1739820696001",
+          "target": "Transform",
+          "start": 2900,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -5,
+                "y": 2.5
+              },
+              {
+                "at": 0.4,
+                "x": 5,
+                "y": -2.5
+              },
+              {
+                "at": 0.6,
+                "x": -2.5,
+                "y": 5
+              },
+              {
+                "at": 0.8,
+                "x": 2.5,
+                "y": -2.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_12",
+          "controlId": "ctrl_1739820696002",
+          "target": "Transform",
+          "start": 2900,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -5,
+                "y": 2.5
+              },
+              {
+                "at": 0.4,
+                "x": 5,
+                "y": -2.5
+              },
+              {
+                "at": 0.6,
+                "x": -2.5,
+                "y": 5
+              },
+              {
+                "at": 0.8,
+                "x": 2.5,
+                "y": -2.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_13",
+          "controlId": "ctrl_1739820696007",
+          "target": "Transform",
+          "start": 4100,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.15,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1.05,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_14",
+          "controlId": "ctrl_1739820696003",
+          "target": "Transform",
+          "start": 4100,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -9,
+                "y": 4.5
+              },
+              {
+                "at": 0.4,
+                "x": 9,
+                "y": -4.5
+              },
+              {
+                "at": 0.6,
+                "x": -4.5,
+                "y": 9
+              },
+              {
+                "at": 0.8,
+                "x": 4.5,
+                "y": -4.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_15",
+          "controlId": "ctrl_1739820696001",
+          "target": "Transform",
+          "start": 4100,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -9,
+                "y": 4.5
+              },
+              {
+                "at": 0.4,
+                "x": 9,
+                "y": -4.5
+              },
+              {
+                "at": 0.6,
+                "x": -4.5,
+                "y": 9
+              },
+              {
+                "at": 0.8,
+                "x": 4.5,
+                "y": -4.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_16",
+          "controlId": "ctrl_1739820696002",
+          "target": "Transform",
+          "start": 4100,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -9,
+                "y": 4.5
+              },
+              {
+                "at": 0.4,
+                "x": 9,
+                "y": -4.5
+              },
+              {
+                "at": 0.6,
+                "x": -4.5,
+                "y": 9
+              },
+              {
+                "at": 0.8,
+                "x": 4.5,
+                "y": -4.5
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_17",
+          "controlId": "ctrl_1739820696004",
+          "target": "Transform",
+          "start": 0,
+          "length": 490,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_18",
+          "controlId": "ctrl_1739820696005",
+          "target": "Transform",
+          "start": 0,
+          "length": 1690,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_19",
+          "controlId": "ctrl_1739820696006",
+          "target": "Transform",
+          "start": 0,
+          "length": 2890,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_20",
+          "controlId": "ctrl_1739820696007",
+          "target": "Transform",
+          "start": 0,
+          "length": 4090,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jurassic_21",
+          "controlId": "ctrl_1739820696008",
+          "target": "Text",
+          "start": 4300,
+          "length": 1000,
+          "effect": {
+            "kind": "text",
+            "effect": "explode",
+            "way": "in",
+            "iterations": 1,
+            "scatter": 140,
+            "scale": 3.2,
+            "order": "random",
+            "stagger": 25,
+            "duration": 620
+          }
+        },
+        {
+          "id": "cl_jurassic_22",
+          "controlId": "ctrl_1739820696008",
+          "target": "Transform",
+          "start": 4300,
+          "length": 300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 2,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2,
+                "x": -6,
+                "y": 3
+              },
+              {
+                "at": 0.4,
+                "x": 6,
+                "y": -3
+              },
+              {
+                "at": 0.6,
+                "x": -3,
+                "y": 6
+              },
+              {
+                "at": 0.8,
+                "x": 3,
+                "y": -3
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1649,6 +1649,55 @@ Verified locally:
   every clip, each on a control it has.
 - Each film recorded frame by frame in Chromium, its frames checked by eye.
 
+## As built: the Film Festival's second reel, and each control stacks as one (2026-11-25)
+
+**Fourteen more films**, the owner having asked for more and not to hold back. Each one leans on
+something the first eight did not:
+- **Star Wars:** a title falling away into the stars, then a crawl of eight lines, each rising and
+  shrinking towards the middle, staggered, so together they read as text sliding into the distance.
+- **Blade Runner:** rain as two scrolling picture patterns, a neon sign stuttering alight, then
+  catching the other gas (Shimmer), a searchlight sweeping the haze.
+- **Tron:** light-cycle trails typed in box-drawing lines, one from its far end, one turning a
+  corner as a typed column, a derez (Explode out), the title wiped in.
+- **Jurassic Park:** footsteps, each ring in the cup wider and each shake harder than the last.
+- **Close Encounters:** five lamps play five notes twice, under a ship whose lights chase round it.
+- **Indiana Jones:** each leg of a route typed along a label turned to lie along it, a plane flying
+  it on one keyframed path, each city named as it lands.
+- **Groundhog Day:** 5:59 flips to 6:00, a Reel of one spin through the digit that was there.
+- **Alien:** a tracker's sweep and pings, blips closing in, a range rolling down, the title gathering
+  a letter at a time out of order.
+- **The Wizard of Oz:** a sepia overlay and a door; the door opens and the colour comes in through it.
+- **Ocean's Eleven:** a 40-bulb marquee chasing, three slot reels stopping one after another on sevens.
+- **2001:** the earth climbing over the moon and the sun over the earth, radial gradients all.
+- **Speed:** the one film on a real control's value: a knob's needle on a value clip, kept above
+  fifty, nearly not.
+- **Inception:** frames falling away inside frames, a spinning top, a cut to black before it falls.
+- **Top Gun:** the horizon banking, brackets closing on a target, LOCK.
+
+The film helper's labels now take alignment, letter spacing, line height and rotation, written where
+the inspector keeps them (`Text.Position.justification`, `Text.Font.letterSpacing`,
+`Text.Multiline.lineHeight`, `Transform.rotation`).
+
+**Found building Inception, and fixed: a Label's words showed through a later control laid over it.**
+- Inside a control its words sit at `z-index: 2`, a part's frames at their own. `.canvas-control`
+  set no z-index and nothing else that makes a stacking context, so those layers joined the
+  surface's stacking. They painted over every later control drawn above them. Inception's cut to
+  black kept its title.
+- The fold hid it for still controls only where both were folded: two plain overlapping Labels on
+  a live surface showed it, as did any live Label under a live cover.
+- `.canvas-control` now has `isolation: isolate`. Each control is a stacking context of its own, in
+  the document-order band, still with no z-index (SceneryGround's comment says why there is none).
+  A control's own blend mode sits on that element, so it still blends with what is behind it.
+  Blends inside a control (a script's drawing, a part's gradient blend) now blend within the
+  control, which is what "over its normal content" meant.
+
+Verified locally:
+- The browser check `scenePlayback` lays a red Label exactly over another's words and samples the
+  pixels where the words are. Without the fix 935 of 1,920 are not the cover's red; with it, none.
+- `test/filmFestival.test.js`: the second reel's value clip on a real knob, the one-spin reels, the
+  typed trails and the slot reels.
+- Each new film recorded frame by frame in Chromium, its frames checked by eye.
+
 ## Open
 
 Nothing for the owner at present.

@@ -1,0 +1,534 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "d7ead539-f11d-4fe5-a5e5-d7ead539d7ea",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Tron",
+  "scriptId": "film_tron",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF000000",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Horizon","id":"ctrl_1722491449000","controlType":"Label"},
+        "Transform": {"width":720,"height":190},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#000000"},{"position":100,"color":"#04202a"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Floor","id":"ctrl_1722491449001","controlType":"Label"},
+        "Transform": {"y":190,"width":720,"height":215},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#021016"},{"position":100,"color":"#000000"}]}},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:grid","tint":"FF00E5FF","opacity":38,"blend":"normal","scale":2.4,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":90,"direction":90,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Edge","id":"ctrl_1722491449002","controlType":"Label"},
+        "Transform": {"y":188,"width":720,"height":2},
+        "Background": {"_children":{"Fill":{"colour":"FF00E5FF"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FF00E5FF"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TrailBlue","id":"ctrl_1722491449003","controlType":"Label"},
+        "Transform": {"x":20,"y":248,"width":680,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━","_children":{"Fill":{"colour":"FF00E5FF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":20},"Multiline":{"lineHeight":1},"Position":{"justification":"left"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FF00E5FF"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TrailOrange","id":"ctrl_1722491449004","controlType":"Label"},
+        "Transform": {"x":300,"y":308,"width":400,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━","_children":{"Fill":{"colour":"FFFF8A1F"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":20},"Multiline":{"lineHeight":1},"Position":{"justification":"right"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFF8A1F"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TrailUp","id":"ctrl_1722491449005","controlType":"Label"},
+        "Transform": {"x":294,"y":262,"width":14,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"┃\n┃\n┃","_children":{"Fill":{"colour":"FFFF8A1F"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":20},"Multiline":{"lineHeight":1}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFF8A1F"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CycleBlue","id":"ctrl_1722491449006","controlType":"Label"},
+        "Transform": {"x":6,"y":254,"width":28,"height":10},
+        "Background": {"_children":{"Fill":{"colour":"FFB8F6FF"},"Border":{"enabled":false},"Corners":{"radius":5}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":14,"spread":1,"colour":"FF00E5FF"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CycleOrange","id":"ctrl_1722491449007","controlType":"Label"},
+        "Transform": {"x":686,"y":314,"width":28,"height":10},
+        "Background": {"_children":{"Fill":{"colour":"FFFFD3A0"},"Border":{"enabled":false},"Corners":{"radius":5}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":14,"spread":1,"colour":"FFFF8A1F"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Derez","id":"ctrl_1722491449008","controlType":"Label"},
+        "Transform": {"x":250,"y":250,"width":100,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"▪ ▪ ▪ ▪ ▪ ▪","_children":{"Fill":{"colour":"FFFF8A1F"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1722491449009","controlType":"Label"},
+        "Transform": {"y":60,"width":720,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TRON","_children":{"Fill":{"colour":"FFB8F6FF"},"Font":{"family":"Rubik","weight":"Medium","weightValue":500,"size":84,"letterSpacing":18}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":18,"spread":1,"colour":"FF00E5FF"}]}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_tron",
+      "name": "Light cycles",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6200,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_tron_1",
+          "controlId": "ctrl_1722491449006",
+          "target": "Transform",
+          "start": 0,
+          "length": 3000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0
+              },
+              {
+                "at": 1,
+                "x": 680
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tron_2",
+          "controlId": "ctrl_1722491449003",
+          "target": "Text",
+          "start": 0,
+          "length": 3000,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 53,
+            "duration": 60
+          }
+        },
+        {
+          "id": "cl_tron_3",
+          "controlId": "ctrl_1722491449007",
+          "target": "Transform",
+          "start": 0,
+          "length": 2300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.78,
+                "x": -392,
+                "y": 0
+              },
+              {
+                "at": 1,
+                "x": -392,
+                "y": -58
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tron_4",
+          "controlId": "ctrl_1722491449004",
+          "target": "Text",
+          "start": 0,
+          "length": 1800,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "order": "reverse",
+            "stagger": 55,
+            "duration": 60
+          }
+        },
+        {
+          "id": "cl_tron_5",
+          "controlId": "ctrl_1722491449005",
+          "target": "Text",
+          "start": 1800,
+          "length": 500,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "order": "reverse",
+            "stagger": 160,
+            "duration": 60
+          }
+        },
+        {
+          "id": "cl_tron_6",
+          "controlId": "ctrl_1722491449007",
+          "target": "Transform",
+          "start": 2300,
+          "length": 300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 3,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tron_7",
+          "controlId": "ctrl_1722491449008",
+          "target": "Transform",
+          "start": 0,
+          "length": 2300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tron_8",
+          "controlId": "ctrl_1722491449008",
+          "target": "Text",
+          "start": 2300,
+          "length": 900,
+          "effect": {
+            "kind": "text",
+            "effect": "explode",
+            "way": "out",
+            "iterations": 1,
+            "scatter": 70,
+            "scale": 1.4,
+            "stagger": 10,
+            "duration": 700
+          }
+        },
+        {
+          "id": "cl_tron_9",
+          "controlId": "ctrl_1722491449009",
+          "target": "Text",
+          "start": 3100,
+          "length": 900,
+          "effect": {
+            "kind": "text",
+            "effect": "wipe",
+            "way": "in",
+            "iterations": 1,
+            "duration": 900
+          }
+        },
+        {
+          "id": "cl_tron_10",
+          "controlId": "ctrl_1722491449003",
+          "target": "Transform",
+          "start": 5400,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tron_11",
+          "controlId": "ctrl_1722491449004",
+          "target": "Transform",
+          "start": 5400,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tron_12",
+          "controlId": "ctrl_1722491449005",
+          "target": "Transform",
+          "start": 5400,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tron_13",
+          "controlId": "ctrl_1722491449006",
+          "target": "Transform",
+          "start": 5400,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

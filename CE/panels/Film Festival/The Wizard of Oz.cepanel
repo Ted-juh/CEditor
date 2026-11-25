@@ -1,0 +1,360 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "03f5a42b-f11d-4fe5-a5e5-03f5a42b03f5",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "The Wizard of Oz",
+  "scriptId": "film_oz",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF6EC6FF",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Sky","id":"ctrl_1766429995000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#4aa8f0"},{"position":100,"color":"#c8ecff"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Rainbow","id":"ctrl_1766429995001","controlType":"Label"},
+        "Transform": {"x":60,"y":30,"width":600,"height":300},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22600%22%20height%3D%22300%22%20viewBox%3D%220%200%20600%20300%22%3E%3Cpath%20d%3D%22M%2020%20300%20A%20280%20280%200%200%201%20580%20300%22%20fill%3D%22none%22%20stroke%3D%22%23e53935%22%20stroke-width%3D%2214%22%20stroke-opacity%3D%22.85%22%2F%3E%3Cpath%20d%3D%22M%2034%20300%20A%20266%20266%200%200%201%20566%20300%22%20fill%3D%22none%22%20stroke%3D%22%23fb8c00%22%20stroke-width%3D%2214%22%20stroke-opacity%3D%22.85%22%2F%3E%3Cpath%20d%3D%22M%2048%20300%20A%20252%20252%200%200%201%20552%20300%22%20fill%3D%22none%22%20stroke%3D%22%23fdd835%22%20stroke-width%3D%2214%22%20stroke-opacity%3D%22.85%22%2F%3E%3Cpath%20d%3D%22M%2062%20300%20A%20238%20238%200%200%201%20538%20300%22%20fill%3D%22none%22%20stroke%3D%22%2343a047%22%20stroke-width%3D%2214%22%20stroke-opacity%3D%22.85%22%2F%3E%3Cpath%20d%3D%22M%2076%20300%20A%20224%20224%200%200%201%20524%20300%22%20fill%3D%22none%22%20stroke%3D%22%231e88e5%22%20stroke-width%3D%2214%22%20stroke-opacity%3D%22.85%22%2F%3E%3Cpath%20d%3D%22M%2090%20300%20A%20210%20210%200%200%201%20510%20300%22%20fill%3D%22none%22%20stroke%3D%22%233949ab%22%20stroke-width%3D%2214%22%20stroke-opacity%3D%22.85%22%2F%3E%3Cpath%20d%3D%22M%20104%20300%20A%20196%20196%200%200%201%20496%20300%22%20fill%3D%22none%22%20stroke%3D%22%238e24aa%22%20stroke-width%3D%2214%22%20stroke-opacity%3D%22.85%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"City","id":"ctrl_1766429995002","controlType":"Label"},
+        "Transform": {"x":430,"y":120,"width":260,"height":170},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22260%22%20height%3D%22170%22%20viewBox%3D%220%200%20260%20170%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22e%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%237dffb0%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230b6b35%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M%2030%20170%20L%2030%2080%20L%2044%2060%20L%2058%2080%20L%2058%20170%20Z%22%20fill%3D%22url(%23e)%22%2F%3E%3Cpath%20d%3D%22M%2070%20170%20L%2070%2040%20L%2084%2020%20L%2098%2040%20L%2098%20170%20Z%22%20fill%3D%22url(%23e)%22%2F%3E%3Cpath%20d%3D%22M%20110%20170%20L%20110%2020%20L%20124%200%20L%20138%2020%20L%20138%20170%20Z%22%20fill%3D%22url(%23e)%22%2F%3E%3Cpath%20d%3D%22M%20150%20170%20L%20150%2050%20L%20164%2030%20L%20178%2050%20L%20178%20170%20Z%22%20fill%3D%22url(%23e)%22%2F%3E%3Cpath%20d%3D%22M%20190%20170%20L%20190%2090%20L%20204%2070%20L%20218%2090%20L%20218%20170%20Z%22%20fill%3D%22url(%23e)%22%2F%3E%3Cpath%20d%3D%22M%2060%20170%20L%2060%20110%20L%2074%2090%20L%2088%20110%20L%2088%20170%20Z%22%20fill%3D%22url(%23e)%22%2F%3E%3Cpath%20d%3D%22M%20160%20170%20L%20160%20120%20L%20174%20100%20L%20188%20120%20L%20188%20170%20Z%22%20fill%3D%22url(%23e)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Fields","id":"ctrl_1766429995003","controlType":"Label"},
+        "Transform": {"y":285,"width":720,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#4caf50"},{"position":100,"color":"#1b5e20"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Road","id":"ctrl_1766429995004","controlType":"Label"},
+        "Transform": {"x":270,"y":285,"width":180,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"FFF5C518"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2224%22%20viewBox%3D%220%200%2040%2024%22%3E%3Cpath%20d%3D%22M0%200.5%20H%2040%20M0%2012.5%20H%2040%20M0.5%200%20V%2012%20M20.5%2012%20V%2024%20M0%2024.5%20H%2040%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22%20fill%3D%22none%22%2F%3E%3C%2Fsvg%3E","tint":"FFB8860B","opacity":90,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":30,"direction":90,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1766429995005","controlType":"Label"},
+        "Transform": {"y":22,"width":720,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"THE WIZARD OF OZ","_children":{"Fill":{"colour":"FF0B8A3A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":40,"letterSpacing":4}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFFFFF"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sepia","id":"ctrl_1766429995006","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"FF8A6A42"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Door","id":"ctrl_1766429995007","controlType":"Label"},
+        "Transform": {"x":300,"y":90,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":90,"stops":[{"position":0,"color":"#4a3420"},{"position":50,"color":"#6a4c30"},{"position":100,"color":"#4a3420"}]}},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Knob","id":"ctrl_1766429995008","controlType":"Label"},
+        "Transform": {"x":396,"y":200,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFC9A15A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_oz",
+      "name": "Over the rainbow",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6400,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_oz_1",
+          "controlId": "ctrl_1766429995007",
+          "target": "Transform",
+          "start": 900,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "x": -150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oz_2",
+          "controlId": "ctrl_1766429995008",
+          "target": "Transform",
+          "start": 900,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "x": -150,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oz_3",
+          "controlId": "ctrl_1766429995006",
+          "target": "Transform",
+          "start": 1500,
+          "length": 1800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.9
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oz_4",
+          "controlId": "ctrl_1766429995005",
+          "target": "Text",
+          "start": 3300,
+          "length": 1200,
+          "effect": {
+            "kind": "text",
+            "effect": "shimmer",
+            "way": "in",
+            "iterations": 1,
+            "colour": "FFFFFFFF",
+            "stagger": 40,
+            "duration": 500
+          }
+        },
+        {
+          "id": "cl_oz_5",
+          "controlId": "ctrl_1766429995002",
+          "target": "Transform",
+          "start": 3300,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 2,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.5,
+                "scale": 1.05
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

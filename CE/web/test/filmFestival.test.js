@@ -1,4 +1,4 @@
-// filmFestival.test.js — the Film Festival's eight panels (scripts/filmFestivalPanels.js, written to
+// filmFestival.test.js — the Film Festival's panels (scripts/filmFestivalPanels.js, written to
 // CE/panels/Film Festival/ by export-film-festival.mjs): the committed files are what the script
 // writes, each opens as a panel, and each one's scene keeps every clip on a control the panel has.
 
@@ -42,4 +42,19 @@ test('the films show the new text effects: The Shining parts its word, The Matri
   assert.ok(effectsOf('matrix').includes('reel:in'));
   assert.ok(effectsOf('bttf').includes('reel:in'));
   assert.ok(effectsOf('psycho').includes('part:out'));
+});
+
+test('the second reel shows the rest of the Designer: a value clip on a real knob, a reel of one spin, typed trails', () => {
+  const clipsOf = (id) => filmPanel(id).animationScenes[0].clips;
+  const speed = filmPanel('speed');
+  const knob = speed.controls.find((control) => control._children.Core.name === 'Speedometer');
+  assert.equal(knob._children.Core.controlType, 'Knob');
+  const needle = clipsOf('speed').find((clip) => clip.controlId === knob._children.Core.id && clip.target === 'Value');
+  assert.ok(needle, 'Speed drives the knob\'s value');
+  const held = needle.effect.frames.filter((frame) => Number.isFinite(frame.value) && frame.at > 0);
+  assert.ok(held.every((frame) => frame.value > 0.5), 'and keeps it above fifty once it is up');
+  const flips = clipsOf('groundhog').filter((clip) => clip.effect.effect === 'reel');
+  assert.deepEqual(flips.map((clip) => clip.effect.spins), [1, 1, 1], '5:59 flips to 6:00, one glyph each');
+  assert.ok(clipsOf('tron').some((clip) => clip.effect.effect === 'typewriter' && clip.effect.order === 'reverse'), 'a trail typed from its far end');
+  assert.ok(clipsOf('oceans').filter((clip) => clip.effect.effect === 'reel').length === 3, 'three slot reels');
 });

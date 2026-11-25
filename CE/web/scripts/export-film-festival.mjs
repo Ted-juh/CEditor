@@ -1,5 +1,5 @@
 // Writes the Film Festival (filmFestivalPanels.js) to CE/panels/Film Festival/, one `.cepanel` a
-// film: eight homages to films' title sequences, each a tour of a corner of the Animation Designer.
+// film: homages to films' title sequences, each a tour of a corner of the Animation Designer.
 //
 //   node --import ./test/support/register-svelte.mjs scripts/export-film-festival.mjs          # write
 //   node --import ./test/support/register-svelte.mjs scripts/export-film-festival.mjs --check  # exit 1 if stale

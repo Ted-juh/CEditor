@@ -1,0 +1,386 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "d7f4f4e4-f11d-4fe5-a5e5-d7f4f4e4d7f4",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Indiana Jones",
+  "scriptId": "film_indy",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFEAD8AD",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Map","id":"ctrl_1723154916000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22720%22%20height%3D%22405%22%20viewBox%3D%220%200%20720%20405%22%3E%3Crect%20width%3D%22720%22%20height%3D%22405%22%20fill%3D%22%23ead8ad%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%2290%22%20y1%3D%220%22%20x2%3D%2290%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%22180%22%20y1%3D%220%22%20x2%3D%22180%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%22270%22%20y1%3D%220%22%20x2%3D%22270%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%22360%22%20y1%3D%220%22%20x2%3D%22360%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%22450%22%20y1%3D%220%22%20x2%3D%22450%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%22540%22%20y1%3D%220%22%20x2%3D%22540%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%22630%22%20y1%3D%220%22%20x2%3D%22630%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%22720%22%20y1%3D%220%22%20x2%3D%22720%22%20y2%3D%22405%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22720%22%20y2%3D%220%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%22101%22%20x2%3D%22720%22%20y2%3D%22101%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%22202%22%20x2%3D%22720%22%20y2%3D%22202%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%22303%22%20x2%3D%22720%22%20y2%3D%22303%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%22404%22%20x2%3D%22720%22%20y2%3D%22404%22%20stroke%3D%22%23b39463%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cpath%20d%3D%22M40%20120%20C%2080%2080%20170%2090%20210%20140%20C%20230%20200%20180%20260%20130%20280%20C%2080%20300%2030%20240%2040%20120%20Z%22%20fill%3D%22%23d2b47e%22%20stroke%3D%22%238a6a3a%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M260%2090%20C%20330%2060%20420%2080%20450%20130%20C%20470%20180%20420%20220%20380%20230%20C%20330%20240%20280%20200%20260%20160%20Z%22%20fill%3D%22%23d2b47e%22%20stroke%3D%22%238a6a3a%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M330%20250%20C%20370%20240%20420%20270%20410%20320%20C%20400%20370%20350%20380%20330%20350%20C%20310%20320%20300%20270%20330%20250%20Z%22%20fill%3D%22%23d2b47e%22%20stroke%3D%22%238a6a3a%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M500%20110%20C%20580%2090%20680%20120%20690%20190%20C%20700%20260%20640%20300%20570%20290%20C%20510%20280%20480%20220%20490%20170%20Z%22%20fill%3D%22%23d2b47e%22%20stroke%3D%22%238a6a3a%22%20stroke-width%3D%221.5%22%2F%3E%3Ccircle%20cx%3D%22660%22%20cy%3D%22350%22%20r%3D%2230%22%20fill%3D%22none%22%20stroke%3D%22%238a6a3a%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M660%20318%20L%20666%20350%20L%20660%20382%20L%20654%20350%20Z%22%20fill%3D%22%238a6a3a%22%2F%3E%3Crect%20width%3D%22720%22%20height%3D%22405%22%20fill%3D%22none%22%20stroke%3D%22%23a07c48%22%20stroke-width%3D%2210%22%20stroke-opacity%3D%22.5%22%2F%3E%3C%2Fsvg%3E","imageFit":"cover"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lisbon","id":"ctrl_1723154916001","controlType":"Label"},
+        "Transform": {"x":104,"y":244,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FF8A1C14"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Cairo","id":"ctrl_1723154916002","controlType":"Label"},
+        "Transform": {"x":339,"y":154,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FF8A1C14"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Kathmandu","id":"ctrl_1723154916003","controlType":"Label"},
+        "Transform": {"x":594,"y":224,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FF8A1C14"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LisbonName","id":"ctrl_1723154916004","controlType":"Label"},
+        "Transform": {"x":40,"y":260,"width":140,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LISBON","_children":{"Fill":{"colour":"FF5A2E14"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":14,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CairoName","id":"ctrl_1723154916005","controlType":"Label"},
+        "Transform": {"x":275,"y":170,"width":140,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CAIRO","_children":{"Fill":{"colour":"FF5A2E14"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":14,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KathmanduName","id":"ctrl_1723154916006","controlType":"Label"},
+        "Transform": {"x":530,"y":240,"width":140,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"KATHMANDU","_children":{"Fill":{"colour":"FF5A2E14"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":14,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Route1","id":"ctrl_1723154916007","controlType":"Label"},
+        "Transform": {"x":102,"y":194,"width":252,"height":22,"rotation":-21},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"━━━━━━━━━━━━━━━━━━━","_children":{"Fill":{"colour":"FFC0261C"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":20},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Route2","id":"ctrl_1723154916008","controlType":"Label"},
+        "Transform": {"x":340,"y":184,"width":264,"height":22,"rotation":15.4},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"━━━━━━━━━━━━━━━━━━━━","_children":{"Fill":{"colour":"FFC0261C"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":20},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Plane","id":"ctrl_1723154916009","controlType":"Label"},
+        "Transform": {"x":78,"y":235,"width":64,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2264%22%20height%3D%2230%22%20viewBox%3D%220%200%2064%2030%22%3E%3Cpath%20d%3D%22M2%2015%20L%2040%2013%20L%2048%206%20L%2052%206%20L%2050%2013%20L%2058%2013%20C%2062%2013%2062%2017%2058%2017%20L%2050%2017%20L%2052%2024%20L%2048%2024%20L%2040%2017%20L%202%2015%20Z%20M8%2015%20L%204%209%20L%208%209%20L%2014%2014%20Z%22%20fill%3D%22%233a2414%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1723154916010","controlType":"Label"},
+        "Transform": {"y":24,"width":720,"height":70},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"INDIANA JONES","_children":{"Fill":{"colour":"FF5A1E0E"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":52,"letterSpacing":3}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_indy",
+      "name": "By map",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 7100,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_indy_1",
+          "controlId": "ctrl_1723154916007",
+          "target": "Text",
+          "start": 400,
+          "length": 2100,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 105,
+            "duration": 80
+          }
+        },
+        {
+          "id": "cl_indy_2",
+          "controlId": "ctrl_1723154916005",
+          "target": "Text",
+          "start": 2400,
+          "length": 700,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 40,
+            "duration": 150
+          }
+        },
+        {
+          "id": "cl_indy_3",
+          "controlId": "ctrl_1723154916008",
+          "target": "Text",
+          "start": 2600,
+          "length": 2100,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 100,
+            "duration": 80
+          }
+        },
+        {
+          "id": "cl_indy_4",
+          "controlId": "ctrl_1723154916006",
+          "target": "Text",
+          "start": 4600,
+          "length": 700,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 40,
+            "duration": 150
+          }
+        },
+        {
+          "id": "cl_indy_5",
+          "controlId": "ctrl_1723154916009",
+          "target": "Transform",
+          "start": 400,
+          "length": 4400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "rotate": -20.955776730632184
+              },
+              {
+                "at": 0.5,
+                "x": 235,
+                "y": -90,
+                "rotate": 15.35013649242442
+              },
+              {
+                "at": 1,
+                "x": 490,
+                "y": -20,
+                "rotate": 15.35013649242442
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_indy_6",
+          "controlId": "ctrl_1723154916004",
+          "target": "Text",
+          "start": 100,
+          "length": 600,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 40,
+            "duration": 150
+          }
+        },
+        {
+          "id": "cl_indy_7",
+          "controlId": "ctrl_1723154916010",
+          "target": "Text",
+          "start": 4900,
+          "length": 1100,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "stagger": 45,
+            "duration": 380,
+            "direction": "up"
+          }
+        }
+      ]
+    }
+  ]
+}
