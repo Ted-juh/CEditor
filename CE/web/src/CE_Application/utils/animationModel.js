@@ -32,6 +32,7 @@ import { TEXT_TRIGGER_TYPES, newTextEffectShape } from './textEffects.js';
 import { patternEntries, patternLabel } from './patternLayers.js';
 import { cleanValueFrames, VALUE_TARGET } from './sceneFormat.js';
 import { controlDrawsValue } from './valueDrawn.js';
+import { sliderWordsRefusal } from './anatomyWords.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import {
   KEYFRAME_TRIGGER_TYPES,
@@ -278,17 +279,20 @@ export function animationsEnabled(control) {
  * A keyframe animation's target only says WHERE it plays — the frames say what moves — so the one
  * thing that can be wrong with it is a part that is not there.
  */
-/** A text effect plays on the control's own words ('Text') or a part's. */
-function textTargetStatus(target, partNames) {
+/**
+ * A text effect plays on the control's own words ('Text') or a part's. On a knob or a slider, only
+ * where it draws words or marks of its own: its scale's numbers, its ticks, its handle labels
+ * (utils/anatomyWords.js).
+ */
+function textTargetStatus(target, partNames, control = null) {
   const path = String(target?.path ?? '').trim();
-  if (path.startsWith('Parts.')) {
-    const part = path.split('.')[1] || '';
-    if (part && partNames.length && !partNames.includes(part)) {
-      return { works: false, reason: 'missing part', part, detail: `This control has no part called "${part}", so the words it plays on are not there.` };
-    }
-    return { works: true, animates: 'text', buckets: [], part };
+  const part = path.startsWith('Parts.') ? (path.split('.')[1] || '') : '';
+  if (part && partNames.length && !partNames.includes(part)) {
+    return { works: false, reason: 'missing part', part, detail: `This control has no part called "${part}", so the words it plays on are not there.` };
   }
-  return { works: true, animates: 'text', buckets: [], part: '' };
+  const refusal = control ? sliderWordsRefusal(control, part) : '';
+  if (refusal) return { works: false, reason: 'no words', part, detail: refusal };
+  return { works: true, animates: 'text', buckets: [], part };
 }
 
 /** A value animation plays on what the value draws, and nowhere else. */
@@ -427,8 +431,8 @@ export function baseValueAt(control, path) {
   return value === undefined || value === null || typeof value === 'object' ? undefined : value;
 }
 
-/** Each target with its status attached, ready to list. */
-export function describeTargets(row, partNames = []) {
+/** Each target with its status attached, ready to list. `control`, where given, lets a knob say where it draws words. */
+export function describeTargets(row, partNames = [], { control = null } = {}) {
   const keyframes = row?.kind === 'keyframes';
   const sequence = row?.kind === SEQUENCE_KIND;
   const words = row?.kind === 'text';
@@ -437,7 +441,7 @@ export function describeTargets(row, partNames = []) {
   const statusOf = (target) => {
     if (drawn) return valueTargetStatus(target);
     if (keyframes) return keyframeTargetStatus(target, partNames);
-    if (words) return textTargetStatus(target, partNames);
+    if (words) return textTargetStatus(target, partNames, control);
     if (sequence) return sequenceTargetStatus(target, partNames, context);
     return sequenceOnlyStatus(target, String(row?.kind ?? 'transition')) ?? targetStatus(target, partNames);
   };
@@ -451,8 +455,8 @@ export function describeTargets(row, partNames = []) {
 }
 
 /** How many of an animation's targets do nothing. */
-export function deadTargetCount(row, partNames = []) {
-  return describeTargets(row, partNames).filter((entry) => !entry.status.works).length;
+export function deadTargetCount(row, partNames = [], options = {}) {
+  return describeTargets(row, partNames, options).filter((entry) => !entry.status.works).length;
 }
 
 // --- Triggers ---------------------------------------------------------------

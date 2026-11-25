@@ -1261,7 +1261,14 @@ There are four kinds, and a fifth on a knob or a slider:
 - **Text** — an effect on the control's words themselves: **Typewriter**, **Explode**, **Roll**,
   **Push**, **Wipe**, **Crossfade** and **Shimmer**, each **In** or **Out**, cut into letters, words
   or lines that start one after another (**ms apart**), forwards, backwards, from the centre or in
-  a random order. It can wait for the words to change: to the value, or to the name.
+  a random order. It can wait for the words to change: to the value, or to the name. A knob or a
+  slider has no words of its own (its name and value are Labels beside it), so on one it plays on
+  what it draws itself, picked under **Plays on**: the **Numbers** round its scale, its **Ticks**, or
+  the labels on its handles. On a scale each number or tick is one piece, round the dial in order:
+  a typewriter writes 0 2 4 6 8 10 one after another, and **Whole** plays them together. Ticks
+  drawn as lines or dots take it too, so a scale can light a tick at a time. A text effect dropped
+  on a knob in the Animation Designer goes to its numbers, else its numeral ticks, its handle
+  labels or its ticks, whichever it shows.
 - **Value** (knobs, sliders, the Macro and meters) — moves what the value draws, its arc, ring, pointer, needle or bar, then hands
   back to the value: a new one is a ring sweep, round to full and back. It plays on the same
   triggers as **Keyframes** except **all the time**, and with **Loop** it repeats while its state

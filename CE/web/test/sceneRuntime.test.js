@@ -150,6 +150,23 @@ test('seek holds a scene at a point of its length, paused, until it is started o
   assert.equal(runtime.seek('s', 'half'), false);
 });
 
+test('a seek into a run makes its animations afresh, so the time it had run does not count; one from a hold does not', () => {
+  const timers = fakeTimers();
+  const runtime = createSceneRuntime({ timers });
+  runtime.setScenes([scene('s', { type: 'script' }, { length: 2000 })]);
+  runtime.start('s');
+  assert.deepEqual(brief(runtime), [['s', 'a', null]]);
+  runtime.seek('s', 0.25);
+  assert.deepEqual(brief(runtime), [['s', 'b', 500]], 'the other phase: a CSS animation paused from its first moment');
+  runtime.seek('s', 0.5);
+  assert.deepEqual(brief(runtime), [['s', 'b', 1000]], 'held already: the same animation, only its delay moves');
+  runtime.start('s');
+  timers.advance(2000);
+  assert.deepEqual(brief(runtime), [['s', 'a', 2000]], 'played to its end');
+  runtime.seek('s', 0.1);
+  assert.deepEqual(brief(runtime), [['s', 'b', 200]], 'after a finished play, afresh too');
+});
+
 test('a one-off effect plays on its place, and a new one there replaces it', () => {
   const timers = fakeTimers();
   const runtime = createSceneRuntime({ timers });

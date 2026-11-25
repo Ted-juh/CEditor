@@ -159,8 +159,8 @@
   // For "does this part exist" on a sequence, generator-made parts count: a filmstrip's frame
   // lives on one, and the document never holds it.
   let knownPartNames = $derived(sequence ? [...new Set([...partNames, ...Object.keys(resolvedPartsOf(control))])] : partNames);
-  let targets = $derived(selected ? describeTargets(selected, knownPartNames) : []);
-  let deadCount = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
+  let targets = $derived(selected ? describeTargets(selected, knownPartNames, { control }) : []);
+  let deadCount = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames, { control }), 0));
 
   // Triggers name states by the control's own States keys; anything else never matches.
   let stateNames = $derived(control ? controlStateNames(control) : []);
@@ -719,6 +719,7 @@ onMount(() => {
         <div class="listwrap">
           <AnimationList
             {rows}
+            {control}
             {partNames}
             {stateNames}
             {clashes}

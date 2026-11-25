@@ -93,7 +93,7 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
   let frameHandle = null;
   let lastFrame = null;
   const extras = new Map();     // key -> scene: one-off effects (ce.anim.effect, swap), one per place
-  const plays = new Map();      // sceneId -> { phase, at }
+  const plays = new Map();      // sceneId -> { phase, at, held }: held, a seek's
   const timers_ = new Map();    // sceneId -> handle
   const beatSlots = new Map();  // sceneId -> floor(beats / every), or null while stopped
   const dones = new Map();      // sceneId -> done(completed), from a script
@@ -225,8 +225,13 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
       }
       stopTimer(scene.id);
       finish(scene.id, false);
+      // A CSS animation paused by its play state keeps the time it has already run, and a new delay
+      // counts from there: a seek into a run, or after one, would land late by that much. So it
+      // makes the animation afresh (the other phase), paused from its first moment at the point
+      // sought. A seek from a hold keeps it: paused since it was made, it has run no time of its own.
       const before = plays.get(scene.id);
-      plays.set(scene.id, { phase: before?.phase ?? 'a', at: Math.max(0, Math.min(1, where)) * scene.length });
+      const phase = !before ? 'a' : before.held ? before.phase : before.phase === 'a' ? 'b' : 'a';
+      plays.set(scene.id, { phase, at: Math.max(0, Math.min(1, where)) * scene.length, held: true });
       onChange();
       return true;
     },

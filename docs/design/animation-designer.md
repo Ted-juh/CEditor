@@ -386,8 +386,8 @@ Label. `animationModel.js` `animationsPatch` writes the whole section from its d
 missing, and all three use it.
 
 Not built: hover peeks (an effect shown while the pointer is over its row), text drawn by a
-slider's handle label or a control's own anatomy (a knob's tick labels), and shimmer as anything
-but a sweep, once or looped. Saving an effect as a preset is step 4.
+slider's handle label or a control's own anatomy (a knob's tick labels; built since, below), and
+shimmer as anything but a sweep, once or looped. Saving an effect as a preset is step 4.
 
 Verified locally: `npm run test:all`, `npm run build`, svelte-check (the one warning from before),
 `npm run lint`, and the Animation tab and panel-motion browser checks. The second plays a
@@ -1175,6 +1175,70 @@ Verified locally:
   `animationDesigner` and `anatomyForms`;
 - WebKitGTK 2.52: the drift held near its end, scale 1.149 and pan −4 % −3 %. The checker image moved
   inside the label's border while the label and its words stayed put.
+
+## As built: text effects on a knob's own words (2026-11-25)
+
+Step 2 left out "text drawn by a slider's handle label or a control's own anatomy (a knob's tick
+labels)". A knob has no words of its own: its name, value and unit are Labels beside it. What it
+draws itself takes the text effects a Label takes, from the same engine (`utils/anatomyWords.js`
+over `textEffects.js`).
+
+- **Where.** The scale's numbers (`Parts.tickNumber`) and ticks (`Parts.tickMajor`, `tickMinor`),
+  drawn in the knob's SVG, and the labels on a slider's handles (`Parts.labelStart`,
+  `labelCurrent`, `labelEnd`), which are HTML. **Plays on** already offered these places; nothing
+  drew an effect there.
+- **One piece a mark.** On a scale each number or tick is one piece, round it in order, whatever
+  the split, because a scale's pieces are its marks; **Whole** plays them together.
+  - A typewriter writes 0 2 4 6 8 10 round the dial; an explosion gathers the numbers in from all
+    sides.
+  - Ticks drawn as lines or dots take an effect too: a scale lit a tick at a time.
+  - The second scale's ticks follow the first's of their kind.
+  - Handle labels are cut as a Label's words are.
+- **Drawing a mark in an effect.**
+  - It paints with `currentColor`, its colour in `color`, so the engine's colour keyframes (a
+    typewriter's arriving colour, a shimmer's light) reach SVG as they reach HTML.
+  - It moves about its own box (`transform-box: fill-box`), not the drawing's.
+  - The part's opacity goes on a group around it, so the effect's own fades run to full and land
+    on that opacity rather than snapping to it at the end.
+  - A roll or a push clips each mark to a box about itself, as a Label's box clips its words: an
+    SVG `clipPath` (`markClipBox`, from the number's size and length or the tick's ends).
+  - A mark with no effect is drawn exactly as before.
+- **Where an effect is put.**
+  - A text effect dropped on a knob in the Designer goes to its numbers, else its numeral ticks,
+    its handle labels or its plain ticks, whichever it shows (`sliderWordsPlace`).
+  - Where it draws none, the Designer says why.
+  - The Animation tab marks a text effect aimed at the knob's own words, at a part that draws none
+    (its cap, its title label) or at numbers it does not show as doing nothing, with the reason
+    (`sliderWordsRefusal`, reason `no words`).
+  - A part added to a knob is drawn as a part, words and all, and is left alone.
+- **Found on the way, and fixed: `ce.anim.seek` landed late after a run.** A CSS animation paused
+  by its play state keeps the time it has already run, and a new delay counts from there. So a seek
+  into a running or finished scene showed it later by the time it had played: 2 s into a 6 s drift,
+  a seek to half way showed 5 s. A seek now makes the scene's animations afresh (the other phase),
+  paused from their first moment at the point sought. A seek from an earlier hold keeps them, since
+  an animation paused since it was made has run no time of its own.
+
+Left out: a knob drawn as a form (`Core.controlForm`, ControlAnatomy) and a knob carried inside a
+component's part. Both draw their scales elsewhere, and neither plays these effects yet.
+
+Verified locally:
+- `test/anatomyWords.test.js` (new):
+  - which words a knob shows, and where a dropped effect goes;
+  - the refusals;
+  - one piece a mark, and Whole;
+  - the clip boxes;
+  - a scene clip reaching the part;
+  - the knob rendered with effects on its numbers, ticks and a handle label;
+  - the Animation tab's reason.
+- `test/sceneRuntime.test.js`: a seek into a run, after a finished play, and from a hold.
+- The browser checks:
+  - `scenePlayback`: a script-started typewriter on a knob's numbers, held at 100 ms with three
+    typed and three to come, in the part's colour; a roll held half way, each number part way up
+    inside its own box;
+  - `animationDesigner`: a roll dropped on a knob lands on its ticks;
+  - `panelMotion`, `animationTab`, `anatomyForms` and `macroSetKnob`.
+- WebKitGTK 2.52: the same two holds, the opacities and the transform as in Chromium, and
+  screenshots with the rolled numbers cut by their boxes.
 
 ## Open
 

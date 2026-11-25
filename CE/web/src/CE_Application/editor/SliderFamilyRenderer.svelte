@@ -10,6 +10,8 @@
   import { activeControlSet } from '../stores/controlSets.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { resolveSliderSemanticParts } from '../utils/sliderEntityFactory.js';
+  import { splitText, textEffectClips, textPieceStyles } from '../utils/textEffects.js';
+  import { markClipBox, markPieceStyles } from '../utils/anatomyWords.js';
   import { numberOr, clamp } from '../utils/primitives.js';
   import {
     formatSliderNumericValue,
@@ -40,6 +42,9 @@
     // What a value effect draws instead of the value, 0 to 1, or null (utils/valueDrawn.js, step 6).
     // It moves the drawing only: readouts and handle labels still say what the value is.
     drawnValue = null,
+    // Text effects playing on the knob's own words, by part (utils/anatomyWords.js): its scale's
+    // numbers and ticks, and the labels on its handles. The keyframe player's `texts`, or null.
+    partTexts = null,
     debug = false,
   } = $props();
 
@@ -667,7 +672,8 @@
       const angle = sliderNormalizedToAngle(behavior, i / count);
       const start = resolveCircularPoint(width, height, angle, base, circularCenter);
       const end = resolveCircularPoint(width, height, angle, base - length, circularCenter);
-      return { major, line: { x1: start.x, y1: start.y, x2: end.x, y2: end.y } };
+      // `rank`: its place among the second scale's ticks of its kind, long and short alternating.
+      return { major, rank: Math.floor(i / 2), line: { x1: start.x, y1: start.y, x2: end.x, y2: end.y } };
     });
   });
 
@@ -718,6 +724,73 @@
     return tickStops.minor.filter((stop) => shown.has(Number(String(stop.key).split('_')[1])));
   });
   let activeHandleLabel = $derived(String(signals?.activeHandle ?? 'current'));
+
+  // --- Text effects on the knob's own words (utils/anatomyWords.js) ------------------------------
+  // A scale's numbers and ticks are drawn here, not as parts, so a text effect on Parts.tickNumber,
+  // tickMajor or tickMinor plays here: one piece a mark, round the scale in order. The labels on the
+  // handles are HTML and are cut as a Label's words are.
+  const wordsEffect = (partName) => partTexts?.get?.(partName)?.at(-1) ?? null;
+
+  /**
+   * One effect over a scale's marks ({ label, box }, in order round it): each mark's style and, for a
+   * roll or a push, the box it is clipped to. Null when no effect plays on the part.
+   */
+  function marksFx(partName, item, marks) {
+    if (!item || !marks.length) return null;
+    const styles = markPieceStyles(item.effect, marks.map((mark) => mark.label), { phase: item.phase, seedText: `${partName}:${item.name}`, at: item.at ?? null });
+    const clips = textEffectClips(item.effect);
+    return marks.map((mark, i) => ({ style: styles[i], clip: clips ? { id: maskIdFor(`${partName}Word${i}`), ...markClipBox(mark.box) } : null }));
+  }
+
+  /** What a tick of this kind covers, for its clip: a numeral's text, a dot, or the line itself. */
+  function tickBox(kind, line, length, strokeWidth, label) {
+    if (kind === 'numeral') return { text: label, x: line.x2 + (line.x2 - line.x1) * 0.6, y: line.y2 + (line.y2 - line.y1) * 0.6, size: Math.max(6, length * 1.4) };
+    if (kind === 'dot') return { r: Math.max(1.5, length * 0.45), x: (line.x1 + line.x2) / 2, y: (line.y1 + line.y2) / 2 };
+    return { ...line, width: strokeWidth };
+  }
+
+  /** A part's ticks as marks: the scale's, then the second scale's of the same kind. */
+  function tickMarks(major) {
+    const kind = major ? majorTickKind : minorTickKind;
+    const length = major ? majorTickLength : minorTickLength;
+    const strokeWidth = major ? tickStrokeWidth : minorTickStrokeWidth;
+    const lineOf = (stop) => (geometry === 'linear'
+      ? linearTickLine(stop.normalized, length)
+      : circularTickLine(sliderNormalizedToAngle(behavior, stop.normalized), length));
+    const label = (stop) => tickNumeral(stop);
+    return [
+      ...(major ? majorStopsShown : minorStopsShown).map((stop) => ({ label: label(stop), box: tickBox(kind, lineOf(stop), length, strokeWidth, label(stop)) })),
+      ...secondScale.filter((tick) => tick.major === major).map((tick) => ({ label: '', box: tickBox(kind, tick.line, length, strokeWidth, '') })),
+    ];
+  }
+
+  let numbersFx = $derived.by(() => {
+    const item = wordsEffect('tickNumber');
+    if (!item || geometry === 'linear' || scaleNumberCount < 2) return null;
+    return marksFx('tickNumber', item, Array.from({ length: scaleNumberCount }, (_, i) => {
+      const a = (sliderNormalizedToAngle(behavior, i / (scaleNumberCount - 1)) * Math.PI) / 180;
+      const label = scaleNumberText(i);
+      return { label, box: { text: label, size: scaleNumberSize, x: circularCenter.x + Math.cos(a) * circularMetrics.radius * scaleNumberReach, y: circularCenter.y + Math.sin(a) * circularMetrics.radius * scaleNumberReach } };
+    }));
+  });
+  let majorFx = $derived.by(() => {
+    const item = showTicks ? wordsEffect('tickMajor') : null;
+    return item ? marksFx('tickMajor', item, tickMarks(true)) : null;
+  });
+  let minorFx = $derived.by(() => {
+    const item = showTicks ? wordsEffect('tickMinor') : null;
+    return item ? marksFx('tickMinor', item, tickMarks(false)) : null;
+  });
+  let wordClips = $derived([...(numbersFx ?? []), ...(majorFx ?? []), ...(minorFx ?? [])].map((fx) => fx.clip).filter(Boolean));
+
+  /** A handle label's words cut for an effect, each with its style; null when none plays on it. */
+  function labelWords(partName, text) {
+    const item = wordsEffect(partName);
+    if (!item) return null;
+    const pieces = splitText(String(text ?? ''), item.effect.split);
+    const styles = textPieceStyles(item.effect, pieces, { phase: item.phase, seedText: `${partName}:${item.name}`, at: item.at ?? null });
+    return { pieces: pieces.map((piece, i) => ({ ...piece, style: styles[i] })), clips: textEffectClips(item.effect) };
+  }
   const sliderInstanceId = $props.id();
   let sliderMaskSeed = $derived(safeSvgId(`${control?._children?.Core?.id ?? 'slider'}-${sliderInstanceId}`));
   let singleFillOrigin = $derived(String(behavior?.fillOrigin ?? 'min').trim().toLowerCase() === 'center' ? centerMarkerNormalized : 0);
@@ -927,6 +1000,14 @@
 <div class="slider-family-renderer" style={partColours ? colourVariables(null) : undefined}>
   <!-- data-drawn: where the value is drawn, 0 to 1 — the value, gliding, or a value effect's (step 6). -->
   <svg class="slider-svg" data-drawn={normalizedValues.current.toFixed(4)} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
+    {#if wordClips.length}
+      <!-- The boxes a roll or a push moves the scale's marks through, one a mark. -->
+      <defs>
+        {#each wordClips as clip (clip.id)}
+          <clipPath id={clip.id}><rect x={clip.x} y={clip.y} width={clip.width} height={clip.height} /></clipPath>
+        {/each}
+      </defs>
+    {/if}
     <!-- A knob's plate (housing, skirt, cap, insert): its shadow, its fill in its outline, its
          border. `mask` names its fill's mask; `role` the part the pointer styles follow. -->
     {#snippet bodyPlate(part, r, mask, borderFallback, role = mask)}
@@ -974,7 +1055,35 @@
       {/if}
     {/snippet}
 
-    {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, label)}
+    {#snippet scaleNumber(i, a, fill, opacity, style)}
+      <text data-scale-number data-word-piece={style ? '' : undefined}
+        x={circularCenter.x + Math.cos(a) * circularMetrics.radius * scaleNumberReach}
+        y={circularCenter.y + Math.sin(a) * circularMetrics.radius * scaleNumberReach}
+        text-anchor="middle" dominant-baseline="central"
+        font-size={scaleNumberSize}
+        font-family={tickNumberPart?._children?.Text?._children?.Font?.family ?? 'Arial'}
+        font-weight={numberOr(tickNumberPart?._children?.Text?._children?.Font?.weightValue, 400)}
+        fill={fill}
+        opacity={opacity}
+        style={style}>{scaleNumberText(i)}</text>
+    {/snippet}
+
+    {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, label, fx = null)}
+      {#if fx}
+        <!-- In a text effect (utils/anatomyWords.js): the part's opacity on a group, so the effect's
+             fades run to full and land on it; the mark paints with currentColor, so the effect's
+             colour reaches it; clipped to a box about itself while a roll or a push moves it. -->
+        <g opacity={opacity} clip-path={fx.clip ? `url(#${fx.clip.id})` : undefined}>
+          <g data-word-piece style={`color:${colour};${fx.style}`}>
+            {@render tickShape(kind, line, 'currentColor', strokeWidth, length, 1, label)}
+          </g>
+        </g>
+      {:else}
+        {@render tickShape(kind, line, colour, strokeWidth, length, opacity, label)}
+      {/if}
+    {/snippet}
+
+    {#snippet tickShape(kind, line, colour, strokeWidth, length, opacity, label)}
       {#if kind === 'dot'}
         <circle data-tick cx={(line.x1 + line.x2) / 2} cy={(line.y1 + line.y2) / 2} r={Math.max(1.5, length * 0.45)} fill={colour} opacity={opacity} />
       {:else if kind === 'numeral'}
@@ -1210,15 +1319,15 @@
       {/if}
 
       {#if showTicks}
-        {#each minorStopsShown as stop (stop.key)}
+        {#each minorStopsShown as stop, i (stop.key)}
           {@const tickLine = linearTickLine(stop.normalized, minorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(minorTickKind, tickLine, argbToCss((highlighted && tickMinorPart?.activeColour) || tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop))}
+          {@render tickMark(minorTickKind, tickLine, argbToCss((highlighted && tickMinorPart?.activeColour) || tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop), minorFx?.[i])}
         {/each}
-        {#each majorStopsShown as stop (stop.key)}
+        {#each majorStopsShown as stop, i (stop.key)}
           {@const tickLine = linearTickLine(stop.normalized, majorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(majorTickKind, tickLine, argbToCss((highlighted && tickMajorPart?.activeColour) || tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop))}
+          {@render tickMark(majorTickKind, tickLine, argbToCss((highlighted && tickMajorPart?.activeColour) || tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop), majorFx?.[i])}
         {/each}
       {/if}
 
@@ -1311,15 +1420,15 @@
       {/if}
 
       {#if showTicks}
-        {#each minorStopsShown as stop (stop.key)}
+        {#each minorStopsShown as stop, i (stop.key)}
           {@const tickLine = circularTickLine(sliderNormalizedToAngle(behavior, stop.normalized), minorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(minorTickKind, tickLine, argbToCss((highlighted && tickMinorPart?.activeColour) || tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop))}
+          {@render tickMark(minorTickKind, tickLine, argbToCss((highlighted && tickMinorPart?.activeColour) || tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop), minorFx?.[i])}
         {/each}
-        {#each majorStopsShown as stop (stop.key)}
+        {#each majorStopsShown as stop, i (stop.key)}
           {@const tickLine = circularTickLine(sliderNormalizedToAngle(behavior, stop.normalized), majorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(majorTickKind, tickLine, argbToCss((highlighted && tickMajorPart?.activeColour) || tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop))}
+          {@render tickMark(majorTickKind, tickLine, argbToCss((highlighted && tickMajorPart?.activeColour) || tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop), majorFx?.[i])}
         {/each}
       {/if}
 
@@ -1328,22 +1437,24 @@
           {@render tickMark(tick.major ? majorTickKind : minorTickKind, tick.line,
             argbToCss((tick.major ? tickMajorPart : tickMinorPart)?._children?.Background?._children?.Fill?.colour, tick.major ? '#D0D0D0' : '#B0B0B0'),
             tick.major ? tickStrokeWidth : minorTickStrokeWidth, tick.major ? majorTickLength : minorTickLength,
-            numberOr((tick.major ? tickMajorPart : tickMinorPart)?.opacity, tick.major ? 0.95 : 0.55), '')}
+            numberOr((tick.major ? tickMajorPart : tickMinorPart)?.opacity, tick.major ? 0.95 : 0.55), '',
+            tick.major ? majorFx?.[majorStopsShown.length + tick.rank] : minorFx?.[minorStopsShown.length + tick.rank])}
         {/each}
       {/if}
 
       {#if scaleNumberCount >= 2}
         {#each Array.from({ length: scaleNumberCount }) as _, i (i)}
           {@const a = (sliderNormalizedToAngle(behavior, i / (scaleNumberCount - 1)) * Math.PI) / 180}
-          <text data-scale-number
-            x={circularCenter.x + Math.cos(a) * circularMetrics.radius * scaleNumberReach}
-            y={circularCenter.y + Math.sin(a) * circularMetrics.radius * scaleNumberReach}
-            text-anchor="middle" dominant-baseline="central"
-            font-size={scaleNumberSize}
-            font-family={tickNumberPart?._children?.Text?._children?.Font?.family ?? 'Arial'}
-            font-weight={numberOr(tickNumberPart?._children?.Text?._children?.Font?.weightValue, 400)}
-            fill={argbToCss(tickNumberPart?._children?.Text?._children?.Fill?.colour, '#D0D0D0')}
-            opacity={numberOr(tickNumberPart?.opacity, 1)}>{scaleNumberText(i)}</text>
+          {@const fill = argbToCss(tickNumberPart?._children?.Text?._children?.Fill?.colour, '#D0D0D0')}
+          {@const fx = numbersFx?.[i]}
+          {#if fx}
+            <!-- In a text effect, as a tick is (tickMark, above). -->
+            <g opacity={numberOr(tickNumberPart?.opacity, 1)} clip-path={fx.clip ? `url(#${fx.clip.id})` : undefined}>
+              {@render scaleNumber(i, a, 'currentColor', undefined, `color:${fill};${fx.style}`)}
+            </g>
+          {:else}
+            {@render scaleNumber(i, a, fill, numberOr(tickNumberPart?.opacity, 1), undefined)}
+          {/if}
         {/each}
       {/if}
 
@@ -1489,22 +1600,26 @@
     {/if}
   </svg>
 
-  {#if showHandleLabels && valueMode !== 'single'}
-    <div class="slider-label" style={labelStyle(labelParts.start, labelAnchors.start)}>
-      {labelContent(labelParts.start, formatSliderNumericValue(behavior, rawValues.start))}
-    </div>
-    {#if valueMode === 'band'}
-      <div class="slider-label" style={labelStyle(labelParts.current, labelAnchors.current)}>
-        {labelContent(labelParts.current, formatSliderNumericValue(behavior, rawValues.current))}
+  {#snippet handleLabel(partName, part, anchor, text)}
+    {@const words = labelWords(partName, text)}
+    {#if words}
+      <!-- In a text effect: cut as a Label's words are, and clipped to itself for a roll or a push. -->
+      <div class="slider-label" data-label-words style={`${labelStyle(part, anchor)}${words.clips ? ';overflow:hidden' : ''}`}>{#each words.pieces as piece, i (i)}<span style={piece.style}>{piece.text}</span>{/each}</div>
+    {:else}
+      <div class="slider-label" style={labelStyle(part, anchor)}>
+        {text}
       </div>
     {/if}
-    <div class="slider-label" style={labelStyle(labelParts.end, labelAnchors.end)}>
-      {labelContent(labelParts.end, formatSliderNumericValue(behavior, rawValues.end))}
-    </div>
+  {/snippet}
+
+  {#if showHandleLabels && valueMode !== 'single'}
+    {@render handleLabel('labelStart', labelParts.start, labelAnchors.start, labelContent(labelParts.start, formatSliderNumericValue(behavior, rawValues.start)))}
+    {#if valueMode === 'band'}
+      {@render handleLabel('labelCurrent', labelParts.current, labelAnchors.current, labelContent(labelParts.current, formatSliderNumericValue(behavior, rawValues.current)))}
+    {/if}
+    {@render handleLabel('labelEnd', labelParts.end, labelAnchors.end, labelContent(labelParts.end, formatSliderNumericValue(behavior, rawValues.end)))}
   {:else if showHandleLabels}
-    <div class="slider-label" style={labelStyle(labelParts.current, labelAnchors.current)}>
-      {labelContent(labelParts.current, formatSliderNumericValue(behavior, rawValues.current))}
-    </div>
+    {@render handleLabel('labelCurrent', labelParts.current, labelAnchors.current, labelContent(labelParts.current, formatSliderNumericValue(behavior, rawValues.current)))}
   {/if}
 
   {#if debug}

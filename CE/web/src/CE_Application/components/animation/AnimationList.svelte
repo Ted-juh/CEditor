@@ -21,6 +21,8 @@
 
   let {
     rows = [],
+    // The control the rows are on, so a knob can say where it draws no words (utils/anatomyWords.js).
+    control = null,
     partNames = [],
     stateNames = [],
     clashes = [],
@@ -35,7 +37,7 @@
 
 <div class="list" role="listbox" tabindex="-1" aria-label="Animations">
   {#each rows as row (row.name)}
-    {@const dead = deadTargetCount(row, partNames)}
+    {@const dead = deadTargetCount(row, partNames, { control })}
     {@const unknown = unknownTriggerStates(row, stateNames)}
     {@const loses = clashesFor(row.name, clashes).filter((clash) => clash.role === 'loses')}
     <div

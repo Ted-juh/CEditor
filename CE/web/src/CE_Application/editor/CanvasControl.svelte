@@ -3683,6 +3683,7 @@
         partTransitions={activeTransitions?.partTransitions ?? null}
         partAnimations={activeKeyframes?.parts ?? null}
         partColours={keyframeColours}
+        partTexts={activeKeyframes?.texts ?? null}
         debug={interactionDebugEnabled}
       />
     {/if}

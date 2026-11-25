@@ -78,10 +78,19 @@ check('an effect from the library becomes a clip on the picked control, at the p
 assert.deepEqual(await d('tracks'), ['wave|Text', 'cutoff|Transform']);
 const fadeId = withClips.clips[1].id;
 assert.equal(await d('settingsFor'), fadeId, 'and its settings are open');
-check('a text effect on a knob, which has no words of its own, is refused with the reason', async () => {});
+// A knob has no words of its own; a text effect dropped on it plays on the words it draws itself
+// (utils/anatomyWords.js): this one shows ticks and no numbers, so on its ticks. Undone after, so
+// the scene is as it was for the checks below.
 await d('clickEffect', 'text:roll:in');
-await wait(50);
-assert.match(await d('note'), /has no words of its own/);
+await wait(80);
+const [withTicks] = await d('scenes');
+check('a text effect on a knob plays on the words and marks it draws: here, its ticks', () => {
+  assert.deepEqual(withTicks.clips.map((clip) => [clip.controlId, clip.target]).at(-1), ['cutoff', 'Parts.tickMajor']);
+  assert.equal(withTicks.clips.length, 3);
+});
+await d('undo');
+await wait(80);
+assert.equal((await d('scenes'))[0].clips.length, 2);
 
 // Scrub to a tenth of the way into the scene: 240 ms of 2400, half-way through the knob's fade.
 const ruler = await d('rulerRect');

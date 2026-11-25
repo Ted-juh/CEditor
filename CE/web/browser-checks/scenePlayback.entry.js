@@ -72,6 +72,9 @@ function panel(prefix) {
     imageSrc: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="20" height="20" fill="#c33"/><rect x="20" y="20" width="20" height="20" fill="#3c3"/></svg>')}`,
     imageFit: 'tile',
   });
+  // A knob's own words: the numbers round its scale, which a scene types in one at a time.
+  const scale = place(createControl('Knob'), `${prefix}scale`, 'Scale', 20, 470, 80, 80);
+  scale._children.Behavior.scaleNumberCount = 6;
   // A pattern a state changes — fainter, larger, faster on Hover — on a colour timing of 600 ms.
   const glow = place(createControl('Label'), `${prefix}glow`, 'Glow', 240, 400, 200, 60);
   glow._children.Text.content = 'Glow';
@@ -87,7 +90,7 @@ function panel(prefix) {
   } } };
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 480, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -113,6 +116,12 @@ function panel(prefix) {
         clips: [clip('c16', `${prefix}knock`, 'Transform', 0, 1000, fade)] },
       { id: 'sc_drift', name: 'Drift', trigger: { type: 'script' }, length: 6000, loop: false,
         clips: [clip('c17', `${prefix}photo`, 'Transform', 0, 6000, sceneEffect('paint:imageDrift').effect)] },
+      // A text clip on a knob's numbers (utils/anatomyWords.js): typed round the dial, one a number.
+      { id: 'sc_numbers', name: 'Numbers', trigger: { type: 'script' }, length: 600, loop: false,
+        clips: [clip('c18', `${prefix}scale`, 'Parts.tickNumber', 0, 600, typewriter)] },
+      // And rolled up into place, each number through a box of its own.
+      { id: 'sc_numbers_roll', name: 'Numbers roll', trigger: { type: 'script' }, length: 600, loop: false,
+        clips: [clip('c19', `${prefix}scale`, 'Parts.tickNumber', 0, 600, sceneEffect('text:roll:in').effect)] },
       // A pattern clip: Wave's pattern pulsed, its scroll going on underneath.
       { id: 'sc_shimmer', name: 'Shimmer', trigger: { type: 'script' }, length: 800, loop: false,
         clips: [clip('c13', `${prefix}wave`, 'Patterns.pattern1', 0, 800, sceneEffect('pattern:pulse').effect)] },
@@ -137,7 +146,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'scale', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -167,6 +176,16 @@ window.__scenes = {
       scroll: mover ? { name: getComputedStyle(mover).animationName, state: getComputedStyle(mover).animationPlayState } : null,
     };
   },
+  /** A knob's scale numbers as drawn: each one's words, whether it is a piece of an effect, and its animation and look now. */
+  scaleWords: (id) => [...(root(id)?.querySelectorAll('[data-scale-number]') ?? [])].map((el) => {
+    const style = getComputedStyle(el);
+    const clip = el.parentElement?.getAttribute('clip-path') ?? '';
+    const box = clip ? document.getElementById(/#([^)]+)/.exec(clip)?.[1] ?? '')?.querySelector('rect') : null;
+    return {
+      text: el.textContent, piece: el.hasAttribute('data-word-piece'), name: style.animationName, delay: style.animationDelay, state: style.animationPlayState,
+      opacity: Number(style.opacity), fill: style.fill, transform: style.transform, clip: box ? { y: Number(box.getAttribute('y')), h: Number(box.getAttribute('height')) } : null,
+    };
+  }),
   /** A control's background image as drawn: the picture's own animation, and the control's. */
   imageMotion: (id) => {
     const paint = root(id)?.querySelector('.bg-fill-paint.image');

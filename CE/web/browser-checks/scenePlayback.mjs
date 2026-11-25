@@ -18,6 +18,8 @@
  *   - a drag heard on one part: on a button's key it moves the scene, on its margin it does not
  *   - a state that changes a pattern eases its opacity, size and speed, and its scroll keeps its place
  *   - a scene drifts a background image — zoomed and panned inside its clip — and not the control
+ *   - a scene types a knob's scale numbers round the dial, one number at a time, and rolls them each through a box of its
+ *     own (utils/anatomyWords.js)
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -338,6 +340,35 @@ try {
     assert.equal(photoHeld.picture.state, 'paused');
     assert.match(photoHeld.picture.delay, /^-3s$/, `held half way: ${photoHeld.picture.delay}`);
     assert.ok(Number(photoHeld.picture.scale) > 1.05 && Number(photoHeld.picture.scale) < 1.15, `zoomed part way: ${photoHeld.picture.scale}`);
+  });
+
+  // A knob's own words: a typewriter on its scale numbers, one number at a time round the dial.
+  const numbersBefore = await s('scaleWords', 'scale');
+  await page.evaluate(() => window.__scenes.script('animatePlay', ['Numbers', {}]));
+  await page.waitForTimeout(40);
+  const numbersPlaying = await s('scaleWords', 'scale');
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Numbers', 100 / 600]));
+  await page.waitForTimeout(80);
+  const numbersHeld = await s('scaleWords', 'scale');
+  check('a scene types a knob\'s scale numbers round the dial, one number at a time, in their own colour', () => {
+    assert.deepEqual(numbersBefore.map((n) => n.text), ['0', '2', '4', '6', '8', '10']);
+    assert.ok(numbersBefore.every((n) => !n.piece && n.name === 'none'), JSON.stringify(numbersBefore));
+    assert.ok(numbersPlaying.every((n) => n.piece && /^ce-tx-/.test(n.name)), JSON.stringify(numbersPlaying));
+    assert.deepEqual(numbersPlaying.map((n) => n.delay), ['0s', '0.045s', '0.09s', '0.135s', '0.18s', '0.225s']);
+    assert.ok(numbersHeld.every((n) => n.state === 'paused'), JSON.stringify(numbersHeld));
+    assert.deepEqual(numbersHeld.map((n) => n.opacity), [1, 1, 1, 0, 0, 0], `held at 100 ms: three typed, three to come: ${JSON.stringify(numbersHeld.map((n) => n.delay))}`);
+    assert.ok(numbersHeld.every((n) => n.fill === numbersBefore[0].fill), `in the part's colour: ${numbersBefore[0].fill} ${numbersHeld.map((n) => n.fill)}`);
+  });
+  // Rolled: half way through a roll, each number is half way up into a box of its own, which clips it.
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Numbers roll', 130 / 600]));
+  await page.waitForTimeout(80);
+  const numbersRolling = await s('scaleWords', 'scale');
+  check('a roll on a knob\'s numbers moves each one through a box of its own', () => {
+    assert.ok(numbersRolling.every((n) => n.clip && n.clip.h > 0), JSON.stringify(numbersRolling));
+    for (const n of numbersRolling) {
+      const dy = Number(/matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*([^)]+)\)/.exec(n.transform)?.[1]);
+      assert.ok(dy > 0.5 && dy < n.clip.h, `part way up, inside its box: ${n.transform} in ${JSON.stringify(n.clip)}`);
+    }
   });
 
   // MIDI in: the kick's note starts its scene; the pedal starts its own going down, not while held.

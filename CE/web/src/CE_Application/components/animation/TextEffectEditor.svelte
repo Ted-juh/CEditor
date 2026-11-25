@@ -14,6 +14,7 @@
   import PathBar from './PathBar.svelte';
   import { cleanFrameColour } from '../../utils/keyframeAnimation.js';
   import { TEXT_EFFECTS, TEXT_EFFECT_NAMES, readTextEffect } from '../../utils/textEffects.js';
+  import { isSliderFamily } from '../../utils/anatomyWords.js';
 
   let { row = null, control = null, onpatch = () => {} } = $props();
 
@@ -110,7 +111,11 @@
       <PathBar {control} kind="keyframes" compact value={PLACE(row?.targets?.[0])}
                onchange={(target) => onpatch({ targets: [{ path: target.path === 'Transform' ? 'Text' : target.path }] })} />
     </div>
-    <p class="hint">On the words, a piece at a time, in Preview and in the plug-in. Text with an outline, a glow or a gradient fill plays it whole.</p>
+    {#if isSliderFamily(control)}
+      <p class="hint">On a knob's numbers and ticks each one is a piece, round the scale in order; Whole plays them together. Its handle labels are cut as a Label's words are.</p>
+    {:else}
+      <p class="hint">On the words, a piece at a time, in Preview and in the plug-in. Text with an outline, a glow or a gradient fill plays it whole.</p>
+    {/if}
   </div>
 {/if}
 

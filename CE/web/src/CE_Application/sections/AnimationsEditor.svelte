@@ -39,7 +39,7 @@
 
   let rows = $derived(control ? readAnimations(control) : []);
   let allOn = $derived(control ? animationsEnabled(control) : true);
-  let dead = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
+  let dead = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames, { control }), 0));
   let unknown = $derived(rows.reduce((sum, row) => sum + unknownTriggerStates(row, stateNames).length, 0));
   let clashes = $derived(findClashes(rows, partNames).length);
 </script>

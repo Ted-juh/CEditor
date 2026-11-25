@@ -38,6 +38,7 @@
   import { MOTION_EVENTS } from '../../utils/stateMotion.js';
   import { isRangeBehavior } from '../../utils/rangeBehavior.js';
   import { controlDrawsValue } from '../../utils/valueDrawn.js';
+  import { sliderWordsPlace, sliderWordsRefusal } from '../../utils/anatomyWords.js';
   import { midiTriggerText, midiNoteName } from '../../utils/sceneMidi.js';
   import ScenePresetPanel from './ScenePresetPanel.svelte';
   import { partRectOf } from '../../utils/sceneClock.js';
@@ -295,7 +296,13 @@
       if (entry.effect.kind === 'keyframes') { note = `“${entry.label}” paints a fill; a pattern takes a move or a fade.`; return; }
       place = entry.target && entry.target !== 'Patterns' ? entry.target : 'Transform';
     }
-    if (entry.effect.kind === 'text' && !String(place).startsWith('Parts.')) place = 'Text';
+    // A text effect dropped on a knob as a whole plays on the words it draws: its scale's numbers,
+    // its ticks or its handle labels (utils/anatomyWords.js), and says why where it draws none.
+    if (entry.effect.kind === 'text' && !String(place).startsWith('Parts.')) place = sliderWordsPlace(control) ?? 'Text';
+    if (entry.effect.kind === 'text') {
+      const refusal = sliderWordsRefusal(control, String(place).startsWith('Parts.') ? String(place).slice('Parts.'.length) : '');
+      if (refusal) { note = refusal; return; }
+    }
     if (place === 'Text' && !control._children?.Text) { note = `${control._children.Core.name || controlId} has no words of its own: a text effect plays on a Label, or on a part with text.`; return; }
     if (place === 'Value' && !controlDrawsValue(control)) { note = `${control._children.Core.name || controlId} draws no value to move: a value effect plays on a knob, a slider, a Macro or a meter.`; return; }
     let base = scene;
