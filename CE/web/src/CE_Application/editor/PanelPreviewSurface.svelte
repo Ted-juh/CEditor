@@ -66,6 +66,7 @@
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { sceneControlIds } from '../utils/sceneFormat.js';
   import { SCENE_STAGE, createSceneRunStore, registerSceneRun } from '../stores/sceneStage.js';
+  import { partRectOf, pointInRect, pointerInRect } from '../utils/sceneClock.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
@@ -451,13 +452,33 @@
    * 'press', 'drag' and 'release'. Asked only of a control some scene listens to; returns whether
    * one did.
    */
-  const sceneInput = (control, kind, payload) => {
+  const sceneInput = (control, kind, payload, local = null) => {
     const id = getControlId(control);
     const hears = kind === 'press' || kind === 'drag' || kind === 'release' ? 'drag' : kind;
     if (!sceneRun || !id || !sceneRun.listens(hears, id)) return false;
-    sceneRun.input(id, kind, payload);
+    // A clock on the whole control hears it all; one on a part (utils/sceneClock.js partRectOf),
+    // only what is over that part as it is drawn, its set applied.
+    const drawn = resolvedPreviewFor(control)?.control ?? control;
+    for (const part of sceneRun.clockParts(hears, id)) {
+      if (!part) { sceneRun.input(id, kind, payload); continue; }
+      const rect = partRectOf(drawn, part);
+      if (!rect) continue;
+      if (kind === 'pointer') sceneRun.input(id, kind, { ...(payload?.inside === false || !local ? { x: 0, y: 0, inside: false } : pointerInRect(local, rect)), part });
+      else if (kind === 'wheel' && pointInRect(local, rect)) sceneRun.input(id, kind, { ...payload, part });
+    }
     return true;
   };
+  /** A drag, for the scenes it drives: on the whole control, and on each part it was pressed on. */
+  function dragForScenes(control, id) {
+    let engaged = [];
+    return (kind, payload) => {
+      if (kind === 'press') {
+        const drawn = resolvedPreviewFor(control)?.control ?? control;
+        engaged = [...sceneRun.clockParts('drag', id)].filter((part) => !part || pointInRect(payload, partRectOf(drawn, part)));
+      }
+      for (const part of engaged) sceneRun.input(id, kind, part ? { ...payload, part } : payload);
+    };
+  }
   /** Where the pointer is over a control, 0 to 1 across and down, from the element it is over. */
   const pointerFraction = (event, inside = true) => {
     const rect = event?.currentTarget?.getBoundingClientRect?.();
@@ -8017,7 +8038,7 @@
       onLongPress: (payload) => dispatchInteraction(id, 'onLongPress', payload),
       onFlick: (payload) => dispatchInteraction(id, 'onFlick', payload),
       onGesture: (eventId) => sceneGesture(control, eventId),
-      onDrag: sceneRun?.listens('drag', id) ? (kind, payload) => sceneRun.input(id, kind, payload) : null,
+      onDrag: sceneRun?.listens('drag', id) ? dragForScenes(control, id) : null,
     });
   }
 
@@ -8060,7 +8081,7 @@
     sceneGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
     // A scene the wheel drives on this control takes the wheel there, so the page does not scroll
     // under it; the value still turns only where the control's own Wheel switch says.
-    if (sceneInput(control, 'wheel', { notches: event.deltaY < 0 ? 1 : -1 })) event.preventDefault();
+    if (sceneInput(control, 'wheel', { notches: event.deltaY < 0 ? 1 : -1 }, controlLocalPoint(event))) event.preventDefault();
     // Hardware style: while an LCD edit zone is active, the wheel acts as a data
     // knob — cycling the char under the caret (text) or the option (choice).
     if (lcdEdit.active && lcdEdit.id === getControlId(control)) {
@@ -8258,7 +8279,7 @@
   }
 
   function handlePointerMove(control, event) {
-    sceneInput(control, 'pointer', pointerFraction(event));
+    sceneInput(control, 'pointer', pointerFraction(event), controlLocalPoint(event));
     // onPointerMove: throttled (~30fps) hover-move over a control, control-local coords. Fires for any
     // control; the built-in custom-hit-zone hover tracking below still only runs for custom components.
     const moveAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());

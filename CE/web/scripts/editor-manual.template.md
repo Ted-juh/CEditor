@@ -1365,6 +1365,10 @@ There is one Designer per panel, and it closes with its panel.
   - **The pointer across** or **down a control**: the scene follows the pointer over it. When the
     pointer leaves, the scene stays or goes back.
 
+  **Heard on** narrows a drag, the wheel or the pointer to one part of the control, such as a
+  button's key: a press on its margin then moves nothing, and the pointer is measured across that
+  part alone.
+
   **Follows** says how closely: **Exactly**, **Smoothly** (a little behind), or **On a spring**.
   With "reduce motion" on, a driven scene follows exactly and does not carry on after you let go.
 

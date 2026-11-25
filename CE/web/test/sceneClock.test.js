@@ -188,3 +188,43 @@ test('the runtime lists which controls each kind of input is wanted from', () =>
   assert.deepEqual([...listeners.wheel], ['k5']);
   assert.deepEqual([...listeners.state], ['k6']);
 });
+
+// --- A clock heard on one part of the control ------------------------------------------------------
+
+import { partRectOf, pointInRect, pointerInRect } from '../src/CE_Application/utils/sceneClock.js';
+import { clockParts } from '../src/CE_Application/utils/sceneRuntime.js';
+import { createControl } from '../src/CE_Application/models/componentTypes.js';
+
+test('a clock may name a part of its control; a value clock may not, the value being the control\'s', () => {
+  assert.equal(cleanClock({ source: 'drag', controlId: 'b', part: 'key' }).part, 'key');
+  assert.equal('part' in cleanClock({ source: 'drag', controlId: 'b' }), false, 'the whole control: nothing stored');
+  assert.equal('part' in cleanClock({ source: 'value', controlId: 'b', part: 'key' }), false);
+  assert.equal('part' in cleanClock({ source: 'drag', controlId: 'b', part: 'no spaces' }), false);
+});
+
+test('a part\'s area comes from its layout and the control\'s size; a point is over it or not', () => {
+  const button = createControl('Button');
+  Object.assign(button._children.Transform, { width: 200, height: 120 });
+  const key = partRectOf(button, 'key');
+  assert.deepEqual(key, { x: 20, y: 12, width: 160, height: 96 });
+  assert.equal(partRectOf(button, 'nothing'), null);
+  assert.equal(pointInRect({ x: 100, y: 60 }, key), true);
+  assert.equal(pointInRect({ x: 5, y: 5 }, key), false, 'in the button, outside its key');
+  assert.deepEqual(pointerInRect({ x: 100, y: 60 }, key), { x: 0.5, y: 0.5, inside: true });
+});
+
+test('the runtime gives an input on a part to the clocks on that part, and the rest to the whole control\'s', () => {
+  const frames = fakeFrames();
+  const runtime = createSceneRuntime({ frames });
+  const onKey = driven('k', { source: 'drag', controlId: 'b', part: 'key', follow: 'exact', span: 100 });
+  const whole = driven('w', { source: 'drag', controlId: 'b', follow: 'exact', span: 100 });
+  runtime.setScenes([onKey, whole]);
+  assert.deepEqual([...clockParts([onKey, whole], 'drag', 'b')].sort(), ['', 'key']);
+  runtime.input('b', 'press', {});
+  runtime.input('b', 'drag', { dx: 0, dy: -50 });
+  assert.deepEqual(runtime.plays().map((p) => [p.scene.id, p.at]), [['k', 0], ['w', 500]], 'a drag off the key moves only the whole control\'s');
+  runtime.input('b', 'press', { part: 'key' });
+  runtime.input('b', 'drag', { dx: 0, dy: -30, part: 'key' });
+  assert.equal(runtime.plays().find((p) => p.scene.id === 'k').at, 300, 'and one on the key moves the key\'s');
+  runtime.destroy();
+});

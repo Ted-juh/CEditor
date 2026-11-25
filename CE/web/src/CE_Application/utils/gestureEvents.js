@@ -140,8 +140,9 @@ const eventTime = (event) => (Number.isFinite(event?.timeStamp) && event.timeSta
  * the Animation tab's stage passes neither. `onGesture(eventId)` hears each gesture once — a click,
  * a long press at the usual hold, a flick — for the scenes that wait on one (utils/sceneRuntime.js).
  * `onDrag(kind, payload)` follows the press itself, for a scene a drag drives (utils/sceneClock.js):
- * 'press', then 'drag' { dx, dy } from where it went down, then 'release' { vx, vy }, all in the
- * panel's pixels (a millisecond, for the speed). Returns a function that stops watching.
+ * 'press' { x, y } (where, in the control's own pixels), then 'drag' { dx, dy } from where it went
+ * down, then 'release' { vx, vy }, all in the panel's pixels (a millisecond, for the speed). Returns
+ * a function that stops watching.
  *
  * Its listeners are its own, on the window in the capture phase: a surface's press handling returns
  * early for many kinds of control, and its own pointerup handler stops the event once it has used
@@ -179,7 +180,7 @@ export function watchGesture(control, event, { scale = 1, onLongPress = null, on
     window.removeEventListener('pointerup', onUp, true);
     window.removeEventListener('pointercancel', stop, true);
   };
-  onDrag?.('press', {});
+  onDrag?.('press', { ...downPoint });
   function onUp(up) {
     const inside = !rect || (up.clientX >= rect.left && up.clientX <= rect.right && up.clientY >= rect.top && up.clientY <= rect.bottom);
     const result = tracker.up(eventTime(up), up.clientX, up.clientY, { inside });

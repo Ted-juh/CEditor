@@ -54,6 +54,21 @@ export function sceneWaitsFor(scene, trigger) {
 }
 
 /**
+ * The parts of a control that clocks of one kind of input listen on ('' for the whole control):
+ * kind is 'value', 'pointer', 'drag' or 'wheel', as sceneListeners names them.
+ */
+export function clockParts(scenes, kind, controlId) {
+  const out = new Set();
+  for (const scene of scenes ?? []) {
+    const clock = scene?.clock;
+    if (!clock || clock.controlId !== controlId) continue;
+    const heard = clock.source === 'pointerX' || clock.source === 'pointerY' ? 'pointer' : clock.source;
+    if (heard === kind) out.add(clock.part ?? '');
+  }
+  return out;
+}
+
+/**
  * The controls some scene listens to, by what it hears: `{ state, event }` for triggers, and
  * `{ value, pointer, drag, wheel }` for the gestures that drive a scene's playhead (sceneClock.js).
  */
@@ -238,8 +253,10 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
      */
     input(controlId, kind, payload = {}) {
       const moved = [];
+      const part = payload?.part ?? '';
       for (const scene of scenes) {
-        if (!scene.clock || scene.clock.controlId !== controlId) continue;
+        // A clock on one part hears only what was on that part; one on the whole control, the rest.
+        if (!scene.clock || scene.clock.controlId !== controlId || (scene.clock.part ?? '') !== part) continue;
         if (clockInput(clockOf(scene), scene.clock, kind, payload, { reducedMotion })) moved.push(scene.id);
       }
       if (moved.length) { onChange(); wake(); }

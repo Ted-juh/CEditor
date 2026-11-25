@@ -8,6 +8,8 @@
  * drag let go does not carry on.
  */
 
+import { resolvePartPixelRect } from './customComponentLayout.js';
+
 /** How fast `smooth` closes the gap: about 63 % of it in this many milliseconds. */
 export const SMOOTH_MS = 90;
 /** The spring: stiffness and damping per second; damped a little under critical, so it settles with a small overshoot. */
@@ -23,6 +25,27 @@ export function along(dx, dy, direction = 'up') {
   if (direction === 'left') return -(Number(dx) || 0);
   if (direction === 'right') return Number(dx) || 0;
   return -(Number(dy) || 0);
+}
+
+/**
+ * Where one of a control's parts is, in the control's own pixels, for a clock heard on that part
+ * alone: from the part's layout and the control's size. Null when it has no such part, or no layout.
+ */
+export function partRectOf(control, part) {
+  const node = control?._children?.Parts?._children?.[part];
+  const transform = control?._children?.Transform ?? {};
+  const rect = node?._children?.Layout ? resolvePartPixelRect(node._children.Layout, Number(transform.width) || 0, Number(transform.height) || 0) : null;
+  return rect && rect.width > 0 && rect.height > 0 ? rect : null;
+}
+
+/** Whether a point in the control's pixels is inside a rect. */
+export const pointInRect = (point, rect) => !!point && !!rect
+  && point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+
+/** The pointer over a part, as a pointer clock hears it: 0 to 1 across and down the part, and whether it is over it. */
+export function pointerInRect(point, rect) {
+  if (!point || !rect) return { x: 0, y: 0, inside: false };
+  return { x: (point.x - rect.x) / rect.width, y: (point.y - rect.y) / rect.height, inside: pointInRect(point, rect) };
 }
 
 export function createClockState() {

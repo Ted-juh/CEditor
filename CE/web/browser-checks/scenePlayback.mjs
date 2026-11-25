@@ -15,6 +15,7 @@
  *   - the Macro's ring and a meter sweep with the scene, and a meter's own needle test plays from a script
  *   - a pattern clip pulses a control's pattern while its scroll goes on underneath
  *   - MIDI in starts scenes: a kick drum's note, and the sustain pedal as it goes down, once
+ *   - a drag heard on one part: on a button's key it moves the scene, on its margin it does not
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -270,6 +271,29 @@ try {
     assert.equal(patternPulsing.scroll.state, 'running', 'still scrolling');
     assert.equal(patternHeld.clip.state, 'paused');
     assert.match(patternHeld.clip.delay, /^-0\.4s$/, `held half way: ${patternHeld.clip.delay}`);
+  });
+
+  // A drag heard on Knock's key only. Its margin (the outer tenth) is the button but not its key.
+  const knockAt = async () => kf(await s('box', 'knock'))[0]?.delay;
+  await page.setViewportSize({ width: 700, height: 1100 });
+  const knock = await s('rect', 'knock');
+  const dragFrom = async (x, y) => {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y - 40, { steps: 4 });
+    await page.mouse.up();
+    await page.waitForTimeout(80);
+  };
+  const knockStart = await knockAt();
+  await dragFrom(knock.x + 4, knock.y + knock.h - 3);
+  const afterMargin = await knockAt();
+  await dragFrom(knock.x + knock.w / 2, knock.y + knock.h / 2 + 10);
+  const afterKey = await knockAt();
+  await page.setViewportSize({ width: 700, height: 640 });
+  check('a drag heard on one part: on a button\'s key it moves the scene, on its margin it does not', () => {
+    assert.match(knockStart ?? '', /^0s$/, `held at its start: ${knockStart}`);
+    assert.equal(afterMargin, knockStart, 'pressed on the margin: nothing');
+    assert.match(afterKey ?? '', /^-0\.4s$/, `40 px of 100 on the key: ${afterKey}`);
   });
 
   // MIDI in: the kick's note starts its scene; the pedal starts its own going down, not while held.

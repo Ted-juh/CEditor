@@ -40,12 +40,13 @@
   import { controlDrawsValue } from '../../utils/valueDrawn.js';
   import { midiTriggerText, midiNoteName } from '../../utils/sceneMidi.js';
   import ScenePresetPanel from './ScenePresetPanel.svelte';
+  import { partRectOf } from '../../utils/sceneClock.js';
   import { scenePresetLibrary, allScenePresets, saveScenePreset, removeScenePreset } from '../../stores/scenePresetLibrary.js';
   import { buildStateTargetOptions } from '../../utils/stateTargets.js';
   import {
     SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
     patternPlacesOf, effectOnlyMoves,
-    resizeClip, removeClip, duplicateClip, setClipEffect, setClipTarget, tracksOf, controlScenes, clipAnimation,
+    resizeClip, removeClip, duplicateClip, setClipEffect, setClipTarget, tracksOf, controlScenes, clipAnimation, targetLabel,
   } from '../../utils/sceneModel.js';
   import { flatControls, flatControlsWithPanelRects } from '../../utils/containment.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../../utils/backgroundCSS.js';
@@ -250,9 +251,14 @@
       ? `Dragging ${name} still changes its value; the scene follows along.`
       : `The wheel still turns ${name}; the scene follows along.`;
   }
+  /** The parts of the clock's control it can be heard on alone: those with a place of their own. */
+  function clockPartsOf(clock) {
+    const control = flat.find((entry) => entry._children.Core.id === clock?.controlId);
+    return Object.keys(control?._children?.Parts?._children ?? {}).filter((part) => partRectOf(control, part));
+  }
   /** What drives a scene, in words, for the scene list: "Drag on Cutoff". */
   function clockText(clock) {
-    const on = controlLabel(clock.controlId);
+    const on = clock.part ? `${controlLabel(clock.controlId)} › ${targetLabel(`Parts.${clock.part}`)}` : controlLabel(clock.controlId);
     if (clock.source === 'value') return `${on}'s value`;
     if (clock.source === 'drag') return `Drag on ${on}`;
     if (clock.source === 'wheel') return `Wheel on ${on}`;
@@ -531,6 +537,14 @@
                     onchange={(event) => setClock({ controlId: event.currentTarget.value })}>
               {#each flat as control (control._children.Core.id)}<option value={control._children.Core.id}>{control._children.Core.name || control._children.Core.id}</option>{/each}
             </select>
+            {#if scene.clock.source !== 'value' && clockPartsOf(scene.clock).length}
+              <label class="beats">Heard on
+                <select class="txt" value={scene.clock.part ?? ''} aria-label="Heard on" data-clock-part
+                        onchange={(event) => setClock({ part: event.currentTarget.value })}>
+                  <option value="">The whole control</option>
+                  {#each clockPartsOf(scene.clock) as part (part)}<option value={part}>{targetLabel(`Parts.${part}`)}</option>{/each}
+                </select></label>
+            {/if}
             {#if scene.clock.source === 'drag'}
               <label class="beats">
                 <select class="txt" value={scene.clock.direction} aria-label="Drag direction" data-clock-direction

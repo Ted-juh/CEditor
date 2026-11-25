@@ -1059,6 +1059,35 @@ Verified locally:
   the pedal starts its own going down, not while held, and again after it is let up and pressed) and
   `animationDesigner` (the trigger set to a note, saved, and named in the scene list).
 
+## As built: a clock heard on one part (2026-11-25)
+
+The record's rule "a gesture is heard on the part picked, with the same path bar, or on the whole
+control" was left out of step 5c's clocks. It is built now.
+
+- **The clock** may name a `part` (`cleanClock`). A clock on the whole control stores nothing, so
+  every clock saved before reads as it did. A value clock has no part: the value is the control's.
+- **Where a part is.** `partRectOf` (`utils/sceneClock.js`) uses the part's layout and the control's
+  size, through `resolvePartPixelRect`, the same sum the custom components lay out with. A part with
+  no area of its own (no layout, or none in size) cannot be chosen.
+- **Routing.** The runtime gives an input marked with a part to that part's clocks, and an unmarked
+  one to the whole control's. The preview decides what to send, against the control as it is drawn,
+  with its set applied:
+  - the pointer, measured across the part, 0 to 1, and whether it is over it;
+  - the wheel, only over the part;
+  - a drag, to the parts it was pressed on. The press now carries where it was, in the control's
+    pixels (`watchGesture`'s `onDrag`).
+
+  The whole control's clocks hear everything, as before.
+- **The Designer** has **Heard on** beside the clock's control, offering the parts with an area of
+  their own. The scene list names the part: "Drag on Knock › Key".
+
+Verified locally:
+- `test/sceneClock.test.js`: a clock naming a part, but not a value clock; a button's key area and a
+  point in its margin; the runtime moving only the clocks of the part an input was on;
+- the browser checks `scenePlayback` (a drag pressed on Knock's margin moves nothing, the same drag
+  on its key moves the scene 400 ms of 1,000) and `animationDesigner` (Heard on offers the control's
+  parts, the choice is saved, and the scene list names it).
+
 ## Open
 
 Nothing for the owner at present.

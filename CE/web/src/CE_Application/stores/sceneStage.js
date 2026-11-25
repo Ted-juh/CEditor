@@ -18,7 +18,7 @@
  * too, and there nothing plays by itself.
  */
 import { writable } from 'svelte/store';
-import { createSceneRuntime, sceneListeners } from '../utils/sceneRuntime.js';
+import { createSceneRuntime, sceneListeners, clockParts } from '../utils/sceneRuntime.js';
 import { createMidiTriggerReader } from '../utils/sceneMidi.js';
 
 export const SCENE_STAGE = 'ce.sceneStage';
@@ -30,6 +30,7 @@ export function createSceneRunStore({ timers, frames } = {}) {
   const publish = () => store.set({ plays: runtime.plays(), listeners });
   runtime = createSceneRuntime({ onChange: publish, ...(timers ? { timers } : {}), ...(frames ? { frames } : {}) });
   let scenesKey = '';
+  let current = [];
   let beatWanted = false;
   let midiWanted = false;
   const midiReader = createMidiTriggerReader();
@@ -41,6 +42,7 @@ export function createSceneRunStore({ timers, frames } = {}) {
       const key = JSON.stringify(scenes);
       if (key === scenesKey) return;
       scenesKey = key;
+      current = scenes;
       runtime.setScenes(scenes);
       listeners = sceneListeners(scenes);
       beatWanted = scenes.some((scene) => scene?.trigger?.type === 'beat');
@@ -59,6 +61,8 @@ export function createSceneRunStore({ timers, frames } = {}) {
     input: (controlId, kind, payload) => runtime.input(controlId, kind, payload),
     /** Whether some scene hears this kind of input from this control: 'value', 'pointer', 'drag', 'wheel'. */
     listens: (kind, controlId) => !!listeners[kind]?.has?.(controlId),
+    /** The parts of a control the clocks of that kind listen on: '' for the whole control. */
+    clockParts: (kind, controlId) => clockParts(current, kind, controlId),
     /**
      * MIDI in (utils/sceneMidi.js): each message the surface heard, as hex. Read only while some
      * scene waits on MIDI; a controller's history is kept regardless of which scene wants it.

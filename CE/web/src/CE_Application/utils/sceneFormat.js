@@ -103,6 +103,7 @@ export function cleanTrigger(raw) {
  *   span       how far moves the whole scene: pixels for a drag, notches for the wheel;
  *   direction  the way a drag moves it forward: up, down, left, right;
  *   follow     'exact', 'smooth', or on a 'spring';
+ *   part       the part a drag, the wheel or the pointer is heard on; absent: the whole control;
  *   release    when the hand lets go (a drag, the pointer leaving): 'stay', spring 'back' to the start,
  *              or 'carry' on with the drag's speed.
  * Time is the default and is stored as no clock at all.
@@ -124,6 +125,9 @@ export function cleanClock(raw) {
     direction: DRAG_DIRECTIONS.includes(raw?.direction) ? raw.direction : 'up',
     follow: CLOCK_FOLLOWS.includes(raw?.follow) ? raw.follow : 'smooth',
     release: CLOCK_RELEASES.includes(raw?.release) ? raw.release : 'stay',
+    // A gesture heard on one part of the control only (sceneClock.js partRectOf): its name, or
+    // nothing for the whole control. A value is the control's, so a value clock has no part.
+    ...(source !== 'value' && id(raw?.part) ? { part: id(raw.part) } : {}),
   };
 }
 
