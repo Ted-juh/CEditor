@@ -1088,6 +1088,23 @@ Verified locally:
   on its key moves the scene 400 ms of 1,000) and `animationDesigner` (Heard on offers the control's
   parts, the choice is saved, and the scene list names it).
 
+## As built: a part's patterns in front (2026-11-25)
+
+Step 3 left one place out: a pattern set **in front of the content** on a part drew nothing, since
+only the control drew its front patterns, and a part's background (through its own
+`BackgroundRenderer`) drew only the ones behind.
+
+`InteractivePartRenderer` now draws its background's front patterns after the rest of its content,
+over its words and its picture. They are clipped to the part's shape: its traced outline where it
+has one, and its corners otherwise, as its background is. A square part needs no clip, since the
+layer's box is the part's and hides what spills over it.
+
+Verified locally:
+- `test/partFrontPatterns.test.js` (new): a front pattern drawn after a part's words and not behind
+  as well, clipped to rounded corners; a pattern behind still before the words, with nothing in front;
+- the browser checks `panelMotion`, `fromSelection` and `anatomyForms`, and the component harness's 96
+  cases (the renderer draws every part).
+
 ## Open
 
 Nothing for the owner at present.

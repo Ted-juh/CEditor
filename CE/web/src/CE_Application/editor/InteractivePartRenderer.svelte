@@ -9,7 +9,9 @@
   import { parseTiming } from '../utils/easing.js';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { numberOr } from '../utils/primitives.js';
-  import { plainFillCSS } from '../utils/plainFillCSS.js';
+  import { plainFillCSS, fillShapeCSS } from '../utils/plainFillCSS.js';
+  import PatternLayers from '../../CE_Panel/components/PatternLayers.svelte';
+  import { hasPatterns } from '../utils/patternLayers.js';
   import { gradientBackgroundCSS } from '../utils/gradientPaint.js';
   import { buildIconTintStyle, buildTextShadowValue, lineColourFor, lineGeometry, lineLayerFor, textAlignFor, textEffectColor, usesIconTint } from './canvasControlStyles.js';
   import { iconImageStyle } from './iconLook.js';
@@ -247,6 +249,12 @@
   let fixedLight = $derived((shape.rendersOutline || !!renderedPlacement) && part?.meta?.fixedLight === true);
   let outlineTurn = $derived(fixedLight && Math.abs(partRotation) > 0.001 ? partRotation : 0);
 
+  // Patterns placed in front of the part's content (PatternLayers.svelte): over its text and its
+  // image, clipped to its shape — its traced outline, or its corners — as the control's own are.
+  let frontPatterns = $derived(hasPatterns(background));
+  let frontPatternClip = $derived(frontPatterns
+    ? (outline?.d ? `clip-path: path(evenodd, '${outline.d}');` : fillShapeCSS(background?._children?.Corners, frame.width, frame.height))
+    : '');
   let outline = $derived.by(() => {
     const traced = outlineState?.shape;
     if (!traced || traced.empty || !traced.pathData) return null;
@@ -1158,6 +1166,10 @@
       </div>
     {:else if image}
       <div class="interactive-part-image" style={imageStyle}></div>
+    {/if}
+
+    {#if frontPatterns}
+      <PatternLayers {background} place="front" width={frame.width} height={frame.height} clip={frontPatternClip} />
     {/if}
 
     {#if debug}

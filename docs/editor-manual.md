@@ -678,6 +678,8 @@ own section:
 - **Repeat** — everywhere, along **One row** or down **One column**; **Sits** puts a row at the top,
   middle or bottom (a column at the left, centre or right), and **Offset** moves it from there.
 - **Place** — **Behind the content**, over the fill, or **In front of the content**, over the text.
+  A part's pattern goes in front of the part's own words and picture the same way, clipped to the
+  part's shape.
 - **Speed** and **Direction** — set a speed, in pixels a second, and the pattern moves on its own:
   right, left, up, down or at any angle. A row moves only left or right, and a column only up or
   down. A moving pattern plays in Preview, on the Animation tool's stage and in the exported plugin;
