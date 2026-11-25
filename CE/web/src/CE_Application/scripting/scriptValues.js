@@ -31,6 +31,7 @@ import {
   readLcdLine, readComponentType, readFontAxis, panelParts, cssOf,
 } from './scriptValueKinds.js';
 import { builtColourOf, builtWords } from './builtColours.js';
+import { readAnimEffect, readSwapEffect, readScene, readAnimTarget } from './animValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
   unknownOptionsMessage, paramTypeLine,
@@ -698,9 +699,28 @@ function classify(arg, node, param, site, index) {
     }
     // ce.anim.play's first name: a control when an animation follows it, a panel scene when alone.
     case 'controlOrScene': {
-      if (sibling(site, 'animation') === undefined) return byForm(arg, value);
-      const read = readControl(value, site.env.ctx);
-      return setRead(arg, 'control', read, read.meaning.choices ? 'choice' : null);
+      if (site.args.some((a) => a !== arg && (a.param?.name === 'animation' || a.name === 'animation'))) {
+        const read = readControl(value, site.env.ctx);
+        return setRead(arg, 'control', read, read.meaning.choices ? 'choice' : null);
+      }
+      if (typeof value !== 'string') return byForm(arg, value);
+      const read = readScene(value, { panel: site.env.ctx.panel, verb: 'ce.anim.play' });
+      return setRead(arg, 'scene', read, read.meaning.choices.length ? 'choice' : null);
+    }
+    // The Animation Designer's calls (animValueKinds.js): a scene, an effect and where it plays, and
+    // a swap's text effect; each a choice, an effect's shown under the row with its preview.
+    case 'scene': {
+      const read = readScene(value, { panel: site.env.ctx.panel, verb: `ce.anim.${site.memberId === 'animateSeek' ? 'seek' : 'play'}` });
+      return setRead(arg, 'scene', read, read.meaning.choices.length ? 'choice' : null);
+    }
+    case 'animEffect': {
+      const read = readAnimEffect(value, site.env.ctx);
+      return setRead(arg, 'animEffect', read, 'choice');
+    }
+    case 'swapEffect': return setRead(arg, 'swapEffect', readSwapEffect(value), 'choice');
+    case 'animTarget': {
+      const read = readAnimTarget(value, site.env.ctx);
+      return setRead(arg, 'animTarget', read, read.meaning.choices?.length ? 'choice' : null);
     }
     case 'path': {
       const read = readPath(value, { ...site.env.ctx, self: site.resolved?.self ? site.env.ctx.self : null });

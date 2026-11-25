@@ -255,6 +255,14 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       return m.summary ? `${m.handler}: ${m.summary}` : m.handler;
     }
     case 'animation': return m.found ? `a keyframe animation of ${m.control}` : '';
+    // The Animation Designer's calls (scripting/animValueKinds.js).
+    case 'animEffect': {
+      const kind = { keyframes: 'a move or a paint', text: 'a text effect', value: 'a value effect' }[m.entry?.effect?.kind] ?? '';
+      return m.found ? [m.label, kind].filter(Boolean).join(' · ') : '';
+    }
+    case 'swapEffect': return m.found ? `out on the old words, in on the new` : '';
+    case 'scene': return m.found ? 'a scene of this panel, as in the Animation Designer' : '';
+    case 'animTarget': return m.found ? m.label ?? '' : '';
     case 'componentIndex': case 'componentWord': case 'deviceRole': case 'dumpKind': case 'sharedName': case 'presetSlot': case 'componentType': case 'fontAxis': return m.hint ?? '';
     case 'noteList': return m.names?.length ? m.names.join(' ') : '';
     case 'lcdLine': {

@@ -1393,6 +1393,43 @@ Verified locally:
   three stand-ins that play together.
 - WebKitGTK 2.52: the same three cards play, the ring at 0.925 half a second into its sweep.
 
+## As built: the Values tab on the Designer's script calls (2026-11-25)
+
+The scripting section's "The Values tab offers library effects and presets, each with its preview,
+for an effect's name, and the path bar for a target".
+
+- **Four value kinds** in the contract (`panelApi.js`), read by `scripting/animValueKinds.js`, a
+  module of its own so the other value kinds do not take the scene model with them.
+  - `animEffect`, `ce.anim.effect`'s effect: the library's effects and the panel's presets, which
+    are the names the runtime finds.
+  - `swapEffect`, `ce.anim.swap`'s: the seven text effects.
+  - `scene`, `ce.anim.seek`'s and `ce.anim.play`'s name when it is alone: the panel's scenes. With
+    an animation after it, it is still a control.
+  - `animTarget`, `ce.anim.effect`'s target.
+  - Each is a choice, and each says the runtime's refusal before the script runs, with the nearest
+    name.
+- **Effects, each with its preview.**
+  - The written effect is shown in its row on its stand-in (`EffectPreview.svelte`), playing while
+    the row is pointed at.
+  - With the caret in it, the library is under the row as cards, each playing while pointed at, and
+    a click writes its name. A native dropdown cannot hold a preview, so the cards are beside it,
+    not instead of it.
+- **A target.**
+  - Built as a dropdown of the control's places as full targets (`Cutoff`, `Cutoff.Value`,
+    `Cutoff.tickNumber`, `Strip.band.Patterns.pattern1`), named as the timeline names them
+    (`targetLabel`).
+  - The path bar was the record's word. But its keyframe tree offers the box and the parts, not a
+    control's words, what its value draws or its patterns, which a script's target can name.
+  - The dropdown is the Designer's own **Plays on**, which lists exactly those.
+- **Completions.** Ctrl+Space in the code offers the same choices, as for every choice kind.
+
+Verified locally:
+- `test/animValueKinds.test.js` (new): each reader's choices, finding and refusal, the cards
+  previewable, a target's places, and the calls read through `readStatement`.
+- `test/scriptValues.test.js`: the kinds the sidebar reads.
+- The `valuesSidebar` browser check: the effect's row previewed, the library's cards under it, Pop
+  playing while pointed at and written by a click, the target offering Cutoff's places.
+
 ## Open
 
 Nothing for the owner at present.

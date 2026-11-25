@@ -1518,7 +1518,7 @@ export const COMMANDS = [
     ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'scene', type: 'string', required: true, summary: 'The scene\'s name, as in the Animation Designer. Not case-sensitive.' },
+      { name: 'scene', type: 'string', required: true, kind: 'scene', summary: 'The scene\'s name, as in the Animation Designer. Not case-sensitive.' },
       { name: 'position', type: 'number', required: true, summary: 'Where: 0 its start, 1 its end.\nOutside 0 ↔ 1: clamped.' },
     ],
     scopes: 'any',
@@ -1537,8 +1537,8 @@ export const COMMANDS = [
     ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, summary: 'Where: "Lamp", "Title.Text", "Knob01.bodyCap", "Cutoff.Value", "Wave.Patterns.pattern1", "Strip.band.Patterns.pattern1".' },
-      { name: 'effect', type: 'string', required: true, summary: 'The effect or preset\'s name.\nNot found: rejected with a console error listing them.\nA value effect on a control that draws no value: rejected with a console error.' },
+      { name: 'target', type: 'string', required: true, kind: 'animTarget', summary: 'Where: "Lamp", "Title.Text", "Knob01.bodyCap", "Cutoff.Value", "Wave.Patterns.pattern1", "Strip.band.Patterns.pattern1".' },
+      { name: 'effect', type: 'string', required: true, kind: 'animEffect', summary: 'The effect or preset\'s name.\nNot found: rejected with a console error listing them.\nA value effect on a control that draws no value: rejected with a console error.' },
       { name: 'opts', type: 'object', required: false, summary: 'The options below.',
         fields: optionFields([
           { name: 'duration', type: 'number', default: 'the effect\'s own', kind: 'number', summary: 'How long the effect takes, in milliseconds.\nLeft out: the effect\'s own; a text effect\'s, for its words, each a little after the last.' },
@@ -1559,9 +1559,9 @@ export const COMMANDS = [
     ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, summary: 'The control whose words change.' },
+      { name: 'target', type: 'string', required: true, kind: 'control', summary: 'The control whose words change.' },
       { name: 'text', type: 'string', required: true, summary: 'The new words.' },
-      { name: 'effect', type: 'string', required: false, summary: 'The transition.\nLeft out: crossfade.' },
+      { name: 'effect', type: 'string', required: false, kind: 'swapEffect', summary: 'The transition.\nLeft out: crossfade.' },
       { name: 'opts', type: 'object', required: false, summary: 'The options below.', fields: optionFields(['done']) },
     ],
     scopes: 'any',

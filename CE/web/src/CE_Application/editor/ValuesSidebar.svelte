@@ -55,6 +55,7 @@
   // that ends because the viewer left for the panel editor must hide the script's panel, not theirs.
   import { showDisplayPanelInScript as scriptDisplay } from '../stores/panelVisibility.js';
   import EasingCurve from '../components/animation/EasingCurve.svelte';
+  import EffectPreview from '../components/animation/EffectPreview.svelte';
   import BezierEditor from '../components/animation/BezierEditor.svelte';
   import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
   import LcdLinePreview from './LcdLinePreview.svelte';
@@ -537,6 +538,12 @@
     s.done();
   }
 
+  // An effect's name (scripting/animValueKinds.js): its choices as cards with previews, under the row
+  // while the caret is in it, so the library is browsed where the name is written.
+  let cardHover = $state('');
+  const effectCardsUnder = (arg, key) => !readOnly && arg.literal && key === caretKey
+    && (arg.kind === 'animEffect' || arg.kind === 'swapEffect') && arg.meaning?.cards?.length > 0;
+
   /** Points written out that the runtime would play: the editor goes under the row. */
   const drawnEnvelope = (arg) => !readOnly && arg.kind === 'envelope' && arg.literal && arg.editable === 'envelope';
 
@@ -757,6 +764,9 @@
   {:else if arg.kind === 'image'}
     {@const src = imageOf(arg)}
     {#if src}<img class="vthumb" {src} alt="" />{/if}
+  {:else if (arg.kind === 'animEffect' || arg.kind === 'swapEffect') && m.entry}
+    <!-- The effect written, on a stand-in: it plays while the row is pointed at. -->
+    <EffectPreview entry={m.entry} small active={hoverKey === keyOf(arg)} />
   {/if}
 {/snippet}
 
@@ -1189,6 +1199,21 @@
                 <div class="vbezier" onclick={(e) => e.stopPropagation()}>
                   <BezierEditor points={arg.meaning.bezier} width={248} height={140} onchange={(points) => commitCurve(arg, points)} />
                 </div>
+              {:else if effectCardsUnder(arg, key)}
+                <!-- The effects to choose from, each on its stand-in, under the row while the caret is in it. -->
+                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                <div class="vfx" data-effect-cards onclick={(e) => e.stopPropagation()}>
+                  {#each arg.meaning.cards as card (card.name)}
+                    <button class={['vfxcard', choiceCurrent(arg).toLowerCase() === card.name.toLowerCase() && 'on']} data-effect-card={card.name}
+                      title={`${card.category}: write "${card.name}"`}
+                      onpointerenter={() => { cardHover = card.name; }} onpointerleave={() => { if (cardHover === card.name) cardHover = ''; }}
+                      onfocus={() => { cardHover = card.name; }} onblur={() => { if (cardHover === card.name) cardHover = ''; }}
+                      onclick={() => pickChoice(arg, card.name)}>
+                      <EffectPreview entry={card.entry} small active={cardHover === card.name} />
+                      <span>{card.name}</span>
+                    </button>
+                  {/each}
+                </div>
               {:else if drawnEnvelope(arg)}
                 <!-- The shape the runtime plays, under the row at its whole width, its points to drag. -->
                 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -1246,6 +1271,19 @@
   .vline { display: flex; align-items: center; gap: 7px; min-width: 0; flex-wrap: wrap; }
   /* A drawn curve's editor goes under the row, across both of its columns. */
   .vbezier { grid-column: 1 / -1; cursor: default; min-width: 0; }
+  /* An effect's choices, each on its stand-in (EffectPreview.svelte), under the row. */
+  .vfx {
+    grid-column: 1 / -1; cursor: default; min-width: 0; max-height: 220px; overflow: auto;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 4px; padding-top: 6px;
+  }
+  .vfxcard {
+    display: flex; align-items: center; gap: 6px; min-width: 0; height: 28px; padding: 0 6px 0 2px;
+    border: 1px solid var(--line); border-radius: 5px; background: transparent; color: var(--txt);
+    font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+  }
+  .vfxcard span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vfxcard.on { border-color: var(--accent, #5B9BD5); }
+  .vfxcard:hover, .vfxcard:focus-visible { background: rgba(255, 255, 255, 0.05); }
   .vtext {
     font-family: var(--mono); font-size: 12px; color: #cfe3d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     min-width: 0; max-width: 100%;
