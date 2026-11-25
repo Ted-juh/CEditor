@@ -299,6 +299,9 @@ function updateAvailability() {
  * replaced payloads in memory. Undo therefore does not revert those payloads —
  * restore keeps whatever asset is currently loaded.
  */
+/** A panel's fields kept out of its history: snapshotOf leaves them out, and a restore leaves them be. */
+const OUTSIDE_PANEL_HISTORY = new Set(['id', 'modified', 'filePath', 'bgImage', 'bgTexture', 'viewer']);
+
 function snapshotOf(context) {
   if (!context) return null;
   if (context.registered) {
@@ -320,7 +323,7 @@ function snapshotOf(context) {
   // `filePath` is where the document lives, not what it says. Undo used to carry it: Save As then
   // one undo pointed the tab back at the file the user had just saved away from, and the next
   // Save overwrote it. Restore keeps the live path, because the snapshot no longer has one.
-  const { id, modified, filePath, bgImage, bgTexture, viewer, ...data } = panel;
+  const { id, modified, filePath, bgImage, bgTexture, viewer, ...data } = panel; // as OUTSIDE_PANEL_HISTORY
   // Which note is open is view state, like the active viewer image above. Keep the notes in
   // history, but do not turn tab navigation into a document edit or rewind it with an unrelated
   // undo.
@@ -587,7 +590,11 @@ function restoreSnapshot(context, entry) {
           const restoredNotepad = data.notepad && typeof data.notepad === 'object'
             ? { ...data.notepad, activeNoteIndex: p.notepad?.activeNoteIndex ?? 0 }
             : data.notepad;
-          return { ...p, ...data, notepad: restoredNotepad, modified };
+          // A key the snapshot does not have was not there then, and undo takes it away: spreading
+          // the snapshot over the live panel left it, so the first scene on a new panel, or the
+          // first preset a panel carried, could not be undone. The fields outside history stay.
+          const kept = Object.fromEntries(Object.entries(p).filter(([key]) => key in data || OUTSIDE_PANEL_HISTORY.has(key)));
+          return { ...kept, ...data, notepad: restoredNotepad, modified };
         })
       );
       // Restore the selection that went with this state, so undoing a delete
