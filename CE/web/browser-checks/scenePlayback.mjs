@@ -8,6 +8,8 @@
  *   - the pointer over the knob — the knob entering Hover — starts the scene waiting on that
  *   - a looping scene starts again each time its length has passed
  *   - a script plays a scene, holds it at a point, plays a library effect and swaps words (step 5c)
+ *   - a drag on a control moves the scene it drives, and stays where it was let go (step 5c)
+ *   - a control's value moves the scene it drives, from where the value was at the start (step 5c)
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -95,7 +97,7 @@ try {
     assert.equal(lampHover.length, 2, JSON.stringify(lampHover));
     assert.ok(lampHover.every((a) => a.state === 'running'));
   });
-  await page.mouse.move(5, 600);
+  await page.mouse.move(680, 5);
 
   // The loop: its animation name flips every 500 ms.
   const loopNames = [];
@@ -147,6 +149,44 @@ try {
     assert.match(leaving?.name ?? '', /^ce-tx-/);
     assert.deepEqual(writes, [['Wave', 'Text.content', 'Hi']]);
     assert.equal(swapDone, true);
+  });
+
+  // A drag drives a scene (step 5c): 100 px up is the whole of it; this one follows exactly.
+  const padAt = async () => kf(await s('box', 'pad'))[0];
+  const padStart = await padAt();
+  const pad = await s('rect', 'pad');
+  await page.mouse.move(pad.x + pad.w / 2, pad.y + pad.h - 10);
+  await page.mouse.down();
+  await page.mouse.move(pad.x + pad.w / 2, pad.y + pad.h - 50, { steps: 4 });
+  await page.waitForTimeout(80);
+  const padHalf = await padAt();
+  await page.mouse.up();
+  await page.waitForTimeout(80);
+  const padLetGo = await padAt();
+  check('a drag on a control moves the scene it drives, and it stays where it was let go', () => {
+    assert.equal(padStart?.state, 'paused', JSON.stringify(padStart));
+    assert.match(padStart.delay, /^0s$/, `held at its start before the hand moves it: ${padStart.delay}`);
+    assert.equal(padHalf.state, 'paused');
+    assert.match(padHalf.delay, /^-0\.4s$/, `40 px of 100: 400 ms into the scene: ${padHalf.delay}`);
+    assert.equal(padLetGo.delay, padHalf.delay);
+  });
+
+  // A value drives a scene: the Level knob's, turned up by dragging it up and to the right.
+  const gaugeAt = async () => kf(await s('box', 'gauge'))[0];
+  const gaugeStart = await gaugeAt();
+  const level = await s('rect', 'level');
+  await page.mouse.move(level.x + level.w / 2, level.y + level.h / 2);
+  await page.mouse.down();
+  await page.mouse.move(level.x + level.w * 0.95, level.y + level.h * 0.05 - 40, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(120);
+  const gaugeTurned = await gaugeAt();
+  const seconds = (delay) => -parseFloat(delay);
+  check('a control\'s value moves the scene it drives, from where the value was at the start', () => {
+    assert.equal(gaugeStart?.state, 'paused', JSON.stringify(gaugeStart));
+    assert.equal(gaugeTurned?.state, 'paused');
+    assert.ok(seconds(gaugeTurned.delay) > seconds(gaugeStart.delay) + 0.05,
+      `turned up, further into the scene: ${gaugeStart.delay} -> ${gaugeTurned.delay}`);
   });
 
   const still = { wave: await s('letters', 'still_wave'), cutoff: kf(await s('box', 'still_cutoff')) };

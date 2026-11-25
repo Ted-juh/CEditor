@@ -446,6 +446,24 @@
     const id = getControlId(control);
     if (sceneRun && id) sceneRun.fire({ type: 'event', controlId: id, event: eventId });
   };
+  /**
+   * Input for the scenes a gesture drives (utils/sceneClock.js): 'pointer', 'wheel', or a drag's
+   * 'press', 'drag' and 'release'. Asked only of a control some scene listens to; returns whether
+   * one did.
+   */
+  const sceneInput = (control, kind, payload) => {
+    const id = getControlId(control);
+    const hears = kind === 'press' || kind === 'drag' || kind === 'release' ? 'drag' : kind;
+    if (!sceneRun || !id || !sceneRun.listens(hears, id)) return false;
+    sceneRun.input(id, kind, payload);
+    return true;
+  };
+  /** Where the pointer is over a control, 0 to 1 across and down, from the element it is over. */
+  const pointerFraction = (event, inside = true) => {
+    const rect = event?.currentTarget?.getBoundingClientRect?.();
+    if (!rect || !rect.width || !rect.height) return { x: 0, y: 0, inside: false };
+    return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height, inside };
+  };
 
   /**
    * Which folded controls are drawn live over their own ground.
@@ -7997,6 +8015,7 @@
       onLongPress: (payload) => dispatchInteraction(id, 'onLongPress', payload),
       onFlick: (payload) => dispatchInteraction(id, 'onFlick', payload),
       onGesture: (eventId) => sceneGesture(control, eventId),
+      onDrag: sceneRun?.listens('drag', id) ? (kind, payload) => sceneRun.input(id, kind, payload) : null,
     });
   }
 
@@ -8037,6 +8056,9 @@
     });
     playGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
     sceneGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
+    // A scene the wheel drives on this control takes the wheel there, so the page does not scroll
+    // under it; the value still turns only where the control's own Wheel switch says.
+    if (sceneInput(control, 'wheel', { notches: event.deltaY < 0 ? 1 : -1 })) event.preventDefault();
     // Hardware style: while an LCD edit zone is active, the wheel acts as a data
     // knob — cycling the char under the caret (text) or the option (choice).
     if (lcdEdit.active && lcdEdit.id === getControlId(control)) {
@@ -8234,6 +8256,7 @@
   }
 
   function handlePointerMove(control, event) {
+    sceneInput(control, 'pointer', pointerFraction(event));
     // onPointerMove: throttled (~30fps) hover-move over a control, control-local coords. Fires for any
     // control; the built-in custom-hit-zone hover tracking below still only runs for custom components.
     const moveAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -8426,6 +8449,7 @@
   }
 
   function handlePointerLeave(control) {
+    sceneInput(control, 'pointer', { x: 0, y: 0, inside: false });
     if (isDisabled(control)) return;
     const controlId = getControlId(control);
     // Drop any listbox hover-row highlight when the pointer leaves.

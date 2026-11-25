@@ -115,9 +115,11 @@ test('a looping scene counts each of its clips; one that plays once counts nothi
   const scenes = [
     { id: 'sc1', name: 'Glow', trigger: { type: 'panelOpen' }, loop: true, length: 800, clips: [clip('a', fade, 'Fade in'), clip('b', sheen)] },
     { id: 'sc2', name: 'Intro', trigger: { type: 'panelOpen' }, loop: false, length: 800, clips: [clip('c', fade)] },
+    { id: 'sc3', name: 'Dragged', trigger: { type: 'panelOpen' }, loop: true, length: 800, clips: [clip('d', fade)],
+      clock: { source: 'drag', controlId: 'cutoff', span: 130, direction: 'up', follow: 'smooth', release: 'stay' } },
   ];
   const summary = panelLoops([knob], undefined, { scenes });
-  assert.equal(summary.count, 3, 'a fade 1, a turning gradient 2; the scene that plays once nothing');
+  assert.equal(summary.count, 3, 'a fade 1, a turning gradient 2; the scene that plays once nothing, nor the one a drag drives');
   assert.deepEqual(loopLines(summary.items), ['Cutoff › scene Glow › Fade in', 'Cutoff › scene Glow › Transform (counts 2)']);
   assert.equal(summary.items[0].kind, 'scene');
   assert.equal(panelLoops([knob]).count, 0, 'and no scenes, no change');

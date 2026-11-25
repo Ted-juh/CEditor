@@ -761,6 +761,63 @@ Verified locally:
 
 Not run: the C++ engines with their regenerated stub lists (CI's Windows job compiles them).
 
+## As built: step 5c, gestures that drive a scene (2026-11-25)
+
+A scene's playhead can be a hand on a control instead of time, as "Gestures that drive a scene"
+above planned.
+
+- **The clock.** A scene has an optional `clock` (`cleanClock` in `utils/sceneFormat.js`):
+  - `source`: `value`, `drag`, `wheel`, `pointerX` or `pointerY`. Time is stored as no clock;
+  - `controlId`: the control it listens to;
+  - `span`: pixels for the whole scene for a drag (130 by default), notches for the wheel (10);
+  - `direction`: up, down, left or right, for a drag;
+  - `follow`: exact, smooth or spring;
+  - `release`: what a drag does when let go (stay, back or carry on), and what the pointer clocks
+    do when the pointer leaves (stay or back).
+- **The maths** is `utils/sceneClock.js`, pure. An input sets where the scene should be, 0 to 1;
+  each frame moves what is shown towards it. Smooth closes about 63 % of the gap in 90 ms. The
+  spring is damped a little under critical, so it overshoots by about 1 % and settles. A drag let go
+  with **carry** keeps its speed, which falls to about 37 % in 300 ms.
+- **The runtime** (`utils/sceneRuntime.js`) takes `input(controlId, kind, payload)`. A driven scene
+  is always on show, posed at its clock's position. It is held at its start until the hand first
+  moves it, and its value clock starts where the value already is. It never answers a trigger,
+  `start` or a loop. It runs a frame loop only while some clock is still catching up, and stops
+  when they have all settled. `seek` from a script puts a driven scene where it says, until the
+  hand moves it again.
+- **The inputs:**
+  - a control reports its value when a scene listens to it (`CanvasControl.svelte`);
+  - the preview reports the pointer over a control and its leaving, and wheel notches;
+  - `watchGesture` gained `onDrag`: press, drag offsets in the panel's pixels, and the release
+    speed. The press tracker's result now carries `vx` and `vy`.
+
+  Each input is sent only for a control some scene listens to.
+- **Shared, never taken.** Dragging a knob still turns it, and the scene on that drag follows
+  along. The Designer says so when a drag or the wheel is picked on a control with a value.
+- **Reduced motion.** A driven scene still follows the hand, since it is the hand, but exactly,
+  and a drag let go does not carry on.
+- **The Designer.** It has a **Driven by** select, with time first. Choosing a control replaces the
+  trigger fields with the control, the span and direction, **Follows**, and what happens when let
+  go. **Loop** is hidden for a driven scene, and the loop budget does not count one, since it moves
+  only while the hand does.
+
+Left out, for now:
+- **A gesture heard on one part** rather than the whole control. The path bar already picks parts
+  for clips; a clock on a part needs the part's own hit area, which the preview does not report.
+- **The wheel switch** the plan mentions. The one controls have, `Behavior.wheelEnabled` on a
+  range control, decides whether the wheel changes its value, and still does. A scene driven by the
+  wheel on a control is an opt-in of its own: it hears the wheel on any control that is not
+  read-only, and takes it there, so the page does not scroll under it.
+
+Verified locally:
+- `test/sceneClock.test.js` (new): the format, drag, release, follow and the runtime with frames
+  that come only when told;
+- `test/gestureEvents.test.js`, `test/loopBudget.test.js`, `test/sceneRuntime.test.js`,
+  `test/sceneModel.test.js`;
+- the browser checks `scenePlayback`, now with a drag that moves a scene 400 ms of 1,000 for 40 px of
+  100 and keeps it there when let go, and a knob whose value moves another; and
+  `animationDesigner`, which drives a scene by a drag and sets it back to time;
+- the same drag in WebKitGTK 2.52 under Xvfb, posed exactly as in Chromium.
+
 ## Open
 
 Nothing for the owner at present.

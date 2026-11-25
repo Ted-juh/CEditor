@@ -34,8 +34,9 @@
   import { animationPresetLibrary, saveEffectAsPreset } from '../../stores/animationPresetLibrary.js';
   import { fileCache } from '../../stores/fileCache.js';
   import { SCENE_STAGE } from '../../stores/sceneStage.js';
-  import { cleanSceneList, SCENE_TRIGGER_TYPES } from '../../utils/sceneFormat.js';
+  import { cleanSceneList, cleanClock, SCENE_TRIGGER_TYPES, CLOCK_SOURCES, CLOCK_FOLLOWS, CLOCK_RELEASES, DRAG_DIRECTIONS } from '../../utils/sceneFormat.js';
   import { MOTION_EVENTS } from '../../utils/stateMotion.js';
+  import { isRangeBehavior } from '../../utils/rangeBehavior.js';
   import { buildStateTargetOptions } from '../../utils/stateTargets.js';
   import {
     SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
@@ -209,6 +210,43 @@
     return TRIGGER_LABELS[trigger?.type] ?? '';
   }
   const setTrigger = (patch) => changeScene({ ...scene, trigger: { ...scene.trigger, ...patch } }, 'scene:trigger');
+
+  // What moves a scene's playhead (utils/sceneClock.js): time, from its trigger, or a hand on a control.
+  const CLOCK_LABELS = { time: 'Time, from its trigger', value: 'A control\'s value', drag: 'A drag on a control', wheel: 'The wheel on a control', pointerX: 'The pointer across a control', pointerY: 'The pointer down a control' };
+  const FOLLOW_LABELS = { exact: 'Exactly', smooth: 'Smoothly', spring: 'On a spring' };
+  const RELEASE_LABELS = { stay: 'Stays', back: 'Goes back', carry: 'Carries on' };
+  const DIRECTION_LABELS = { up: 'Up', down: 'Down', left: 'Left', right: 'Right' };
+  /** Set a scene's clock; back to time drops it. A new clock starts on the picked control. */
+  function setClock(patch) {
+    if (!scene) return;
+    const merged = { ...(scene.clock ?? { controlId: pickedId || flat[0]?._children?.Core?.id || '' }), ...patch };
+    if ('source' in patch && patch.source !== scene.clock?.source) delete merged.span;
+    const clock = cleanClock(merged);
+    const next = { ...scene };
+    if (clock) next.clock = clock; else delete next.clock;
+    changeScene(next, 'scene:clock');
+  }
+  /**
+   * A gesture the control already uses is shared, never taken (the owner's rule): said when it is
+   * picked, so nobody wonders why the knob still turns.
+   */
+  function clockShares(clock) {
+    const control = flat.find((entry) => entry._children.Core.id === clock?.controlId);
+    if (!control || !(clock.source === 'drag' || clock.source === 'wheel')) return '';
+    if (!isRangeBehavior(control._children.Behavior)) return '';
+    const name = controlLabel(clock.controlId);
+    return clock.source === 'drag'
+      ? `Dragging ${name} still changes its value; the scene follows along.`
+      : `The wheel still turns ${name}; the scene follows along.`;
+  }
+  /** What drives a scene, in words, for the scene list: "Drag on Cutoff". */
+  function clockText(clock) {
+    const on = controlLabel(clock.controlId);
+    if (clock.source === 'value') return `${on}'s value`;
+    if (clock.source === 'drag') return `Drag on ${on}`;
+    if (clock.source === 'wheel') return `Wheel on ${on}`;
+    return `Pointer ${clock.source === 'pointerX' ? 'across' : 'down'} ${on}`;
+  }
 
   // --- Clips ----------------------------------------------------------------------------------------
   function effectFor(id) {
@@ -409,7 +447,7 @@
       <div class="ph">Scenes <button type="button" class="tb add" data-add-scene onclick={addScene}><Plus size={12} /> Scene</button></div>
       {#each panelScenes as entry (entry.id)}
         <button type="button" class="srow" class:sel={scene?.id === entry.id} data-scene={entry.id} onclick={() => selectScene(entry.id)}>
-          <span class="sn">{entry.name}</span><span class="st">{triggerText(entry.trigger)}</span>
+          <span class="sn">{entry.name}</span><span class="st">{entry.clock ? clockText(entry.clock) : triggerText(entry.trigger)}</span>
         </button>
       {/each}
       {#if ownScenes.length}
@@ -424,6 +462,44 @@
         <div class="sedit">
           <input class="txt" type="text" value={scene.name} aria-label="Scene name"
                  onchange={(event) => changeScene({ ...scene, name: event.currentTarget.value }, 'scene:name')} />
+          <select class="txt" value={scene.clock?.source ?? 'time'} aria-label="What drives the scene" data-scene-clock
+                  onchange={(event) => setClock({ source: event.currentTarget.value })}>
+            {#each CLOCK_SOURCES as source (source)}<option value={source}>{CLOCK_LABELS[source]}</option>{/each}
+          </select>
+          {#if scene.clock}
+            <select class="txt" value={scene.clock.controlId} aria-label="Driving control" data-clock-control
+                    onchange={(event) => setClock({ controlId: event.currentTarget.value })}>
+              {#each flat as control (control._children.Core.id)}<option value={control._children.Core.id}>{control._children.Core.name || control._children.Core.id}</option>{/each}
+            </select>
+            {#if scene.clock.source === 'drag'}
+              <label class="beats">
+                <select class="txt" value={scene.clock.direction} aria-label="Drag direction" data-clock-direction
+                        onchange={(event) => setClock({ direction: event.currentTarget.value })}>
+                  {#each DRAG_DIRECTIONS as direction (direction)}<option value={direction}>{DIRECTION_LABELS[direction]}</option>{/each}
+                </select>
+                <input class="txt num" type="number" min="10" max="4000" step="10" value={scene.clock.span} aria-label="Pixels for the whole scene" data-clock-span
+                       onchange={(event) => setClock({ span: Number(event.currentTarget.value) })} />
+                px for the whole scene</label>
+            {:else if scene.clock.source === 'wheel'}
+              <label class="beats">
+                <input class="txt num" type="number" min="1" max="400" step="1" value={scene.clock.span} aria-label="Notches for the whole scene" data-clock-span
+                       onchange={(event) => setClock({ span: Number(event.currentTarget.value) })} />
+                notches for the whole scene</label>
+            {/if}
+            <label class="beats">Follows
+              <select class="txt" value={scene.clock.follow} aria-label="How the scene follows" data-clock-follow
+                      onchange={(event) => setClock({ follow: event.currentTarget.value })}>
+                {#each CLOCK_FOLLOWS as follow (follow)}<option value={follow}>{FOLLOW_LABELS[follow]}</option>{/each}
+              </select></label>
+            {#if scene.clock.source === 'drag' || scene.clock.source === 'pointerX' || scene.clock.source === 'pointerY'}
+              <label class="beats">{scene.clock.source === 'drag' ? 'Let go, it' : 'When the pointer leaves, it'}
+                <select class="txt" value={scene.clock.release} aria-label="When let go" data-clock-release
+                        onchange={(event) => setClock({ release: event.currentTarget.value })}>
+                  {#each CLOCK_RELEASES.filter((release) => release !== 'carry' || scene.clock.source === 'drag') as release (release)}<option value={release}>{RELEASE_LABELS[release]}</option>{/each}
+                </select></label>
+            {/if}
+            {#if clockShares(scene.clock)}<span class="cnote" data-clock-shares>{clockShares(scene.clock)}</span>{/if}
+          {:else}
           <select class="txt" value={scene.trigger.type} aria-label="Scene trigger"
                   onchange={(event) => changeScene({ ...scene, trigger: { ...scene.trigger, type: event.currentTarget.value, controlId: scene.trigger.controlId ?? pickedId } }, 'scene:trigger')}>
             {#each SCENE_TRIGGER_TYPES as type (type)}<option value={type}>{TRIGGER_LABELS[type]}</option>{/each}
@@ -450,8 +526,11 @@
                      onchange={(event) => setTrigger({ every: Math.max(1, Math.min(64, Math.round(Number(event.currentTarget.value) || 1))) })} />
               beats</label>
           {/if}
+          {/if}
           <span class="srowtools">
+            {#if scene.clock}<span></span>{:else}
             <label class="chk"><input type="checkbox" checked={scene.loop} onchange={(event) => changeScene({ ...scene, loop: event.currentTarget.checked }, 'scene:loop')} /> Loop</label>
+            {/if}
             <button type="button" class="tb" aria-label="Remove scene" onclick={removeScene}><Trash2 size={12} /></button>
           </span>
         </div>
@@ -501,6 +580,7 @@
   .cn { text-transform: capitalize; }
   .cc { font-size: 11px; color: #8A96A3; }
   .hint, .empty { margin: 0; padding: 8px 10px; font-size: 12px; color: #8A96A3; }
+  .cnote { font-size: 12px; color: #8A96A3; }
   .stage { min-height: 0; display: flex; flex-direction: column; background: #0B0E10; }
   .stagebar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #20262C; color: #AEB9C4; font-size: 12px; }
   .safe { margin-left: auto; color: #8A96A3; }

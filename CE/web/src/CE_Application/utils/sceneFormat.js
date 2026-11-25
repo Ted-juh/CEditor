@@ -55,6 +55,38 @@ export function cleanTrigger(raw) {
   return { type };
 }
 
+/**
+ * What drives a scene's playhead, when it is not time (step 5c, "Gestures that drive a scene"):
+ *   source     'value' (the control's value, 0 to 1), 'drag' (a drag on it), 'wheel' (its wheel),
+ *              'pointerX' / 'pointerY' (where the pointer is across it);
+ *   controlId  the control it listens to;
+ *   span       how far moves the whole scene: pixels for a drag, notches for the wheel;
+ *   direction  the way a drag moves it forward: up, down, left, right;
+ *   follow     'exact', 'smooth', or on a 'spring';
+ *   release    when the hand lets go (a drag, the pointer leaving): 'stay', spring 'back' to the start,
+ *              or 'carry' on with the drag's speed.
+ * Time is the default and is stored as no clock at all.
+ */
+export const CLOCK_SOURCES = Object.freeze(['time', 'value', 'drag', 'wheel', 'pointerX', 'pointerY']);
+export const CLOCK_FOLLOWS = Object.freeze(['exact', 'smooth', 'spring']);
+export const CLOCK_RELEASES = Object.freeze(['stay', 'back', 'carry']);
+export const DRAG_DIRECTIONS = Object.freeze(['up', 'down', 'left', 'right']);
+
+export function cleanClock(raw) {
+  const source = CLOCK_SOURCES.includes(raw?.source) ? raw.source : 'time';
+  if (source === 'time') return null;
+  const span = Number(raw?.span);
+  const fallbackSpan = source === 'wheel' ? 10 : 130;
+  return {
+    source,
+    controlId: id(raw?.controlId),
+    span: Number.isFinite(span) && span > 0 ? Math.min(4000, Math.round(span)) : fallbackSpan,
+    direction: DRAG_DIRECTIONS.includes(raw?.direction) ? raw.direction : 'up',
+    follow: CLOCK_FOLLOWS.includes(raw?.follow) ? raw.follow : 'smooth',
+    release: CLOCK_RELEASES.includes(raw?.release) ? raw.release : 'stay',
+  };
+}
+
 /** A clip read and checked, or null. Its effect keeps what an animation node may hold. */
 export function cleanClip(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -89,6 +121,7 @@ export function cleanScene(raw) {
     length: Math.max(ms(raw.length, 2000, 100), span),
     loop: raw.loop === true,
     clips,
+    ...(cleanClock(raw.clock) ? { clock: cleanClock(raw.clock) } : {}),
   };
 }
 

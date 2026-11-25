@@ -1326,6 +1326,20 @@ There is one Designer per panel, and it closes with its panel.
   - **The beat**: every so many beats while the transport runs;
   - **A script asks**: `ce.anim.play("Intro")` from a script.
 
+  **Driven by** can hand the scene's playhead to a control instead of time. The scene then sits
+  at its start until the control moves it, and never starts or loops by itself:
+  - **A control's value**: the scene is as far along as the value is, so a knob at half way holds
+    it half way;
+  - **A drag on a control**: dragging the given number of pixels, in the given direction, plays the
+    whole scene. Let go, it **stays**, **goes back** to the start, or **carries on** with the drag's
+    speed. Dragging a knob still turns it, and the scene follows along;
+  - **The wheel on a control**: the given number of notches plays the whole scene;
+  - **The pointer across** or **down a control**: the scene follows the pointer over it. When the
+    pointer leaves, the scene stays or goes back.
+
+  **Follows** says how closely: **Exactly**, **Smoothly** (a little behind), or **On a spring**.
+  With "reduce motion" on, a driven scene follows exactly and does not carry on after you let go.
+
   Under
   **Controls' own** is every animation the controls already have, each shown as a scene of one
   clip. It is the same animation, not a copy: move or stretch it here and the control's animation
@@ -1352,7 +1366,8 @@ playhead.
 
 A script can do the same:
 - `ce.anim.play("Intro")` plays a scene by its name.
-- `ce.anim.seek("Cover", 0.5)` holds a scene at a point, which lets a script be its clock.
+- `ce.anim.seek("Cover", 0.5)` holds a scene at a point, which lets a script be its clock. On a
+  driven scene it moves the scene there until the control moves it again.
 - `ce.anim.effect("Lamp", "Pop")` plays one effect from the library, or one of the panel's presets,
   without a scene.
 - `ce.anim.swap("Readout", "Saw", "roll")` changes a control's words with a transition.

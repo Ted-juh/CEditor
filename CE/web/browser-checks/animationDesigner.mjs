@@ -162,6 +162,32 @@ check('the scene is in the saved document', () => {
   assert.equal(saved[0].clips.length, 3);
 });
 
+// Step 5c: a hand on a control drives the scene instead of time.
+await d('clickScene', saved[0].id);
+await wait(150);
+await page.selectOption('[data-scene-clock]', 'drag');
+await wait(100);
+const triggerWhileDriven = await page.$('[aria-label="Scene trigger"]');
+await page.locator('[data-clock-span]').fill('200');
+await page.locator('[data-clock-span]').dispatchEvent('change');
+await page.selectOption('[data-clock-release]', 'carry');
+await wait(150);
+const driven = (await d('saved'))[0];
+const listed = await page.evaluate((id) => document.querySelector(`[data-scene="${id}"] .st`)?.textContent ?? '', saved[0].id);
+await page.selectOption('[data-scene-clock]', 'time');
+await wait(150);
+const timedAgain = (await d('saved'))[0];
+check('a scene can be driven by a drag on a control instead of time, and set back', () => {
+  assert.equal(driven.clock?.source, 'drag', JSON.stringify(driven.clock));
+  assert.equal(driven.clock.span, 200);
+  assert.equal(driven.clock.release, 'carry');
+  assert.ok(driven.clock.controlId, 'on a control');
+  assert.equal(triggerWhileDriven, null, 'no trigger to pick while a hand drives it');
+  assert.match(listed, /^Drag on /, listed);
+  assert.equal('clock' in timedAgain, false, 'back to time, and the clock is gone');
+  assert.equal(timedAgain.clips.length, 3, 'with its clips as they were');
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();

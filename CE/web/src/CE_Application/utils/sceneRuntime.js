@@ -26,13 +26,21 @@
  * tested without a clock.
  */
 
+import { createClockState, clockInput, clockStep } from './sceneClock.js';
+
 const DEFAULT_TIMERS = {
   set: (fn, ms) => setTimeout(fn, ms),
   clear: (handle) => clearTimeout(handle),
 };
+const DEFAULT_FRAMES = {
+  request: (fn) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : setTimeout(() => fn(Date.now()), 16)),
+  cancel: (handle) => (typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame(handle) : clearTimeout(handle)),
+  now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+};
 
-/** Whether a trigger is the one a scene waits for. */
+/** Whether a trigger is the one a scene waits for. A scene driven by a gesture waits for none. */
 export function sceneWaitsFor(scene, trigger) {
+  if (scene?.clock) return false;
   const wants = scene?.trigger;
   if (!wants || !trigger || wants.type !== trigger.type) return false;
   if (wants.type === 'state') {
@@ -42,19 +50,30 @@ export function sceneWaitsFor(scene, trigger) {
   return wants.type === 'panelOpen';
 }
 
-/** The controls whose states or gestures some scene waits for, by kind: `{ state: Set, event: Set }`. */
+/**
+ * The controls some scene listens to, by what it hears: `{ state, event }` for triggers, and
+ * `{ value, pointer, drag, wheel }` for the gestures that drive a scene's playhead (sceneClock.js).
+ */
 export function sceneListeners(scenes) {
-  const out = { state: new Set(), event: new Set() };
+  const out = { state: new Set(), event: new Set(), value: new Set(), pointer: new Set(), drag: new Set(), wheel: new Set() };
   for (const scene of scenes ?? []) {
+    const clock = scene?.clock;
+    if (clock?.controlId) {
+      out[clock.source === 'pointerX' || clock.source === 'pointerY' ? 'pointer' : clock.source]?.add(clock.controlId);
+      continue;
+    }
     const { type, controlId } = scene?.trigger ?? {};
     if ((type === 'state' || type === 'event') && controlId) out[type].add(controlId);
   }
   return out;
 }
 
-export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMERS } = {}) {
+export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMERS, frames = DEFAULT_FRAMES } = {}) {
   let scenes = [];
   let reducedMotion = false;
+  const clocks = new Map();     // sceneId -> clock state, for a scene a gesture drives (sceneClock.js)
+  let frameHandle = null;
+  let lastFrame = null;
   const extras = new Map();     // key -> scene: one-off effects (ce.anim.effect, swap), one per place
   const plays = new Map();      // sceneId -> { phase, at }
   const timers_ = new Map();    // sceneId -> handle
@@ -110,7 +129,29 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
   }
 
   function drop(id) {
-    plays.delete(id); stopTimer(id); beatSlots.delete(id); finish(id, false);
+    plays.delete(id); stopTimer(id); beatSlots.delete(id); finish(id, false); clocks.delete(id);
+  }
+
+  const clockOf = (scene) => {
+    if (!clocks.has(scene.id)) clocks.set(scene.id, createClockState());
+    return clocks.get(scene.id);
+  };
+  /** One frame for the clocks that are still moving; the loop stops when they have all settled. */
+  function frame(now) {
+    frameHandle = null;
+    const dt = lastFrame === null ? 16 : now - lastFrame;
+    lastFrame = now;
+    let moving = false;
+    for (const scene of scenes) {
+      if (!scene.clock || !clocks.has(scene.id)) continue;
+      if (clockStep(clocks.get(scene.id), scene.clock, dt, { reducedMotion })) moving = true;
+    }
+    onChange();
+    if (moving) frameHandle = frames.request(frame);
+    else lastFrame = null;
+  }
+  function wake() {
+    if (frameHandle === null) { lastFrame = null; frameHandle = frames.request(frame); }
   }
 
   return {
@@ -119,7 +160,7 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
       scenes = Array.isArray(list) ? list.filter((scene) => scene?.id) : [];
       const ids = new Set(all().map((scene) => scene.id));
       let changed = false;
-      for (const id of [...plays.keys()]) {
+      for (const id of [...plays.keys(), ...clocks.keys()]) {
         if (!ids.has(id)) { drop(id); changed = true; }
       }
       if (changed) onChange();
@@ -143,7 +184,7 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
     /** Start one scene by its id or name, whatever its trigger: ce.anim.play(scene). */
     start(idOrName, { done = null } = {}) {
       const scene = sceneNamed(idOrName);
-      if (!scene) return false;
+      if (!scene || scene.clock) return false;
       run(scene, done);
       onChange();
       return true;
@@ -156,6 +197,14 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
       const scene = sceneNamed(idOrName);
       const where = Number(position);
       if (!scene || !Number.isFinite(where)) return false;
+      if (scene.clock) {
+        // A script is this scene's clock for the moment: where it says, at once.
+        const state = clockOf(scene);
+        state.target = state.shown = Math.max(0, Math.min(1, where));
+        state.velocity = 0; state.carry = 0;
+        onChange();
+        return true;
+      }
       stopTimer(scene.id);
       finish(scene.id, false);
       const before = plays.get(scene.id);
@@ -179,6 +228,20 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
       onChange();
       return true;
     },
+    /**
+     * A gesture on a control, for the scenes it drives (sceneClock.js): 'value' { normalized },
+     * 'pointer' { x, y, inside }, 'press', 'drag' { dx, dy }, 'release' { vx, vy }, 'wheel' { notches }.
+     * Returns the ids of the scenes it moved.
+     */
+    input(controlId, kind, payload = {}) {
+      const moved = [];
+      for (const scene of scenes) {
+        if (!scene.clock || scene.clock.controlId !== controlId) continue;
+        if (clockInput(clockOf(scene), scene.clock, kind, payload, { reducedMotion })) moved.push(scene.id);
+      }
+      if (moved.length) { onChange(); wake(); }
+      return moved;
+    },
     /** The transport's position in beats while it runs, null while it does not. */
     beat(beats) {
       const started = [];
@@ -201,12 +264,17 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
     plays() {
       const out = [];
       for (const scene of all()) {
+        // A scene a gesture drives is always on show, held where its clock is: at its start until
+        // the hand first moves it.
+        if (scene.clock) { out.push({ scene, phase: 'a', at: (clocks.get(scene.id)?.shown ?? 0) * scene.length }); continue; }
         const play = plays.get(scene.id);
         if (play) out.push({ scene, phase: play.phase, at: play.at });
       }
       return out;
     },
     destroy() {
+      if (frameHandle !== null) { frames.cancel(frameHandle); frameHandle = null; }
+      clocks.clear();
       for (const id of [...timers_.keys()]) stopTimer(id);
       plays.clear();
       beatSlots.clear();

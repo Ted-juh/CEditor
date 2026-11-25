@@ -1845,6 +1845,16 @@
       if (now.size === 0 && before.size > 0) sceneStage.fire({ type: 'state', controlId: id, to: 'default' });
     });
   });
+  // A control whose value drives a scene (a value clock, utils/sceneClock.js) reports its value as
+  // it changes, the first look included: that is where the scene starts.
+  let reportsValue = $derived(!!(sceneStage?.input && core?.id && stageFrame?.listeners?.value?.has?.(core.id)));
+  $effect(() => {
+    if (!reportsValue || keyframeValueKey == null) return;
+    const normalized = Number(keyframeValueKey);
+    if (!Number.isFinite(normalized)) return;
+    const id = core.id;
+    untrack(() => sceneStage.input(id, 'value', { normalized }));
+  });
   let activeKeyframes = $derived(mergeKeyframeOutputs(playerKeyframes, sceneKeyframes));
   $effect(() => {
     const fired = activeKeyframes?.fired;

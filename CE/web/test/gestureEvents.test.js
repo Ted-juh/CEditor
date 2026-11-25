@@ -33,7 +33,7 @@ test('a press that stays put is a click; one that moves is a drag, and a fast re
   press.down(0, 100, 100);
   press.move(50, 102, 101);
   assert.equal(press.stillHeld(), true, 'two pixels is still a click');
-  assert.deepEqual({ ...press.up(120, 102, 101), speed: undefined }, { click: true, moved: false, held: 120, speed: undefined, direction: 'right' });
+  assert.deepEqual({ ...press.up(120, 102, 101), speed: undefined }, { click: true, moved: false, held: 120, speed: undefined, direction: 'right', vx: 0, vy: 0 });
 
   press.down(0, 100, 100);
   press.move(40, 100, 80);
@@ -48,6 +48,8 @@ test('a press that stays put is a click; one that moves is a drag, and a fast re
   const fast = press.up(60, 100, 120);
   assert.equal(fast.direction, 'up');
   assert.ok(isFlick(fast), `80 px in 60 ms is a flick (${Math.round(fast.speed)} px/s)`);
+  assert.equal(fast.vx, 0);
+  assert.ok(Math.abs(fast.vy - -80 / 60) < 1e-9, `and its speed each way, in px a millisecond, for a scene a drag throws (${fast.vy})`);
 
   assert.equal(press.up(10, 0, 0), null, 'an up with no down is nothing');
   press.down(0, 0, 0);

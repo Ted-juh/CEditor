@@ -11,7 +11,8 @@
  *   - a live surface, Preview and the plug-in (step 5b): `createSceneRunStore`, a store of
  *     `{ plays: [{ scene, phase, at }], listeners }` with the runtime's `fire`, `open` and `beat`
  *     beside it (utils/sceneRuntime.js). A control that some scene waits on (`listeners.state`)
- *     reports its states as it enters them.
+ *     reports its states as it enters them, and one whose value drives a scene (`listeners.value`)
+ *     reports its value, through `input` (utils/sceneClock.js).
  *
  * A surface inside another's stage provides none of its own: the Designer's stage is a live surface
  * too, and there nothing plays by itself.
@@ -21,12 +22,12 @@ import { createSceneRuntime, sceneListeners } from '../utils/sceneRuntime.js';
 
 export const SCENE_STAGE = 'ce.sceneStage';
 
-export function createSceneRunStore({ timers } = {}) {
+export function createSceneRunStore({ timers, frames } = {}) {
   let listeners = sceneListeners([]);
   let runtime = null;
   const store = writable({ plays: [], listeners });
   const publish = () => store.set({ plays: runtime.plays(), listeners });
-  runtime = createSceneRuntime({ onChange: publish, ...(timers ? { timers } : {}) });
+  runtime = createSceneRuntime({ onChange: publish, ...(timers ? { timers } : {}), ...(frames ? { frames } : {}) });
   let scenesKey = '';
   let beatWanted = false;
   return {
@@ -50,6 +51,10 @@ export function createSceneRunStore({ timers } = {}) {
     seek: (idOrName, position) => runtime.seek(idOrName, position),
     effect: (key, scene, options) => runtime.effect(key, scene, options),
     find: (idOrName) => runtime.find(idOrName),
+    /** A gesture on a control, for the scenes it drives (sceneClock.js). */
+    input: (controlId, kind, payload) => runtime.input(controlId, kind, payload),
+    /** Whether some scene hears this kind of input from this control: 'value', 'pointer', 'drag', 'wheel'. */
+    listens: (kind, controlId) => !!listeners[kind]?.has?.(controlId),
     /** Whether any scene waits on the beat: only then is the transport listened to. */
     wantsBeat: () => beatWanted,
     destroy: () => runtime.destroy(),

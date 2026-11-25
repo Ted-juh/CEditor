@@ -62,6 +62,8 @@ export function createPressTracker({ slop = CLICK_SLOP_PX, windowMs = FLICK_WIND
         held: t - start.t,
         speed: (Math.hypot(dx, dy) / span) * 1000,
         direction: flickDirection(dx, dy),
+        vx: dx / span,
+        vy: dy / span,
       };
       start = null;
       samples = [];
@@ -137,13 +139,15 @@ const eventTime = (event) => (Number.isFinite(event?.timeStamp) && event.timeSta
  * `onFlick(payload)` are for a surface that raises script events (the Preview and the player);
  * the Animation tab's stage passes neither. `onGesture(eventId)` hears each gesture once — a click,
  * a long press at the usual hold, a flick — for the scenes that wait on one (utils/sceneRuntime.js).
- * Returns a function that stops watching.
+ * `onDrag(kind, payload)` follows the press itself, for a scene a drag drives (utils/sceneClock.js):
+ * 'press', then 'drag' { dx, dy } from where it went down, then 'release' { vx, vy }, all in the
+ * panel's pixels (a millisecond, for the speed). Returns a function that stops watching.
  *
  * Its listeners are its own, on the window in the capture phase: a surface's press handling returns
  * early for many kinds of control, and its own pointerup handler stops the event once it has used
  * it. `event.currentTarget` is the control's element; its bounds at the press decide "inside".
  */
-export function watchGesture(control, event, { scale = 1, onLongPress = null, onFlick = null, onGesture = null } = {}) {
+export function watchGesture(control, event, { scale = 1, onLongPress = null, onFlick = null, onGesture = null, onDrag = null } = {}) {
   if (typeof window === 'undefined' || !event) return () => {};
   const rect = event.currentTarget?.getBoundingClientRect?.() ?? null;
   const local = (at) => (rect
@@ -155,18 +159,31 @@ export function watchGesture(control, event, { scale = 1, onLongPress = null, on
   let live = true;
   const timers = [];
 
-  const onMove = (move) => tracker.move(eventTime(move), move.clientX, move.clientY);
+  const per = scale || 1;
+  const onMove = (move) => {
+    tracker.move(eventTime(move), move.clientX, move.clientY);
+    onDrag?.('drag', { dx: (move.clientX - event.clientX) / per, dy: (move.clientY - event.clientY) / per });
+  };
+  let released = false;
+  const release = (vx = 0, vy = 0) => {
+    if (released || !onDrag) return;
+    released = true;
+    onDrag('release', { vx: vx / per, vy: vy / per });
+  };
   const stop = () => {
     if (!live) return;
     live = false;
+    release();
     for (const timer of timers) clearTimeout(timer);
     window.removeEventListener('pointermove', onMove, true);
     window.removeEventListener('pointerup', onUp, true);
     window.removeEventListener('pointercancel', stop, true);
   };
+  onDrag?.('press', {});
   function onUp(up) {
     const inside = !rect || (up.clientX >= rect.left && up.clientX <= rect.right && up.clientY >= rect.top && up.clientY <= rect.bottom);
     const result = tracker.up(eventTime(up), up.clientX, up.clientY, { inside });
+    release(result?.vx ?? 0, result?.vy ?? 0);
     stop();
     if (!result) return;
     if (result.click) { playGesture(control, 'click'); onGesture?.('click'); }
