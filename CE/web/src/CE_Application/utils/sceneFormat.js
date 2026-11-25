@@ -17,7 +17,8 @@
  *                   | { type: 'script' },                  // only when ce.anim.play asks
  *            length,                                      // ms: where the timeline ends
  *            loop,                                        // plays again from the start
- *            clips: [{ id, controlId, target, start, length, effect, label? }] }
+ *            clips: [{ id, controlId, target, start, length, effect, label? }],
+ *            markers?: [{ id, at, action }] }                // ms; calls a script's ce.core.action
  *
  * A CLIP is an effect on one place of one control for a stretch of the scene's time. `target` is
  * where on the control, as a keyframe animation's target is: 'Transform' (the control), 'Text' (its
@@ -60,7 +61,7 @@ const VALUE_FRAMES_MAX = 16;
 
 /** The longest a scene or a clip may be, ms: past this, a typo. */
 export const SCENE_MAX_LENGTH = 600000;
-const LIMITS = { name: 60, clips: 400, scenes: 200 };
+const LIMITS = { name: 60, clips: 400, scenes: 200, markers: 64, action: 64 };
 
 const deepCopy = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
 const text = (value, max) => String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
@@ -203,15 +204,36 @@ export function cleanScene(raw) {
   if (!sceneId) return null;
   const clips = (Array.isArray(raw.clips) ? raw.clips : []).slice(0, LIMITS.clips).map(cleanClip).filter(Boolean);
   const span = clips.reduce((end, clip) => Math.max(end, clip.start + clip.length), 0);
+  const length = Math.max(ms(raw.length, 2000, 100), span);
+  const markers = cleanMarkers(raw.markers, length);
   return {
     id: sceneId,
     name: text(raw.name, LIMITS.name) || 'Scene',
     trigger: cleanTrigger(raw.trigger),
-    length: Math.max(ms(raw.length, 2000, 100), span),
+    length,
     loop: raw.loop === true,
     clips,
     ...(cleanClock(raw.clock) ? { clock: cleanClock(raw.clock) } : {}),
+    ...(markers.length ? { markers } : {}),
   };
+}
+
+/**
+ * A scene's markers, read: each a moment of the timeline (`at`, ms, within the scene) and the name of
+ * an action a script registers with ce.core.action, called as a play passes it (sceneRuntime.js). In
+ * time order, ids unique, at most LIMITS.markers. One whose action is not written yet is kept, and
+ * calls nothing: it is a marker someone is still naming.
+ */
+export function cleanMarkers(list, length = SCENE_MAX_LENGTH) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of (Array.isArray(list) ? list : []).slice(0, LIMITS.markers)) {
+    const markerId = id(raw?.id);
+    if (!markerId || seen.has(markerId)) continue;
+    seen.add(markerId);
+    out.push({ id: markerId, at: Math.min(length, ms(raw.at, 0)), action: text(raw.action, LIMITS.action) });
+  }
+  return out.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
 }
 
 /** A panel's scenes, read; at most LIMITS.scenes, ids unique. */

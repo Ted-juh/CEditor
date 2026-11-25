@@ -18,6 +18,11 @@
     onresize = () => {},
     ondropeffect = () => {},
     ondelete = () => {},
+    // The scene's markers (sceneFormat.js), flags on the ruler: picked, moved and taken out here.
+    selectedMarkerId = '',
+    onmarkerselect = () => {},
+    onmarkermove = () => {},
+    onmarkerdelete = () => {},
   } = $props();
 
   const LABEL_W = 220;
@@ -62,6 +67,30 @@
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
   }
+
+  // --- Markers: a press picks one, a drag moves it along the ruler, Delete takes it out -------------
+  let markerDrag = $state(null);     // { id, at }: where the marker being dragged is now
+  function markerDown(event, marker) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    onmarkerselect(marker.id);
+    const el = event.currentTarget;
+    const ruler = laneEl;
+    el.focus?.();
+    el.setPointerCapture?.(event.pointerId);
+    markerDrag = { id: marker.id, at: marker.at };
+    const move = (e) => { markerDrag = { id: marker.id, at: snapTo(timeAt(e, ruler)) }; };
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      if (markerDrag && markerDrag.at !== marker.at) onmarkermove(marker.id, markerDrag.at);
+      markerDrag = null;
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+  }
+  const markerAt = (marker) => (markerDrag?.id === marker.id ? markerDrag.at : marker.at);
 
   // --- Clips: move, copy, stretch ------------------------------------------------------------------
   function clipDown(event, clip, mode) {
@@ -135,6 +164,14 @@
       {#each ticks as t (t)}
         <span class="tick" style={`left:${t * pxPerMs}px`}><i>{fmt(t)}</i></span>
       {/each}
+      {#each scene?.markers ?? [] as marker (marker.id)}
+        <button type="button" class="marker" class:sel={marker.id === selectedMarkerId} class:unnamed={!marker.action} data-marker={marker.id}
+                style={`left:${markerAt(marker) * pxPerMs}px`}
+                title={`${fmt(markerAt(marker))}: ${marker.action ? `calls ${marker.action}` : 'calls nothing yet: name its action'}`}
+                aria-label={`Marker at ${fmt(marker.at)}${marker.action ? `, calls ${marker.action}` : ''}`}
+                onpointerdown={(event) => markerDown(event, marker)}
+                onkeydown={(event) => { if (event.key === 'Delete' || event.key === 'Backspace') { event.stopPropagation(); onmarkerdelete(marker.id); } }}></button>
+      {/each}
     </div>
   </div>
   <div class="tracks">
@@ -175,6 +212,14 @@
   .sticky { position: sticky; left: 0; z-index: 2; }
   .head { position: sticky; top: 0; z-index: 3; background: #151A1E; }
   .ruler { position: relative; height: 30px; cursor: ew-resize; outline: none; }
+  /* A marker: a flag hanging from the top of the ruler, its point at its moment. */
+  .marker {
+    position: absolute; top: 0; width: 10px; height: 12px; margin-left: -5px; padding: 0; border: 0; cursor: grab;
+    background: #F2B84B; clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%); z-index: 2;
+  }
+  .marker.unnamed { background: #8A96A3; }
+  .marker.sel { background: #FFE08A; outline: none; filter: drop-shadow(0 0 2px #FFE08A); }
+  .marker:focus-visible { filter: drop-shadow(0 0 2px #5AA9E6); }
   .ruler:focus-visible { box-shadow: inset 0 0 0 1px #5AA9E6; }
   .tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid #2F3840; }
   .tick i { position: absolute; left: 4px; top: 8px; font-style: normal; color: #8A96A3; white-space: nowrap; font-size: 11px; }

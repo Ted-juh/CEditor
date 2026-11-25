@@ -24,6 +24,11 @@
  *
  * `plays()` is `[{ scene, phase, at }]`, `at` null while it runs. The timers are injected, so it is
  * tested without a clock.
+ *
+ * MARKERS (sceneFormat.js `markers`) call `onMarker(action, { scene, marker })` as a play passes
+ * them: a timed play at each one's moment, a clock as it moves forward past one (the hand, the ease
+ * after it, a script's seek), all at once under reduced motion, as the scene jumps to its end. A
+ * scene held where a seek put it calls none, and a play cut short calls none of the rest.
  */
 
 import { createClockState, clockInput, clockStep } from './sceneClock.js';
@@ -86,7 +91,7 @@ export function sceneListeners(scenes) {
   return out;
 }
 
-export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMERS, frames = DEFAULT_FRAMES } = {}) {
+export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, timers = DEFAULT_TIMERS, frames = DEFAULT_FRAMES } = {}) {
   let scenes = [];
   let reducedMotion = false;
   const clocks = new Map();     // sceneId -> clock state, for a scene a gesture drives (sceneClock.js)
@@ -95,6 +100,7 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
   const extras = new Map();     // key -> scene: one-off effects (ce.anim.effect, swap), one per place
   const plays = new Map();      // sceneId -> { phase, at, held }: held, a seek's
   const timers_ = new Map();    // sceneId -> handle
+  const markerTimers = new Map(); // sceneId -> handles: the markers of the play under way
   const beatSlots = new Map();  // sceneId -> floor(beats / every), or null while stopped
   const dones = new Map();      // sceneId -> done(completed), from a script
 
@@ -106,7 +112,37 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
   };
   const stopTimer = (id) => {
     if (timers_.has(id)) { timers.clear(timers_.get(id)); timers_.delete(id); }
+    for (const handle of markerTimers.get(id) ?? []) timers.clear(handle);
+    markerTimers.delete(id);
   };
+
+  // --- Markers: a moment of a scene that calls a script's action as a play passes it -----------
+  /** Call a marker's action, if it has one; an action that throws does not stop the scene. */
+  function callMarker(scene, marker) {
+    if (!marker?.action) return;
+    try { onMarker(marker.action, { scene, marker }); } catch { /* the script runtime reports its own errors */ }
+  }
+  /** A timed play's markers, each at its moment; under reduced motion all at once, in order. */
+  function scheduleMarkers(scene) {
+    const markers = (scene.markers ?? []).filter((marker) => marker.action && marker.at <= scene.length);
+    if (!markers.length) return;
+    const fire = (marker) => () => { const current = sceneById(scene.id); if (current) callMarker(current, marker); };
+    const handles = reducedMotion
+      ? [timers.set(() => { for (const marker of markers) fire(marker)(); }, 0)]
+      : markers.map((marker) => timers.set(fire(marker), marker.at));
+    markerTimers.set(scene.id, handles);
+  }
+  /**
+   * A clock moved from `before` to `after` (0 to 1): the markers it passed going forward. Going back
+   * passes none, so a hand that rocks the scene to and fro does not call an action every time.
+   */
+  function crossMarkers(scene, before, after) {
+    if (!(after > before) || !scene.markers?.length) return;
+    for (const marker of scene.markers) {
+      const t = marker.at / scene.length;
+      if ((t > before || (t === 0 && before === 0)) && t <= after) callMarker(scene, marker);
+    }
+  }
   /** A script's done(completed), once: true at the end, false when cut short (restarted, sought, gone). */
   const finish = (id, completed) => {
     const done = dones.get(id);
@@ -119,6 +155,7 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
     const before = plays.get(scene.id);
     const phase = before?.phase === 'a' ? 'b' : 'a';
     stopTimer(scene.id);
+    scheduleMarkers(scene);
     if (reducedMotion) {
       plays.set(scene.id, { phase, at: scene.length });
       // At its end at once; a script waiting on it hears so after this call has returned.
@@ -162,7 +199,10 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
     let moving = false;
     for (const scene of scenes) {
       if (!scene.clock || !clocks.has(scene.id)) continue;
-      if (clockStep(clocks.get(scene.id), scene.clock, dt, { reducedMotion })) moving = true;
+      const state = clocks.get(scene.id);
+      const before = state.shown;
+      if (clockStep(state, scene.clock, dt, { reducedMotion })) moving = true;
+      crossMarkers(scene, before, state.shown);
     }
     onChange();
     if (moving) frameHandle = frames.request(frame);
@@ -218,7 +258,9 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
       if (scene.clock) {
         // A script is this scene's clock for the moment: where it says, at once.
         const state = clockOf(scene);
+        const before = state.shown;
         state.target = state.shown = Math.max(0, Math.min(1, where));
+        crossMarkers(scene, before, state.shown);
         state.velocity = 0; state.carry = 0;
         onChange();
         return true;
@@ -262,7 +304,10 @@ export function createSceneRuntime({ onChange = () => {}, timers = DEFAULT_TIMER
       for (const scene of scenes) {
         // A clock on one part hears only what was on that part; one on the whole control, the rest.
         if (!scene.clock || scene.clock.controlId !== controlId || (scene.clock.part ?? '') !== part) continue;
-        if (clockInput(clockOf(scene), scene.clock, kind, payload, { reducedMotion })) moved.push(scene.id);
+        const state = clockOf(scene);
+        const before = state.shown;
+        if (clockInput(state, scene.clock, kind, payload, { reducedMotion })) moved.push(scene.id);
+        crossMarkers(scene, before, state.shown);
       }
       if (moved.length) { onChange(); wake(); }
       return moved;

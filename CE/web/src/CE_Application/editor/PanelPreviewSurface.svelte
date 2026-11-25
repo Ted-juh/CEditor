@@ -330,7 +330,7 @@
     sliderControlWheelValue,
   } from '../utils/sliderControlPart.js';
   import { floating } from '../utils/floatingUi.js';
-  import { dispatchInteraction, dispatchKeyEvent, scriptsHear } from '../scripting/panelRuntime.js';
+  import { dispatchInteraction, dispatchKeyEvent, scriptsHear, runMarkerAction } from '../scripting/panelRuntime.js';
   import { playGesture, watchGesture } from '../utils/gestureEvents.js';
   import {
     registerKeysSurface, isLiveSurface, keysCapture, keysBubble, keysUp, letGo as keysLetGo,
@@ -416,7 +416,8 @@
   // Preview and the plug-in, which are this surface. Not inside the Animation Designer's stage, which
   // is this surface too and has a stage of its own: there a scene moves only under the playhead.
   const outerSceneStage = getContext(SCENE_STAGE) ?? null;
-  const sceneRun = outerSceneStage ? null : createSceneRunStore();
+  // A scene's markers call the scripts' actions as it passes them (scripting/panelRuntime.js).
+  const sceneRun = outerSceneStage ? null : createSceneRunStore({ onMarker: (action, { scene }) => runMarkerAction(action, { scene: scene?.name ?? '' }) });
   if (sceneRun) setContext(SCENE_STAGE, sceneRun);
   $effect(() => { sceneRun?.setScenes(panel?.animationScenes ?? []); });
   $effect(() => { sceneRun?.setReducedMotion($systemReducedMotion); });

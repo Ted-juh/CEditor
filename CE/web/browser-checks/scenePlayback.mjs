@@ -19,6 +19,7 @@
  *   - a state that changes a pattern eases its opacity, size and speed, and its scroll keeps its place
  *   - a scene drifts a background image — zoomed and panned inside its clip — and not the control
  *   - a clip on a part's pattern pulses that pattern, and not the part or the control
+ *   - a scene's markers call the scripts' actions as it passes them; one no script defines is said
  *   - a scene types a knob's scale numbers round the dial, one number at a time, and rolls them each through a box of its
  *     own (utils/anatomyWords.js)
  *   - inside the Designer's stage nothing plays by itself
@@ -362,6 +363,21 @@ try {
     assert.equal(photoHeld.picture.state, 'paused');
     assert.match(photoHeld.picture.delay, /^-3s$/, `held half way: ${photoHeld.picture.delay}`);
     assert.ok(Number(photoHeld.picture.scale) > 1.05 && Number(photoHeld.picture.scale) < 1.15, `zoomed part way: ${photoHeld.picture.scale}`);
+  });
+
+  // Markers: a script-started scene calls the actions its markers name, in order, as it passes them.
+  const cuesFrom = await page.evaluate(() => performance.now());
+  await page.evaluate(() => window.__scenes.script('animatePlay', ['Cues', {}]));
+  await page.waitForTimeout(800);
+  const cues = await s('markerCalls');
+  const cueTrace = await page.evaluate(() => window.__scenes.markerTrace());
+  check('a scene\'s markers call the scripts\' actions as it passes them, and one no script defines is said', () => {
+    assert.deepEqual(cues.map(([action]) => action), ['lights', 'beam'], JSON.stringify(cues));
+    const [lightsAt, beamAt] = cues.map(([, at]) => at - cuesFrom);
+    assert.ok(lightsAt >= 80 && lightsAt < 350, `lights at about 100 ms: ${lightsAt}`);
+    assert.ok(beamAt >= 380 && beamAt < 650, `beam at about 400 ms: ${beamAt}`);
+    assert.equal(cueTrace.length, 1, JSON.stringify(cueTrace));
+    assert.match(cueTrace[0], /a marker calls "nobody", and no script defines that action\. The actions: lights, beam/);
   });
 
   // A knob's own words: a typewriter on its scale numbers, one number at a time round the dial.

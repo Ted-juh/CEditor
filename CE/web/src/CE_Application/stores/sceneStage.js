@@ -23,12 +23,16 @@ import { createMidiTriggerReader } from '../utils/sceneMidi.js';
 
 export const SCENE_STAGE = 'ce.sceneStage';
 
-export function createSceneRunStore({ timers, frames } = {}) {
+/**
+ * `onMarker(action, { scene, marker })` is what a scene's marker calls as a play passes it
+ * (sceneRuntime.js): the live surface hands it to the script runtime's actions.
+ */
+export function createSceneRunStore({ timers, frames, onMarker } = {}) {
   let listeners = sceneListeners([]);
   let runtime = null;
   const store = writable({ plays: [], listeners });
   const publish = () => store.set({ plays: runtime.plays(), listeners });
-  runtime = createSceneRuntime({ onChange: publish, ...(timers ? { timers } : {}), ...(frames ? { frames } : {}) });
+  runtime = createSceneRuntime({ onChange: publish, ...(onMarker ? { onMarker } : {}), ...(timers ? { timers } : {}), ...(frames ? { frames } : {}) });
   let scenesKey = '';
   let current = [];
   let beatWanted = false;

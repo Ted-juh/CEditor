@@ -1201,7 +1201,7 @@ Example: `defineAction("randomize", fn)` lets any script call fn with `run("rand
 
 Good to know:
 
-- The panel offers it wherever a control can trigger an action.
+- The panel offers it wherever a control can trigger an action, and an Animation Designer scene's marker calls it as the scene passes the marker.
 - A name this script defined: replaced. One another script defined: this one is ignored, with a console error.
 - Returns nothing. A name or a function left out: nothing is defined, without a word.
 

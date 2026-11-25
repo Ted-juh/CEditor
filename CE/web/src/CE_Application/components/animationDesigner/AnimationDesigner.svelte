@@ -34,7 +34,7 @@
   import { animationPresetLibrary, saveEffectAsPreset } from '../../stores/animationPresetLibrary.js';
   import { fileCache } from '../../stores/fileCache.js';
   import { SCENE_STAGE } from '../../stores/sceneStage.js';
-  import { cleanSceneList, cleanClock, patternPlace, SCENE_TRIGGER_TYPES, CLOCK_SOURCES, CLOCK_FOLLOWS, CLOCK_RELEASES, DRAG_DIRECTIONS } from '../../utils/sceneFormat.js';
+  import { cleanSceneList, cleanClock, cleanMarkers, newSceneId, patternPlace, SCENE_TRIGGER_TYPES, CLOCK_SOURCES, CLOCK_FOLLOWS, CLOCK_RELEASES, DRAG_DIRECTIONS } from '../../utils/sceneFormat.js';
   import { MOTION_EVENTS } from '../../utils/stateMotion.js';
   import { isRangeBehavior } from '../../utils/rangeBehavior.js';
   import { controlDrawsValue } from '../../utils/valueDrawn.js';
@@ -50,6 +50,7 @@
   } from '../../stores/scenePresetLibrary.js';
   import { scenePresetFileText } from '../../utils/scenePresetFormat.js';
   import { openTypedDocument, saveTypedDocumentAs } from '../../stores/typedDocuments.js';
+  import { scriptNames } from '../../scripting/scriptNames.js';
   import { buildStateTargetOptions } from '../../utils/stateTargets.js';
   import {
     SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
@@ -73,6 +74,12 @@
   let tracks = $derived(scene ? tracksOf(scene, controls) : []);
   let clipId = $state('');
   let clip = $derived(scene?.clips.find((entry) => entry.id === clipId) ?? null);
+  // A scene's markers (sceneFormat.js): moments that call a script's action as a play passes them,
+  // flags on the ruler; the picked one's settings stand where a clip's do.
+  let markerId = $state('');
+  let marker = $derived(clip ? null : scene?.markers?.find((entry) => entry.id === markerId) ?? null);
+  // The actions the panel's scripts register with ce.core.action, written out (scriptNames.js).
+  let actionNames = $derived([...new Set(scriptNames(panel?.scripts ?? []).defines.map((entry) => entry.name))].sort());
   let clipControl = $derived(clip ? flat.find((entry) => entry._children?.Core?.id === clip.controlId) ?? null : null);
   let pickedId = $state('');
   let picked = $derived(flat.find((entry) => entry._children?.Core?.id === pickedId) ?? null);
@@ -174,6 +181,24 @@
     if (!scene || !next) return;
     if (scene.own) writeOwn(scene, next, tag);
     else writeScenes(panelScenes.map((entry) => (entry.id === next.id ? next : entry)), tag);
+  }
+
+  // --- Markers ---------------------------------------------------------------------------------------
+  const withMarkers = (markers) => ({ ...scene, markers: cleanMarkers(markers, scene.length) });
+  function addMarker() {
+    if (!scene || scene.own) return;
+    const added = { id: newSceneId('mk'), at: Math.round(at), action: actionNames[0] ?? '' };
+    changeScene(withMarkers([...(scene.markers ?? []), added]), 'marker:add');
+    markerId = added.id;
+    clipId = '';
+    note = added.action ? '' : 'Name the action the marker calls: one a script registers with ce.core.action.';
+  }
+  function setMarker(id, patch, tag) {
+    changeScene(withMarkers((scene.markers ?? []).map((entry) => (entry.id === id ? { ...entry, ...patch } : entry))), tag);
+  }
+  function removeMarker(id) {
+    changeScene(withMarkers((scene.markers ?? []).filter((entry) => entry.id !== id)), 'marker:remove');
+    if (markerId === id) markerId = '';
   }
 
   // --- Scenes ---------------------------------------------------------------------------------------
@@ -563,7 +588,22 @@
   </section>
 
   <aside class="set" aria-label="Clip settings">
-    <div class="ph">{clip ? 'Clip' : 'Settings'}</div>
+    <div class="ph">{clip ? 'Clip' : marker ? 'Marker' : 'Settings'}</div>
+    {#if marker}
+      <div class="mk" data-marker-settings={marker.id}>
+        <label class="mkrow"><span>At</span>
+          <input class="txt num" type="number" min="0" max={scene.length} step="10" value={marker.at} aria-label="When, in ms" data-marker-at
+                 onchange={(event) => setMarker(marker.id, { at: Math.round(Number(event.currentTarget.value) || 0) }, `marker:at:${marker.id}`)} /> ms</label>
+        <label class="mkrow"><span>Calls</span>
+          <input class="txt" type="text" list="ad-actions" value={marker.action} placeholder="An action's name" aria-label="The action it calls" data-marker-action
+                 onchange={(event) => setMarker(marker.id, { action: event.currentTarget.value.trim() }, `marker:action:${marker.id}`)} /></label>
+        <datalist id="ad-actions">{#each actionNames as name (name)}<option value={name}></option>{/each}</datalist>
+        <p class="hint">{actionNames.length
+          ? `As a play passes it, in Preview and the plug-in, it calls the action a script registers with ce.core.action: ${actionNames.join(', ')}.`
+          : 'As a play passes it, in Preview and the plug-in, it calls an action a script registers with ce.core.action("name", function). No script registers one yet.'}</p>
+        <button type="button" class="tb" data-marker-remove onclick={() => removeMarker(marker.id)}>Remove marker</button>
+      </div>
+    {:else}
     <ClipSettings {clip} control={clipControl} own={!!scene?.own} sceneName={scene?.own ? '' : scene?.name ?? ''}
                   onpatch={(patch) => changeScene(setClipEffect(scene, clip.id, patch), `clip:effect:${clip.id}`)}
                   ontarget={(target) => changeScene(setClipTarget(scene, clip.id, target), `clip:target:${clip.id}`)}
@@ -571,6 +611,7 @@
                   onlength={(length) => changeScene(resizeClip(scene, clip.id, length, 1), `clip:length:${clip.id}`)}
                   ondelete={() => ondelete(clip.id)}
                   onsavepreset={savePreset} />
+    {/if}
   </aside>
 
   <section class="bottom">
@@ -694,6 +735,10 @@
             {#if scene.clock}<span></span>{:else}
             <label class="chk"><input type="checkbox" checked={scene.loop} onchange={(event) => changeScene({ ...scene, loop: event.currentTarget.checked }, 'scene:loop')} /> Loop</label>
             {/if}
+            {#if !scene.own}
+              <button type="button" class="tb" data-add-marker onclick={addMarker}
+                      title="A moment that calls a script's action as the scene passes it, at the playhead">+ Marker</button>
+            {/if}
             <button type="button" class="tb" data-save-scene-preset disabled={!scene.clips.length} onclick={saveSceneAsPreset}
                     title="Keep this whole scene, to put on other controls or another panel">Save as preset</button>
             <button type="button" class="tb" aria-label="Remove scene" onclick={removeScene}><Trash2 size={12} /></button>
@@ -702,8 +747,12 @@
       {/if}
     </nav>
     <SceneTimeline {scene} {tracks} {at} {snap} selectedClipId={clipId} readOnlyAdd={!!scene?.own}
+                   selectedMarkerId={marker?.id ?? ''}
+                   onmarkerselect={(id) => { markerId = id; clipId = ''; }}
+                   onmarkermove={(id, t) => setMarker(id, { at: t }, `marker:move:${id}`)}
+                   onmarkerdelete={removeMarker}
                    onseek={(t) => { stop(); at = t; }}
-                   onselect={(id) => { clipId = id; pickedId = scene?.clips.find((c) => c.id === id)?.controlId ?? pickedId; }}
+                   onselect={(id) => { clipId = id; markerId = ''; pickedId = scene?.clips.find((c) => c.id === id)?.controlId ?? pickedId; }}
                    {onmove} {onresize} {ondelete}
                    ondropeffect={({ effectId, controlId, target, start }) => placeEffect(effectId, controlId, start, target)} />
   </section>
@@ -771,6 +820,12 @@
   .sub { margin: 6px 14px 2px; font-size: 11px; color: #8A96A3; }
   .sedit { display: flex; flex-direction: column; gap: 5px; margin: 8px 8px 0; padding-top: 8px; border-top: 1px solid #20262C; }
   .srowtools { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .mk { display: flex; flex-direction: column; gap: 8px; padding: 10px; font-size: 12px; color: #CCD3DA; }
+  .mkrow { display: flex; align-items: center; gap: 8px; }
+  .mkrow > span { flex: 0 0 44px; color: #8A96A3; }
+  .mkrow .txt:not(.num) { flex: 1; min-width: 0; }
+  .mk .hint { margin: 0; color: #8A96A3; line-height: 1.4; }
+  .mk .tb { align-self: flex-start; }
   .chk { display: inline-flex; gap: 5px; align-items: center; color: #CCD3DA; font-size: 12px; }
   .beats { display: inline-flex; gap: 6px; align-items: center; color: #CCD3DA; font-size: 12px; }
   .beats .num { width: 56px; }

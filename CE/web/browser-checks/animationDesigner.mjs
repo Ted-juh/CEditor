@@ -378,6 +378,43 @@ check('each library card previews its effect on a stand-in while pointed at, and
   assert.equal(minisPlaying.playing, true);
 });
 
+// Markers: + Marker at the playhead; its action named in its settings; its flag dragged; Delete.
+await d('clickScene', saved[0].id);
+await wait(120);
+const mkRuler = await d('rulerRect');
+await page.mouse.click(mkRuler.x + mkRuler.w * 0.25, mkRuler.y + mkRuler.h / 2);
+await wait(80);
+await page.click('[data-add-marker]');
+await wait(120);
+const mkAdded = (await d('saved')).find((entry) => entry.id === saved[0].id)?.markers ?? [];
+const mkSettings = await page.$('[data-marker-settings]') !== null;
+await page.fill('[data-marker-action]', 'lights');
+await page.press('[data-marker-action]', 'Enter');
+await page.locator('[data-marker-action]').blur();
+await wait(120);
+const mkNamed = (await d('saved')).find((entry) => entry.id === saved[0].id)?.markers ?? [];
+const mkFlag = await page.locator('[data-marker]').first().boundingBox();
+await page.mouse.move(mkFlag.x + mkFlag.width / 2, mkFlag.y + mkFlag.height / 2);
+await page.mouse.down();
+await page.mouse.move(mkRuler.x + mkRuler.w * 0.5, mkFlag.y + mkFlag.height / 2, { steps: 6 });
+await page.mouse.up();
+await wait(120);
+const mkMoved = (await d('saved')).find((entry) => entry.id === saved[0].id)?.markers ?? [];
+await page.locator('[data-marker]').first().focus();
+await page.keyboard.press('Delete');
+await wait(120);
+const mkGone = (await d('saved')).find((entry) => entry.id === saved[0].id)?.markers;
+check('a marker goes on at the playhead, is named, dragged along the ruler and deleted', () => {
+  const length = saved[0].length;
+  assert.equal(mkAdded.length, 1, JSON.stringify(mkAdded));
+  assert.ok(Math.abs(mkAdded[0].at - length * 0.25) <= length * 0.03, `at the playhead: ${mkAdded[0].at} of ${length}`);
+  assert.equal(mkAdded[0].action, '', 'no script registers an action here, so it waits to be named');
+  assert.equal(mkSettings, true);
+  assert.equal(mkNamed[0].action, 'lights');
+  assert.ok(Math.abs(mkMoved[0].at - length * 0.5) <= length * 0.03, `dragged to half way: ${mkMoved[0].at} of ${length}`);
+  assert.equal(mkGone, undefined, 'none left, no key');
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();

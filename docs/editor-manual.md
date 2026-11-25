@@ -1417,6 +1417,13 @@ There is one Designer per panel, and it closes with its panel.
   changes.
 - **Timeline** (bottom). A track for each place a scene plays on.
   - Drag the ruler to scrub.
+  - **+ Marker** (by the scene's name) puts a marker on the ruler at the playhead: a flag at a moment
+    that calls one of your scripts' actions as a play passes it, in Preview and the plug-in. Click its
+    flag to name the action under **Calls** (the actions your scripts register with
+    `ce.core.action` are offered) or to change its time; drag the flag to move it; **Delete** takes
+    it out. A loop calls it every time round, and a scene driven by a control calls it as the hand
+    moves the scene forward past it; with reduced motion the scene jumps to its end and calls them
+    all. A grey flag has no action yet.
   - Drag a clip to move it, Alt+drag to copy it, or drag its right edge to make it longer.
   - The arrow keys nudge a clip, and Delete removes it.
   - **Snap** sets the grid.

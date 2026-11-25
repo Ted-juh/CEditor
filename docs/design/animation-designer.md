@@ -1430,6 +1430,57 @@ Verified locally:
 - The `valuesSidebar` browser check: the effect's row previewed, the library's cards under it, Pop
   playing while pointed at and written by a click, the target offering Cutoff's places.
 
+## As built: timeline markers (2026-11-25)
+
+The scripting section's last row: "Timeline markers: call an action registered with
+`ce.core.action`", panel window.
+
+- **The data.** A scene may carry `markers: [{ id, at, action }]` (`sceneFormat.js`
+  `cleanMarkers`): a moment in ms within the scene and an action's name. They are kept in time
+  order, at most 64, and none leaves no key.
+  - One whose action is not written yet is kept, and calls nothing: a marker someone is still
+    naming.
+  - Scene presets do not carry markers: an action is a panel's own scripts'.
+- **When it calls** (`sceneRuntime.js`, `onMarker`). As a play passes it:
+  - a timed play, at each marker's moment, every time round a loop. A play cut short (restarted,
+    sought, gone) calls none of the rest.
+  - a scene a gesture drives, as its clock moves forward past one: the hand, the ease after it, or a
+    script that is its clock with `ce.anim.seek`. Going back passes none, so a hand rocking the
+    scene to and fro does not call an action each time.
+  - with reduced motion, all at once and in order, as the scene jumps to its end: the motion is
+    skipped, not what the scene does.
+  - a scene held where a seek put it, none.
+  - An action that throws does not stop the scene.
+- **What it calls.** The live surface (`PanelPreviewSurface`, so the editor's Preview and the
+  plug-in) hands each one to `runMarkerAction` (`panelRuntime.js`). That calls it as `run()`
+  would: an action registered with `ce.core.action`, or a function a script defines by that name.
+  - One no script defines is said in the console in the scene's words ("Scene "Cues": a marker calls
+    "nobody", and no script defines that action. The actions: …"), not `run()`'s.
+  - The Designer's own stage calls none: there a scene moves only under the playhead.
+- **The Designer.**
+  - **+ Marker** puts one at the playhead, naming the panel's first registered action if there is
+    one (`scriptNames.js` `defines`).
+  - Its flag on the ruler is picked by a click, moved by a drag (snapped as clips are), and taken out
+    by Delete.
+  - Picked, its settings stand where a clip's do: its time, **Calls** (with the panel's actions
+    offered), and Remove.
+  - A flag with no action is grey.
+
+Verified locally:
+- `test/sceneMarkers.test.js` (new):
+  - the data's order and bounds;
+  - a timed play at each moment, an unnamed marker silent;
+  - loops, a play cut short, a held scene;
+  - reduced motion all at once and after the call returns;
+  - a clock forward and back, a script's seek;
+  - an action that throws.
+- The browser checks:
+  - `scenePlayback`: a script-started scene calls `lights` at about 100 ms and `beam` at about
+    400 ms, registered by a script, and its third marker's unknown action is said once in the
+    console;
+  - `animationDesigner`: + Marker at a quarter of the ruler, named, dragged to half way, and
+    deleted.
+
 ## Open
 
 Nothing for the owner at present.

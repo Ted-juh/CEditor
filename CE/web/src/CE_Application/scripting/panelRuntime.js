@@ -4840,6 +4840,24 @@ function runAction(ref, args) {
   return undefined;
 }
 
+/**
+ * A scene's timeline marker (utils/sceneRuntime.js) calls its action as the scene passes it, as run()
+ * calls one: an action a script registered with ce.core.action, or a function a script defines by
+ * that name. One no script defines is said in the console in the scene's words, not run()'s.
+ */
+export function runMarkerAction(action, { scene = '' } = {}) {
+  const name = String(action ?? '').trim();
+  if (!name) return undefined;
+  const defined = actions.has(name.toLowerCase())
+    || activeScripts().some((s) => s.enabled !== false && typeof handlerCache.get(s.id)?.handlers?.[name] === 'function');
+  if (!defined) {
+    const names = [...actions.values()].map((a) => a.name);
+    addScriptTrace('error', '', `Scene "${scene}": a marker calls "${name}", and no script defines that action${names.length ? `. The actions: ${names.join(', ')}` : ''}. Register one with ce.core.action("${name}", function).`);
+    return undefined;
+  }
+  return runAction(name);
+}
+
 /** The actions scripts have registered, for the editor's binding UI. Names as declared. */
 export function registeredActions() {
   return [...actions.values()].map((a) => a.name);

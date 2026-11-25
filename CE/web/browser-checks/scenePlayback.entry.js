@@ -124,6 +124,10 @@ function panel(prefix) {
         clips: [clip('c16', `${prefix}knock`, 'Transform', 0, 1000, fade)] },
       { id: 'sc_drift', name: 'Drift', trigger: { type: 'script' }, length: 6000, loop: false,
         clips: [clip('c17', `${prefix}photo`, 'Transform', 0, 6000, sceneEffect('paint:imageDrift').effect)] },
+      // Markers (sceneFormat.js): moments that call a script's action as the scene passes them.
+      { id: 'sc_cues', name: 'Cues', trigger: { type: 'script' }, length: 600, loop: false,
+        clips: [clip('c21', `${prefix}lamp`, 'Transform', 0, 600, fade)],
+        markers: [{ id: 'mk_b', at: 400, action: 'beam' }, { id: 'mk_a', at: 100, action: 'lights' }, { id: 'mk_x', at: 500, action: 'nobody' }] },
       // A text clip on a knob's numbers (utils/anatomyWords.js): typed round the dial, one a number.
       { id: 'sc_numbers', name: 'Numbers', trigger: { type: 'script' }, length: 600, loop: false,
         clips: [clip('c18', `${prefix}scale`, 'Parts.tickNumber', 0, 600, typewriter)] },
@@ -153,6 +157,10 @@ setRuntimeHost({
   writeValue: (control, path, value) => { textWrites.push([control._children.Core.name, path, value]); return true; },
 });
 const script = scriptApiForTesting('', 'scene-fixture');
+// The actions a scene's markers call, as a script registers them with ce.core.action.
+const markerCalls = [];
+script.defineAction('lights', () => { markerCalls.push(['lights', Math.round(performance.now())]); });
+script.defineAction('beam', () => { markerCalls.push(['beam', Math.round(performance.now())]); });
 mount(SceneStageHost, { target: document.getElementById('still'), props: { panel: panel('still_') } });
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
@@ -238,6 +246,15 @@ window.__scenes = {
     return own ? { drawn: Number(own.dataset.drawn), reading } : null;
   },
   /** A script's call, as a panel script makes it; `done` is recorded under `doneKey`. */
+  /** What the markers have called, in order, and when (ms on the page's clock). */
+  markerCalls: () => markerCalls.map((entry) => [...entry]),
+  /** The console lines a scene's marker left: one naming an action no script defines. */
+  markerTrace: async () => {
+    const { scriptTrace } = await import('../src/CE_Application/stores/scriptConsole.js');
+    let lines = [];
+    scriptTrace.subscribe((list) => { lines = list.map((t) => t.message); })();
+    return lines.filter((line) => line.startsWith('Scene "Cues"'));
+  },
   script: (name, args, doneKey = '') => {
     const list = [...args];
     if (doneKey) list.push({ ...(list.pop() ?? {}), done: (completed) => { window.__scenes.dones[doneKey] = completed; } });
