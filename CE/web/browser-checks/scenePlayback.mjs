@@ -18,6 +18,7 @@
  *   - a drag heard on one part: on a button's key it moves the scene, on its margin it does not
  *   - a state that changes a pattern eases its opacity, size and speed, and its scroll keeps its place
  *   - a scene drifts a background image — zoomed and panned inside its clip — and not the control
+ *   - a clip on a part's pattern pulses that pattern, and not the part or the control
  *   - a scene types a knob's scale numbers round the dial, one number at a time, and rolls them each through a box of its
  *     own (utils/anatomyWords.js)
  *   - inside the Designer's stage nothing plays by itself
@@ -275,6 +276,27 @@ try {
     assert.equal(patternPulsing.scroll.state, 'running', 'still scrolling');
     assert.equal(patternHeld.clip.state, 'paused');
     assert.match(patternHeld.clip.delay, /^-0\.4s$/, `held half way: ${patternHeld.clip.delay}`);
+  });
+
+  // A part's pattern: Strip's band's pattern pulsed by a scene; the band, the label and Strip's own
+  // background are left alone, and the pattern's scroll goes on.
+  const bandBefore = await s('pattern', 'strip', 'pattern1', 'band');
+  await page.evaluate(() => window.__scenes.script('animatePlay', ['Band pulse', {}]));
+  await page.waitForTimeout(120);
+  const bandPulsing = await s('pattern', 'strip', 'pattern1', 'band');
+  const stripBox = kf(await s('box', 'strip'));
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Band pulse', 0.5]));
+  await page.waitForTimeout(80);
+  const bandHeld = await s('pattern', 'strip', 'pattern1', 'band');
+  check('a clip on a part\'s pattern pulses that pattern, and not the part or the control', () => {
+    assert.equal(bandBefore?.clip.name, 'none', JSON.stringify(bandBefore));
+    assert.match(bandBefore.scroll?.name ?? '', /ce-pattern-x$/, 'it scrolls');
+    assert.match(bandPulsing.clip.name, /^ce-kf-/, JSON.stringify(bandPulsing));
+    assert.equal(bandPulsing.clip.state, 'running');
+    assert.equal(bandPulsing.scroll.state, 'running', 'still scrolling');
+    assert.deepEqual(stripBox, [], 'the label itself does not move');
+    assert.equal(bandHeld.clip.state, 'paused');
+    assert.match(bandHeld.clip.delay, /^-0\.4s$/, `held half way: ${bandHeld.clip.delay}`);
   });
 
   // A drag heard on Knock's key only. Its margin (the outer tenth) is the button but not its key.

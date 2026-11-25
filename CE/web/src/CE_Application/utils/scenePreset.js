@@ -17,7 +17,7 @@
  *
  * Pure: the library is stores/scenePresetLibrary.js, the buttons the Designer's.
  */
-import { cleanScene, cleanClip, cleanTrigger, cleanClock, newSceneId, VALUE_TARGET } from './sceneFormat.js';
+import { cleanScene, cleanClip, cleanTrigger, cleanClock, newSceneId, patternPlace, VALUE_TARGET } from './sceneFormat.js';
 import { controlDrawsValue } from './valueDrawn.js';
 import { flatControlsWithPanelRects } from './containment.js';
 
@@ -44,8 +44,12 @@ function needsOf(clips) {
   for (const clip of clips) {
     if (clip.target === 'Text') words = true;
     else if (clip.target === VALUE_TARGET) value = true;
-    else if (String(clip.target).startsWith('Parts.')) parts.add(String(clip.target).split('.')[1]);
-    else if (String(clip.target).startsWith('Patterns.')) patterns.add(String(clip.target).split('.')[1]);
+    else if (patternPlace(clip.target)) {
+      // A pattern by its name; a part's as `part.name`, and the part with it.
+      const { part, name } = patternPlace(clip.target);
+      if (part) parts.add(part);
+      patterns.add(part ? `${part}.${name}` : name);
+    } else if (String(clip.target).startsWith('Parts.')) parts.add(String(clip.target).split('.')[1]);
   }
   return { text: words, value, parts: [...parts].sort(), patterns: [...patterns].sort() };
 }
@@ -103,7 +107,7 @@ export function cleanScenePreset(raw) {
       text: slot?.needs?.text === true,
       value: slot?.needs?.value === true,
       parts: (Array.isArray(slot?.needs?.parts) ? slot.needs.parts : []).map((part) => text(part, 64)).filter((part) => /^[A-Za-z0-9_-]+$/.test(part)),
-      patterns: (Array.isArray(slot?.needs?.patterns) ? slot.needs.patterns : []).map((name) => text(name, 64)).filter((name) => /^[A-Za-z0-9_-]+$/.test(name)),
+      patterns: (Array.isArray(slot?.needs?.patterns) ? slot.needs.patterns : []).map((name) => text(name, 129)).filter((name) => /^(?:[A-Za-z0-9_-]+\.)?[A-Za-z0-9_-]+$/.test(name)),
     },
   }));
   if (!slots.length) return null;
@@ -156,9 +160,14 @@ export function slotDoesNotFit(slot, control) {
   const parts = partNamesOf(control);
   const missing = (slot.needs?.parts ?? []).filter((part) => !parts.has(part));
   if (missing.length) return `${name} has no ${missing.length > 1 ? 'parts' : 'part'} ${missing.join(', ')}.`;
-  const patterns = new Set(Object.keys(control?._children?.Background?._children?.Patterns?._children ?? {}));
+  // Its own patterns by name, and its parts' as `part.name`, as needsOf writes them.
+  const patternsOf = (node) => Object.keys(node?._children?.Background?._children?.Patterns?._children ?? {});
+  const patterns = new Set([
+    ...patternsOf(control),
+    ...Object.entries(control?._children?.Parts?._children ?? {}).flatMap(([part, node]) => patternsOf(node).map((pattern) => `${part}.${pattern}`)),
+  ]);
   const noPattern = (slot.needs?.patterns ?? []).filter((pattern) => !patterns.has(pattern));
-  if (noPattern.length) return `${name} has no pattern ${noPattern.join(', ')} for its pattern clip.`;
+  if (noPattern.length) return `${name} has no pattern ${noPattern.map((pattern) => pattern.replace('.', ' › ')).join(', ')} for its pattern clip.`;
   return '';
 }
 

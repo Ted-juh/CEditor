@@ -14,6 +14,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { sceneEffect } from '../src/CE_Application/utils/sceneModel.js';
 import { setRuntimeHost, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { addPatternPatch } from '../src/CE_Application/utils/patternLayers.js';
+import { createPartNode } from '../src/CE_Application/utils/customComponentFactory.js';
 import { latestMidiInputMessage } from '../src/CE_Application/stores/deviceProfileStores.js';
 
 function place(control, id, name, x, y, w, h) {
@@ -72,6 +73,13 @@ function panel(prefix) {
     imageSrc: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="20" height="20" fill="#c33"/><rect x="20" y="20" width="20" height="20" fill="#3c3"/></svg>')}`,
     imageFit: 'tile',
   });
+  // A part's pattern: Strip's band, a part of its own with a scrolling pattern, which a scene pulses.
+  const strip = place(createControl('Label'), `${prefix}strip`, 'Strip', 240, 480, 200, 60);
+  strip._children.Text.content = 'Strip';
+  const band = createPartNode('band', { layout: { width: 180, height: 30 }, sections: { Background: { _type: 'Background', _children: {} } } });
+  const { patch: bandPattern } = addPatternPatch(band._children.Background, 'Background', { speed: 40 });
+  band._children.Background._children.Patterns = bandPattern['Background.Patterns'];
+  strip._children.Parts = { _type: 'Parts', _children: { band } };
   // A knob's own words: the numbers round its scale, which a scene types in one at a time.
   const scale = place(createControl('Knob'), `${prefix}scale`, 'Scale', 20, 470, 80, 80);
   scale._children.Behavior.scaleNumberCount = 6;
@@ -90,7 +98,7 @@ function panel(prefix) {
   } } };
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale, strip],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -122,6 +130,9 @@ function panel(prefix) {
       // And rolled up into place, each number through a box of its own.
       { id: 'sc_numbers_roll', name: 'Numbers roll', trigger: { type: 'script' }, length: 600, loop: false,
         clips: [clip('c19', `${prefix}scale`, 'Parts.tickNumber', 0, 600, sceneEffect('text:roll:in').effect)] },
+      // A clip on a part's pattern: Strip's band's, pulsed, the band and the label still.
+      { id: 'sc_band', name: 'Band pulse', trigger: { type: 'script' }, length: 800, loop: false,
+        clips: [clip('c20', `${prefix}strip`, 'Parts.band.Patterns.pattern1', 0, 800, sceneEffect('pattern:pulse').effect)] },
       // A pattern clip: Wave's pattern pulsed, its scroll going on underneath.
       { id: 'sc_shimmer', name: 'Shimmer', trigger: { type: 'script' }, length: 800, loop: false,
         clips: [clip('c13', `${prefix}wave`, 'Patterns.pattern1', 0, 800, sceneEffect('pattern:pulse').effect)] },
@@ -146,7 +157,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'scale', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'scale', 'strip', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -165,9 +176,10 @@ window.__scenes = {
     return { name: style.animationName, delay: style.animationDelay, state: style.animationPlayState };
   },
   rect: (id) => { const r = root(id).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; },
-  /** A pattern's clip animation, and its scroll's (PatternLayers.svelte). */
-  pattern: (id, name) => {
-    const layer = root(id)?.querySelector(`.pattern-layer[data-pattern="${name}"]`);
+  /** A pattern's clip animation, and its scroll's (PatternLayers.svelte); `part` for a part's pattern. */
+  pattern: (id, name, part = '') => {
+    const host = part ? root(id)?.querySelector(`.interactive-part[data-part-name="${part}"]`) : root(id);
+    const layer = host?.querySelector(`.pattern-layer[data-pattern="${name}"]`);
     if (!layer) return null;
     const clipStyle = getComputedStyle(layer.querySelector('.pattern-clip'));
     const mover = layer.querySelector('.pattern-move-x, .pattern-move-y');

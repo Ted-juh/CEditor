@@ -15,7 +15,7 @@
  * moment. A clip holds its first frame before it starts and its last after (fill `both`), so a
  * control that fades in at 1.2 s is not seen before it.
  */
-import { newSceneId, cleanClip, cleanScene, SCENE_MAX_LENGTH, VALUE_TARGET } from './sceneFormat.js';
+import { newSceneId, cleanClip, cleanScene, SCENE_MAX_LENGTH, VALUE_TARGET, PATTERN_PLACE, patternPlace } from './sceneFormat.js';
 import {
   readKeyframes, animationValue, keyframesRule, channelFrames, colourAnimationValue, colourKeyframesRule,
   COLOUR_CHANNELS, GRADIENT_CHANNEL, IMAGE_CHANNEL,
@@ -24,6 +24,9 @@ import { readTextEffect, textEffectRules, TEXT_EFFECTS, TEXT_EFFECT_NAMES } from
 import { flatControls } from './containment.js';
 import { patternEntries, patternLabel } from './patternLayers.js';
 import { partPlace } from './targetPaths.js';
+import { isSliderFamily, isSliderRendererPart } from './anatomyWords.js';
+import { BUTTON_DEVICE_TYPES, isButtonDevicePart } from '../models/buttonDeviceParts.js';
+import { METER_DEVICE_TYPES, isMeterDevicePart } from '../models/meterDeviceParts.js';
 
 const CHANNELS = [...Object.keys(COLOUR_CHANNELS), GRADIENT_CHANNEL, IMAGE_CHANNEL];
 const deepCopy = (value) => JSON.parse(JSON.stringify(value));
@@ -61,8 +64,9 @@ export const SCENE_EFFECTS = Object.freeze([
   // across a photograph, and a face turning behind the control.
   { id: 'paint:imageDrift', label: 'Image drift', category: 'Paint', target: 'Transform', length: 6000, effect: keyframesEffect([{ at: 0, zoom: 1, panX: 0, panY: 0 }, { at: 1, zoom: 1.15, panX: -4, panY: -3 }], { easing: 'inOutQuad' }) },
   { id: 'paint:imageSpin', label: 'Image spin', category: 'Paint', target: 'Transform', length: 8000, effect: keyframesEffect([{ at: 0, spin: 0 }, { at: 1, spin: 360 }], { easing: 'linear' }) },
-  // On one of the control's patterns (target 'Patterns': its first, unless dropped on another's track):
-  // the pattern as a whole, faded or moved, its own scroll going on underneath.
+  // On one of the control's patterns (target 'Patterns': its first, or a part's first when it has
+  // none of its own, unless dropped on another's track): the pattern as a whole, faded or moved, its
+  // own scroll going on underneath.
   { id: 'pattern:fadeIn', label: 'Pattern fades in', category: 'Pattern', target: 'Patterns', length: 700, effect: keyframesEffect([{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }]) },
   { id: 'pattern:fadeOut', label: 'Pattern fades out', category: 'Pattern', target: 'Patterns', length: 700, effect: keyframesEffect([{ at: 0, opacity: 1 }, { at: 1, opacity: 0 }]) },
   { id: 'pattern:rise', label: 'Pattern rises in', category: 'Pattern', target: 'Patterns', length: 800, effect: keyframesEffect([{ at: 0, y: 14, opacity: 0 }, { at: 1, y: 0, opacity: 1 }]) },
@@ -76,9 +80,29 @@ export const SCENE_EFFECTS = Object.freeze([
 ]);
 export const SCENE_EFFECT_CATEGORIES = Object.freeze(['All', 'Text', 'Swap', 'Move', 'Paint', 'Pattern', 'Value', 'Mine']);
 
-/** The places a control's own patterns give a clip: `Patterns.<name>`, in the background's order. */
+/**
+ * Whether a control's own renderer draws this part — a knob's, a button's or a meter's anatomy —
+ * rather than drawing it as a part with a background of its own, as CanvasControl decides.
+ */
+function drawnByItsRenderer(control, part) {
+  const type = String(control?._children?.Core?.controlType ?? '');
+  if (isSliderFamily(control)) return isSliderRendererPart(part);
+  if (BUTTON_DEVICE_TYPES.has(type)) return isButtonDevicePart(part);
+  if (METER_DEVICE_TYPES.has(type)) return isMeterDevicePart(part);
+  return false;
+}
+
+/**
+ * The places a control's patterns give a clip, in the background's order: its own first
+ * (`Patterns.<name>`), then each part's (`Parts.<part>.Patterns.<name>`), in the parts' order. Only
+ * a part drawn as a part draws its background's patterns; a button's key has a pattern of its own kind.
+ */
 export function patternPlacesOf(control) {
-  return patternEntries(control?._children?.Background).map(([name]) => `Patterns.${name}`);
+  const own = patternEntries(control?._children?.Background).map(([name]) => `Patterns.${name}`);
+  const parts = Object.entries(control?._children?.Parts?._children ?? {})
+    .filter(([part]) => !drawnByItsRenderer(control, part))
+    .flatMap(([part, node]) => patternEntries(node?._children?.Background).map(([name]) => `Parts.${part}.Patterns.${name}`));
+  return [...own, ...parts].filter((place) => PATTERN_PLACE.test(place));
 }
 
 /** Whether a keyframe effect only moves and fades, which is all a pattern clip can show. */
@@ -147,11 +171,13 @@ export function duplicateClip(scene, clipId, start, snap = 10) {
 export function targetLabel(target) {
   if (target === 'Transform') return 'Whole control';
   if (target === VALUE_TARGET) return 'What the value draws';
-  if (String(target).startsWith('Patterns.')) return `Pattern › ${patternLabel(String(target).slice('Patterns.'.length))}`;
+  const pattern = patternPlace(target);
   if (target === 'Text') return 'Text';
-  const part = String(target).split('.')[1] ?? '';
+  const part = pattern ? pattern.part : String(target).split('.')[1] ?? '';
   const place = partPlace(part);
-  return place.group ? `${place.group} › ${place.label}` : place.label;
+  const partLabel = place.group ? `${place.group} › ${place.label}` : place.label;
+  if (pattern) return `${pattern.part ? `${partLabel} › ` : ''}Pattern › ${patternLabel(pattern.name)}`;
+  return partLabel;
 }
 
 const nameOf = (control) => String(control?._children?.Core?.name || control?._children?.Core?.id || 'Control');
@@ -248,8 +274,9 @@ export function clipAnimation(clip) {
 const partOf = (target) => (String(target).startsWith('Parts.') ? String(target).split('.')[1] : '');
 
 /**
- * What one control draws of a scene: `{ parts, colours, texts, rules }` as the keyframe player gives
- * it, or null when the scene has nothing on it. `at` (ms) poses every clip at that moment, paused;
+ * What one control draws of a scene: `{ parts, colours, texts, patterns, partPatterns, rules }` as the
+ * keyframe player gives the first four (patterns by name; a part's, by part and then name), or null
+ * when the scene has nothing on it. `at` (ms) poses every clip at that moment, paused;
  * without it the clips play from the moment this is applied. `phase` restarts a played scene.
  */
 export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } = {}) {
@@ -259,19 +286,22 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
   const colours = new Map();
   const texts = new Map();
   const patterns = new Map();         // pattern name -> animation values, for PatternLayers
+  const partPatterns = new Map();     // part -> pattern name -> animation values: a part's patterns
   const rules = [];
   const options = { at: Number.isFinite(at) ? at : null, fill: 'both' };
   for (const clip of clips) {
     // What the value draws is not CSS: valueDrawn.js works it out a frame at a time.
     if (clip.effect.kind === 'value') continue;
-    if (String(clip.target).startsWith('Patterns.')) {
+    const pattern = patternPlace(clip.target);
+    if (pattern) {
       // A pattern moves and fades as a whole; it has no colours of its own to animate here.
       const entry = readKeyframes(clipAnimation(clip), clip.id);
       if (!entry?.moves) continue;
-      const name = String(clip.target).slice('Patterns.'.length);
-      const list = patterns.get(name) ?? [];
+      if (pattern.part && !partPatterns.has(pattern.part)) partPatterns.set(pattern.part, new Map());
+      const byName = pattern.part ? partPatterns.get(pattern.part) : patterns;
+      const list = byName.get(pattern.name) ?? [];
       list.push(animationValue(entry, phase, options));
-      patterns.set(name, list);
+      byName.set(pattern.name, list);
       rules.push(keyframesRule(entry, phase));
       continue;
     }
@@ -302,7 +332,7 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
       rules.push(colourKeyframesRule(entry, channel, phase));
     }
   }
-  return { parts, colours, texts, patterns, rules: [...new Set(rules)].join('\n') };
+  return { parts, colours, texts, patterns, partPatterns, rules: [...new Set(rules)].join('\n') };
 }
 
 /**
@@ -328,6 +358,8 @@ export function mergeKeyframeOutputs(own, scene) {
     colours,
     texts: mergeLists(own.texts, scene.texts),
     patterns: mergeLists(own.patterns, scene.patterns),
+    partPatterns: new Map([...new Set([...(own.partPatterns?.keys() ?? []), ...(scene.partPatterns?.keys() ?? [])])]
+      .map((part) => [part, mergeLists(own.partPatterns?.get(part), scene.partPatterns?.get(part))])),
     rules: [own.rules, scene.rules].filter(Boolean).join('\n'),
   };
 }

@@ -1530,14 +1530,14 @@ export const COMMANDS = [
     example: '`animateEffect("Lamp", "Pop")` pops the Lamp; `animateEffect("Title.Text", "Typewriter in")` types its words in.',
     notes: [
       'The effects are the Animation Designer\'s library ("Fade in", "Pop", "Typewriter in", "Gradient sheen"…) and the presets the panel carries, by name, any case.',
-      'A target is a control\'s name, then .Text for its words, a part\'s name, or .Patterns.<name> for one of its patterns; the control alone is its whole box, or its words for a text effect, or its first pattern for a Pattern effect ("Pattern pulse").',
+      'A target is a control\'s name, then .Text for its words, a part\'s name, or .Patterns.<name> for one of its patterns (.<part>.Patterns.<name> for one of a part\'s); the control alone is its whole box, or its words for a text effect, or its first pattern for a Pattern effect ("Pattern pulse"), a part\'s first when it has none of its own.',
       'A value effect ("Ring sweep", "Rise to value", "Wiggle"…) moves what a value draws — a knob\'s or a slider\'s, the Macro\'s ring, a meter\'s needle or bar — then hands back to the value: the control alone is that, or name it as .Value. It moves the drawing only; the value, and what it sends, stay as they are.',
       'A new effect on the same place replaces the last, which reports done(false). An effect that ends holds its last frame; a value effect ends on the value.',
       'With the panel\'s window closed: returns false.',
     ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, summary: 'Where: "Lamp", "Title.Text", "Knob01.bodyCap", "Cutoff.Value", "Wave.Patterns.pattern1".' },
+      { name: 'target', type: 'string', required: true, summary: 'Where: "Lamp", "Title.Text", "Knob01.bodyCap", "Cutoff.Value", "Wave.Patterns.pattern1", "Strip.band.Patterns.pattern1".' },
       { name: 'effect', type: 'string', required: true, summary: 'The effect or preset\'s name.\nNot found: rejected with a console error listing them.\nA value effect on a control that draws no value: rejected with a console error.' },
       { name: 'opts', type: 'object', required: false, summary: 'The options below.',
         fields: optionFields([

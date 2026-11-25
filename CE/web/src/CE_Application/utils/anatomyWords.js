@@ -39,6 +39,11 @@ function semanticPartNames() {
   return semanticNames;
 }
 
+/** Whether the slider renderer draws a part of this name itself, rather than as a part of its own. */
+export function isSliderRendererPart(part) {
+  return semanticPartNames().has(String(part));
+}
+
 /** Whether a control is a knob or a slider: the family SliderFamilyRenderer draws. */
 export function isSliderFamily(control) {
   return isSliderBehavior(control?._children?.Behavior ?? null);
@@ -88,7 +93,7 @@ export function sliderWordsRefusal(control, part = '') {
   if (SLIDER_WORD_PARTS.includes(part)) {
     return sliderWordParts(control).includes(part) ? '' : `${name} does not show that now: turn it on in its Ticks section, or play the effect on ${WORD_PLACES}.`;
   }
-  if (!semanticPartNames().has(part)) return '';
+  if (!isSliderRendererPart(part)) return '';
   if (part.startsWith('label')) return `${name} prints its name, value and range as Labels of their own beside it: put the effect on that Label.`;
   return `That part of ${name} draws no words: a text effect plays on ${WORD_PLACES}.`;
 }

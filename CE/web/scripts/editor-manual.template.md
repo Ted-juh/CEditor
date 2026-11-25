@@ -1333,7 +1333,10 @@ There is one Designer per panel, and it closes with its panel.
   patterns, the first unless you drop one on another pattern's track. The pattern moves and fades
   as a whole while its own scroll goes on underneath. A pattern takes moves and fades only; a control
   with no pattern says so. Any move or fade from **Move** can go on a pattern too: choose it under
-  **Plays on**.
+  **Plays on**. A part's patterns are there as well, named by the part (**band › Pattern › Pattern 1**),
+  so a component's stripe can pulse while the component stays still; a Pattern effect goes on a
+  part's first pattern when the control has none of its own. A knob's, a button's or a meter's own
+  parts are not offered: the control draws those itself, and a clip cannot reach them.
 
   **Value** effects move what a knob's or a slider's value draws (its arc, ring, pointer or fill)
   for a moment, then hand back to the value: **Ring sweep** runs round to full and settles on the

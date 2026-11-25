@@ -3700,6 +3700,7 @@
             ?? null}
           animationList={activeKeyframes?.parts?.get?.(partName) ?? null}
           textEffect={activeKeyframes?.texts?.get?.(partName)?.at(-1) ?? null}
+          patternAnimations={activeKeyframes?.partPatterns?.get?.(partName) ?? null}
           colourChannels={keyframeColours ? (keyframeColours.get(partName) ?? {}) : null}
           fadeHidden={fadeableParts.has(partName)}
           debug={interactionDebugEnabled}

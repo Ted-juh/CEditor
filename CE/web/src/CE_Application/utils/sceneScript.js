@@ -60,10 +60,15 @@ export function resolvePlace(control, rest) {
     return key ? `Patterns.${key}` : null;
   }
   const parts = control?._children?.Parts?._children ?? {};
-  const name = lower(steps[0]) === 'parts' ? steps[1] : steps[0];
-  if (steps.length > (lower(steps[0]) === 'parts' ? 2 : 1)) return null;
-  const key = Object.keys(parts).find((part) => lower(part) === lower(name));
-  return key ? `Parts.${key}` : null;
+  const onPart = lower(steps[0]) === 'parts' ? steps.slice(1) : steps;
+  const key = Object.keys(parts).find((part) => lower(part) === lower(onPart[0]));
+  if (!key) return null;
+  if (onPart.length === 1) return `Parts.${key}`;
+  // A part's pattern: Knob01.Parts.key.Patterns.pattern1, or Knob01.key.Patterns.pattern1.
+  if (onPart.length !== 3 || lower(onPart[1]) !== 'patterns') return null;
+  const patterns = Object.keys(parts[key]?._children?.Background?._children?.Patterns?._children ?? {});
+  const pattern = patterns.find((name) => lower(name) === lower(onPart[2]));
+  return pattern ? `Parts.${key}.Patterns.${pattern}` : null;
 }
 
 /** How long a text effect takes over these words: each piece a little after the last. */

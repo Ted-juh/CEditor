@@ -1015,7 +1015,8 @@ reach it. It can now.
   not fit it.
 
 Left out: patterns on a control's parts (`Parts.<p>.Background.Patterns`). The Pattern tab can put
-them there, but the timeline reaches only the control's own.
+them there, but the timeline reaches only the control's own. (Built since: "As built: a part's
+patterns on the timeline", below.)
 
 Verified locally:
 - `test/patternClips.test.js` (new): the place and what plays there, the library, a scene's output
@@ -1239,6 +1240,48 @@ Verified locally:
   - `panelMotion`, `animationTab`, `anatomyForms` and `macroSetKnob`.
 - WebKitGTK 2.52: the same two holds, the opacities and the transform as in Chromium, and
   screenshots with the rolled numbers cut by their boxes.
+
+## As built: a part's patterns on the timeline (2026-11-25)
+
+Pattern clips (above) reached only a control's own background patterns. The Pattern tab can put
+patterns on a part too (a component's stripe, a panel's band), and a clip now plays on those.
+
+- **The place** is `Parts.<part>.Patterns.<name>`, keyframes only, as on the control's own
+  (`PATTERN_PLACE` and `patternPlace` in `sceneFormat.js`). The timeline names it by the part
+  (**band › Pattern › Pattern 1**).
+- **What is offered.** `patternPlacesOf` lists the control's own patterns first, then each part's.
+  - A Pattern effect dropped on the control goes on its first pattern, or a part's first when it
+    has none of its own.
+  - Plays on lists them all.
+  - A part the control's own renderer draws (a knob's, a button's, a meter's anatomy) is not
+    offered. Those draw a pattern of their own kind, or none, and a clip there would play on
+    nothing.
+- **Drawing.**
+  - A scene's output gains `partPatterns`, part → pattern name → animations, merged as the rest
+    are.
+  - CanvasControl hands each part its own to InteractivePartRenderer, which gives them to its
+    BackgroundRenderer and its front PatternLayers.
+  - The clip's animation plays on the pattern's clip wrapper, as the control's do, so the scroll
+    goes on underneath and the part itself does not move.
+  - A part with a pattern is never baked into the static SVG (`staticPartBaking.js`), so it is
+    always there to animate.
+- **Scripts** name a part's pattern as `Strip.band.Patterns.pattern1` (or `Strip.Parts.band…`).
+  A Pattern effect on a control with no pattern of its own goes on a part's first.
+- **Scene presets** ask for the part and its pattern (`needs.parts`, and `needs.patterns` as
+  `band.pattern1`), and a control without them is refused with the pattern named.
+
+Verified locally:
+- `test/partPatternClips.test.js` (new):
+  - the place and what plays there, and its label;
+  - the order things are offered in, and that a button's key and a knob's cap are not offered;
+  - a scene's output per part, with nothing on the part or the control, and through two merges;
+  - script paths;
+  - a preset's needs and its refusal.
+- The browser checks `scenePlayback` (a script-started pulse on Strip's band's pattern: the
+  pattern's clip animating, its scroll running, the label still, held half way by a seek) and
+  `animationDesigner`.
+- WebKitGTK 2.52: the same hold, at -0.4 s with the scroll running. The screenshot shows the band's
+  wave fainter and larger and the label unchanged.
 
 ## Open
 

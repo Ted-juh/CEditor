@@ -57,6 +57,8 @@
     // A text effect playing on this part's text (utils/textEffects.js): { name, effect, phase }, or
     // null. Its @keyframes are in the control's own style element; here the text is cut into pieces.
     textEffect = null,
+    // A scene's clips on this part's patterns, by pattern name (PatternLayers.svelte), or null.
+    patternAnimations = null,
     debug = false,
     editableInput = null,
     oneditableinput = null,
@@ -954,7 +956,7 @@
           </svg>
         {/if}
         {#if background}
-          <BackgroundRenderer {background} width={frame.width} height={frame.height} {outline} patternTiming={transitionBucket?.colour ?? null} {imageMoves} />
+          <BackgroundRenderer {background} width={frame.width} height={frame.height} {outline} patternAnimations={patternAnimations} patternTiming={transitionBucket?.colour ?? null} {imageMoves} />
         {/if}
         {#if shadowLayers?.inner.length}
           <svg class="interactive-outline-shadow" viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
@@ -993,7 +995,7 @@
            holds the colour and thickness that fall back to, and drawn as a box it put a full ring,
            radius 999 and the arc's own colour, under every arc the Arc pen made, so the arc's gap
            never showed. -->
-      <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} patternTiming={transitionBucket?.colour ?? null} {imageMoves} />
+      <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} patternAnimations={patternAnimations} patternTiming={transitionBucket?.colour ?? null} {imageMoves} />
     {/if}
 
     {#if polygonFillStyle}
@@ -1171,7 +1173,7 @@
     {/if}
 
     {#if frontPatterns}
-      <PatternLayers {background} place="front" width={frame.width} height={frame.height} clip={frontPatternClip} timing={transitionBucket?.colour ?? null} />
+      <PatternLayers {background} place="front" width={frame.width} height={frame.height} clip={frontPatternClip} animations={patternAnimations} timing={transitionBucket?.colour ?? null} />
     {/if}
 
     {#if debug}

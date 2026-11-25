@@ -34,7 +34,7 @@
   import { animationPresetLibrary, saveEffectAsPreset } from '../../stores/animationPresetLibrary.js';
   import { fileCache } from '../../stores/fileCache.js';
   import { SCENE_STAGE } from '../../stores/sceneStage.js';
-  import { cleanSceneList, cleanClock, SCENE_TRIGGER_TYPES, CLOCK_SOURCES, CLOCK_FOLLOWS, CLOCK_RELEASES, DRAG_DIRECTIONS } from '../../utils/sceneFormat.js';
+  import { cleanSceneList, cleanClock, patternPlace, SCENE_TRIGGER_TYPES, CLOCK_SOURCES, CLOCK_FOLLOWS, CLOCK_RELEASES, DRAG_DIRECTIONS } from '../../utils/sceneFormat.js';
   import { MOTION_EVENTS } from '../../utils/stateMotion.js';
   import { isRangeBehavior } from '../../utils/rangeBehavior.js';
   import { controlDrawsValue } from '../../utils/valueDrawn.js';
@@ -286,13 +286,14 @@
     // What the value draws takes a value effect and nothing else, and a value effect plays nowhere else.
     if (entry.effect.kind === 'value') place = 'Value';
     else if (place === 'Value') place = entry.target && entry.target !== 'Value' ? entry.target : 'Transform';
-    // A Pattern effect goes on the control's first pattern, unless dropped on another's track.
+    // A Pattern effect goes on the control's first pattern, or a part's if it has none of its own,
+    // unless dropped on another's track.
     if (place === 'Patterns') {
       place = patternPlacesOf(control)[0] ?? '';
-      if (!place) { note = `${controlName} has no pattern: add one on its Background tab, then put the effect on it.`; return; }
+      if (!place) { note = `${controlName} has no pattern: add one on its Background tab, or a part's, then put the effect on it.`; return; }
     }
     // A pattern shows a move or a fade, nothing else: words, a value, a colour or a gradient go on their own place.
-    if (String(place).startsWith('Patterns.') && !effectOnlyMoves(entry.effect)) {
+    if (patternPlace(place) && !effectOnlyMoves(entry.effect)) {
       if (entry.effect.kind === 'keyframes') { note = `“${entry.label}” paints a fill; a pattern takes a move or a fade.`; return; }
       place = entry.target && entry.target !== 'Patterns' ? entry.target : 'Transform';
     }
