@@ -10,6 +10,7 @@
  *   - a script plays a scene, holds it at a point, plays a library effect and swaps words (step 5c)
  *   - a drag on a control moves the scene it drives, and stays where it was let go (step 5c)
  *   - a control's value moves the scene it drives, from where the value was at the start (step 5c)
+ *   - a ring sweep moves what a knob's value draws round to full and hands back to the value (step 6)
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -189,6 +190,51 @@ try {
       `turned up, further into the scene: ${gaugeStart.delay} -> ${gaugeTurned.delay}`);
   });
 
+  // A value effect (step 6): the Level knob's ring swept round to full, then handed back to its value.
+  const level0 = await s('drawn', 'level');
+  const dial0 = await s('drawn', 'dial');
+  const fader0 = await s('drawn', 'fader');
+  await page.evaluate(() => window.__scenes.script('animatePlay', ['Sweep', {}], 'sweep'));
+  await page.waitForTimeout(90);
+  const sweepEarly = await s('drawn', 'level');
+  await page.waitForTimeout(560);
+  const sweepPeak = await s('drawn', 'level');
+  const dialPeak = await s('drawn', 'dial');
+  const faderPeak = await s('drawn', 'fader');
+  await page.waitForTimeout(800);
+  const sweepAfter = await s('drawn', 'level');
+  const dialAfter = await s('drawn', 'dial');
+  const faderAfter = await s('drawn', 'fader');
+  const sweepDone = await page.evaluate(() => window.__scenes.dones.sweep);
+  check('a ring sweep moves what a knob\'s value draws round to full, then hands back to the value', () => {
+    assert.ok(level0.drawn > 0.3 && level0.drawn < 0.95, `the knob's own value first: ${JSON.stringify(level0)}`);
+    assert.ok(sweepEarly.drawn < level0.drawn - 0.2, `starting from nothing: ${sweepEarly.drawn}`);
+    assert.ok(sweepPeak.drawn > 0.9, `round to full: ${sweepPeak.drawn}`);
+    assert.ok(Math.hypot(sweepPeak.x - level0.x, sweepPeak.y - level0.y) > 5, 'the pointer moved with it');
+    assert.equal(sweepAfter.drawn, level0.drawn, 'and back on the value exactly');
+    assert.deepEqual([sweepAfter.x, sweepAfter.y], [level0.x, level0.y]);
+    assert.equal(sweepDone, true);
+  });
+  check('a knob drawn as a form, and a linear slider, sweep the same way', () => {
+    assert.ok(Number.isFinite(dial0?.drawn), JSON.stringify(dial0));
+    assert.ok(dialPeak.drawn > 0.9, `round to full: ${dialPeak.drawn}`);
+    assert.equal(dialAfter.drawn, dial0.drawn);
+    assert.ok(Number.isFinite(fader0?.drawn), JSON.stringify(fader0));
+    assert.ok(faderPeak.drawn > 0.9, `the slider to the top: ${faderPeak.drawn}`);
+    assert.ok(Math.hypot(faderPeak.x - fader0.x, faderPeak.y - fader0.y) > 5, 'its handle moved with it');
+    assert.equal(faderAfter.drawn, fader0.drawn);
+  });
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Sweep', 0.55]));
+  await page.waitForTimeout(60);
+  const sweepHeld = await s('drawn', 'level');
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Sweep', 1]));
+  await page.waitForTimeout(60);
+  const sweepEnd = await s('drawn', 'level');
+  check('held by a script mid-sweep, the knob draws full; at the end, its value', () => {
+    assert.equal(sweepHeld.drawn, 1);
+    assert.equal(sweepEnd.drawn, level0.drawn);
+  });
+
   const still = { wave: await s('letters', 'still_wave'), cutoff: kf(await s('box', 'still_cutoff')) };
   check('inside the Designer\'s stage nothing plays by itself', () => {
     assert.ok(!still.wave || !/^ce-tx-/.test(still.wave.name), JSON.stringify(still.wave));
@@ -202,10 +248,15 @@ try {
   await reduced.waitForFunction(() => window.__scenesMounted && window.__scenes.ready());
   await reduced.waitForTimeout(150);
   const posed = kf(await reduced.evaluate(() => window.__scenes.box('cutoff')));
-  check('with reduced motion a scene goes straight to its last frame', () => {
+  const reducedLevel = await reduced.evaluate(() => window.__scenes.drawn('level'));
+  await reduced.evaluate(() => window.__scenes.script('animatePlay', ['Sweep', {}]));
+  await reduced.waitForTimeout(80);
+  const reducedSweep = await reduced.evaluate(() => window.__scenes.drawn('level'));
+  check('with reduced motion a scene goes straight to its last frame, and a ring sweep to the value', () => {
     assert.equal(posed.length, 1, JSON.stringify(posed));
     assert.equal(posed[0].state, 'paused');
     assert.match(posed[0].delay, /^-0\.8s/);
+    assert.equal(reducedSweep.drawn, reducedLevel.drawn);
   });
 
   assert.deepEqual(failures, [], 'the page must run without errors');

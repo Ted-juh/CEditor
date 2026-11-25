@@ -4911,15 +4911,16 @@ Play a library effect or one of the panel's animation presets on a control, its 
 
 Example: `animateEffect("Lamp", "Pop")` pops the Lamp; `animateEffect("Title.Text", "Typewriter in")` types its words in.
 
-- `target` (text, required): Where: "Lamp", "Title.Text", "Knob01.bodyCap".
-- `effect` (text, required): The effect or preset's name.<br>Not found: rejected with a console error listing them.
+- `target` (text, required): Where: "Lamp", "Title.Text", "Knob01.bodyCap", "Cutoff.Value".
+- `effect` (text, required): The effect or preset's name.<br>Not found: rejected with a console error listing them.<br>A value effect on a control that draws no value: rejected with a console error.
 - `opts` (options, optional): The options below.
 
 Good to know:
 
 - The effects are the Animation Designer's library ("Fade in", "Pop", "Typewriter in", "Gradient sheen"…) and the presets the panel carries, by name, any case.
 - A target is a control's name, then .Text for its words or a part's name; the control alone is its whole box, or its words for a text effect.
-- A new effect on the same place replaces the last, which reports done(false). An effect that ends holds its last frame.
+- A value effect ("Ring sweep", "Rise to value", "Wiggle"…) moves what a knob's or a slider's value draws, then hands back to the value: the control alone is that, or name it as .Value. It moves the drawing only; the value, and what it sends, stay as they are.
+- A new effect on the same place replaces the last, which reports done(false). An effect that ends holds its last frame; a value effect ends on the value.
 - With the panel's window closed: returns false.
 
 *Short name: `animateEffect` · Panel window only.*

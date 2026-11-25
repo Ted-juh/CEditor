@@ -37,6 +37,7 @@
   import { cleanSceneList, cleanClock, SCENE_TRIGGER_TYPES, CLOCK_SOURCES, CLOCK_FOLLOWS, CLOCK_RELEASES, DRAG_DIRECTIONS } from '../../utils/sceneFormat.js';
   import { MOTION_EVENTS } from '../../utils/stateMotion.js';
   import { isRangeBehavior } from '../../utils/rangeBehavior.js';
+  import { controlDrawsValue } from '../../utils/valueDrawn.js';
   import { buildStateTargetOptions } from '../../utils/stateTargets.js';
   import {
     SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
@@ -264,8 +265,12 @@
     if (!entry || !control) return;
     if (scene?.own) { note = 'A control\'s own animation has one clip. Make a scene (+ Scene) to put effects together.'; return; }
     let place = target ?? entry.target ?? 'Transform';
+    // What the value draws takes a value effect and nothing else, and a value effect plays nowhere else.
+    if (entry.effect.kind === 'value') place = 'Value';
+    else if (place === 'Value') place = entry.target && entry.target !== 'Value' ? entry.target : 'Transform';
     if (entry.effect.kind === 'text' && !String(place).startsWith('Parts.')) place = 'Text';
     if (place === 'Text' && !control._children?.Text) { note = `${control._children.Core.name || controlId} has no words of its own: a text effect plays on a Label, or on a part with text.`; return; }
+    if (place === 'Value' && !controlDrawsValue(control)) { note = `${control._children.Core.name || controlId} draws no value to move: a value effect plays on a knob or a slider.`; return; }
     let base = scene;
     let list = panelScenes;
     if (!base) {

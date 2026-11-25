@@ -161,6 +161,8 @@
   import { getContext, setContext, untrack } from 'svelte';
   import { SCENE_STAGE } from '../stores/sceneStage.js';
   import { sceneControlOutput, mergeKeyframeOutputs } from '../utils/sceneModel.js';
+  import { drawnValueFor } from '../utils/valueDrawn.js';
+  import { VALUE_TARGET } from '../utils/sceneFormat.js';
   import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
   import { pictureColour, pictureColourSources, withColourFollows, withPictureColourSources } from '../utils/pictureRecolour.js';
   import { activeControlSet, controlSetSources, CONTROL_SET_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../stores/controlSets.js';
@@ -1828,6 +1830,48 @@
       return output ? mergeKeyframeOutputs(drawn, output) : drawn;
     }, null)
     : null);
+  // What the value draws, moved by a scene's value clips (step 6, utils/valueDrawn.js): an arc's
+  // `d` and a pointer's angle are attributes CSS cannot animate, so a running clip is worked out here
+  // a frame at a time. A running play's clock starts when this control first sees it — when its CSS
+  // animations start too — and a play started again (its phase flipped) starts it again. Posed plays
+  // (the Designer's playhead, a seek, a scene a hand drives) say their moment themselves.
+  let valuePlays = $derived(core?.id && stagePlays.length
+    ? stagePlays.filter((play) => play.scene?.clips?.some?.((clip) => clip.controlId === core.id && clip.target === VALUE_TARGET))
+    : []);
+  const valueStarts = new Map();
+  let valueNow = $state(0);
+  let valueFrame = 0;
+  const valuePlayKey = (play) => `${play.scene?.id}:${play.phase ?? 'a'}`;
+  const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let liveNormalized = $derived(numberOr(interactionRuntime?.signals?.currentValueNormalized, numberOr(interactionRuntime?.signals?.valueNormalized, 0)));
+  let drawnValueState = $derived(valuePlays.length
+    ? drawnValueFor(valuePlays, core.id, liveNormalized, {
+      elapsedOf: (play) => Math.max(0, valueNow - (valueStarts.get(valuePlayKey(play)) ?? valueNow)),
+      dragging: previewSession?.dragging === true || interactionRuntime?.signals?.dragging === true,
+    })
+    : { value: null, running: false });
+  let drawnValue = $derived(drawnValueState.value);
+  $effect.pre(() => {
+    const plays = valuePlays;
+    untrack(() => {
+      const seen = new Set();
+      const now = nowMs();
+      for (const play of plays) {
+        if (Number.isFinite(play.at)) continue;
+        const key = valuePlayKey(play);
+        seen.add(key);
+        if (!valueStarts.has(key)) valueStarts.set(key, now);
+      }
+      for (const key of [...valueStarts.keys()]) if (!seen.has(key)) valueStarts.delete(key);
+      if (seen.size) valueNow = now;
+    });
+  });
+  $effect(() => {
+    if (!drawnValueState.running || valueFrame || typeof requestAnimationFrame !== 'function') return;
+    const step = (now) => { valueFrame = 0; valueNow = now; };
+    valueFrame = requestAnimationFrame(step);
+  });
+  onDestroy(() => { if (valueFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(valueFrame); valueFrame = 0; });
   // A control some scene waits on tells the runtime which states it enters (sceneRuntime.js): each
   // state that starts to hold, and `default` when the last one stops. Not on the first look, as the
   // keyframe player does not: a toggle that opens switched on does not set off its scene.
@@ -3443,7 +3487,7 @@
   {/if}
   <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
-      <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
+      <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
       <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} />
@@ -3620,6 +3664,7 @@
       <SliderFamilyRenderer
         control={renderControl}
         runtime={interactionRuntime}
+        {drawnValue}
         width={displayW}
         height={displayH}
         partTransitions={activeTransitions?.partTransitions ?? null}

@@ -37,6 +37,9 @@
     partAnimations = null,
     // Keyframe colour channels per part, or null when the control has no colour frames.
     partColours = null,
+    // What a value effect draws instead of the value, 0 to 1, or null (utils/valueDrawn.js, step 6).
+    // It moves the drawing only: readouts and handle labels still say what the value is.
+    drawnValue = null,
     debug = false,
   } = $props();
 
@@ -285,7 +288,9 @@
   });
   $effect(() => () => { if (glideFrame) cancelAnimationFrame(glideFrame); glideFrame = 0; });
 
-  let normalizedValues = $derived(glide ?? targetValues);
+  let normalizedValues = $derived(Number.isFinite(drawnValue)
+    ? { ...(glide ?? targetValues), current: Math.max(0, Math.min(1, drawnValue)) }
+    : (glide ?? targetValues));
   let rawValues = $derived({
     start: numberOr(signals?.startValueRaw, 0),
     current: numberOr(signals?.currentValueRaw, numberOr(signals?.valueRaw, 0)),
@@ -920,7 +925,8 @@
 
 <!-- The control's own colour frames stop here: what is drawn inside belongs to its parts. -->
 <div class="slider-family-renderer" style={partColours ? colourVariables(null) : undefined}>
-  <svg class="slider-svg" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
+  <!-- data-drawn: where the value is drawn, 0 to 1 — the value, gliding, or a value effect's (step 6). -->
+  <svg class="slider-svg" data-drawn={normalizedValues.current.toFixed(4)} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
     <!-- A knob's plate (housing, skirt, cap, insert): its shadow, its fill in its outline, its
          border. `mask` names its fill's mask; `role` the part the pointer styles follow. -->
     {#snippet bodyPlate(part, r, mask, borderFallback, role = mask)}

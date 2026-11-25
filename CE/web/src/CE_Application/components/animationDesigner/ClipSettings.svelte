@@ -9,6 +9,7 @@
   import PropertySelect from '../../properties/PropertySelect.svelte';
   import TextEffectEditor from '../animation/TextEffectEditor.svelte';
   import FramesEditor from '../animation/FramesEditor.svelte';
+  import ValueFramesEditor from './ValueFramesEditor.svelte';
   import { EASING_NAMES } from '../../utils/easing.js';
   import { resolvedPartsOf } from '../../utils/animationModel.js';
   import { targetLabel } from '../../utils/sceneModel.js';
@@ -26,8 +27,11 @@
     onsavepreset = () => {},
   } = $props();
 
+  let isValue = $derived(clip?.effect?.kind === 'value');
   let places = $derived.by(() => {
     if (!control) return [];
+    // A value effect plays on what the value draws, and only there.
+    if (isValue) return [{ value: 'Value', label: targetLabel('Value') }];
     const out = [{ value: 'Transform', label: 'Whole control' }];
     if (control._children?.Text) out.push({ value: 'Text', label: 'Text' });
     for (const name of Object.keys(resolvedPartsOf(control) ?? {})) out.push({ value: `Parts.${name}`, label: targetLabel(`Parts.${name}`) });
@@ -53,7 +57,7 @@
 {#if clip}
   <div class="cs" data-clip-settings={clip.id}>
     <div class="top">
-      <b>{clip.label || (isText ? `${clip.effect.effect ?? 'Text'} ${clip.effect.way ?? 'in'}` : 'Keyframes')}</b>
+      <b>{clip.label || (isText ? `${clip.effect.effect ?? 'Text'} ${clip.effect.way ?? 'in'}` : isValue ? 'Value' : 'Keyframes')}</b>
       <span class="who">{controlName}</span>
     </div>
     <div class="r">
@@ -80,19 +84,23 @@
       <PropertySelect ariaLabel="Easing" value={EASING_NAMES.includes(clip.effect.easing) ? clip.effect.easing : 'outCubic'}
                       options={EASING_NAMES.map((name) => ({ value: name, label: name }))} onchange={(value) => onpatch({ easing: value })} />
     </div>
-    <div class="grp">{isText ? 'The words' : 'Frames'}</div>
+    <div class="grp">{isText ? 'The words' : isValue ? 'Where the value is drawn' : 'Frames'}</div>
     {#if isText}
       <TextEffectEditor row={{ animation: { ...clip.effect, kind: 'text', targets: [{ path: clip.target }] } }} {control} onpatch={textPatch} />
+    {:else if isValue}
+      <ValueFramesEditor frames={clip.effect.frames ?? []} onchange={(frames) => onpatch({ frames })} />
     {:else}
       <FramesEditor frames={clip.effect.frames ?? []} {gradient} onchange={(frames) => onpatch({ frames })} />
     {/if}
     <div class="grp">Script</div>
-    <p class="mono" title="What a script names this place by">{controlName}.{clip.target === 'Transform' ? '' : clip.target}</p>
+    <p class="mono" title="What a script names this place by">{controlName}{clip.target === 'Transform' || clip.target === 'Value' ? '' : `.${clip.target}`}</p>
     {#if !own && sceneName}<p class="mono dim" title="What a script plays this scene with">ce.anim.play("{sceneName}")</p>{/if}
     <div class="acts">
+      {#if !isValue}
       <input class="txt" type="text" bind:value={presetName} aria-label="Preset name" />
       <button type="button" class="tb" data-save-clip-preset disabled={!presetName.trim()} onclick={() => onsavepreset(presetName.trim())}
               title="Keep this effect in your library, to drop on any control">Save as preset</button>
+      {/if}
       {#if !own}<button type="button" class="tb danger" onclick={ondelete}>Remove clip</button>{/if}
     </div>
   </div>

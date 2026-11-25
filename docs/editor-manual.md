@@ -1303,9 +1303,17 @@ three ways:
 
 There is one Designer per panel, and it closes with its panel.
 
-- **Library** (left). Effects by kind (**Text**, **Swap**, **Move**, **Paint**) and **Mine**, your
-  own presets. Drag one onto a control on the stage or onto a track, or pick a control and click
-  the effect.
+- **Library** (left). Effects by kind (**Text**, **Swap**, **Move**, **Paint**, **Value**) and
+  **Mine**, your own presets. Drag one onto a control on the stage or onto a track, or pick a
+  control and click the effect.
+
+  **Value** effects move what a knob's or a slider's value draws (its arc, ring, pointer or fill)
+  for a moment, then hand back to the value: **Ring sweep** runs round to full and settles on the
+  value, and there are also **Rise to value**, **Fall to value**, **Reach full and back** and
+  **Wiggle**. Only the drawing moves: the value, its readout and what it sends stay as they are.
+  A clip always ends on the value, wherever the value went meanwhile, and while you turn the
+  knob it shows where you turned it to. Each frame of a value clip is the value itself, a point
+  of the range, or so far from the value. They play on knobs and on sliders with one value.
 - **Stage** (middle). The panel as it looks, posed at the playhead. Click a control to pick it.
   Nothing on the stage reaches the synth. **Try a trigger** holds **Hover** or **Press** for a
   moment, so you can see a control's state animations.
@@ -1369,7 +1377,7 @@ A script can do the same:
 - `ce.anim.seek("Cover", 0.5)` holds a scene at a point, which lets a script be its clock. On a
   driven scene it moves the scene there until the control moves it again.
 - `ce.anim.effect("Lamp", "Pop")` plays one effect from the library, or one of the panel's presets,
-  without a scene.
+  without a scene. `ce.anim.effect("Cutoff", "Ring sweep")` sweeps a knob's ring.
 - `ce.anim.swap("Readout", "Saw", "roll")` changes a control's words with a transition.
 - `ce.anim.pattern("Wave", { speed = 40 })` changes a pattern while it moves.
 

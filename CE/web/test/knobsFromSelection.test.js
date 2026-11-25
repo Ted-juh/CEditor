@@ -126,7 +126,8 @@ test('the part draws the knob with the panel\'s own renderer', () => {
   // The value turns it (its arc reaches further); it prints no value, which is a Label of its own.
   const arc = (html) => html.match(/bodyTrackFillArc"[\s\S]*?<path d="([^"]+)"/)?.[1];
   assert.ok(arc(draw(0.8)) && arc(draw(0.2)) && arc(draw(0.8)) !== arc(draw(0.2)), 'the value arc follows the value');
-  assert.doesNotMatch(draw(0.8), /slider-readout|0\.80/);
+  // As text: the renderer's data-drawn attribute says where it draws the value, which is not a readout.
+  assert.doesNotMatch(draw(0.8), /slider-readout|>\s*0\.80\s*</);
 });
 
 // --- What is refused ---------------------------------------------------------------------------------

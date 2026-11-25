@@ -22,10 +22,24 @@
  * words) or 'Parts.<name>'. `effect` is an animation as the control stores one, of kind keyframes or
  * text, minus what the clip says itself (when, how long, where): what the keyframe and text players
  * already read, so a scene plays through the engines every control's animations play through.
+ *
+ * One more place and kind (step 6, "value-drawn"): target 'Value' is what a knob's or a slider's
+ * value draws — its pointer, its arc, its fill — and an effect of kind 'value' moves it for the
+ * length of the clip, then hands back to the value (utils/valueDrawn.js):
+ *
+ *   effect: { kind: 'value', easing, frames: [{ at,          // 0 to 1 of the clip
+ *                                              value?,       // where, 0 to 1 of the range
+ *                                              by? }] }      // or this far from the live value
+ *
+ * A frame with neither is the live value, wherever it is at that moment. The two go together: a
+ * 'value' effect plays only on 'Value', and nothing else does.
  */
 
 export const SCENE_TRIGGER_TYPES = Object.freeze(['panelOpen', 'state', 'event', 'beat', 'script']);
-export const CLIP_KINDS = Object.freeze(['keyframes', 'text']);
+export const CLIP_KINDS = Object.freeze(['keyframes', 'text', 'value']);
+/** The clip target that is what a control's value draws (step 6). */
+export const VALUE_TARGET = 'Value';
+const VALUE_FRAMES_MAX = 16;
 
 /** The longest a scene or a clip may be, ms: past this, a typo. */
 export const SCENE_MAX_LENGTH = 600000;
@@ -87,6 +101,37 @@ export function cleanClock(raw) {
   };
 }
 
+/**
+ * A value effect's frames read and checked: sorted by `at`, each with `value` (0 to 1), `by` (-1 to 1)
+ * or neither (the live value). Null when fewer than two read.
+ */
+export function cleanValueFrames(raw) {
+  if (!Array.isArray(raw)) return null;
+  const out = [];
+  for (const frame of raw.slice(0, VALUE_FRAMES_MAX)) {
+    const at = Number(frame?.at);
+    if (!Number.isFinite(at)) continue;
+    const entry = { at: Math.max(0, Math.min(1, at)) };
+    const value = Number(frame?.value);
+    const by = Number(frame?.by);
+    if (frame?.value !== undefined && frame?.value !== null && Number.isFinite(value)) entry.value = Math.max(0, Math.min(1, value));
+    else if (frame?.by !== undefined && frame?.by !== null && Number.isFinite(by) && by !== 0) entry.by = Math.max(-1, Math.min(1, by));
+    out.push(entry);
+  }
+  out.sort((a, b) => a.at - b.at);
+  return out.length >= 2 ? out : null;
+}
+
+/** A value effect read and checked, or null: its kind, easing (and a custom curve's points) and frames. */
+function cleanValueEffect(raw) {
+  const frames = cleanValueFrames(raw?.frames);
+  if (!frames) return null;
+  const out = { kind: 'value', easing: text(raw.easing, 24) || 'inOutCubic', frames };
+  if (raw.bezier !== undefined) out.bezier = deepCopy(raw.bezier);
+  if (raw.spring !== undefined) out.spring = deepCopy(raw.spring);
+  return out;
+}
+
 /** A clip read and checked, or null. Its effect keeps what an animation node may hold. */
 export function cleanClip(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -94,9 +139,12 @@ export function cleanClip(raw) {
   const controlId = id(raw.controlId);
   const target = String(raw.target ?? '');
   if (!clipId || !controlId) return null;
-  if (!(target === 'Transform' || target === 'Text' || /^Parts\.[A-Za-z0-9_-]+$/.test(target))) return null;
-  const effect = raw.effect && typeof raw.effect === 'object' ? deepCopy(raw.effect) : null;
+  if (!(target === 'Transform' || target === 'Text' || target === VALUE_TARGET || /^Parts\.[A-Za-z0-9_-]+$/.test(target))) return null;
+  let effect = raw.effect && typeof raw.effect === 'object' ? deepCopy(raw.effect) : null;
   if (!effect || !CLIP_KINDS.includes(String(effect.kind ?? ''))) return null;
+  if ((effect.kind === 'value') !== (target === VALUE_TARGET)) return null;
+  if (effect.kind === 'value') effect = cleanValueEffect(effect);
+  if (!effect) return null;
   // What the clip says itself is not the effect's to say. A keyframe effect lasts as long as its
   // clip; a text effect keeps its own `duration`, which is each piece's (its whole length depends on
   // how many letters the words have), and the clip's length is how much of the timeline it takes.

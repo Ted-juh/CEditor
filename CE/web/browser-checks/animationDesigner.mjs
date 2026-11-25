@@ -188,6 +188,34 @@ check('a scene can be driven by a drag on a control instead of time, and set bac
   assert.equal(timedAgain.clips.length, 3, 'with its clips as they were');
 });
 
+// Step 6: a value effect on what the knob's value draws, in a scene of its own.
+await d('addScene');
+await wait(150);
+await d('pickAt', 380, 90);
+await wait(50);
+const liveDrawn = await d('stageDrawn', 'cutoff');
+await d('clickEffect', 'value:sweep');
+await wait(150);
+const swept = (await d('scenes')).at(-1);
+const frameRows = await d('valueFrameRows');
+await page.mouse.click(ruler.x + ruler.w * 0.1, ruler.y + ruler.h / 2);
+await wait(150);
+const sweepTime = Number((await d('time')).split(' / ')[0]) * 1000;
+const posedDrawn = await d('stageDrawn', 'cutoff');
+await d('pickAt', 100, 70);
+await wait(50);
+await d('clickEffect', 'value:sweep');
+await wait(50);
+const valueNote = await d('note');
+const expected = await d('sweepAt', sweepTime / 1200, liveDrawn);
+check('a ring sweep on a knob plays on what its value draws, and the stage is posed at the playhead', () => {
+  assert.deepEqual(swept.clips.map((c) => [c.controlId, c.target, c.effect.kind]), [['cutoff', 'Value', 'value']]);
+  assert.equal(frameRows, 3, 'its three frames: from nothing, to full, back to the value');
+  assert.ok(Math.abs(posedDrawn - expected) < 0.002, `${sweepTime} ms in: drawn ${posedDrawn}, the engine says ${expected}`);
+  assert.notEqual(posedDrawn, liveDrawn, 'not the value itself');
+  assert.match(valueNote, /Wave draws no value to move: a value effect plays on a knob or a slider/);
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();

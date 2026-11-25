@@ -620,8 +620,8 @@ export const WRITTEN = {
     js: `// the Cover scene follows a knob: the script is its clock\nfunction onValueChange(value) { ce.anim.seek("Cover", value / 127); }`,
   },
   animateEffect: {
-    lua: `ce.anim.effect("Lamp", "Pop")\nce.anim.effect("Title.Text", "Typewriter in", { duration = 1200 })`,
-    js: `ce.anim.effect("Lamp", "Pop");\nce.anim.effect("Title.Text", "Typewriter in", { duration: 1200 });`,
+    lua: `ce.anim.effect("Lamp", "Pop")\nce.anim.effect("Title.Text", "Typewriter in", { duration = 1200 })\n-- the knob's ring runs round to full and settles on its value\nce.anim.effect("Cutoff", "Ring sweep")`,
+    js: `ce.anim.effect("Lamp", "Pop");\nce.anim.effect("Title.Text", "Typewriter in", { duration: 1200 });\n// the knob's ring runs round to full and settles on its value\nce.anim.effect("Cutoff", "Ring sweep");`,
   },
   animateSwap: {
     lua: `-- the old words roll out, then the new ones roll in\nce.anim.swap("Readout", "Saw", "roll")`,

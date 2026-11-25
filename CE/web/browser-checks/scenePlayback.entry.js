@@ -5,6 +5,7 @@
  * start the scenes waiting on them, that a scene that ends holds its last frame, posed and still,
  * that a loop starts again, and that inside the Designer's stage nothing plays by itself. Step 5c:
  * a script's calls reach the runtime, and a drag or a control's value moves a scene's playhead.
+ * Step 6: a value effect moves what a knob draws, then hands back to its value.
  */
 import { mount } from 'svelte';
 import PanelPreviewSurface from '../src/CE_Application/editor/PanelPreviewSurface.svelte';
@@ -22,6 +23,7 @@ function place(control, id, name, x, y, w, h) {
 const fade = sceneEffect('move:fadeIn').effect;
 const pop = sceneEffect('move:pop').effect;
 const typewriter = sceneEffect('text:typewriter:in').effect;
+const ringSweep = sceneEffect('value:sweep').effect;
 const clip = (id, controlId, target, start, length, effect) => ({ id, controlId, target, start, length, effect });
 
 function panel(prefix) {
@@ -37,9 +39,14 @@ function panel(prefix) {
   const level = place(createControl('Knob'), `${prefix}level`, 'Level', 460, 100, 80, 80);
   const gauge = place(createControl('Label'), `${prefix}gauge`, 'Gauge', 460, 200, 120, 40);
   gauge._children.Text.content = 'Gauge';
+  // Step 6: a knob drawn as a form (ControlAnatomy), not from parts.
+  const dial = place(createControl('Knob'), `${prefix}dial`, 'Dial', 360, 160, 80, 80);
+  dial._children.Core.controlForm = 'disc';
+  // And a linear slider, which the same renderer draws.
+  const fader = place(createControl('Slider'), `${prefix}fader`, 'Fader', 220, 255, 180, 24);
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 280, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 280, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -56,6 +63,9 @@ function panel(prefix) {
       { id: 'sc_value', name: 'Follow', trigger: { type: 'script' }, length: 1000, loop: false,
         clock: exactly('value', `${prefix}level`),
         clips: [clip('c7', `${prefix}gauge`, 'Transform', 0, 1000, fade)] },
+      // Step 6: what the Level knob's value draws, swept round to full and handed back.
+      { id: 'sc_sweep', name: 'Sweep', trigger: { type: 'script' }, length: 1200, loop: false,
+        clips: [clip('c8', `${prefix}level`, 'Value', 0, 1200, ringSweep), clip('c9', `${prefix}dial`, 'Value', 0, 1200, ringSweep), clip('c10', `${prefix}fader`, 'Value', 0, 1200, ringSweep)] },
     ],
   };
 }
@@ -73,7 +83,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -92,6 +102,16 @@ window.__scenes = {
     return { name: style.animationName, delay: style.animationDelay, state: style.animationPlayState };
   },
   rect: (id) => { const r = root(id).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; },
+  /** Where a knob draws its value (step 6), and where its pointer is. */
+  drawn: (id) => {
+    const svg = root(id)?.querySelector('svg.slider-svg');
+    const pointer = svg?.querySelector('[data-pointer="current"]');
+    // A knob's handle is a circle, a slider's a rect.
+    const at = (round, square) => Number(pointer?.getAttribute(round) ?? pointer?.getAttribute(square));
+    if (svg) return { drawn: Number(svg.dataset.drawn), x: at('cx', 'x'), y: at('cy', 'y') };
+    const form = root(id)?.querySelector('svg.anatomy');
+    return form ? { drawn: Number(form.dataset.position) } : null;
+  },
   /** A script's call, as a panel script makes it; `done` is recorded under `doneKey`. */
   script: (name, args, doneKey = '') => {
     const list = [...args];

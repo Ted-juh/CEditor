@@ -14,6 +14,8 @@ import { panels, activePanelId, activeEditorTab, animationDesignerTabs } from '.
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { undo, flushHistory, initHistory } from '../src/CE_Application/stores/history.js';
 import { serializePanel } from '../src/CE_Application/stores/panelModel.js';
+import { valueEffectAt } from '../src/CE_Application/utils/valueDrawn.js';
+import { sceneEffect } from '../src/CE_Application/utils/sceneModel.js';
 
 function place(control, id, name, x, y, w, h) {
   control._children.Core.id = id;
@@ -65,6 +67,11 @@ window.__designer = {
   time: () => text(document.querySelector('[data-time]')),
   play: () => document.querySelector('[data-play]')?.click(),
   settingsFor: () => document.querySelector('[data-clip-settings]')?.dataset.clipSettings ?? null,
+  /** Where the stage draws a knob's value (step 6), and how many frames its value clip shows. */
+  stageDrawn: (id) => Number(document.querySelector(`.board .canvas-control[data-control-id="${id}"] svg.slider-svg`)?.dataset.drawn),
+  valueFrameRows: () => document.querySelectorAll('[data-value-frame]').length,
+  /** Where the engine says a ring sweep draws, that far through it, from that value. */
+  sweepAt: (progress, live) => valueEffectAt(sceneEffect('value:sweep').effect, progress, live),
   /** What the stage draws on a control's words and its own box right now. */
   stagePose: (id) => {
     const root = document.querySelector(`.board .canvas-control[data-control-id="${id}"]`);

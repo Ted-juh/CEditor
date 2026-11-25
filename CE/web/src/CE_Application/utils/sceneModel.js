@@ -15,7 +15,7 @@
  * moment. A clip holds its first frame before it starts and its last after (fill `both`), so a
  * control that fades in at 1.2 s is not seen before it.
  */
-import { newSceneId, cleanClip, cleanScene, SCENE_MAX_LENGTH } from './sceneFormat.js';
+import { newSceneId, cleanClip, cleanScene, SCENE_MAX_LENGTH, VALUE_TARGET } from './sceneFormat.js';
 import {
   readKeyframes, animationValue, keyframesRule, channelFrames, colourAnimationValue, colourKeyframesRule,
   COLOUR_CHANNELS, GRADIENT_CHANNEL,
@@ -30,6 +30,9 @@ const deepCopy = (value) => JSON.parse(JSON.stringify(value));
 // --- The library's effects ------------------------------------------------------------------------
 
 const keyframesEffect = (frames, extra = {}) => ({ kind: 'keyframes', easing: 'outCubic', iterations: 1, direction: 'normal', frames, ...extra });
+// What a knob's or slider's value draws (step 6, valueDrawn.js). Each ends on the live value: the
+// effect hands back to it.
+const valueEffect = (frames, easing = 'inOutCubic') => ({ kind: 'value', easing, frames });
 
 /**
  * What the library offers to drop on a track: each text effect in and out, and moves and paint as
@@ -53,8 +56,13 @@ export const SCENE_EFFECTS = Object.freeze([
   { id: 'paint:sheen', label: 'Gradient sheen', category: 'Paint', target: 'Transform', length: 1600, effect: keyframesEffect([{ at: 0, shift: -100 }, { at: 1, shift: 100 }], { easing: 'linear' }) },
   { id: 'paint:turn', label: 'Gradient turn', category: 'Paint', target: 'Transform', length: 2000, effect: keyframesEffect([{ at: 0, turn: 0 }, { at: 1, turn: 360 }], { easing: 'linear' }) },
   { id: 'paint:flash', label: 'Colour flash', category: 'Paint', target: 'Transform', length: 400, effect: keyframesEffect([{ at: 0, fill: 'FFFFFFFF' }, { at: 1 }], { easing: 'outQuad' }) },
+  { id: 'value:sweep', label: 'Ring sweep', category: 'Value', target: VALUE_TARGET, length: 1200, effect: valueEffect([{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]) },
+  { id: 'value:rise', label: 'Rise to value', category: 'Value', target: VALUE_TARGET, length: 800, effect: valueEffect([{ at: 0, value: 0 }, { at: 1 }], 'outCubic') },
+  { id: 'value:fall', label: 'Fall to value', category: 'Value', target: VALUE_TARGET, length: 800, effect: valueEffect([{ at: 0, value: 1 }, { at: 1 }], 'outCubic') },
+  { id: 'value:reach', label: 'Reach full and back', category: 'Value', target: VALUE_TARGET, length: 900, effect: valueEffect([{ at: 0 }, { at: 0.45, value: 1 }, { at: 1 }]) },
+  { id: 'value:wiggle', label: 'Wiggle', category: 'Value', target: VALUE_TARGET, length: 700, effect: valueEffect([{ at: 0 }, { at: 0.2, by: 0.06 }, { at: 0.4, by: -0.05 }, { at: 0.6, by: 0.03 }, { at: 0.8, by: -0.015 }, { at: 1 }], 'inOutQuad') },
 ]);
-export const SCENE_EFFECT_CATEGORIES = Object.freeze(['All', 'Text', 'Swap', 'Move', 'Paint', 'Mine']);
+export const SCENE_EFFECT_CATEGORIES = Object.freeze(['All', 'Text', 'Swap', 'Move', 'Paint', 'Value', 'Mine']);
 const EFFECT_BY_ID = new Map(SCENE_EFFECTS.map((entry) => [entry.id, entry]));
 
 /** A library effect by id. */
@@ -112,6 +120,7 @@ export function duplicateClip(scene, clipId, start, snap = 10) {
 /** Where on a control, as the timeline names it. */
 export function targetLabel(target) {
   if (target === 'Transform') return 'Whole control';
+  if (target === VALUE_TARGET) return 'What the value draws';
   if (target === 'Text') return 'Text';
   const part = String(target).split('.')[1] ?? '';
   const place = partPlace(part);
@@ -225,6 +234,8 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
   const rules = [];
   const options = { at: Number.isFinite(at) ? at : null, fill: 'both' };
   for (const clip of clips) {
+    // What the value draws is not CSS: valueDrawn.js works it out a frame at a time.
+    if (clip.effect.kind === 'value') continue;
     const node = clipAnimation(clip);
     const part = partOf(clip.target);
     if (clip.effect.kind === 'text') {

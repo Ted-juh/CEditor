@@ -213,6 +213,7 @@ import { requestAnimationPlay } from '../stores/animationActivity.js';
 import { sceneRunFor } from '../stores/sceneStage.js';
 import { patternEntries } from '../utils/patternLayers.js';
 import { findEffect, effectNames, resolvePlace, textSpanFor, oneOffScene, swapFamily } from '../utils/sceneScript.js';
+import { controlDrawsValue } from '../utils/valueDrawn.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
   insertControlIntoTree, mapControlsTree, removeControlFromTree, remintControlIds, controlPanelOffset,
@@ -5620,10 +5621,17 @@ function animateEffectImpl(target, effectName, opts, scriptId = '') {
     return false;
   }
   const isText = entry.effect?.kind === 'text';
-  // The control alone takes a text effect on its words, the library's own place for one.
+  const isValue = entry.effect?.kind === 'value';
+  // The control alone takes a text effect on its words, the library's own place for one, and a
+  // value effect on what its value draws (step 6).
   const named = sceneTarget(verb, target);
   if (!named) return false;
-  const place = isText && named.place === 'Transform' ? 'Text' : named.place;
+  const place = isText && named.place === 'Transform' ? 'Text' : isValue && named.place === 'Transform' ? 'Value' : named.place;
+  if (isValue && (place !== 'Value' || !controlDrawsValue(named.control))) {
+    addScriptTrace('error', '', `${verb}: "${entry.label}" moves what a knob's or a slider's value draws; ${named.controlName} draws none there.`);
+    return false;
+  }
+  if (!isValue && place === 'Value') { addScriptTrace('error', '', `${verb}: "${entry.label}" does not play on what a value draws; give ${named.controlName} or one of its parts.`); return false; }
   if (isText && place !== 'Text') { addScriptTrace('error', '', `${verb}: "${entry.label}" plays on words; give ${named.controlName} or ${named.controlName}.Text.`); return false; }
   if (isText && !named.control._children?.Text) { addScriptTrace('error', '', `${verb}: ${named.controlName} has no words of its own for "${entry.label}".`); return false; }
   const length = animTiming(verb, opts, 'duration', isText ? textSpanFor(entry.effect, named.control._children?.Text?.content) : entry.length);

@@ -818,6 +818,66 @@ Verified locally:
   `animationDesigner`, which drives a scene by a drag and sets it back to time;
 - the same drag in WebKitGTK 2.52 under Xvfb, posed exactly as in Chromium.
 
+## As built: step 6, value-drawn, knobs first (2026-11-25)
+
+The fifth engine: an effect that moves what a knob's value draws (its arc, its ring, its pointer)
+for a moment, then hands back to the value.
+
+- **Where it enters.** Every knob is drawn from the same value signals: the default knob and the
+  control sets' knobs by `SliderFamilyRenderer`, which already chose the drawn value in one place
+  (`glide ?? targetValues`, for the value glide), and the knob forms by `ControlAnatomy` (`p`, which
+  the illustrated forms take too). Both now take a `drawnValue`, and `CanvasControl` works it out.
+  Not "42 renderers five ways" for knobs, then: two, reading one number. Linear sliders draw
+  through the same renderer, so they get it too.
+- **The clip.** A new place, `Value` ("what the value draws"), and a new kind, `value`, which go
+  together and only together (`cleanClip`). Frames are `{ at, value }` (a point of the range),
+  `{ at, by }` (so far from the live value) or `{ at }` (the live value), eased per stretch as a
+  keyframe animation is.
+- **The engine** is `utils/valueDrawn.js`, pure. Drawn values are SVG attributes CSS cannot animate,
+  so it is worked out a frame at a time, as the value glide already was. A running play's clock
+  starts when the control first sees it, as its CSS animations do, and starts again when the play
+  is restarted (its phase flips). Posed plays — the Designer's playhead, a seek, a scene a hand
+  drives — give their moment themselves. The frame loop runs only while a value clip is ahead.
+- **The promises.** It moves the drawing, never the value: nothing is sent, the readout says what
+  the value is. A clip hands back when it ends, whatever the scene's last frame (a finished scene
+  holds its last frame; a value clip's last frame is the value). Before it starts, it holds its first
+  frame, as every clip does. While the control is dragged, the hand wins. With reduced motion a scene
+  goes to its end, which is the value.
+- **The library**, a **Value** category: Ring sweep, Rise to value, Fall to value, Reach full and
+  back, and Wiggle. Each ends on the live value, which a test holds for every one.
+- **The Designer.** A value effect goes on the control's Value track. It is refused, with the
+  reason, on a control that draws no value (a range slider's two handles included). Its settings
+  have a frame editor of their own (`ValueFramesEditor.svelte`), which warns when the last frame is
+  not the value.
+- **Scripts.** `ce.anim.effect("Cutoff", "Ring sweep")`: the control alone, or `Cutoff.Value`, is
+  what its value draws. A value effect anywhere else, or another effect on `.Value`, is refused with
+  the reason.
+- **The loop budget** counts a looping value clip as two, since it is redrawn every frame, as a
+  moving gradient is repainted. That is reasoning, not a measurement.
+
+Left out, for now:
+- **Saving a value clip as a preset.** Presets hold a control's own animations, and a value effect
+  is not one of those yet; the button is hidden on a value clip rather than saving something that
+  would not apply.
+- **A control's own value animations** (the Animation tab's rows, on Hover or a click). A scene
+  with a state or gesture trigger on the knob does the same today.
+- **The other families:** the Macro's ring, meters, XY pads, envelopes, and custom components that
+  carry knobs. Each draws its value its own way.
+- **Scene presets**, such as a ring sweep over every knob 0.15 s apart.
+
+Verified locally:
+- `test/valueDrawn.test.js` (new): the format, frames, the sweep's shape, every library effect ending
+  on the value, plays posed and running, the hand winning, which controls draw a value, and the loop
+  budget; `test/sceneScripts.test.js` for the script call;
+- the browser checks `scenePlayback`, where a script's ring sweep takes a knob drawn from parts, one
+  drawn as a form and a linear slider from nothing to full and back to exactly the value, their
+  handles moving with it, a seek holds it at full, and with reduced motion it goes straight to the
+  value; and `animationDesigner`, where a ring sweep placed on a knob poses the stage where the
+  engine says, and is refused on a Label;
+- the checks over what the change touched: `anatomyForms`, `macroSetKnob`, `shapeClip`, `panelMotion`,
+  `animationTab` and `playerInbound`, and the component harness's knob and slider cases;
+- the same sweep in WebKitGTK 2.52 under Xvfb: 0.5, 0.999 at the peak, 0.5 after, for both knobs.
+
 ## Open
 
 Nothing for the owner at present.

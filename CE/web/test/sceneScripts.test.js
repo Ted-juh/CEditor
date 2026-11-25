@@ -101,6 +101,22 @@ test('ce.anim.effect plays a library effect on a box, words or a part, one per p
   });
 });
 
+test('ce.anim.effect plays a value effect on what a knob\'s value draws (step 6)', () => {
+  withPanel((script, { calls, knob }) => {
+    const knobId = knob._children.Core.id;
+    assert.equal(script.animateEffect('Cutoff', 'Ring sweep'), true, 'the knob alone: what its value draws');
+    assert.equal(calls[0][1], `${knobId}|Value`);
+    assert.equal(calls[0][2].clips[0].target, 'Value');
+    assert.equal(calls[0][2].clips[0].effect.kind, 'value');
+    assert.equal(script.animateEffect('Cutoff.Value', 'value:wiggle'), true, 'or named');
+    assert.equal(script.animateEffect('Title', 'Ring sweep'), false);
+    assert.match(traced(), /"Ring sweep" moves what a knob's or a slider's value draws; Title draws none there/);
+    clearScriptTrace();
+    assert.equal(script.animateEffect('Cutoff.Value', 'Pop'), false);
+    assert.match(traced(), /"Pop" does not play on what a value draws/);
+  });
+});
+
 test('ce.anim.effect refuses what it cannot play, and says what it can', () => {
   withPanel((script) => {
     assert.equal(script.animateEffect('Title', 'Wobble'), false);

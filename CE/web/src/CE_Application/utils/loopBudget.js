@@ -16,7 +16,8 @@
  *   - a text effect set to loop: 1;
  *   - a sequence set to loop: 1;
  *   - a panel scene set to loop (sceneRuntime.js, step 5b): each of its clips, 1 each — 2 for one
- *     that turns or shifts a gradient — since each one moves again every time the scene does.
+ *     that turns or shifts a gradient, or moves what a value draws (step 6) — since each one moves
+ *     again every time the scene does.
  * A loop that plays only while a state holds counts: it is what the panel can be doing. A transition,
  * a one-shot, a still pattern, a switched-off animation or Animations section, a scene that plays
  * once, and a scene a gesture drives (it moves only while the hand does), count nothing.
@@ -80,13 +81,16 @@ export function panelLoops(controls, budget = LOOP_BUDGET, { scenes = [] } = {})
     for (const clip of scene.clips ?? []) {
       const paintsGradient = clip.effect?.kind === 'keyframes'
         && (clip.effect.frames ?? []).some((frame) => frame && (frame.turn !== undefined || frame.shift !== undefined));
+      // What a value draws is worked out by script and redrawn every frame (valueDrawn.js), as a
+      // moving gradient is repainted: it counts as one does.
+      const drawsValue = clip.effect?.kind === 'value';
       items.push({
         controlId: clip.controlId,
         control: names.get(clip.controlId) ?? clip.controlId,
         what: `scene ${scene.name} › ${clip.label || clip.target}`,
         kind: 'scene',
         scene: scene.id,
-        weight: paintsGradient ? 2 : 1,
+        weight: paintsGradient || drawsValue ? 2 : 1,
       });
     }
   }
