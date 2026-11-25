@@ -1401,6 +1401,13 @@ There is one Designer per panel, and it closes with its panel.
 
   Either way it becomes a new scene, which you edit like any other.
 
+  A scene preset is also a file of its own, **.cescene**. **Export…** saves the one you clicked, to
+  send to someone or keep; **Import…**, at the top of **Scenes**, brings one into yours. **Carry on
+  this panel** keeps a copy in the panel itself, so it travels with the panel file. Whoever opens
+  that panel sees it under **Scenes** as **This panel**, can use it straight away, and can **Keep in
+  my library** to have it for every panel. A panel needs no copy to play the scenes it already has;
+  carrying one is for handing the preset on.
+
   Under
   **Controls' own** is every animation the controls already have, each shown as a scene of one
   clip. It is the same animation, not a copy: move or stretch it here and the control's animation

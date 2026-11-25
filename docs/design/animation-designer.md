@@ -943,7 +943,7 @@ The record's example is "a ring sweep over any knobs, 0.15 s apart".
 
 Left out: scene presets in files and carried by a panel, as animation presets are (.ceanim, "This
 panel"). A scene preset's place for that is the same typed-document route; nothing has needed it
-yet.
+yet. (Built since: "As built: scene presets as files and carried by a panel", below.)
 
 Verified locally:
 - `test/scenePreset.test.js` (new): slots and their needs, no control ids left in a preset, fitting by
@@ -1298,6 +1298,56 @@ Verified locally:
   `animationDesigner`.
 - WebKitGTK 2.52: the same hold, at -0.4 s with the scroll running. The screenshot shows the band's
   wave fainter and larger and the label unchanged.
+
+## As built: scene presets as files and carried by a panel (2026-11-25)
+
+The scene presets' left-out item. A scene preset now has an animation preset's two other homes.
+
+- **A file of its own, `.cescene`.**
+  - What a preset is, read and checked, and written to and read from its file, moved to
+    `utils/scenePresetFormat.js`. It imports only the scene format, which imports nothing, so a
+    panel can read the presets it carries where only plain Node runs: the export tools load
+    `panelModel.js`, as `animationPresetFormat.js` is kept for the same reason.
+  - A file that is not JSON, not a scene preset, from a newer CEditor, too large, or with nothing
+    playable in it, is refused with that reason.
+  - It goes through the typed-document route a `.ceanim` takes: a native dialog in the app (one
+    more kind in `typedDocumentKind`, `ValueTreeBridgeHandlers.cpp`), a download and a file input
+    in a browser.
+- **This panel.**
+  - `panel.scenePresets` is carried in the document, checked as it is read (`scenePresetsOf`), and
+    written only when there is one (`panelModel.js`). A broken one is ignored when the panel opens
+    and dropped when it is saved.
+  - A panel needs no copy to play what a preset made, which is an ordinary scene. Carrying one is
+    for handing the preset on, so it is a choice: **Carry on this panel**, or an import there.
+- **The Designer's Scenes.**
+  - Each card says where its preset lives: **Built in**, **Mine** or **This panel**, and
+    **· on this panel** when the panel carries a copy of one of yours.
+  - The picked preset's panel has **Export…**, **Carry on this panel**, **Keep in my library** (for
+    one only the panel has), and **Remove** or **Not on this panel**.
+  - **Import…** heads the list.
+  - Panel commands take the Designer's own panel by id, which need not be the active one.
+- **Found on the way, and fixed: undo could not take back a panel field that was new.**
+  - A panel restore spread the snapshot over the live panel. A key the snapshot did not have, such
+    as `animationScenes` on a panel that had none, was left in place.
+  - So the first scene the Designer added to a new panel could not be undone, nor the first
+    animation preset or text style a panel carried, nor the first scene preset.
+  - A restore now drops what the snapshot does not have, and keeps the fields kept out of history
+    (`OUTSIDE_PANEL_HISTORY`: id, file path, background images…).
+  - Held by `test/history.test.js`.
+
+Verified locally:
+- `test/scenePresetFiles.test.js` (new):
+  - a .cescene round trip and every refusal;
+  - a panel carrying one through undo, a save and an open, with a broken one ignored and dropped;
+  - the library's order and places;
+  - keeping one a panel carries, and removing yours while the panel keeps its copy;
+  - importing into the library and the panel.
+- `test/history.test.js`: a new field undone, the file path left alone, redo.
+- `test/exportToolsPlainNode.test.js`.
+- The `animationDesigner` browser check: Export downloads a .cescene of the preset; Carry puts it in
+  the saved panel and the card says so; Import through the file picker adds one.
+- The C++ change compiled with GCC (`-fsyntax-only`, as `CLAUDE.md` gives it). Not run: MSVC, which
+  CI's Windows build gives it, and the app's own file dialogs.
 
 ## Open
 

@@ -6,7 +6,15 @@
    */
   import { canRepeat, candidatesFor, defaultMapping, repeatedScene, sceneFromPreset, REPEAT_STAGGER } from '../../utils/scenePreset.js';
 
-  let { preset, controls = [], mine = false, onadd = () => {}, onremove = () => {}, oncancel = () => {} } = $props();
+  /**
+   * `where` the preset lives (stores/scenePresetLibrary.js): 'builtin', 'mine' or 'panel' (only this
+   * panel carries it); `carried`, whether this panel carries a copy. Export saves it as a .cescene
+   * file; Carry puts a copy in the panel, so it goes with it; Keep takes a panel's into your library.
+   */
+  let {
+    preset, controls = [], where = 'builtin', carried = false,
+    onadd = () => {}, onremove = () => {}, oncancel = () => {}, onexport = () => {}, oncarry = () => {}, onkeep = () => {},
+  } = $props();
 
   const idOf = (control) => control?._children?.Core?.id ?? '';
   const nameOf = (control) => String(control?._children?.Core?.name || idOf(control));
@@ -71,7 +79,13 @@
     <div class="acts">
       <button type="button" class="tb go" data-preset-add onclick={add}>Add scene</button>
       <button type="button" class="tb" onclick={oncancel}>Cancel</button>
-      {#if mine}<button type="button" class="tb quiet" onclick={() => onremove(preset.id)} title="Take it out of your library; scenes made from it stay">Remove</button>{/if}
+    </div>
+    <div class="acts">
+      <button type="button" class="tb" data-preset-export onclick={onexport} title="Save it as a .cescene file, to send or keep">Export…</button>
+      {#if !carried}<button type="button" class="tb" data-preset-carry onclick={oncarry} title="Keep a copy in this panel, so it goes wherever the panel goes">Carry on this panel</button>{/if}
+      {#if where === 'panel'}<button type="button" class="tb" data-preset-keep onclick={onkeep} title="Put it in your scene presets, for any panel">Keep in my library</button>{/if}
+      {#if where === 'mine'}<button type="button" class="tb quiet" data-preset-remove onclick={onremove} title="Take it out of your library; scenes made from it stay">Remove</button>
+      {:else if where === 'panel'}<button type="button" class="tb quiet" data-preset-remove onclick={onremove} title="Stop carrying it on this panel; scenes made from it stay">Not on this panel</button>{/if}
     </div>
   </div>
 {/if}

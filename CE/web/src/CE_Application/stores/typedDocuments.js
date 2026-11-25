@@ -18,7 +18,7 @@ import {
 } from '../bridge/bridge.js';
 
 /** A kind's file ending, for names and for the browser's own dialogs. */
-export const TYPED_DOCUMENT_SUFFIX = { ctrl49Screen: '.assignment.json', animationPreset: '.ceanim' };
+export const TYPED_DOCUMENT_SUFFIX = { ctrl49Screen: '.assignment.json', animationPreset: '.ceanim', scenePreset: '.cescene' };
 
 let listening = false;
 let counter = 0;

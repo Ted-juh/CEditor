@@ -17,23 +17,23 @@
  *
  * Pure: the library is stores/scenePresetLibrary.js, the buttons the Designer's.
  */
-import { cleanScene, cleanClip, cleanTrigger, cleanClock, newSceneId, patternPlace, VALUE_TARGET } from './sceneFormat.js';
+import { cleanScene, cleanClip, newSceneId, patternPlace, VALUE_TARGET } from './sceneFormat.js';
+import { SCENE_PRESET_FORMAT, SCENE_PRESET_VERSION, cleanScenePreset } from './scenePresetFormat.js';
+
+// The format (reading, checking, writing a preset and its file) imports nothing beyond the scene
+// format, so a panel can read the presets it carries where only plain Node runs (panelModel.js).
+export { SCENE_PRESET_FORMAT, SCENE_PRESET_VERSION, cleanScenePreset, scenePresetFileText, readScenePresetFile } from './scenePresetFormat.js';
 import { controlDrawsValue } from './valueDrawn.js';
 import { flatControlsWithPanelRects } from './containment.js';
 
-export const SCENE_PRESET_FORMAT = 'ceditor.scenePreset';
-export const SCENE_PRESET_VERSION = 1;
 /** How far apart the controls of a repeated preset start, ms, unless told otherwise. */
 export const REPEAT_STAGGER = 150;
-const LIMITS = { name: 60, slots: 64, clips: 400 };
 
 const deepCopy = (value) => JSON.parse(JSON.stringify(value));
-const text = (value, max) => String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 const idOf = (control) => control?._children?.Core?.id ?? '';
 const nameOf = (control) => String(control?._children?.Core?.name || idOf(control) || 'Control');
 const typeOf = (control) => String(control?._children?.Core?.controlType ?? '');
 const partNamesOf = (control) => new Set(Object.keys(control?._children?.Parts?._children ?? {}));
-const slotIndex = (value) => (Number.isInteger(value) && value >= 0 && value < LIMITS.slots ? value : -1);
 
 /** What a slot's clips ask of the control that takes it. */
 function needsOf(clips) {
@@ -94,62 +94,6 @@ export function buildScenePreset(scene, controls, { id = newSceneId('sp'), name 
   });
 }
 
-/** A scene preset read as data from anywhere, checked, or null. */
-export function cleanScenePreset(raw) {
-  if (!raw || typeof raw !== 'object' || raw.format !== SCENE_PRESET_FORMAT) return null;
-  if (!(Number(raw.version) >= 1)) return null;
-  const id = text(raw.id, 64);
-  if (!/^[A-Za-z0-9_:-]+$/.test(id)) return null;
-  const slots = (Array.isArray(raw.slots) ? raw.slots : []).slice(0, LIMITS.slots).map((slot) => ({
-    type: text(slot?.type, 40),
-    label: text(slot?.label, LIMITS.name),
-    needs: {
-      text: slot?.needs?.text === true,
-      value: slot?.needs?.value === true,
-      parts: (Array.isArray(slot?.needs?.parts) ? slot.needs.parts : []).map((part) => text(part, 64)).filter((part) => /^[A-Za-z0-9_-]+$/.test(part)),
-      patterns: (Array.isArray(slot?.needs?.patterns) ? slot.needs.patterns : []).map((name) => text(name, 129)).filter((name) => /^(?:[A-Za-z0-9_-]+\.)?[A-Za-z0-9_-]+$/.test(name)),
-    },
-  }));
-  if (!slots.length) return null;
-  // Each clip read as a scene clip would be, on a stand-in control, then given back its slot.
-  const clips = [];
-  for (const clip of (Array.isArray(raw.clips) ? raw.clips : []).slice(0, LIMITS.clips)) {
-    const slot = slotIndex(clip?.slot);
-    if (slot < 0 || slot >= slots.length) continue;
-    const read = cleanClip({ ...clip, id: 'c', controlId: 'slot' });
-    if (!read) continue;
-    clips.push({ slot, target: read.target, start: read.start, length: read.length, effect: read.effect, ...(read.label ? { label: read.label } : {}) });
-  }
-  if (!clips.length) return null;
-  const trigger = cleanTrigger({ ...(raw.trigger ?? {}), controlId: 'slot' });
-  const triggerSlot = slotIndex(raw.trigger?.slot);
-  if (trigger.controlId !== undefined) {
-    delete trigger.controlId;
-    if (triggerSlot < 0 || triggerSlot >= slots.length) return null;
-    trigger.slot = triggerSlot;
-  }
-  const clockRead = cleanClock({ ...(raw.clock ?? {}), controlId: 'slot' });
-  let clock = null;
-  if (clockRead) {
-    const clockSlot = slotIndex(raw.clock?.slot);
-    if (clockSlot < 0 || clockSlot >= slots.length) return null;
-    clock = { ...clockRead, slot: clockSlot };
-    delete clock.controlId;
-  }
-  const span = clips.reduce((end, clip) => Math.max(end, clip.start + clip.length), 0);
-  return {
-    format: SCENE_PRESET_FORMAT,
-    version: SCENE_PRESET_VERSION,
-    id,
-    name: text(raw.name, LIMITS.name) || 'Scene preset',
-    length: Math.max(Math.round(Number(raw.length) || 0), span, 100),
-    loop: raw.loop === true,
-    trigger,
-    ...(clock ? { clock } : {}),
-    slots,
-    clips,
-  };
-}
 
 /** Why a control cannot take a slot, or '' when it can. Its type need not match: what it has must. */
 export function slotDoesNotFit(slot, control) {

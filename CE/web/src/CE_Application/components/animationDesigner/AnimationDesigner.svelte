@@ -42,7 +42,12 @@
   import { midiTriggerText, midiNoteName } from '../../utils/sceneMidi.js';
   import ScenePresetPanel from './ScenePresetPanel.svelte';
   import { partRectOf } from '../../utils/sceneClock.js';
-  import { scenePresetLibrary, allScenePresets, saveScenePreset, removeScenePreset } from '../../stores/scenePresetLibrary.js';
+  import {
+    scenePresetLibrary, scenePresetEntries, scenePresetsOf, saveScenePreset, removeScenePreset, carryScenePreset,
+    removeScenePresetFromPanel, keepPanelScenePreset, importScenePresetText,
+  } from '../../stores/scenePresetLibrary.js';
+  import { scenePresetFileText } from '../../utils/scenePresetFormat.js';
+  import { openTypedDocument, saveTypedDocumentAs } from '../../stores/typedDocuments.js';
   import { buildStateTargetOptions } from '../../utils/stateTargets.js';
   import {
     SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
@@ -332,12 +337,45 @@
     .filter(({ entry }) => entry)
     .map(({ preset, entry }) => ({ id: `mine:${preset.id}`, label: preset.name, category: 'Mine', ...entry })));
   let shownEffects = $derived(category === 'Mine' ? mine : category === 'All' ? [...SCENE_EFFECTS, ...mine] : SCENE_EFFECTS.filter((entry) => entry.category === category));
-  // Whole scenes kept to use again (utils/scenePreset.js): the built-in ones and yours, under Scenes.
+  // Whole scenes kept to use again (utils/scenePreset.js), under Scenes: the built-in ones, yours, and
+  // those this panel carries (stores/scenePresetLibrary.js); each one a .cescene file to export.
   const LIBRARY_CATEGORIES = [...SCENE_EFFECT_CATEGORIES, 'Scenes'];
-  let scenePresets = $derived(allScenePresets($scenePresetLibrary));
+  let scenePresetCards = $derived(scenePresetEntries($scenePresetLibrary, scenePresetsOf(panel)));
   let presetPick = $state('');
-  let pickedPreset = $derived(category === 'Scenes' ? scenePresets.find((entry) => entry.id === presetPick) ?? null : null);
-  let pickedPresetMine = $derived(!!pickedPreset && $scenePresetLibrary.some((entry) => entry.id === pickedPreset.id));
+  let pickedEntry = $derived(category === 'Scenes' ? scenePresetCards.find((entry) => entry.preset.id === presetPick) ?? null : null);
+  let pickedPreset = $derived(pickedEntry?.preset ?? null);
+  const WHERE_LABEL = { builtin: 'Built in', mine: 'Mine', panel: 'This panel' };
+  async function exportScenePreset(preset) {
+    const result = await saveTypedDocumentAs('scenePreset', preset.name, scenePresetFileText(preset));
+    if (result.ok) note = `${preset.name} saved as ${result.name || 'a .cescene file'}.`;
+    else if (!result.cancelled) note = `${preset.name} could not be saved.`;
+  }
+  async function importScenePreset() {
+    const result = await openTypedDocument('scenePreset');
+    if (!result.ok) { if (!result.cancelled) note = 'That file could not be read.'; return; }
+    const imported = importScenePresetText(result.data);
+    note = imported.error ?? `${imported.preset.name} ${imported.replaced ? 'updated' : 'added'} in your scene presets.`;
+    if (imported.preset) presetPick = imported.preset.id;
+  }
+  function carryPicked() {
+    const result = carryScenePreset(pickedPreset, panelId);
+    note = result.reason ?? `${pickedPreset.name} is carried by this panel now: it goes wherever the panel goes.`;
+  }
+  function keepPicked() {
+    const result = keepPanelScenePreset(pickedPreset.id, panelId);
+    note = result.reason ?? `${pickedPreset.name} is in your scene presets now, for any panel.`;
+  }
+  function removePicked() {
+    const { preset, where, carried } = pickedEntry;
+    if (where === 'mine') {
+      removeScenePreset(preset.id);
+      note = `${preset.name} is out of your library${carried ? '; this panel still carries it' : ''}. Scenes made from it stay.`;
+    } else {
+      removeScenePresetFromPanel(preset.id, panelId);
+      note = `This panel no longer carries ${preset.name}. Scenes made from it stay.`;
+    }
+    presetPick = '';
+  }
   function addSceneFromPreset(made) {
     writeScenes([...panelScenes, made], 'scene:preset');
     sceneId = made.id;
@@ -447,10 +485,13 @@
     </div>
     <div class="cards">
       {#if category === 'Scenes'}
-        {#each scenePresets as entry (entry.id)}
-          <button type="button" class="card" class:sel={presetPick === entry.id} data-scene-preset={entry.id} onclick={() => { presetPick = presetPick === entry.id ? '' : entry.id; }}
+        <button type="button" class="tb import" data-import-scene-preset onclick={importScenePreset}
+                title="Bring in a .cescene file someone sent you, into your scene presets">Import…</button>
+        {#each scenePresetCards as entry (entry.preset.id)}
+          <button type="button" class="card" class:sel={presetPick === entry.preset.id} data-scene-preset={entry.preset.id} data-where={entry.where}
+                  onclick={() => { presetPick = presetPick === entry.preset.id ? '' : entry.preset.id; }}
                   title="A whole scene: click to put it on this panel">
-            <span class="cn named">{entry.name}</span><span class="cc">{String(entry.id).startsWith('builtin:') ? 'Built in' : 'Mine'}</span>
+            <span class="cn named">{entry.preset.name}</span><span class="cc">{WHERE_LABEL[entry.where]}{entry.carried && entry.where !== 'panel' ? ' · on this panel' : ''}</span>
           </button>
         {/each}
       {:else}
@@ -466,8 +507,9 @@
       {/if}
     </div>
     {#if pickedPreset}
-      <ScenePresetPanel preset={pickedPreset} {controls} mine={pickedPresetMine} onadd={addSceneFromPreset}
-                        oncancel={() => { presetPick = ''; }} onremove={(id) => { removeScenePreset(id); presetPick = ''; }} />
+      <ScenePresetPanel preset={pickedPreset} {controls} where={pickedEntry.where} carried={pickedEntry.carried} onadd={addSceneFromPreset}
+                        oncancel={() => { presetPick = ''; }} onremove={removePicked} onexport={() => exportScenePreset(pickedPreset)}
+                        oncarry={carryPicked} onkeep={keepPicked} />
     {/if}
     <p class="hint">{category === 'Scenes' ? 'A scene preset becomes a new scene: on controls you choose, or on every one that fits.' : 'Drag an effect onto a control, or onto a track.'}</p>
   </aside>
@@ -683,6 +725,7 @@
   .cats button { height: 24px; padding: 0 8px; border: 1px solid #3A434D; border-radius: 12px; background: #1E2328; color: #CCD3DA; font: inherit; font-size: 12px; cursor: pointer; }
   .cats button.on { border-color: #5AA9E6; background: #173A5A; color: #E8F4FF; }
   .cards { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 4px; padding: 0 10px 8px; }
+  .cards .tb.import { align-self: flex-start; flex: 0 0 auto; }
   .card { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 32px; padding: 0 9px; border: 1px solid #2B323A; border-radius: 6px; background: #1A1F24; color: #E8EEF3; font: inherit; text-align: left; cursor: grab; }
   .card:hover { border-color: #5B6670; }
   .cn { text-transform: capitalize; }

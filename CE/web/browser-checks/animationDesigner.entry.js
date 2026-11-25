@@ -78,6 +78,10 @@ window.__designer = {
   showCategory: (name) => [...document.querySelectorAll('.cats button')].find((b) => b.textContent.trim() === name)?.click(),
   clickPreset: (id) => document.querySelector(`[data-scene-preset="${id}"]`)?.click(),
   presetCards: () => [...document.querySelectorAll('[data-scene-preset]')].map((el) => [el.dataset.scenePreset, text(el)]),
+  /** A button of the picked scene preset's panel, by its data attribute: data-preset-export, -carry, -keep, -remove. */
+  presetAction: (attr) => document.querySelector(`[${attr}]`)?.click(),
+  importScenePreset: () => document.querySelector('[data-import-scene-preset]')?.click(),
+  savedScenePresets: () => JSON.parse(serializePanel(panel())).scenePresets ?? null,
   presetApplyText: () => text(document.querySelector('[data-scene-preset-apply]')),
   presetSlots: () => [...document.querySelectorAll('[data-preset-slot]')].map((el) => el.value),
   addFromPreset: () => document.querySelector('[data-preset-add]')?.click(),

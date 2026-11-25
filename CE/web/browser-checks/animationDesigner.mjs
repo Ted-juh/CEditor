@@ -11,6 +11,7 @@
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { extname, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -310,6 +311,37 @@ check('a scene kept as a preset goes back on the panel, each part on the control
   assert.equal(putBack.clips.length, original.clips.length);
   assert.deepEqual(putBack.clips.map((c) => [c.controlId, c.target, c.start]).sort(), original.clips.map((c) => [c.controlId, c.target, c.start]).sort());
   assert.notEqual(putBack.id, original.id, 'a new scene, not the old one');
+});
+
+// Scene presets as files and carried by the panel: Export a .cescene, Carry on this panel, Import one.
+await d('showCategory', 'Scenes');
+await wait(80);
+await d('clickPreset', mineId);
+await wait(80);
+const [download] = await Promise.all([page.waitForEvent('download'), d('presetAction', 'data-preset-export')]);
+const exported = JSON.parse(readFileSync(await download.path(), 'utf8'));
+check('Export writes a .cescene file of a scene preset', () => {
+  assert.match(download.suggestedFilename(), /\.cescene$/);
+  assert.equal(exported.format, 'ceditor.scenePreset');
+  assert.equal(exported.id, mineId);
+});
+await d('presetAction', 'data-preset-carry');
+await wait(100);
+const carriedNote = await d('note');
+const carried = await d('savedScenePresets');
+const carriedCards = await d('presetCards');
+check('Carry on this panel puts a copy in the panel\'s document, and the card says so', () => {
+  assert.match(carriedNote, /carried by this panel now/, carriedNote);
+  assert.deepEqual(carried?.map((preset) => preset.id), [mineId]);
+  assert.match(carriedCards.find(([id]) => id === mineId)?.[1] ?? '', /Mine · on this panel/);
+});
+const fromFile = { ...exported, id: 'sp_fromafriend', name: 'From a friend' };
+const [chooser] = await Promise.all([page.waitForEvent('filechooser'), d('importScenePreset')]);
+await chooser.setFiles({ name: 'From a friend.cescene', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fromFile)) });
+await page.waitForFunction(() => window.__designer.presetCards().some(([id]) => id === 'sp_fromafriend'));
+const importedNote = await d('note');
+check('Import brings a .cescene file into your scene presets', () => {
+  assert.match(importedNote, /From a friend added in your scene presets/, importedNote);
 });
 
 if (failures.length) {
