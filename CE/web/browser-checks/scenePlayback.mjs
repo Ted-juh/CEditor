@@ -16,6 +16,7 @@
  *   - a pattern clip pulses a control's pattern while its scroll goes on underneath
  *   - MIDI in starts scenes: a kick drum's note, and the sustain pedal as it goes down, once
  *   - a drag heard on one part: on a button's key it moves the scene, on its margin it does not
+ *   - a state that changes a pattern eases its opacity, size and speed, and its scroll keeps its place
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -294,6 +295,30 @@ try {
     assert.match(knockStart ?? '', /^0s$/, `held at its start: ${knockStart}`);
     assert.equal(afterMargin, knockStart, 'pressed on the margin: nothing');
     assert.match(afterKey ?? '', /^-0\.4s$/, `40 px of 100 on the key: ${afterKey}`);
+  });
+
+  // A state that changes Glow's pattern: fainter, larger, faster, eased over 600 ms; no jump.
+  await page.setViewportSize({ width: 700, height: 1200 });
+  const glowBox = await s('rect', 'glow');
+  const glowRest = await s('patternDrawn', 'glow', 'pattern1');
+  await page.mouse.move(glowBox.x + glowBox.w / 2, glowBox.y + glowBox.h / 2, { steps: 2 });
+  const glowAtOnce = await s('patternDrawn', 'glow', 'pattern1');
+  await page.waitForTimeout(260);
+  const glowMid = await s('patternDrawn', 'glow', 'pattern1');
+  await page.waitForTimeout(700);
+  const glowHover = await s('patternDrawn', 'glow', 'pattern1');
+  await page.mouse.move(680, 5);
+  await page.setViewportSize({ width: 700, height: 640 });
+  const placeGap = (a, b) => { const d = Math.abs(a - b) % 1; return Math.min(d, 1 - d); };
+  check('a state that changes a pattern eases its opacity, size and speed, and its scroll keeps its place', () => {
+    assert.equal(glowRest.opacity, 1, JSON.stringify(glowRest));
+    assert.ok(glowMid.opacity < 0.95 && glowMid.opacity > 0.35, `fading: ${glowMid.opacity}`);
+    assert.ok(Math.abs(glowHover.opacity - 0.3) < 0.02, `faded to 30 %: ${glowHover.opacity}`);
+    assert.ok(glowMid.tile > glowRest.tile * 1.05 && glowMid.tile < glowHover.tile * 0.98, `growing: ${glowRest.tile} ${glowMid.tile} ${glowHover.tile}`);
+    assert.ok(Math.abs(glowHover.tile - glowRest.tile * 2) < 1, 'to twice the size');
+    assert.ok(placeGap(glowAtOnce.place, glowRest.place) < 0.08, `the scroll kept its place: ${glowRest.place} -> ${glowAtOnce.place}`);
+    assert.ok(glowMid.rate > 0.3 && glowMid.rate < 0.98, `its speed easing to the new: rate ${glowMid.rate}`);
+    assert.equal(glowHover.rate, 1, 'at the new speed');
   });
 
   // MIDI in: the kick's note starts its scene; the pedal starts its own going down, not while held.

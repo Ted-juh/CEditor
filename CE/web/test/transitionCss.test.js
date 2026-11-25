@@ -72,9 +72,10 @@ test('showing and hiding a part eases opacity and visibility together', () => {
 });
 
 test('the colour timing travels as an inherited custom property, and is always set', () => {
-  assert.equal(colourTransitionVar(null), '--ce-colour-transition:none;',
+  assert.equal(colourTransitionVar(null), '--ce-colour-transition:none;--ce-colour-timing:0s;',
     'a part with no colour timing must not borrow its control\'s');
-  assert.equal(colourTransitionVar(T), `--ce-colour-transition:${BUCKET_PROPERTIES.part.colour.map((p) => `${p} ${T}`).join(', ')};`);
+  assert.equal(colourTransitionVar(T), `--ce-colour-transition:${BUCKET_PROPERTIES.part.colour.map((p) => `${p} ${T}`).join(', ')};--ce-colour-timing:${T};`,
+    'and the timing alone, for a pattern\'s opacity, size and speed');
   assert.match(colourTransitionVar(T, { svg: true }), /stop-color 120ms/);
 });
 

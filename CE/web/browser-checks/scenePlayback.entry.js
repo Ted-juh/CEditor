@@ -64,13 +64,22 @@ function panel(prefix) {
   pedal._children.Text.content = 'Pedal';
   // A drag heard on a button's key only: its margin, outside the key, moves nothing.
   const knock = place(createControl('Button'), `${prefix}knock`, 'Knock', 20, 400, 200, 60);
+  // A pattern a state changes — fainter, larger, faster on Hover — on a colour timing of 600 ms.
+  const glow = place(createControl('Label'), `${prefix}glow`, 'Glow', 240, 400, 200, 60);
+  glow._children.Text.content = 'Glow';
+  const { patch: glowPattern } = addPatternPatch(glow._children.Background, 'Background', { speed: 40 });
+  glow._children.Background._children.Patterns = glowPattern['Background.Patterns'];
+  glow._children.States = { _type: 'States', enabled: true, priority: [], _children: { Hover: { _type: 'State', name: 'Hover', enabled: true, when: { hover: true },
+    patches: { component: { 'Background.Patterns.pattern1.opacity': 30, 'Background.Patterns.pattern1.scale': 2, 'Background.Patterns.pattern1.speed': 160 }, parts: {} } } } };
+  glow._children.Animations = { _type: 'Animations', enabled: true, _children: { tint: { _type: 'Animation', name: 'tint', enabled: true, kind: 'transition',
+    trigger: { type: 'stateChange', from: ['*'], to: ['hover'], reverse: true }, duration: 600, delay: 0, easing: 'linear', targets: [{ path: 'Background.Fill.colour' }] } } };
   vu._children.Animations = { _type: 'Animations', enabled: true, _children: { needle: {
     _type: 'Animation', name: 'needle', enabled: true, kind: 'value', duration: 1000, delay: 0, iterations: 1, easing: 'inOutCubic',
     frames: sceneEffect('value:sweep').effect.frames, trigger: { type: 'script' }, targets: [{ path: 'Value' }],
   } } };
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 480, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 480, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -118,7 +127,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -146,6 +155,21 @@ window.__scenes = {
     return {
       clip: { name: clipStyle.animationName, state: clipStyle.animationPlayState, delay: clipStyle.animationDelay },
       scroll: mover ? { name: getComputedStyle(mover).animationName, state: getComputedStyle(mover).animationPlayState } : null,
+    };
+  },
+  /** A pattern as drawn now: its layer's opacity, its tile's size, and its scroll's place and rate. */
+  patternDrawn: (id, name) => {
+    const layer = root(id)?.querySelector(`.pattern-layer[data-pattern="${name}"]`);
+    if (!layer) return null;
+    const mover = layer.querySelector('.pattern-move-x, .pattern-move-y');
+    const animation = mover?.getAnimations?.()?.find((entry) => entry.animationName);
+    const duration = Number(animation?.effect?.getTiming?.().duration) || 0;
+    return {
+      opacity: Number(getComputedStyle(layer).opacity),
+      tile: mover ? mover.getBoundingClientRect().width : 0,
+      place: animation && duration ? (Number(animation.currentTime) % duration) / duration : null,
+      rate: animation ? animation.playbackRate : null,
+      duration,
     };
   },
   /** Where a knob draws its value (step 6), and where its pointer is. */

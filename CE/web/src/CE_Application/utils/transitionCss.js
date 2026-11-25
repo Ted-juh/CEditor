@@ -91,7 +91,9 @@ export function rootTransitionDeclaration(rootTransitions) {
  * timing — so a part never borrows its parent's.
  */
 export function colourTransitionVar(timing, { svg = false } = {}) {
-  if (!timing) return '--ce-colour-transition:none;';
+  // `--ce-colour-timing` is the timing alone, for what eases on it without being a colour: a
+  // pattern's opacity, size and speed (PatternLayers.svelte).
+  if (!timing) return '--ce-colour-transition:none;--ce-colour-timing:0s;';
   const properties = svg ? BUCKET_PROPERTIES.svg.colour : BUCKET_PROPERTIES.part.colour;
-  return `--ce-colour-transition:${properties.map((property) => `${property} ${timing}`).join(', ')};`;
+  return `--ce-colour-transition:${properties.map((property) => `${property} ${timing}`).join(', ')};--ce-colour-timing:${timing};`;
 }

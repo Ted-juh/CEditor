@@ -3492,7 +3492,7 @@
   <EffectSurface effects={hasAnatomy ? null : effects} width={displayW} height={displayH} shadowsOnly target="component">
   {#if separateBackground && !hasAnatomy}
     <div class="control-background" style={filterCSS}>
-      <BackgroundRenderer {background} width={displayW} height={displayH} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} />
     </div>
   {/if}
   <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
@@ -3500,7 +3500,7 @@
       <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
-      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} />
     {/if}
 
     {#if ownRenderer === 'LcdDisplay'}
@@ -4283,7 +4283,7 @@
 
     {#if frontPatterns}
       <!-- Patterns in front of the content: over the text, clipped to the control's shape. -->
-      <PatternLayers {background} place="front" width={displayW} height={displayH} clip={frontPatternClip} reducedMotion={patternsStill} animations={activeKeyframes?.patterns ?? null} />
+      <PatternLayers {background} place="front" width={displayW} height={displayH} clip={frontPatternClip} reducedMotion={patternsStill} animations={activeKeyframes?.patterns ?? null} timing={activeTransitions?.rootTransitions?.get?.('colour') ?? null} />
     {/if}
   </div>
   </EffectSurface>

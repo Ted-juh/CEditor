@@ -680,6 +680,9 @@ own section:
 - **Place** — **Behind the content**, over the fill, or **In front of the content**, over the text.
   A part's pattern goes in front of the part's own words and picture the same way, clipped to the
   part's shape.
+- A state can change a pattern (its tint, **Opacity**, **Size** or **Speed**, on its **States** tab),
+  and with a colour animation on the control the change eases on its timing: the pattern fades,
+  grows and speeds up or slows down, keeping its place as it moves.
 - **Speed** and **Direction** — set a speed, in pixels a second, and the pattern moves on its own:
   right, left, up, down or at any angle. A row moves only left or right, and a column only up or
   down. A moving pattern plays in Preview, on the Animation tool's stage and in the exported plugin;

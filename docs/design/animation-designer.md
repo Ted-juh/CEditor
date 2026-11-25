@@ -1105,6 +1105,39 @@ Verified locally:
 - the browser checks `panelMotion`, `fromSelection` and `anatomyForms`, and the component harness's 96
   cases (the renderer draws every part).
 
+## As built: a pattern's opacity, size and speed ease between states (2026-11-25)
+
+Step 3 left these switching: a state that made a pattern fainter, larger or faster changed it at
+once, and only its tint faded, on the control's colour timing. All four now ease on that timing.
+
+- **Opacity** is a transition on the pattern's layer.
+- **Size** is transitions on the painted area, its mask's tile and position, and the movers' tile.
+- **Speed** cannot be a CSS transition. A running CSS animation given a new duration keeps its
+  elapsed time, and so jumps to another place. A Svelte action on each mover (`steadyScroll` in
+  `PatternLayers.svelte`) puts the scroll back at the same place in the new duration's terms, through
+  the Web Animations API (`currentTime`). It then ramps the animation's `playbackRate` from the old
+  speed to the new over the same timing. It picks the scroll itself out of `getAnimations()`, which
+  also lists the size's transitions.
+- **Where the timing comes from.** `PatternLayers` takes the control's or the part's colour timing as
+  a prop and writes each transition into the same style attribute as the value it eases. The first
+  version read it as a custom property (`--ce-colour-timing`, which `colourTransitionVar` now also
+  sets). Chromium eased with it, but WebKitGTK 2.52 settled the new opacity at once in the panel.
+  - The same CSS transitioned in WebKitGTK in every isolated reduction: the timing on the element or
+    on its parent, set in the same write or before it, inline or in a stylesheet.
+  - So the cause is in how the panel's writes interleave, likely a style read between the two
+    writes, and not in the CSS.
+  - Writing the timing beside the value removes the dependence on order. The variable stays as the
+    fallback for a caller that passes no timing.
+
+Verified locally:
+- `test/transitionCss.test.js` (the timing variable);
+- the browser check `scenePlayback`: Glow's pattern, made fainter, larger and faster on Hover with a
+  600 ms colour timing. Mid-way it is fading and growing and its rate is easing; at the end it is at
+  30 %, twice the size and the new speed, and its scroll never jumped. Also `panelMotion`,
+  `effectsTab`, `animationTab` and `anatomyForms`;
+- WebKitGTK 2.52, the same hover: opacity 1 → 0.86 → 0.54 → 0.3, tile 64 → 77 → 106 → 128 px, rate
+  0.55 → 0.77 → 1, the place kept.
+
 ## Open
 
 Nothing for the owner at present.
