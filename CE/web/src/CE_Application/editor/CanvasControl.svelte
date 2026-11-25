@@ -88,7 +88,7 @@
   import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
   import { attachedFollowers, textShownOwners, withAttached } from '../utils/attachedLabels.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
-  import { buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
+  import { blendsThroughControl, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { hasBackgroundEffects } from '../utils/surfaceEffects.js';
   import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
@@ -2078,6 +2078,8 @@
   let frontPatternClip = $derived(frontPatterns ? fillShapeCSS(background?._children?.Corners, displayW, displayH) : '');
   let patternsStill = $derived(editorInteractionEnabled !== false || interactionRuntime?.keyframes?.reducedMotion === true);
   let blendCSS  = $derived(buildBlendCSS(effects));
+  // A stacking context of its own, unless a layer inside blends with what is behind (effectsCSS.js).
+  let stacksAlone = $derived(!blendsThroughControl(control));
   let filterCSS = $derived(buildFilterCSS(effects));
 
   // A flat colour or a single gradient paints on `.control-content` itself instead of on a child
@@ -3482,6 +3484,7 @@
 <div
   bind:this={rootElement}
   class="canvas-control"
+  class:stacks-alone={stacksAlone}
   class:embedded
   data-control-id={embedded ? undefined : core?.id}
   class:selected={editorInteractionEnabled && isSelected && !panelLocked}
@@ -4435,16 +4438,20 @@
 </div>
 
 <style>
-  /* `isolation` makes each control a stacking context of its own, still in the document-order band
-     (no z-index: SceneryGround says why there is none). Without it the layers inside a control —
-     its words at z-index 2, a part's frames — joined the SURFACE's stacking and painted over every
-     later control drawn above them: a Label's words showed through the panel laid over it. The
-     Film Festival's Inception cut to black and kept its title. A control's own blend mode sits on
-     this element, so it still blends with what is behind the control. */
   .canvas-control {
     position: absolute;
     box-sizing: border-box;
     cursor: default;
+  }
+  /* `isolation` makes a control a stacking context of its own, still in the document-order band (no
+     z-index: SceneryGround says why there is none). Without it the layers inside a control — its
+     words at z-index 2, a part's frames — join the SURFACE's stacking and paint over every later
+     control drawn above them: a Label's words showed through the panel laid over it, and the Film
+     Festival's Inception cut to black and kept its title. A control's own blend mode sits on this
+     element, so it still blends with what is behind it. Not for a control with a layer inside that
+     blends (blendsThroughControl): that layer has to reach what is behind the control, and in a
+     context of its own it would blend with nothing — a Photoshop knob's dodge layers went white. */
+  .canvas-control.stacks-alone {
     isolation: isolate;
   }
   .canvas-control.embedded { pointer-events: none; }

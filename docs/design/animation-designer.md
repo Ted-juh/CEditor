@@ -1685,15 +1685,24 @@ the inspector keeps them (`Text.Position.justification`, `Text.Font.letterSpacin
   black kept its title.
 - The fold hid it for still controls only where both were folded: two plain overlapping Labels on
   a live surface showed it, as did any live Label under a live cover.
-- `.canvas-control` now has `isolation: isolate`. Each control is a stacking context of its own, in
-  the document-order band, still with no z-index (SceneryGround's comment says why there is none).
-  A control's own blend mode sits on that element, so it still blends with what is behind it.
-  Blends inside a control (a script's drawing, a part's gradient blend) now blend within the
-  control, which is what "over its normal content" meant.
+- A control is now a stacking context of its own (`.stacks-alone`, `isolation: isolate`), in the
+  document-order band, still with no z-index (SceneryGround's comment says why there is none). A
+  control's own blend mode sits on that element, so it still blends with what is behind it.
+- **Except a control with a layer inside that blends** (`blendsThroughControl`, `effectsCSS.js`): a
+  part's blend mode, a gradient's, a picture's, a pattern's, or one a state sets. Such a layer has to
+  reach what is behind the control. The first cut isolated every control, and the browser check
+  `pictureColour` caught what that does to a knob imported from a Blender PSD. Its light and shadow
+  layers (multiply, color-dodge, plus-lighter) blended with nothing, and its corners went white
+  where the panel should show. Those controls draw as they always did, words leaking included.
+  Every control as it is made, and every Film Festival control, stacks as one.
 
 Verified locally:
 - The browser check `scenePlayback` lays a red Label exactly over another's words and samples the
   pixels where the words are. Without the fix 935 of 1,920 are not the cover's red; with it, none.
+- `pictureColour` passes again: the imported knob's corner shows the panel after a recolour.
+- `test/controlStacking.test.js` (new): every control type as made stacks as one. A gradient, a
+  pattern or a state's blend keeps a control out, and its own root blend does not. The PSD knob
+  blends through, and every Film Festival control stacks as one.
 - `test/filmFestival.test.js`: the second reel's value clip on a real knob, the one-spin reels, the
   typed trails and the slot reels.
 - Each new film recorded frame by frame in Chromium, its frames checked by eye.
