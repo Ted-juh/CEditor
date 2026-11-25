@@ -30,6 +30,7 @@
   import { anatomyForm } from '../models/controlAnatomy.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { isSliderControlPart, sliderControlSession } from '../utils/sliderControlPart.js';
+  import { sliderWordsPlace } from '../utils/anatomyWords.js';
   import { booleanShapeFor, booleanShapeRevision, compoundShapeFor } from '../utils/booleanGroups.js';
   import { outlineInsetDepths } from '../utils/outlineBorder.js';
   import { outlineShadows } from '../utils/outlineShadows.js';
@@ -159,6 +160,13 @@
   // ControlAnatomy on the panel, not by SliderFamilyRenderer; CanvasControl picks between them the
   // same way. The part always used SliderFamilyRenderer, so a converted knob with a form came out a
   // different knob: smaller, with a larger readout.
+  // A text effect on this part, when it carries a knob, plays on the knob's own first words — its
+  // scale's numbers, else its ticks or its readout (utils/anatomyWords.js), as one on the knob would.
+  let hostedTexts = $derived.by(() => {
+    if (!sliderResolved || !textEffect) return null;
+    const place = sliderWordsPlace(sliderResolved.control);
+    return place ? new Map([[place.slice('Parts.'.length), [textEffect]]]) : null;
+  });
   let sliderAnatomy = $derived(sliderResolved
     ? anatomyForm(sliderResolved.control?._children?.Core?.controlType, sliderResolved.control?._children?.Core?.controlForm)
     : '');
@@ -1057,6 +1065,7 @@
         width={frame.width}
         height={frame.height}
         label={String(sliderResolved.control?._children?.Text?.content ?? '')}
+        partTexts={hostedTexts}
       />
     {:else if sliderResolved}
       <SliderFamilyRenderer
@@ -1065,6 +1074,7 @@
         width={frame.width}
         height={frame.height}
         partTransitions={sliderTransitions?.partTransitions ?? null}
+        partTexts={hostedTexts}
         {debug}
       />
     {/if}

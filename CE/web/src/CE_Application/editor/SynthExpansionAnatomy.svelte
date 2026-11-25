@@ -1,6 +1,9 @@
 <script>
   import {SYNTH_EXPANSION} from '../models/synthExpansionSets.js';
-  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true} = $props();
+  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true,readoutFx=''} = $props();
+  // A text effect on the knob's readout (utils/anatomyWords.js): the words played whole, in the
+  // readout's colour through currentColor, so the effect's colour frames reach SVG text.
+  const readoutAttrs = (colour) => (readoutFx ? { fill: 'currentColor', style: `color:${colour};${readoutFx}`, 'data-word-piece': '' } : { fill: colour });
   const uid=$props.id(), paint=n=>`url(#${uid}-${n})`;
   let cfg=$derived(SYNTH_EXPANSION.find(d=>d.id===design));
   let angle=$derived(-135+p*270);
@@ -48,12 +51,12 @@
   {:else if design==='edge-light'}
     {@render ticks(67,12)}<circle cx="80" cy="79" r="53" fill="#09141d"/><circle cx="80" cy="76" r="52" fill={paint('metal')}/><circle cx="80" cy="76" r="46" fill={housing}/><path d={arc(49,-135+Math.max(.001,p)*270)} fill="none" stroke={accent} stroke-width="3"/><circle cx="80" cy="76" r="39" fill={paint('cap')}/><path d="M78 30h4v27h-4Z" fill={accent} transform={`rotate(${angle} 80 76)`}/><circle cx="80" cy="76" r="39" fill={paint('lens')}/>
   {:else if design==='touch-encoder'}
-    <circle cx="80" cy="76" r="57" fill="none" stroke={face} stroke-width="1"/><path d={arc(57,-135+Math.max(.001,p)*270)} fill="none" stroke={accent} stroke-width="3"/><circle cx="80" cy="76" r="46" fill={face}/><circle cx="80" cy="76" r="39" fill={housing}/>{@const tip=point(angle,57)}<circle cx={tip[0]} cy={tip[1]} r="4" fill={accent}/>{#if showValue}<text x="80" y="82" text-anchor="middle" fill={legend} font-size="16" font-family="monospace">{readout}</text>{:else}<path d="M67 76h26" stroke={accent}/>{/if}
+    <circle cx="80" cy="76" r="57" fill="none" stroke={face} stroke-width="1"/><path d={arc(57,-135+Math.max(.001,p)*270)} fill="none" stroke={accent} stroke-width="3"/><circle cx="80" cy="76" r="46" fill={face}/><circle cx="80" cy="76" r="39" fill={housing}/>{@const tip=point(angle,57)}<circle cx={tip[0]} cy={tip[1]} r="4" fill={accent}/>{#if showValue}<text x="80" y="82" text-anchor="middle" {...readoutAttrs(legend)} font-size="16" font-family="monospace">{readout}</text>{:else}<path d="M67 76h26" stroke={accent}/>{/if}
   {:else if design==='carbon-pro'}
     {@render ticks(66,10)}<circle cx="80" cy="80" r="54" fill="#111b20"/><g transform={`rotate(${angle} 80 76)`}><polygon points={grip(8,53,44)} fill={paint('edge')} stroke="#1c2a2e" stroke-width="2"/><circle cx="80" cy="76" r="33" fill={paint('cap')} stroke="#748387" stroke-width=".7"/><path d="M74 28h12v31H74Z" fill="#263238"/><path d="M78 30h4v26h-4Z" fill={accent}/></g>
   {/if}
   </g>
-  {#if showValue&&design!=='touch-encoder'}<text x="80" y="163" text-anchor="middle" fill={legend} font-size="12" font-family="monospace">{readout}</text>{/if}
+  {#if showValue&&design!=='touch-encoder'}<text x="80" y="163" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{readout}</text>{/if}
 {:else if meter}
   {@const mode=cfg.meterStyle}
   {#if mode==='needle'}
@@ -66,7 +69,7 @@
       {:else}{#each Array.from({length:16}) as _,i}<rect x={14+i*8.2} {y} width={mode==='dots'?4:5.5} height={mode==='dots'?4:height} rx={mode==='dots'?2:0} transform={mode==='dots'?'translate(0 12)':undefined} fill={i/16<p?accent:face} opacity={i/16<p?1:.25}/>{/each}{/if}
     {/each}<path d="M14 79h134" stroke={legend} stroke-opacity=".25"/>
   {/if}
-  {#if showValue}<text x="80" y="98" fill={legend} text-anchor="middle" font-size="10" font-family="monospace">{readout}</text>{/if}
+  {#if showValue}<text x="80" y="98" {...readoutAttrs(legend)} text-anchor="middle" font-size="10" font-family="monospace">{readout}</text>{/if}
 {:else}
   {@const type=cfg.key}{@const dy=active?3:0}
   {#if toggle&&type==='rocker'}

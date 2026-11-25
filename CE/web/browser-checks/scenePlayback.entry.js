@@ -124,6 +124,9 @@ function panel(prefix) {
         clips: [clip('c16', `${prefix}knock`, 'Transform', 0, 1000, fade)] },
       { id: 'sc_drift', name: 'Drift', trigger: { type: 'script' }, length: 6000, loop: false,
         clips: [clip('c17', `${prefix}photo`, 'Transform', 0, 6000, sceneEffect('paint:imageDrift').effect)] },
+      // A knob drawn as a form (the Dial, a disc): its readout typed in, whole, as SVG text is.
+      { id: 'sc_dial_words', name: 'Dial words', trigger: { type: 'script' }, length: 600, loop: false,
+        clips: [clip('c22', `${prefix}dial`, 'Parts.labelCurrent', 0, 600, typewriter)] },
       // Markers (sceneFormat.js): moments that call a script's action as the scene passes them.
       { id: 'sc_cues', name: 'Cues', trigger: { type: 'script' }, length: 600, loop: false,
         clips: [clip('c21', `${prefix}lamp`, 'Transform', 0, 600, fade)],
@@ -246,6 +249,13 @@ window.__scenes = {
     return own ? { drawn: Number(own.dataset.drawn), reading } : null;
   },
   /** A script's call, as a panel script makes it; `done` is recorded under `doneKey`. */
+  /** A knob form's readout as drawn (ControlAnatomy): a piece of an effect or not, and its animation. */
+  formReadout: (id) => {
+    const text = [...(root(id)?.querySelectorAll('svg.anatomy text') ?? [])].find((el) => el.textContent.trim() !== '');
+    if (!text) return null;
+    const style = getComputedStyle(text);
+    return { piece: text.hasAttribute('data-word-piece'), name: style.animationName, fill: text.getAttribute('fill') };
+  },
   /** What the markers have called, in order, and when (ms on the page's clock). */
   markerCalls: () => markerCalls.map((entry) => [...entry]),
   /** The console lines a scene's marker left: one naming an action no script defines. */

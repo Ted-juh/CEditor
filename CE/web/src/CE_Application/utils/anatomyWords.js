@@ -19,12 +19,17 @@
  * (transform-box: fill-box) rather than the drawing's; and a roll or a push is clipped to a box about
  * each mark, as a Label's box clips its words.
  *
+ * A knob drawn as a form (ControlAnatomy) has other words: its readout (labelCurrent), played whole as
+ * SVG text, and on the classic forms its ring of ticks (tickMajor), one piece a tick. A knob carried
+ * by a component's part plays an effect on that part on its first words (InteractivePartRenderer).
+ *
  * Pure: no DOM, no stores.
  */
 import { knobTrackOf } from './knobTrack.js';
 import { isSliderBehavior, getSliderValueMode } from './sliderBehavior.js';
 import { resolveSliderSemanticParts } from './sliderEntityFactory.js';
 import { buildSliderTickStops } from './sliderGeometry.js';
+import { anatomyForm } from '../models/controlAnatomy.js';
 import { textPieceStyles } from './textEffects.js';
 
 /** The marks of a scale, drawn in the SVG: one piece each. */
@@ -45,6 +50,20 @@ export function isSliderRendererPart(part) {
   return semanticPartNames().has(String(part));
 }
 
+/**
+ * A knob drawn as a form by code (editor/ControlAnatomy.svelte: a form set on it and not converted
+ * to parts, or one of the illustrated designs), its form's name; '' for one drawn from its parts.
+ * A form prints no scale numbers or handle labels: its words are its readout and, on the classic
+ * forms that have one, its ring of ticks.
+ */
+export function knobFormOf(control) {
+  const core = control?._children?.Core;
+  return core?.controlType === 'Knob' ? anatomyForm('Knob', core.controlForm) : '';
+}
+/** The classic forms that draw a ring of ticks (ControlAnatomy's `ticks`). */
+export const FORM_TICKS = Object.freeze(['pointer', 'halo', 'skirt', 'vernier', 'scallop']);
+const formDivisions = (control) => Math.max(4, Math.min(48, Math.round(Number(control?._children?.Core?.formDivisions) || 12)));
+
 /** Whether a control is a knob or a slider: the family SliderFamilyRenderer draws. */
 export function isSliderFamily(control) {
   return isSliderBehavior(control?._children?.Behavior ?? null);
@@ -61,6 +80,14 @@ function handleLabelsShown(behavior) {
 /** The word and mark parts this knob or slider draws now, in the order a text effect dropped on it looks for one. */
 export function sliderWordParts(control) {
   if (!isSliderFamily(control)) return [];
+  const form = knobFormOf(control);
+  if (form) {
+    // A form's words: its readout (labelCurrent, the value it shows), then its ring of ticks.
+    return [
+      ...(control._children.Core.formShowValue !== false ? ['labelCurrent'] : []),
+      ...(FORM_TICKS.includes(form) ? ['tickMajor'] : []),
+    ];
+  }
   const behavior = control._children.Behavior;
   const track = knobTrackOf(control, 100, 100);
   const parts = resolveSliderSemanticParts(control?._children?.Parts ?? null)._children;
@@ -90,6 +117,14 @@ const WORD_PLACES = 'its scale’s numbers, its ticks or the labels on its handl
 export function sliderWordsRefusal(control, part = '') {
   if (!isSliderFamily(control)) return '';
   const name = control?._children?.Core?.name || 'This knob';
+  const form = knobFormOf(control);
+  if (form) {
+    const shown = sliderWordParts(control);
+    if (part && shown.includes(part)) return '';
+    if (part && !isSliderRendererPart(part)) return '';
+    const what = [shown.includes('labelCurrent') && 'its readout', shown.includes('tickMajor') && 'its ring of ticks'].filter(Boolean).join(' or ');
+    return `${name} is drawn as a form ("${form}")${what ? `: a text effect plays on ${what}` : ', which shows no words now'}. Convert it to parts for its numbers and handle labels.`;
+  }
   if (!part) return `${name} has no words of its own: a text effect plays on ${WORD_PLACES}. Its name and value are Labels beside it.`;
   if (SLIDER_WORD_PARTS.includes(part)) {
     return sliderWordParts(control).includes(part) ? '' : `${name} does not show that now: turn it on in its Ticks section, or play the effect on ${WORD_PLACES}.`;
@@ -105,6 +140,7 @@ export function sliderWordsRefusal(control, part = '') {
  */
 export function sliderMarkCount(control, part) {
   if (!SLIDER_MARK_PARTS.includes(part) || !isSliderFamily(control)) return null;
+  if (knobFormOf(control)) return part === 'tickMajor' ? formDivisions(control) + 1 : null;
   if (part === 'tickNumber') return knobTrackOf(control, 100, 100).scaleNumberCount;
   const stops = buildSliderTickStops(control._children.Behavior);
   return part === 'tickMajor' ? stops.major.length : stops.minor.length;

@@ -1268,7 +1268,10 @@ There are four kinds, and a fifth on a knob or a slider:
   a typewriter writes 0 2 4 6 8 10 one after another, and **Whole** plays them together. Ticks
   drawn as lines or dots take it too, so a scale can light a tick at a time. A text effect dropped
   on a knob in the Animation Designer goes to its numbers, else its numeral ticks, its handle
-  labels or its ticks, whichever it shows.
+  labels or its ticks, whichever it shows. A knob drawn as a form (picked under its form, not
+  converted to parts) prints no numbers: there a text effect plays on its readout, whole, and on
+  the ring of ticks the pointer, halo, skirt, vernier and scalloped forms have, a tick at a time.
+  A knob carried in a component's part takes an effect on that part on its own words, as above.
 - **Value** (knobs, sliders, the Macro and meters) — moves what the value draws, its arc, ring, pointer, needle or bar, then hands
   back to the value: a new one is a ring sweep, round to full and back. It plays on the same
   triggers as **Keyframes** except **all the time**, and with **Loop** it repeats while its state

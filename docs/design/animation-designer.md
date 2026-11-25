@@ -1220,7 +1220,8 @@ over `textEffects.js`).
   an animation paused since it was made has run no time of its own.
 
 Left out: a knob drawn as a form (`Core.controlForm`, ControlAnatomy) and a knob carried inside a
-component's part. Both draw their scales elsewhere, and neither plays these effects yet.
+component's part. Both draw their scales elsewhere, and neither plays these effects yet. (Built
+since: "As built: text effects on a knob form's words, and on a knob in a part", below.)
 
 **Scripts too (a commit of its own, after).**
 - `ce.anim.effect` put a text effect only on a control's own words, so
@@ -1480,6 +1481,41 @@ Verified locally:
     console;
   - `animationDesigner`: + Marker at a quarter of the ruler, named, dragged to half way, and
     deleted.
+
+## As built: text effects on a knob form's words, and on a knob in a part (2026-11-25)
+
+The knob-words item's two left-out cases.
+
+- **A knob drawn as a form.** A form is set on a knob and not converted to parts, or is one of the
+  twelve illustrated designs. It prints no scale numbers or handle labels. Its words are other
+  ones, and `anatomyWords.js` now knows them (`knobFormOf`, `FORM_TICKS`):
+  - its **readout**, under `labelCurrent`, wherever the form draws it: in `ControlAnatomy` and the
+    four design components (`PhysicalAnatomy`, `AdditionalAnatomy`, `SculptedSynthAnatomy`,
+    `SynthExpansionAnatomy`). It is played whole, as SVG text plays an effect (a piece of a line of
+    SVG text cannot be moved), and painted with `currentColor` so the effect's colour reaches it.
+  - its **ring of ticks**, under `tickMajor`, on the five classic forms that draw one (pointer, halo,
+    skirt, vernier, scallop): one piece a tick, round it in order, through `markPieceStyles` as a
+    parts-drawn knob's ticks are.
+
+  A text effect dropped on such a knob goes to its readout first, then its ticks. Anything else (its
+  numbers, a handle label) is refused with what the form does draw, and that Convert to Parts gives
+  it the rest. A script's span counts the form's ticks, its divisions and one.
+- **A knob carried by a component's part.** The scene addresses the part, one level down, not the
+  knob's own parts inside it. So an effect on that part plays on the carried knob's first words:
+  its numbers, else its ticks or its readout, as an effect on the knob itself would
+  (`InteractivePartRenderer` hands it to the knob's `SliderFamilyRenderer` or `ControlAnatomy`).
+- **Not done:** a roll or a push on a form's ticks or readout is not clipped to a box per mark, as a
+  parts-drawn knob's are.
+
+Verified locally:
+- `test/anatomyWords.test.js`: a form's words and their order, its refusals, its tick count; a
+  pointer form's thirteen ticks played a piece each, a disc's readout whole in `currentColor`; a
+  carried knob's numbers played from its part's effect.
+- The browser checks `scenePlayback` (the Dial, a disc form, takes a script-started typewriter on its
+  readout), `anatomyForms` and `macroSetKnob`, and the component harness's twelve knob and slider
+  cases.
+- WebKitGTK is not run again: the readout and ticks are SVG elements with a CSS animation and
+  `currentColor`, which the knob's scale numbers already showed it draws.
 
 ## Open
 

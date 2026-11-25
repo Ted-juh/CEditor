@@ -3500,7 +3500,7 @@
   {/if}
   <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
-      <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
+      <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} partTexts={activeKeyframes?.texts ?? null} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
       <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} {imageMoves} />

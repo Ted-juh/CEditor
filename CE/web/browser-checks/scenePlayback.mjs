@@ -20,6 +20,7 @@
  *   - a scene drifts a background image — zoomed and panned inside its clip — and not the control
  *   - a clip on a part's pattern pulses that pattern, and not the part or the control
  *   - a scene's markers call the scripts' actions as it passes them; one no script defines is said
+ *   - a knob drawn as a form takes a text effect on its readout, whole
  *   - a scene types a knob's scale numbers round the dial, one number at a time, and rolls them each through a box of its
  *     own (utils/anatomyWords.js)
  *   - inside the Designer's stage nothing plays by itself
@@ -363,6 +364,18 @@ try {
     assert.equal(photoHeld.picture.state, 'paused');
     assert.match(photoHeld.picture.delay, /^-3s$/, `held half way: ${photoHeld.picture.delay}`);
     assert.ok(Number(photoHeld.picture.scale) > 1.05 && Number(photoHeld.picture.scale) < 1.15, `zoomed part way: ${photoHeld.picture.scale}`);
+  });
+
+  // A knob drawn as a form: a scene types its readout in, whole.
+  const dialBefore = await s('formReadout', 'dial');
+  await page.evaluate(() => window.__scenes.script('animatePlay', ['Dial words', {}]));
+  await page.waitForTimeout(60);
+  const dialTyping = await s('formReadout', 'dial');
+  check('a knob drawn as a form takes a text effect on its readout, played whole', () => {
+    assert.deepEqual([dialBefore?.piece, dialBefore?.name], [false, 'none'], JSON.stringify(dialBefore));
+    assert.equal(dialTyping.piece, true, JSON.stringify(dialTyping));
+    assert.match(dialTyping.name, /^ce-tx-/);
+    assert.equal(dialTyping.fill, 'currentColor', 'its colour through currentColor, so the effect\'s colour reaches it');
   });
 
   // Markers: a script-started scene calls the actions its markers name, in order, as it passes them.

@@ -6,8 +6,11 @@ import assert from 'node:assert/strict';
 
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import {
-  SLIDER_WORD_PARTS, sliderWordParts, sliderWordsPlace, sliderWordsRefusal, markPieceStyles, markClipBox,
+  SLIDER_WORD_PARTS, sliderWordParts, sliderWordsPlace, sliderWordsRefusal, markPieceStyles, markClipBox, knobFormOf, sliderMarkCount,
 } from '../src/CE_Application/utils/anatomyWords.js';
+import ControlAnatomy from '../src/CE_Application/editor/ControlAnatomy.svelte';
+import InteractivePartRenderer from '../src/CE_Application/editor/InteractivePartRenderer.svelte';
+import { sliderControlSnapshot } from '../src/CE_Application/utils/sliderControlPart.js';
 import { readTextEffect, textEffectRules } from '../src/CE_Application/utils/textEffects.js';
 import { sceneControlOutput } from '../src/CE_Application/utils/sceneModel.js';
 import { describeTargets, deadTargetCount } from '../src/CE_Application/utils/animationModel.js';
@@ -124,4 +127,51 @@ test('a roll clips each tick to a box about itself; a handle label is cut into l
   assert.ok(clips.length >= 2, html);
   for (const id of clips) assert.ok(html.includes(`clip-path="url(#${id})"`), id);
   assert.match(html, /<div class="slider-label[^"]*" data-label-words="" style="[^"]*"><!--\[--><span style="display:inline-block;white-space:pre;animation:ce-tx-/);
+});
+
+// --- A knob drawn as a form (ControlAnatomy), and one carried by a component's part -----------------
+
+const formKnob = (form, core = {}) => {
+  const control = knob({}, 'Dial');
+  Object.assign(control._children.Core, { controlForm: form, ...core });
+  return control;
+};
+
+test('a knob drawn as a form offers its readout, then its ring of ticks, and says what it draws when asked for more', () => {
+  assert.equal(knobFormOf(formKnob('pointer')), 'pointer');
+  assert.equal(knobFormOf(knob()), '', 'one drawn from its parts');
+  assert.deepEqual(sliderWordParts(formKnob('pointer')), ['labelCurrent', 'tickMajor']);
+  assert.deepEqual(sliderWordParts(formKnob('disc')), ['labelCurrent'], 'a disc has no ring of ticks');
+  assert.deepEqual(sliderWordParts(formKnob('disc', { formShowValue: false })), []);
+  assert.equal(sliderWordsPlace(formKnob('halo')), 'Parts.labelCurrent');
+  assert.equal(sliderWordsRefusal(formKnob('halo'), 'tickMajor'), '');
+  assert.match(sliderWordsRefusal(formKnob('halo'), 'tickNumber'), /^Dial is drawn as a form \("halo"\): a text effect plays on its readout or its ring of ticks\. Convert it to parts/);
+  assert.match(sliderWordsRefusal(formKnob('disc', { formShowValue: false }), ''), /which shows no words now/);
+  assert.equal(sliderMarkCount(formKnob('pointer', { formDivisions: 24 }), 'tickMajor'), 25, 'its divisions and one');
+});
+
+test('a form plays an effect on its ticks one a tick, and on its readout whole, painting with currentColor', () => {
+  const draw = (form, texts) => render(ControlAnatomy, { props: { control: formKnob(form), width: 120, height: 128,
+    partTexts: new Map(Object.entries(texts).map(([part, fields]) => [part, [{ name: 'fx', phase: 'a', effect: effect(fields) }]])) } }).body;
+  const ticks = draw('pointer', { tickMajor: { effect: 'typewriter', stagger: 30 } });
+  const lines = [...ticks.matchAll(/<line [^>]*stroke="currentColor"[^>]*style="([^"]*)"[^>]*data-word-piece=""/g)].map((match) => match[1]);
+  assert.equal(lines.length, 13, 'twelve divisions: thirteen ticks');
+  assert.deepEqual(lines.slice(0, 3).map((style) => / (\d+)ms 1 normal/.exec(style)?.[1]), ['0', '30', '60']);
+  const readout = draw('disc', { labelCurrent: { effect: 'explode' } });
+  assert.match(readout, /<text [^>]*fill="currentColor"[^>]*style="color:[^;]+;animation:ce-tx-/);
+  const still = draw('disc', {});
+  assert.doesNotMatch(still, /data-word-piece/);
+});
+
+test('a knob carried by a component\'s part plays an effect on that part on its first words', () => {
+  const carried = sliderControlSnapshot(knob({ scaleNumberCount: 6 }));
+  const item = { name: 'fx', phase: 'a', effect: effect({ effect: 'typewriter', stagger: 40 }) };
+  const html = render(InteractivePartRenderer, {
+    props: {
+      part: { kind: 'slidercontrol', visible: true, meta: { sliderControl: { control: carried, value: 0.5 } }, _children: { Layout: { x: 0, y: 0, width: 100, height: 100, xUnit: 'px', yUnit: 'px', anchorX: 'left', anchorY: 'top' } } },
+      partName: 'k', parentWidth: 100, parentHeight: 100, textEffect: item,
+    },
+  }).body;
+  const numbers = [...html.matchAll(/<text data-scale-number="" data-word-piece=""[^>]*>([^<]*)<\/text>/g)].map((match) => match[1]);
+  assert.deepEqual(numbers, ['0', '2', '4', '6', '8', '10']);
 });

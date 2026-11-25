@@ -1,6 +1,9 @@
 <script>
   import {SYNTH_SCULPTED} from '../models/synthSculptedSets.js';
-  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true} = $props();
+  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true,readoutFx=''} = $props();
+  // A text effect on the knob's readout (utils/anatomyWords.js): the words played whole, in the
+  // readout's colour through currentColor, so the effect's colour frames reach SVG text.
+  const readoutAttrs = (colour) => (readoutFx ? { fill: 'currentColor', style: `color:${colour};${readoutFx}`, 'data-word-piece': '' } : { fill: colour });
   const uid=$props.id(), paint=n=>`url(#${uid}-${n})`;
   let cfg=$derived(SYNTH_SCULPTED.find(d=>d.id===design));
   let angle=$derived(-135+p*270);
@@ -55,12 +58,12 @@
       {@render scale(69,12,true)}<ellipse cx="80" cy="88" rx="54" ry="43" fill="#071016"/><g transform={`rotate(${angle} 80 76)`} filter={paint('shadow')}><polygon points={star(12,52,49)} fill={paint('glass')} stroke="#d7f0f0" stroke-opacity=".7"/><polygon points="80,27 105,34 125,55 130,80 117,105 95,124 68,126 43,110 29,86 34,58 54,37" fill={face} fill-opacity=".45" stroke="white" stroke-opacity=".35"/><path d="M80 27L95 68L125 55M80 27L66 68L34 58M66 68L43 110M95 68L117 105M66 68L95 68L80 105Z" fill="none" stroke="white" stroke-opacity={.28*depth}/><path d="M78 28h4v32h-4Z" fill={accent}/></g>
     {/if}
   </g>
-  {#if showValue}<text x="80" y="164" text-anchor="middle" fill={legend} font-size="12" font-family="monospace">{readout}</text>{/if}
+  {#if showValue}<text x="80" y="164" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{readout}</text>{/if}
 {:else if meter}
   <g filter={paint('shadow')}><rect x="7" y="11" width="146" height="70" rx={cfg.meterStyle==='needle'?5:10} fill={paint('side')} stroke={face}/><rect x="14" y="17" width="132" height="54" rx="4" fill={cfg.meterStyle==='needle'?'#d9d2b8':housing}/>
   {#if cfg.meterStyle==='needle'}<path d="M24 49Q80 5 136 49" fill="none" stroke="#736b56"/><path d="M80 67V23" transform={`rotate(${-55+p*110} 80 67)`} stroke={accent} stroke-width="2"/>
   {:else}{#each Array.from({length:16}) as _,i}<rect x={18+i*7.7} y={cfg.meterStyle==='split'&&i%2?43:29} width="5" height={cfg.meterStyle==='dots'?5:24} rx={cfg.meterStyle==='dots'?2.5:1} fill={i/16<p?accent:face} opacity={i/16<p?1:.2}/>{/each}{/if}<path d="M18 20h124" stroke="white" stroke-opacity={.16*depth}/></g>
-  {#if showValue}<text x="80" y="98" fill={legend} text-anchor="middle" font-size="10" font-family="monospace">{readout}</text>{/if}
+  {#if showValue}<text x="80" y="98" {...readoutAttrs(legend)} text-anchor="middle" font-size="10" font-family="monospace">{readout}</text>{/if}
 {:else}
   {@const dy=active?4:0}{@const type=cfg.key}
   <g filter={paint('shadow')}><rect x="20" y="13" width="120" height="62" rx={type==='lens'?12:5} fill={paint('side')} stroke={face}/><g transform={`translate(0 ${dy})`}>
