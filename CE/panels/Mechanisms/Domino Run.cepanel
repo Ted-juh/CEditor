@@ -1,0 +1,1426 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "937189cc-3c4a-4d17-9e21-937189cc9371",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Domino Run",
+  "scriptId": "mechanism_dominorun",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1D2229",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [
+    {
+      "id": "mechanism_dominorun_1",
+      "name": "Domino run",
+      "language": "javascript",
+      "source": "// The domino run: each scene ends on a marker, and the marker's action starts the next scene.\ndefineAction('roll', function () { animatePlay('Ball'); });\ndefineAction('ring', function () { animatePlay('Bell'); });\ndefineAction('again', function () { animatePlay('Dominoes'); });\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Wall","id":"ctrl_1743691596000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#2b323b"},{"position":100,"color":"#161a1f"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Shelf","id":"ctrl_1743691596001","controlType":"Label"},
+        "Transform": {"x":30,"y":190,"width":486,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#a87a4a"},{"position":100,"color":"#6a4a2a"}]}},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ramp","id":"ctrl_1743691596002","controlType":"Label"},
+        "Transform": {"x":486,"y":249,"width":190,"height":8,"rotation":33},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#a87a4a"},{"position":100,"color":"#6a4a2a"}]}},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Cup","id":"ctrl_1743691596003","controlType":"Label"},
+        "Transform": {"x":622,"y":312,"width":60,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2240%22%20viewBox%3D%220%200%2060%2040%22%3E%3Cpath%20d%3D%22M2%202%20L%208%2038%20H%2052%20L%2058%202%22%20fill%3D%22none%22%20stroke%3D%22%23c9ced4%22%20stroke-width%3D%224%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bracket","id":"ctrl_1743691596004","controlType":"Label"},
+        "Transform": {"x":590,"y":30,"width":90,"height":6},
+        "Background": {"_children":{"Fill":{"colour":"FF8A929C"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bell","id":"ctrl_1743691596005","controlType":"Label"},
+        "Transform": {"x":600,"y":36,"width":70,"height":70},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2270%22%20height%3D%2270%22%20viewBox%3D%220%200%2070%2070%22%3E%3Crect%20x%3D%2228%22%20y%3D%220%22%20width%3D%2214%22%20height%3D%2210%22%20rx%3D%223%22%20fill%3D%22%238a6a24%22%2F%3E%3Cpath%20d%3D%22M35%208%20C%2018%208%2016%2026%2014%2040%20C%2012%2050%206%2054%204%2058%20H%2066%20C%2064%2054%2058%2050%2056%2040%20C%2054%2026%2052%208%2035%208%20Z%22%20fill%3D%22%23e0bb5a%22%20stroke%3D%22%238a6a24%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2235%22%20cy%3D%2262%22%20r%3D%226%22%20fill%3D%22%238a6a24%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ring1","id":"ctrl_1743691596006","controlType":"Label"},
+        "Transform": {"x":585,"y":21,"width":100,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2246%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ring2","id":"ctrl_1743691596007","controlType":"Label"},
+        "Transform": {"x":585,"y":21,"width":100,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2246%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ring3","id":"ctrl_1743691596008","controlType":"Label"},
+        "Transform": {"x":585,"y":21,"width":100,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2246%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ding","id":"ctrl_1743691596009","controlType":"Label"},
+        "Transform": {"x":520,"y":112,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DING","_children":{"Fill":{"colour":"FFFFE28A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":26}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino1","id":"ctrl_1743691596010","controlType":"Label"},
+        "Transform": {"x":48,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFF4EEE2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino2","id":"ctrl_1743691596011","controlType":"Label"},
+        "Transform": {"x":84,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E1D0"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino3","id":"ctrl_1743691596012","controlType":"Label"},
+        "Transform": {"x":120,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFF4EEE2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino4","id":"ctrl_1743691596013","controlType":"Label"},
+        "Transform": {"x":156,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E1D0"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino5","id":"ctrl_1743691596014","controlType":"Label"},
+        "Transform": {"x":192,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFF4EEE2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino6","id":"ctrl_1743691596015","controlType":"Label"},
+        "Transform": {"x":228,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E1D0"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino7","id":"ctrl_1743691596016","controlType":"Label"},
+        "Transform": {"x":264,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFF4EEE2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino8","id":"ctrl_1743691596017","controlType":"Label"},
+        "Transform": {"x":300,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E1D0"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino9","id":"ctrl_1743691596018","controlType":"Label"},
+        "Transform": {"x":336,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFF4EEE2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino10","id":"ctrl_1743691596019","controlType":"Label"},
+        "Transform": {"x":372,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E1D0"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino11","id":"ctrl_1743691596020","controlType":"Label"},
+        "Transform": {"x":408,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFF4EEE2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Domino12","id":"ctrl_1743691596021","controlType":"Label"},
+        "Transform": {"x":444,"y":132,"width":12,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E1D0"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ball","id":"ctrl_1743691596022","controlType":"Label"},
+        "Transform": {"x":494,"y":166,"width":24,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%2211%22%20fill%3D%22%23e53935%22%2F%3E%3Cpath%20d%3D%22M2%2012%20H%2022%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3Ccircle%20cx%3D%228%22%20cy%3D%227%22%20r%3D%223%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.5%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1743691596023","controlType":"Label"},
+        "Transform": {"x":30,"y":30,"width":400,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOMINO RUN","_children":{"Fill":{"colour":"FFF4EEE2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":28,"letterSpacing":8},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Caption","id":"ctrl_1743691596024","controlType":"Label"},
+        "Transform": {"x":30,"y":72,"width":460,"height":20},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"three scenes; each one’s last marker starts the next","_children":{"Fill":{"colour":"FF8A96A3"},"Font":{"family":"JetBrains Mono","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_dominorun",
+      "name": "Dominoes",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 2400,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_dominorun_1",
+          "controlId": "ctrl_1743691596010",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.025,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.15,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.2916666666666667,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.3416666666666667,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.39166666666666666,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_2",
+          "controlId": "ctrl_1743691596011",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.03333333333333333,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.15833333333333333,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.3375,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.3875,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.4375,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_3",
+          "controlId": "ctrl_1743691596012",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.041666666666666664,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.16666666666666666,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.38333333333333336,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.43333333333333335,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.48333333333333334,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_4",
+          "controlId": "ctrl_1743691596013",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.05,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.175,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.42916666666666664,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4791666666666667,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.5291666666666667,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_5",
+          "controlId": "ctrl_1743691596014",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.058333333333333334,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.18333333333333332,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.475,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.525,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.575,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_6",
+          "controlId": "ctrl_1743691596015",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.06666666666666667,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.19166666666666668,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.5208333333333334,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.5708333333333333,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.6208333333333333,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_7",
+          "controlId": "ctrl_1743691596016",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.075,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.2,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.5666666666666667,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.6166666666666667,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.6666666666666666,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_8",
+          "controlId": "ctrl_1743691596017",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.08333333333333333,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.20833333333333334,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.6125,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.6625,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.7125,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_9",
+          "controlId": "ctrl_1743691596018",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.09166666666666666,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.21666666666666667,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.6583333333333333,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.7083333333333334,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.7583333333333333,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_10",
+          "controlId": "ctrl_1743691596019",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.225,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.7041666666666667,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.7541666666666667,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.8041666666666667,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_11",
+          "controlId": "ctrl_1743691596020",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.10833333333333334,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.23333333333333334,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.75,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.8,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.85,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_12",
+          "controlId": "ctrl_1743691596021",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.11666666666666667,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 0.24166666666666667,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.7958333333333333,
+                "rotate": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.8458333333333333,
+                "rotate": 34,
+                "x": 17.2,
+                "y": 1.6
+              },
+              {
+                "at": 0.8958333333333334,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              },
+              {
+                "at": 1,
+                "rotate": 68,
+                "x": 30.6,
+                "y": 12.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_19",
+          "controlId": "ctrl_1743691596006",
+          "target": "Transform",
+          "start": 0,
+          "length": 10,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_20",
+          "controlId": "ctrl_1743691596007",
+          "target": "Transform",
+          "start": 0,
+          "length": 10,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_21",
+          "controlId": "ctrl_1743691596008",
+          "target": "Transform",
+          "start": 0,
+          "length": 10,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_22",
+          "controlId": "ctrl_1743691596009",
+          "target": "Transform",
+          "start": 0,
+          "length": 10,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        }
+      ],
+      "markers": [
+        {
+          "id": "mk_dominorun_1_1",
+          "at": 2150,
+          "action": "roll"
+        }
+      ]
+    },
+    {
+      "id": "sc_dominorun_2",
+      "name": "Ball",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1700,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_dominorun_13",
+          "controlId": "ctrl_1743691596022",
+          "target": "Transform",
+          "start": 0,
+          "length": 1700,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.12,
+                "x": 24,
+                "y": 22,
+                "rotate": 120
+              },
+              {
+                "at": 0.55,
+                "x": 140,
+                "y": 102,
+                "rotate": 520
+              },
+              {
+                "at": 0.64,
+                "x": 146,
+                "y": 140,
+                "rotate": 560
+              },
+              {
+                "at": 0.68,
+                "opacity": 0
+              },
+              {
+                "at": 0.9,
+                "x": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "markers": [
+        {
+          "id": "mk_dominorun_2_1",
+          "at": 1100,
+          "action": "ring"
+        }
+      ]
+    },
+    {
+      "id": "sc_dominorun_3",
+      "name": "Bell",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1600,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_dominorun_14",
+          "controlId": "ctrl_1743691596005",
+          "target": "Transform",
+          "start": 0,
+          "length": 1600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 0.1,
+                "rotate": 24
+              },
+              {
+                "at": 0.25,
+                "rotate": -18
+              },
+              {
+                "at": 0.4,
+                "rotate": 12
+              },
+              {
+                "at": 0.55,
+                "rotate": -7
+              },
+              {
+                "at": 0.7,
+                "rotate": 3
+              },
+              {
+                "at": 1,
+                "rotate": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_15",
+          "controlId": "ctrl_1743691596006",
+          "target": "Transform",
+          "start": 0,
+          "length": 800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.3,
+                "opacity": 0.9
+              },
+              {
+                "at": 1,
+                "scale": 1.6,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_16",
+          "controlId": "ctrl_1743691596007",
+          "target": "Transform",
+          "start": 160,
+          "length": 800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.3,
+                "opacity": 0.9
+              },
+              {
+                "at": 1,
+                "scale": 1.6,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_17",
+          "controlId": "ctrl_1743691596008",
+          "target": "Transform",
+          "start": 320,
+          "length": 800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.3,
+                "opacity": 0.9
+              },
+              {
+                "at": 1,
+                "scale": 1.6,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_dominorun_18",
+          "controlId": "ctrl_1743691596009",
+          "target": "Transform",
+          "start": 0,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.3,
+                "opacity": 0
+              },
+              {
+                "at": 0.15,
+                "scale": 1.3,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 0.8,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        }
+      ],
+      "markers": [
+        {
+          "id": "mk_dominorun_3_1",
+          "at": 1550,
+          "action": "again"
+        }
+      ]
+    }
+  ]
+}

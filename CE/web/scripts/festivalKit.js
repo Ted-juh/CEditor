@@ -21,11 +21,14 @@ export const text = (effect, way, over = {}) => ({ kind: 'text', effect, way, it
 /** How a collection names what it makes: the hash's seed, the script id's prefix, the GUID's middle. */
 export const FILM_KIND = Object.freeze({ seed: 'ceditor-film', script: 'film', guid: 'f11d-4fe5-a5e5' });
 export const SONG_KIND = Object.freeze({ seed: 'ceditor-song', script: 'song', guid: '50e9-4b00-8c5d' });
+export const MECHANISM_KIND = Object.freeze({ seed: 'ceditor-mechanism', script: 'mechanism', guid: '3c4a-4d17-9e21' });
+export const GALLERY_KIND = Object.freeze({ seed: 'ceditor-gallery', script: 'gallery', guid: '9a11-4e7b-b3c0' });
 
 /**
  * One panel of a collection, its controls numbered from a hash of its id. `clip` puts a clip on the
  * first scene unless told which; `done` makes the panel with one looping scene played when it opens,
- * `scenes` with several, each of them { name, length, trigger?, loop?, clock? }.
+ * `scenes` with several, each of them { name, length, trigger?, loop?, clock?, markers? }. `script`
+ * gives the panel a script of its own, in JavaScript.
  */
 export function panelMaker(id, name, { set = 'carbon-pro', bg = 'FF000000', kind = FILM_KIND } = {}) {
   let hash = 5381;
@@ -35,6 +38,7 @@ export function panelMaker(id, name, { set = 'carbon-pro', bg = 'FF000000', kind
   const clipsByScene = [[]];
   let clipCount = 0;
   const ids = {};
+  const scripts = [];
   const add = (type, cname, x, y, w, h, over = {}) => {
     const control = createControl(type, { Transform: { x, y, width: w, height: h }, ...over });
     control._children.Core.id = `ctrl_${n++}`;
@@ -74,16 +78,22 @@ export function panelMaker(id, name, { set = 'carbon-pro', bg = 'FF000000', kind
       filePath: null,
       controlSet: normalizeControlSet(set),
       animationScenes: sceneList,
+      ...(scripts.length ? { scripts } : {}),
     });
     return panel;
   };
+  const script = (scriptName, source) => {
+    scripts.push({ id: `${kind.script}_${id}_${scripts.length + 1}`, name: scriptName, language: 'javascript', source });
+  };
   const done = (sceneName, length) => make([{ id: `sc_${id}`, name: sceneName, trigger: { type: 'panelOpen' }, length, loop: true, clips: clipsByScene[0] }]);
-  const scenes = (list) => make(list.map(({ name: sceneName, length, trigger = { type: 'panelOpen' }, loop = true, clock = null }, i) => ({
+  const scenes = (list) => make(list.map(({ name: sceneName, length, trigger = { type: 'panelOpen' }, loop = true, clock = null, markers = null }, i) => ({
     id: i === 0 ? `sc_${id}` : `sc_${id}_${i + 1}`, name: sceneName, trigger, length, loop,
     clips: clipsByScene[i] ?? [],
     ...(clock ? { clock: { ...clock, controlId: ids[clock.control] ?? clock.controlId } } : {}),
+    ...(markers ? { markers: markers.map((marker, k) => ({ id: `mk_${id}_${i + 1}_${k + 1}`, ...marker })) } : {}),
   })));
-  return { add, label, clip, done, scenes, ids };
+  const controlById = (controlId) => controls.find((control) => control._children.Core.id === controlId);
+  return { add, label, clip, done, scenes, script, ids, controlById };
 }
 
 /** A pattern on a control's background (or a part's), with these settings. */
@@ -95,6 +105,9 @@ export function pattern(control, fields) {
   else background._children.Patterns._children[key.split('.').pop()] = patch[key];
   return control;
 }
+/** The names of a control's background patterns, in the order they were laid: what a pattern clip's
+ *  target names ('Patterns.<name>'). */
+export const patternNames = (control) => Object.keys(control._children.Background._children.Patterns?._children ?? {});
 export const gradient = (control, angle, stops) => {
   Object.assign(control._children.Background._children.Fill, { solidEnabled: false, gradientEnabled: true,
     gradient: { type: 'linear', angle, stops: stops.map(([position, color]) => ({ position, color })) } });

@@ -1,0 +1,389 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "8dabfb82-3c4a-4d17-9e21-8dabfb828dab",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Clockwork",
+  "scriptId": "mechanism_clockwork",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1A1512",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [
+    {
+      "id": "mechanism_clockwork_1",
+      "name": "Clock",
+      "language": "javascript",
+      "source": "// The clock tells the real time: each hand is a scene of one turn, held where the time puts it,\n// once a second.\nfunction setHands() {\n  var now = new Date();\n  var s = now.getSeconds();\n  var m = now.getMinutes() + s / 60;\n  var h = (now.getHours() % 12) + m / 60;\n  animateSeek('Seconds', s / 60);\n  animateSeek('Minutes', m / 60);\n  animateSeek('Hours', h / 12);\n  after(1000, setHands);\n}\nsetHands();\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Wall","id":"ctrl_1736858498000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#2e241c"},{"position":100,"color":"#140f0c"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Case","id":"ctrl_1736858498001","controlType":"Label"},
+        "Transform": {"x":250,"y":20,"width":220,"height":370},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#6a4426"},{"position":100,"color":"#3a2414"}]}},"Border":{"enabled":false},"Corners":{"radius":24}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Window","id":"ctrl_1736858498002","controlType":"Label"},
+        "Transform": {"x":300,"y":250,"height":124},
+        "Background": {"_children":{"Fill":{"colour":"FF1E140C"},"Border":{"enabled":false},"Corners":{"radius":12}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pendulum","id":"ctrl_1736858498003","controlType":"Label"},
+        "Transform": {"x":300,"y":236,"height":190},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22190%22%20viewBox%3D%220%200%20120%20190%22%3E%3Crect%20x%3D%2258%22%20y%3D%220%22%20width%3D%224%22%20height%3D%22150%22%20fill%3D%22%238a6a24%22%2F%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%22160%22%20r%3D%2222%22%20fill%3D%22%23e0bb5a%22%20stroke%3D%22%238a6a24%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Face","id":"ctrl_1736858498004","controlType":"Label"},
+        "Transform": {"x":270,"y":30,"width":180,"height":180},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22300%22%20viewBox%3D%220%200%20300%20300%22%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22150%22%20r%3D%22144%22%20fill%3D%22%23f4eee2%22%20stroke%3D%22%233a2e22%22%20stroke-width%3D%228%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(0%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(6%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(12%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(18%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(24%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(30%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(36%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(42%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(48%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(54%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(60%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(66%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(72%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(78%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(84%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(90%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(96%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(102%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(108%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(114%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(120%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(126%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(132%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(138%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(144%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(150%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(156%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(162%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(168%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(174%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(180%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(186%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(192%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(198%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(204%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(210%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(216%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(222%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(228%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(234%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(240%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(246%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(252%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(258%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(264%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(270%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(276%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(282%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(288%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(294%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(300%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(306%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(312%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(318%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(324%20150%20150)%22%2F%3E%3Crect%20x%3D%22147%22%20y%3D%2214%22%20width%3D%226%22%20height%3D%2218%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(330%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(336%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(342%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(348%20150%20150)%22%2F%3E%3Crect%20x%3D%22149%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%228%22%20fill%3D%22%233a2e22%22%20transform%3D%22rotate(354%20150%20150)%22%2F%3E%3Ctext%20x%3D%22202.0%22%20y%3D%2267.9%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E1%3C%2Ftext%3E%3Ctext%20x%3D%22240.1%22%20y%3D%22106.0%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E2%3C%2Ftext%3E%3Ctext%20x%3D%22254.0%22%20y%3D%22158.0%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E3%3C%2Ftext%3E%3Ctext%20x%3D%22240.1%22%20y%3D%22210.0%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E4%3C%2Ftext%3E%3Ctext%20x%3D%22202.0%22%20y%3D%22248.1%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E5%3C%2Ftext%3E%3Ctext%20x%3D%22150.0%22%20y%3D%22262.0%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E6%3C%2Ftext%3E%3Ctext%20x%3D%2298.0%22%20y%3D%22248.1%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E7%3C%2Ftext%3E%3Ctext%20x%3D%2259.9%22%20y%3D%22210.0%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E8%3C%2Ftext%3E%3Ctext%20x%3D%2246.0%22%20y%3D%22158.0%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E9%3C%2Ftext%3E%3Ctext%20x%3D%2259.9%22%20y%3D%22106.0%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E10%3C%2Ftext%3E%3Ctext%20x%3D%2298.0%22%20y%3D%2267.9%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E11%3C%2Ftext%3E%3Ctext%20x%3D%22150.0%22%20y%3D%2254.0%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2224%22%20text-anchor%3D%22middle%22%20fill%3D%22%233a2e22%22%3E12%3C%2Ftext%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HourHand","id":"ctrl_1736858498005","controlType":"Label"},
+        "Transform": {"x":270,"y":30,"width":180,"height":180},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22300%22%20viewBox%3D%220%200%20300%20300%22%3E%3Crect%20x%3D%22145%22%20y%3D%2280%22%20width%3D%2210%22%20height%3D%2288%22%20rx%3D%225%22%20fill%3D%22%232a1e14%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22150%22%20r%3D%2210%22%20fill%3D%22%232a1e14%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MinuteHand","id":"ctrl_1736858498006","controlType":"Label"},
+        "Transform": {"x":270,"y":30,"width":180,"height":180},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22300%22%20viewBox%3D%220%200%20300%20300%22%3E%3Crect%20x%3D%22146.5%22%20y%3D%2242%22%20width%3D%227%22%20height%3D%22126%22%20rx%3D%223.5%22%20fill%3D%22%232a1e14%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22150%22%20r%3D%227%22%20fill%3D%22%232a1e14%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SecondHand","id":"ctrl_1736858498007","controlType":"Label"},
+        "Transform": {"x":270,"y":30,"width":180,"height":180},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22300%22%20viewBox%3D%220%200%20300%20300%22%3E%3Crect%20x%3D%22148.5%22%20y%3D%2232%22%20width%3D%223%22%20height%3D%22148%22%20rx%3D%221.5%22%20fill%3D%22%23c62828%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22150%22%20r%3D%223%22%20fill%3D%22%23c62828%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1736858498008","controlType":"Label"},
+        "Transform": {"x":10,"y":150,"width":226,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLOCKWORK","_children":{"Fill":{"colour":"FFE8D2A8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":22,"letterSpacing":4},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Caption","id":"ctrl_1736858498009","controlType":"Label"},
+        "Transform": {"x":480,"y":150,"width":220,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the real time: a script holds each hand’s scene in place","_children":{"Fill":{"colour":"FFA8957A"},"Font":{"family":"JetBrains Mono","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_clockwork",
+      "name": "Pendulum",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 2000,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_clockwork_1",
+          "controlId": "ctrl_1736858498003",
+          "target": "Transform",
+          "start": 0,
+          "length": 2000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": -9,
+                "y": 0
+              },
+              {
+                "at": 0.5,
+                "rotate": 9
+              },
+              {
+                "at": 1,
+                "rotate": -9
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_clockwork_2",
+      "name": "Seconds",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_clockwork_2",
+          "controlId": "ctrl_1736858498007",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 360
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_clockwork_3",
+      "name": "Minutes",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_clockwork_3",
+          "controlId": "ctrl_1736858498006",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 360
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_clockwork_4",
+      "name": "Hours",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_clockwork_4",
+          "controlId": "ctrl_1736858498005",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 360
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

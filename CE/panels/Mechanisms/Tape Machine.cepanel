@@ -1,0 +1,498 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "72aa802e-3c4a-4d17-9e21-72aa802e72aa",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Tape Machine",
+  "scriptId": "mechanism_tapemachine",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF121417",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Body","id":"ctrl_1733776558000","controlType":"Label"},
+        "Transform": {"x":30,"y":20,"width":660,"height":330},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#a3a9b0"},{"position":100,"color":"#5d6269"}]}},"Border":{"enabled":false},"Corners":{"radius":18}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Brushed","id":"ctrl_1733776558001","controlType":"Label"},
+        "Transform": {"x":30,"y":20,"width":660,"height":330},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Corners":{"radius":18},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:scanlines","tint":"FFFFFFFF","opacity":8,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PackL","id":"ctrl_1733776558002","controlType":"Label"},
+        "Transform": {"x":135,"y":65,"width":150,"height":150},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":50,"stops":[{"position":0,"color":"#2a1c12"},{"position":70,"color":"#4a3322"},{"position":100,"color":"#2a1c12"}]}},"Border":{"enabled":false},"Corners":{"radius":75}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PackR","id":"ctrl_1733776558003","controlType":"Label"},
+        "Transform": {"x":460,"y":90,"width":100,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":50,"stops":[{"position":0,"color":"#2a1c12"},{"position":70,"color":"#4a3322"},{"position":100,"color":"#2a1c12"}]}},"Border":{"enabled":false},"Corners":{"radius":50}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReelL","id":"ctrl_1733776558004","controlType":"Label"},
+        "Transform": {"x":110,"y":40,"width":200,"height":200},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22200%22%20viewBox%3D%220%200%20200%20200%22%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2292%22%20fill%3D%22none%22%20stroke%3D%22%232a2d31%22%20stroke-width%3D%2210%22%2F%3E%3Crect%20x%3D%2294%22%20y%3D%2214%22%20width%3D%2212%22%20height%3D%2276%22%20rx%3D%224%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(0%20100%20100)%22%2F%3E%3Crect%20x%3D%2294%22%20y%3D%2214%22%20width%3D%2212%22%20height%3D%2276%22%20rx%3D%224%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(120%20100%20100)%22%2F%3E%3Crect%20x%3D%2294%22%20y%3D%2214%22%20width%3D%2212%22%20height%3D%2276%22%20rx%3D%224%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(240%20100%20100)%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2226%22%20fill%3D%22%23c0c4c8%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%229%22%20fill%3D%22%232a2d31%22%2F%3E%3Crect%20x%3D%2297%22%20y%3D%2274%22%20width%3D%226%22%20height%3D%2212%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(0%20100%20100)%22%2F%3E%3Crect%20x%3D%2297%22%20y%3D%2274%22%20width%3D%226%22%20height%3D%2212%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(120%20100%20100)%22%2F%3E%3Crect%20x%3D%2297%22%20y%3D%2274%22%20width%3D%226%22%20height%3D%2212%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(240%20100%20100)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReelR","id":"ctrl_1733776558005","controlType":"Label"},
+        "Transform": {"x":410,"y":40,"width":200,"height":200},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22200%22%20viewBox%3D%220%200%20200%20200%22%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2292%22%20fill%3D%22none%22%20stroke%3D%22%232a2d31%22%20stroke-width%3D%2210%22%2F%3E%3Crect%20x%3D%2294%22%20y%3D%2214%22%20width%3D%2212%22%20height%3D%2276%22%20rx%3D%224%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(0%20100%20100)%22%2F%3E%3Crect%20x%3D%2294%22%20y%3D%2214%22%20width%3D%2212%22%20height%3D%2276%22%20rx%3D%224%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(120%20100%20100)%22%2F%3E%3Crect%20x%3D%2294%22%20y%3D%2214%22%20width%3D%2212%22%20height%3D%2276%22%20rx%3D%224%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(240%20100%20100)%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2226%22%20fill%3D%22%23c0c4c8%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%229%22%20fill%3D%22%232a2d31%22%2F%3E%3Crect%20x%3D%2297%22%20y%3D%2274%22%20width%3D%226%22%20height%3D%2212%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(0%20100%20100)%22%2F%3E%3Crect%20x%3D%2297%22%20y%3D%2274%22%20width%3D%226%22%20height%3D%2212%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(120%20100%20100)%22%2F%3E%3Crect%20x%3D%2297%22%20y%3D%2274%22%20width%3D%226%22%20height%3D%2212%22%20fill%3D%22%232a2d31%22%20transform%3D%22rotate(240%20100%20100)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tape","id":"ctrl_1733776558006","controlType":"Label"},
+        "Transform": {"x":190,"y":296,"width":340,"height":3},
+        "Background": {"_children":{"Fill":{"colour":"FF3A2A1E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TapeL","id":"ctrl_1733776558007","controlType":"Label"},
+        "Transform": {"x":160,"y":252,"width":70,"height":3,"rotation":52},
+        "Background": {"_children":{"Fill":{"colour":"FF3A2A1E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TapeR","id":"ctrl_1733776558008","controlType":"Label"},
+        "Transform": {"x":492,"y":254,"width":70,"height":3,"rotation":-52},
+        "Background": {"_children":{"Fill":{"colour":"FF3A2A1E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GuideL","id":"ctrl_1733776558009","controlType":"Label"},
+        "Transform": {"x":173,"y":289,"width":18,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FFD8DCE0"},"Border":{"enabled":false},"Corners":{"radius":9}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GuideR","id":"ctrl_1733776558010","controlType":"Label"},
+        "Transform": {"x":515,"y":289,"width":18,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FFD8DCE0"},"Border":{"enabled":false},"Corners":{"radius":9}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Head","id":"ctrl_1733776558011","controlType":"Label"},
+        "Transform": {"x":330,"y":284,"width":60,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#e3e7eb"},{"position":100,"color":"#7d848c"}]}},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VuL","controlSetId":"graphite","id":"ctrl_1733776558012","controlType":"Meter"},
+        "Transform": {"x":60,"y":316,"width":160,"height":20},
+        "Meter": {"segments":14,"trackColour":"FF1E2228","rounded":2}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VuR","controlSetId":"graphite","id":"ctrl_1733776558013","controlType":"Meter"},
+        "Transform": {"x":500,"y":316,"width":160,"height":20},
+        "Meter": {"segments":14,"trackColour":"FF1E2228","rounded":2}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Rec","id":"ctrl_1733776558014","controlType":"Label"},
+        "Transform": {"x":636,"y":40,"width":18,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF5A1A1A"},"Border":{"enabled":false},"Corners":{"radius":9}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RecName","id":"ctrl_1733776558015","controlType":"Label"},
+        "Transform": {"x":590,"y":40,"width":40,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"REC","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":11},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1733776558016","controlType":"Label"},
+        "Transform": {"y":354,"width":720,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TAPE MACHINE","_children":{"Fill":{"colour":"FFD8DCE0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":18,"letterSpacing":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Hint","id":"ctrl_1733776558017","controlType":"Label"},
+        "Transform": {"y":380,"width":720,"height":20},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"press Play: the reels turn with the transport","_children":{"Fill":{"colour":"FF6B7682"},"Font":{"family":"JetBrains Mono"}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_tapemachine",
+      "name": "Idle",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 2400,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_tapemachine_1",
+          "controlId": "ctrl_1733776558017",
+          "target": "Transform",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.35
+              },
+              {
+                "at": 0.5,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.35
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_tapemachine_2",
+      "name": "Beat",
+      "trigger": {
+        "type": "beat",
+        "every": 1
+      },
+      "length": 500,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_tapemachine_2",
+          "controlId": "ctrl_1733776558004",
+          "target": "Transform",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": -120
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tapemachine_3",
+          "controlId": "ctrl_1733776558005",
+          "target": "Transform",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": -120
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tapemachine_4",
+          "controlId": "ctrl_1733776558012",
+          "target": "Value",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0.42
+              },
+              {
+                "at": 0.12,
+                "value": 0.86
+              },
+              {
+                "at": 0.6,
+                "value": 0.58
+              },
+              {
+                "at": 1,
+                "value": 0.46
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tapemachine_5",
+          "controlId": "ctrl_1733776558013",
+          "target": "Value",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0.38
+              },
+              {
+                "at": 0.16,
+                "value": 0.78
+              },
+              {
+                "at": 0.6,
+                "value": 0.62
+              },
+              {
+                "at": 1,
+                "value": 0.4
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_tapemachine_6",
+          "controlId": "ctrl_1733776558014",
+          "target": "Transform",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FF5A1A1A"
+              },
+              {
+                "at": 0.04,
+                "fill": "FFFF3B30",
+                "scale": 1.15
+              },
+              {
+                "at": 0.5,
+                "fill": "FF5A1A1A",
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "fill": "FF5A1A1A"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

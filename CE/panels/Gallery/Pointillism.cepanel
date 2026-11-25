@@ -1,0 +1,831 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "c09efb8a-9a11-4e7b-b3c0-c09efb8ac09e",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Pointillism",
+  "scriptId": "gallery_pointillism",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFFBF8F0",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Sky","id":"ctrl_1781644554000","controlType":"Label"},
+        "Transform": {"width":720,"height":250},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%224.9%22%20cy%3D%225.3%22%20r%3D%221.59%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%222.9%22%20cy%3D%2210.6%22%20r%3D%222.13%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.0%22%20cy%3D%2210.6%22%20r%3D%221.31%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%224.6%22%20cy%3D%2211.5%22%20r%3D%221.50%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%226.3%22%20cy%3D%226.3%22%20r%3D%221.77%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FF8CBCE6","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern2":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%224.9%22%20cy%3D%226.4%22%20r%3D%221.24%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.3%22%20cy%3D%226.6%22%20r%3D%221.85%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%228.2%22%20cy%3D%229.6%22%20r%3D%221.87%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%225.3%22%20cy%3D%224.9%22%20r%3D%222.25%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%226.0%22%20cy%3D%225.7%22%20r%3D%222.02%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFB4D8F4","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":5,"offsetY":3,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern3":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%224.9%22%20cy%3D%227.5%22%20r%3D%221.99%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.8%22%20cy%3D%222.6%22%20r%3D%221.58%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2213.4%22%20cy%3D%228.6%22%20r%3D%221.33%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%225.9%22%20cy%3D%2210.3%22%20r%3D%221.90%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%225.8%22%20cy%3D%225.1%22%20r%3D%222.27%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFF2C6D6","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":10,"offsetY":6,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sun","id":"ctrl_1781644554001","controlType":"Label"},
+        "Transform": {"x":470,"y":50,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Corners":{"radius":60},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%224.9%22%20cy%3D%2212.9%22%20r%3D%221.36%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%226.0%22%20cy%3D%226.6%22%20r%3D%221.29%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.2%22%20cy%3D%223.6%22%20r%3D%221.93%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%229.4%22%20cy%3D%2213.6%22%20r%3D%221.27%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%224.4%22%20cy%3D%222.2%22%20r%3D%221.33%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFFFC53A","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern2":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%224.9%22%20cy%3D%222.0%22%20r%3D%222.11%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%226.5%22%20cy%3D%222.6%22%20r%3D%222.11%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%222.6%22%20r%3D%221.39%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2210.1%22%20cy%3D%227.0%22%20r%3D%222.02%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%224.1%22%20cy%3D%2213.6%22%20r%3D%221.58%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFFF9628","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":5,"offsetY":3,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern3":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%224.9%22%20cy%3D%223.1%22%20r%3D%221.77%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%226.9%22%20cy%3D%2210.6%22%20r%3D%221.83%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2213.6%22%20cy%3D%2213.6%22%20r%3D%221.95%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2210.8%22%20cy%3D%2212.5%22%20r%3D%221.68%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.8%22%20cy%3D%2213.1%22%20r%3D%221.83%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFFFE68A","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":10,"offsetY":6,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FarHill","id":"ctrl_1781644554002","controlType":"Label"},
+        "Transform": {"x":-100,"y":170,"width":560,"height":260},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Corners":{"radius":260},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%224.9%22%20cy%3D%228.6%22%20r%3D%222.23%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%229.1%22%20cy%3D%222.5%22%20r%3D%221.55%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.4%22%20cy%3D%228.5%22%20r%3D%221.45%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%222.2%22%20cy%3D%223.7%22%20r%3D%222.14%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%222.4%22%20cy%3D%2210.2%22%20r%3D%221.99%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FF6FA27C","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern2":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%225.0%22%20cy%3D%229.6%22%20r%3D%221.88%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%2210.5%22%20r%3D%221.27%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%228.6%22%20cy%3D%227.5%22%20r%3D%222.01%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%222.9%22%20cy%3D%229.1%22%20r%3D%221.80%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%222.1%22%20cy%3D%229.6%22%20r%3D%222.24%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FF98C094","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":5,"offsetY":3,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern3":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%225.0%22%20cy%3D%2210.7%22%20r%3D%221.54%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2210.0%22%20cy%3D%226.5%22%20r%3D%222.09%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2213.8%22%20cy%3D%226.5%22%20r%3D%221.47%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.6%22%20cy%3D%222.6%22%20r%3D%221.45%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2213.9%22%20cy%3D%229.0%22%20r%3D%221.39%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFC2D9AE","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":10,"offsetY":6,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NearHill","id":"ctrl_1781644554003","controlType":"Label"},
+        "Transform": {"x":260,"y":200,"width":620,"height":300},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Corners":{"radius":300},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%225.0%22%20cy%3D%224.2%22%20r%3D%222.00%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2212.2%22%20cy%3D%2210.5%22%20r%3D%221.80%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.6%22%20cy%3D%2213.5%22%20r%3D%222.07%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%227.0%22%20cy%3D%225.8%22%20r%3D%221.92%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2212.5%22%20cy%3D%226.1%22%20r%3D%221.54%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FF3F7A44","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern2":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%225.0%22%20cy%3D%225.3%22%20r%3D%221.66%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2212.7%22%20cy%3D%226.5%22%20r%3D%221.53%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%2212.5%22%20r%3D%221.52%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%227.7%22%20cy%3D%2211.2%22%20r%3D%221.57%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2212.2%22%20cy%3D%225.5%22%20r%3D%221.80%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FF6E9E4E","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":5,"offsetY":3,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern3":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%225.0%22%20cy%3D%226.3%22%20r%3D%221.31%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2213.1%22%20cy%3D%222.5%22%20r%3D%221.25%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2214.0%22%20cy%3D%2211.5%22%20r%3D%222.08%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%224.7%22%20r%3D%221.22%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2211.9%22%20cy%3D%225.0%22%20r%3D%222.05%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFA2C062","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":10,"offsetY":6,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Water","id":"ctrl_1781644554004","controlType":"Label"},
+        "Transform": {"y":320,"width":720,"height":85},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%225.0%22%20cy%3D%2211.8%22%20r%3D%221.78%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.3%22%20cy%3D%226.5%22%20r%3D%222.06%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.9%22%20cy%3D%226.4%22%20r%3D%221.58%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2211.9%22%20cy%3D%227.9%22%20r%3D%221.69%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2210.5%22%20cy%3D%222.1%22%20r%3D%222.20%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FF2F6FAF","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern2":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%225.0%22%20cy%3D%2212.9%22%20r%3D%221.43%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%223.8%22%20cy%3D%222.5%22%20r%3D%221.78%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%229.0%22%20cy%3D%225.4%22%20r%3D%222.14%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2212.6%22%20cy%3D%2213.3%22%20r%3D%221.34%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2210.3%22%20cy%3D%2213.5%22%20r%3D%221.35%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FF66A0D6","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":5,"offsetY":3,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern3":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Ccircle%20cx%3D%225.0%22%20cy%3D%2214.0%22%20r%3D%222.18%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%224.2%22%20cy%3D%2210.5%22%20r%3D%221.51%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%222.2%22%20cy%3D%224.4%22%20r%3D%221.60%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2213.2%22%20cy%3D%226.8%22%20r%3D%222.10%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2210.0%22%20cy%3D%2212.9%22%20r%3D%221.60%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFCCE3F4","opacity":100,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":10,"offsetY":6,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1781644554005","controlType":"Label"},
+        "Transform": {"x":20,"y":20,"width":300,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"POINTILLISM","_children":{"Fill":{"colour":"FF2F4A6A"},"Font":{"family":"Space Grotesk","weight":"Light","weightValue":300,"size":26,"letterSpacing":6},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_pointillism",
+      "name": "Painting",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6800,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_pointillism_1",
+          "controlId": "ctrl_1781644554000",
+          "target": "Patterns.pattern1",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.04411764705882353,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.17647058823529413,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_2",
+          "controlId": "ctrl_1781644554000",
+          "target": "Patterns.pattern2",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.07058823529411765,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.20294117647058824,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_3",
+          "controlId": "ctrl_1781644554000",
+          "target": "Patterns.pattern3",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.09705882352941177,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.22941176470588234,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_4",
+          "controlId": "ctrl_1781644554001",
+          "target": "Patterns.pattern1",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.16176470588235295,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.29411764705882354,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_5",
+          "controlId": "ctrl_1781644554001",
+          "target": "Patterns.pattern2",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.18823529411764706,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.3205882352941177,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_6",
+          "controlId": "ctrl_1781644554001",
+          "target": "Patterns.pattern3",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.21470588235294116,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.34705882352941175,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_7",
+          "controlId": "ctrl_1781644554002",
+          "target": "Patterns.pattern1",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.27941176470588236,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.4117647058823529,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_8",
+          "controlId": "ctrl_1781644554002",
+          "target": "Patterns.pattern2",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.3058823529411765,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.43823529411764706,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_9",
+          "controlId": "ctrl_1781644554002",
+          "target": "Patterns.pattern3",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.3323529411764706,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.4647058823529412,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_10",
+          "controlId": "ctrl_1781644554003",
+          "target": "Patterns.pattern1",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.39705882352941174,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.5294117647058824,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_11",
+          "controlId": "ctrl_1781644554003",
+          "target": "Patterns.pattern2",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.4235294117647059,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.5558823529411765,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_12",
+          "controlId": "ctrl_1781644554003",
+          "target": "Patterns.pattern3",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.45,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.5823529411764706,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_13",
+          "controlId": "ctrl_1781644554004",
+          "target": "Patterns.pattern1",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.5147058823529411,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.6470588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_14",
+          "controlId": "ctrl_1781644554004",
+          "target": "Patterns.pattern2",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.5411764705882353,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.6735294117647059,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_15",
+          "controlId": "ctrl_1781644554004",
+          "target": "Patterns.pattern3",
+          "start": 0,
+          "length": 6800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.5676470588235294,
+                "opacity": 0,
+                "scale": 3
+              },
+              {
+                "at": 0.7,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 0.8970588235294118,
+                "opacity": 1,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_pointillism_16",
+          "controlId": "ctrl_1781644554005",
+          "target": "Text",
+          "start": 4300,
+          "length": 1000,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 70,
+            "duration": 200
+          }
+        }
+      ]
+    }
+  ]
+}

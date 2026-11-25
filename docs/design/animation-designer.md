@@ -1754,6 +1754,68 @@ Verified locally:
 - Each song recorded frame by frame in Chromium, its frames checked by eye: the eyes following a
   moving pointer, and the sequencer playing from a running transport at 120 BPM.
 
+## As built: Mechanisms and the Gallery (2026-11-25)
+
+Asked for a wide range of showcases, the owner chose two collections from a list of ten. Every
+drawing is made for these panels. The Gallery's compositions are in the manner of their movements,
+and none is a particular work.
+
+**Mechanisms** (`CE/panels/Mechanisms/`): things that turn, mesh and chain, each moved by something
+other than the clock alone.
+- **Gear Train:** five gears meshed at their teeth ratios on a scene driven by the Drive knob's
+  value. Each gear's drawing starts turned so that one of its gaps meets the other's tooth, and each
+  turns the other way from the one before, by the ratio of their teeth.
+  - The knob is set to drag up and down, a knob's height for its whole range. By default a knob
+    turns by the angle of the pointer about its middle, which a straight drag barely moves.
+- **Tape Machine:** a scene on every beat turns each reel a third of a turn. A three-spoked reel
+  joins up, so the reels turn steadily for as long as the transport runs. Two Meters swing and the
+  record lamp blinks on the beat.
+- **Music Box:** a pinned drum (a scrolling pattern), ten comb teeth plucked in a tune of sixteen
+  steps, the key unwinding.
+- **Domino Run:** three scenes chained by markers. The dominoes stand up and fall, and the last
+  marker's action plays the ball rolling down the ramp. The ball's marker rings the bell, and the
+  bell's marker starts the dominoes again. The panel's script is three `defineAction` lines, each
+  calling `animatePlay`.
+- **Clockwork:** a clock that tells the real time. Each hand is a scene of one turn that nothing
+  plays; the panel's script holds each with `animateSeek` at the time and calls itself again a
+  second later with `after`. A pendulum swings by the clock beside it.
+
+**The Gallery** (`CE/panels/Gallery/`):
+- **Bauhaus:** primary shapes fly in, settle into one composition, cross to a second, and come back.
+- **Primary Grid:** black lines drawn out from their middles, cells taking red, yellow and blue in
+  turn.
+- **Op Art:** two fields of rings, one circling over the other, so the moiré moves. Below, two
+  crossed stripe patterns drawn apart and back together by pattern clips.
+- **Pointillism:** a landscape painted region by region, each region's dots fading in large and
+  settling. A pattern is a mask painted in its tint, so each colour of dots is a pattern of its own;
+  one white-tinted pattern of coloured dots painted white on white.
+- **Art Deco:** a sunburst turning a little each way, gold lines drawn out from the middle, fans
+  opening, the title shining.
+- **Kinetic Mobile:** three hanging arms, each turning about where it hangs (the middle of its
+  box), swinging and dying away a beat behind the one before.
+- **Constructivism:** a red band and a black band slam in from opposite sides, then a circle is
+  stamped and a word pushed in at an angle. The bands are drawn diagonal in their pictures, so a
+  move does not undo a turn.
+
+The four collections share one exporter: `scripts/showcaseCollections.js` says where each panel
+goes and what its file holds, and `scripts/export-showcases.mjs [collection…] [--check]` writes or
+checks them. The films' and songs' scripts are that exporter for one collection, kept by their names.
+
+Verified locally:
+- `test/showcaseCollections.test.js` (new):
+  - The files are the scripts', and every clip, marker and script survives the file.
+  - The gears turn alternately at their teeth ratios on the knob's value.
+  - The reels turn a third of a turn a beat.
+  - The domino script answers each marker by playing a scene the panel has, round and round.
+  - The clock script, run at 22:15:30, holds the hands at the half minute, 15.5 minutes and 10.26
+    hours, and asks to run again in a second.
+  - Every pattern clip moves a pattern its control has.
+- Each panel recorded frame by frame in Chromium, its frames checked by eye:
+  - the gears following a hand on the knob;
+  - the reels on a running transport;
+  - the domino chain going round through its markers and the real script;
+  - the clock at the page's time, its second hand ticking.
+
 ## Open
 
 Nothing for the owner at present.

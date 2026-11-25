@@ -1,0 +1,400 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "ffc5ac2f-9a11-4e7b-b3c0-ffc5ac2fffc5",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Kinetic Mobile",
+  "scriptId": "gallery_kineticmobile",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFF2EFE8",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Rail","id":"ctrl_1761144751000","controlType":"Label"},
+        "Transform": {"x":60,"y":26,"width":600,"height":6},
+        "Background": {"_children":{"Fill":{"colour":"FF222222"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ArmLeft","id":"ctrl_1761144751001","controlType":"Label"},
+        "Transform": {"x":-10,"y":-180,"width":400,"height":420},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22420%22%20viewBox%3D%220%200%20400%20420%22%3E%3Cline%20x1%3D%22200%22%20y1%3D%22210%22%20x2%3D%22200%22%20y2%3D%22300%22%20stroke%3D%22%23222%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%22110%22%20y%3D%22297%22%20width%3D%22180%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%23222%22%2F%3E%3Cline%20x1%3D%22114%22%20y1%3D%22300%22%20x2%3D%22114%22%20y2%3D%22340%22%20stroke%3D%22%23222%22%20stroke-width%3D%221.5%22%2F%3E%3Cline%20x1%3D%22286%22%20y1%3D%22300%22%20x2%3D%22286%22%20y2%3D%22326%22%20stroke%3D%22%23222%22%20stroke-width%3D%221.5%22%2F%3E%3Ccircle%20cx%3D%22114%22%20cy%3D%22366%22%20r%3D%2226%22%20fill%3D%22%23d62828%22%2F%3E%3Cpath%20d%3D%22M286%20326%20C%20312%20336%20308%20370%20286%20380%20C%20264%20370%20260%20336%20286%20326%20Z%22%20fill%3D%22%23141414%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ArmMiddle","id":"ctrl_1761144751002","controlType":"Label"},
+        "Transform": {"x":170,"y":-260,"width":400,"height":580},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22580%22%20viewBox%3D%220%200%20400%20580%22%3E%3Cline%20x1%3D%22200%22%20y1%3D%22290%22%20x2%3D%22200%22%20y2%3D%22460%22%20stroke%3D%22%23222%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%2280%22%20y%3D%22457%22%20width%3D%22240%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%23222%22%2F%3E%3Cline%20x1%3D%2284%22%20y1%3D%22460%22%20x2%3D%2284%22%20y2%3D%22500%22%20stroke%3D%22%23222%22%20stroke-width%3D%221.5%22%2F%3E%3Cline%20x1%3D%22316%22%20y1%3D%22460%22%20x2%3D%22316%22%20y2%3D%22486%22%20stroke%3D%22%23222%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M84%20500%20C%20110%20510%20106%20544%2084%20554%20C%2062%20544%2058%20510%2084%20500%20Z%22%20fill%3D%22%23f2c230%22%2F%3E%3Ccircle%20cx%3D%22316%22%20cy%3D%22506%22%20r%3D%2220%22%20fill%3D%22%231e4fa8%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ArmRight","id":"ctrl_1761144751003","controlType":"Label"},
+        "Transform": {"x":340,"y":-150,"width":400,"height":360},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22360%22%20viewBox%3D%220%200%20400%20360%22%3E%3Cline%20x1%3D%22200%22%20y1%3D%22180%22%20x2%3D%22200%22%20y2%3D%22240%22%20stroke%3D%22%23222%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%22120%22%20y%3D%22237%22%20width%3D%22160%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%23222%22%2F%3E%3Cline%20x1%3D%22124%22%20y1%3D%22240%22%20x2%3D%22124%22%20y2%3D%22280%22%20stroke%3D%22%23222%22%20stroke-width%3D%221.5%22%2F%3E%3Cline%20x1%3D%22276%22%20y1%3D%22240%22%20x2%3D%22276%22%20y2%3D%22266%22%20stroke%3D%22%23222%22%20stroke-width%3D%221.5%22%2F%3E%3Ccircle%20cx%3D%22124%22%20cy%3D%22296%22%20r%3D%2216%22%20fill%3D%22%23141414%22%2F%3E%3Ccircle%20cx%3D%22276%22%20cy%3D%22300%22%20r%3D%2234%22%20fill%3D%22%23d62828%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1761144751004","controlType":"Label"},
+        "Transform": {"y":360,"width":720,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"KINETIC MOBILE","_children":{"Fill":{"colour":"FF222222"},"Font":{"family":"Space Grotesk","weight":"Light","weightValue":300,"size":18,"letterSpacing":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_kineticmobile",
+      "name": "Breeze",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 7000,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_kineticmobile_1",
+          "controlId": "ctrl_1761144751001",
+          "target": "Transform",
+          "start": 0,
+          "length": 7000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 0.08571428571428572,
+                "rotate": 14
+              },
+              {
+                "at": 0.17142857142857143,
+                "rotate": -11
+              },
+              {
+                "at": 0.2571428571428571,
+                "rotate": 8
+              },
+              {
+                "at": 0.34285714285714286,
+                "rotate": -6
+              },
+              {
+                "at": 0.42857142857142855,
+                "rotate": 4
+              },
+              {
+                "at": 0.5142857142857142,
+                "rotate": -2.5
+              },
+              {
+                "at": 0.6,
+                "rotate": 1.2
+              },
+              {
+                "at": 0.6857142857142857,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_kineticmobile_2",
+          "controlId": "ctrl_1761144751002",
+          "target": "Transform",
+          "start": 0,
+          "length": 7000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 0.05,
+                "rotate": 0
+              },
+              {
+                "at": 0.1357142857142857,
+                "rotate": -14
+              },
+              {
+                "at": 0.22142857142857142,
+                "rotate": 11
+              },
+              {
+                "at": 0.30714285714285716,
+                "rotate": -8
+              },
+              {
+                "at": 0.39285714285714285,
+                "rotate": 6
+              },
+              {
+                "at": 0.4785714285714286,
+                "rotate": -4
+              },
+              {
+                "at": 0.5642857142857143,
+                "rotate": 2.5
+              },
+              {
+                "at": 0.65,
+                "rotate": -1.2
+              },
+              {
+                "at": 0.7357142857142858,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_kineticmobile_3",
+          "controlId": "ctrl_1761144751003",
+          "target": "Transform",
+          "start": 0,
+          "length": 7000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 0.1,
+                "rotate": 0
+              },
+              {
+                "at": 0.18571428571428572,
+                "rotate": 14
+              },
+              {
+                "at": 0.2714285714285714,
+                "rotate": -11
+              },
+              {
+                "at": 0.35714285714285715,
+                "rotate": 8
+              },
+              {
+                "at": 0.44285714285714284,
+                "rotate": -6
+              },
+              {
+                "at": 0.5285714285714286,
+                "rotate": 4
+              },
+              {
+                "at": 0.6142857142857143,
+                "rotate": -2.5
+              },
+              {
+                "at": 0.7,
+                "rotate": 1.2
+              },
+              {
+                "at": 0.7857142857142857,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_kineticmobile_4",
+          "controlId": "ctrl_1761144751004",
+          "target": "Text",
+          "start": 400,
+          "length": 1200,
+          "effect": {
+            "kind": "text",
+            "effect": "crossfade",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "stagger": 40,
+            "duration": 500
+          }
+        }
+      ]
+    }
+  ]
+}
