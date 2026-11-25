@@ -64,7 +64,7 @@
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
-  import { sceneControlIds } from '../utils/sceneFormat.js';
+  import { sceneControlIds, sceneMoveReach } from '../utils/sceneFormat.js';
   import { SCENE_STAGE, createSceneRunStore, registerSceneRun } from '../stores/sceneStage.js';
   import { partRectOf, pointInRect, pointerInRect } from '../utils/sceneClock.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
@@ -409,8 +409,10 @@
     const scened = sceneControlIds(panel?.animationScenes);
     return scened.size ? new Set([...($scriptTouchedControlIds ?? []), ...scened]) : $scriptTouchedControlIds;
   });
+  // And covers everywhere a scene moves it, so a control it slides under is not folded beneath it.
+  let sceneMoves = $derived(sceneMoveReach(panel?.animationScenes));
   let previewPlan = $derived(buildSceneryRenderPlan(panel,
-    { preview: true, fold: true, neverFold }));
+    { preview: true, fold: true, neverFold, moves: sceneMoves }));
 
   // The panel's scenes, playing on their triggers (stores/sceneStage.js, utils/sceneRuntime.js): in
   // Preview and the plug-in, which are this surface. Not inside the Animation Designer's stage, which

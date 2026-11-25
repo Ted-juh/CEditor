@@ -95,12 +95,12 @@ function groundItem(layer, controls) {
  * the order planSceneryFold's rule is stated against: it folds a control only when nothing already
  * live overlaps it, so everything left live belongs on top of everything folded.
  */
-function pushLayerControls(items, layerName, controls, folding, neverFold) {
+function pushLayerControls(items, layerName, controls, folding, neverFold, moves) {
   if (!folding) {
     for (const control of controls) items.push(controlItem(control));
     return;
   }
-  const { ground, live } = planSceneryFold(controls, neverFold);
+  const { ground, live } = planSceneryFold(controls, neverFold, moves);
   if (ground.length > 0) items.push(groundItem(layerName, ground));
   for (const control of live) items.push(controlItem(control));
 }
@@ -112,11 +112,13 @@ function pushLayerControls(items, layerName, controls, folding, neverFold) {
  *        preview passes true)
  * @param neverFold ids that must stay live whatever the component model says — the controls a
  *        script has written to. See stores/scriptTouchedControls.js.
+ * @param moves how far a panel's scenes move the controls they move (sceneFormat.js sceneMoveReach):
+ *        such a control covers everywhere it goes, so nothing it passes under is folded beneath it.
  * @returns {{ items: Array, scenery: Map }} items are
  *          `{ type: 'scenery' | 'ground' | 'control', ... }`;
  *          `scenery` maps layer name -> { folded, refusals } for the dock to report.
  */
-export function buildSceneryRenderPlan(panel, { preview = false, fold = false, neverFold = null } = {}) {
+export function buildSceneryRenderPlan(panel, { preview = false, fold = false, neverFold = null, moves = null } = {}) {
   const layers = normalizePanelLayers(panel?.layers, panel?.controls ?? []);
   const names = layerNames(layers);
   const ordered = sortControlsForRender(panel?.controls ?? [], names);
@@ -139,7 +141,7 @@ export function buildSceneryRenderPlan(panel, { preview = false, fold = false, n
     if (controls.length === 0) continue;
 
     if (!sceneryLayerIsCompiled(layer, { preview })) {
-      pushLayerControls(items, layer.name, controls, fold, neverFold);
+      pushLayerControls(items, layer.name, controls, fold, neverFold, moves);
       continue;
     }
 
@@ -155,7 +157,7 @@ export function buildSceneryRenderPlan(panel, { preview = false, fold = false, n
     // the refusals are mostly captions, captions are what the ground was built for, and refusing
     // them from the image is not a reason to render 189 of them as components.
     const liveIds = new Set(result.live.map(c => c._children.Core.id));
-    pushLayerControls(items, layer.name, controls.filter(c => liveIds.has(c._children.Core.id)), fold, neverFold);
+    pushLayerControls(items, layer.name, controls.filter(c => liveIds.has(c._children.Core.id)), fold, neverFold, moves);
   }
 
   return { items, scenery };

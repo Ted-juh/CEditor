@@ -261,3 +261,33 @@ export function sceneControlIds(scenes) {
   }
   return ids;
 }
+
+/**
+ * How far a panel's scenes move the controls they move whole (keyframe clips on `Transform`): by id,
+ * `{ left, right, up, down, scale, turns }` — the furthest its frames take it each way in px, the
+ * largest it is scaled to, and whether it turns. A control that moves covers more than its box:
+ * everywhere it goes. The still ground folds a control only where nothing live covers it
+ * (sceneryModel.js planSceneryFold), so a wall a door slides behind has to know the door gets there.
+ */
+export function sceneMoveReach(scenes) {
+  const reach = new Map();
+  for (const scene of Array.isArray(scenes) ? scenes : []) {
+    for (const clip of Array.isArray(scene?.clips) ? scene.clips : []) {
+      if (!clip?.controlId || clip.target !== 'Transform' || clip.effect?.kind !== 'keyframes') continue;
+      const id = String(clip.controlId);
+      const r = reach.get(id) ?? { left: 0, right: 0, up: 0, down: 0, scale: 1, turns: false };
+      for (const frame of Array.isArray(clip.effect.frames) ? clip.effect.frames : []) {
+        const x = Number(frame?.x);
+        const y = Number(frame?.y);
+        const scale = Number(frame?.scale);
+        const rotate = Number(frame?.rotate);
+        if (Number.isFinite(x)) { r.left = Math.max(r.left, -x); r.right = Math.max(r.right, x); }
+        if (Number.isFinite(y)) { r.up = Math.max(r.up, -y); r.down = Math.max(r.down, y); }
+        if (Number.isFinite(scale)) r.scale = Math.max(r.scale, scale);
+        if (Number.isFinite(rotate) && rotate !== 0) r.turns = true;
+      }
+      reach.set(id, r);
+    }
+  }
+  return reach;
+}
