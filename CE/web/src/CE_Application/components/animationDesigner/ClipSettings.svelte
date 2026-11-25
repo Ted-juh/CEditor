@@ -98,7 +98,7 @@
     <div class="acts">
       <input class="txt" type="text" bind:value={presetName} aria-label="Preset name" />
       <button type="button" class="tb" data-save-clip-preset disabled={!presetName.trim()} onclick={() => onsavepreset(presetName.trim())}
-              title={isValue ? 'Keep this effect in your library, to drop on any knob or slider' : 'Keep this effect in your library, to drop on any control'}>Save as preset</button>
+              title={isValue ? 'Keep this effect in your library, to drop on any knob, slider, Macro or meter' : 'Keep this effect in your library, to drop on any control'}>Save as preset</button>
       {#if !own}<button type="button" class="tb danger" onclick={ondelete}>Remove clip</button>{/if}
     </div>
   </div>

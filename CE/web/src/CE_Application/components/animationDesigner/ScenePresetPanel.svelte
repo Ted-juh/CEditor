@@ -25,7 +25,7 @@
     reason = '';
   });
   let takers = $derived(repeatable ? candidatesFor(preset.slots[0], controls) : []);
-  let what = $derived(preset?.slots?.[0]?.needs?.value ? 'knob or slider' : preset?.slots?.[0]?.needs?.text ? 'control with words' : 'control');
+  let what = $derived(preset?.slots?.[0]?.needs?.value ? 'knob, slider, Macro or meter' : preset?.slots?.[0]?.needs?.text ? 'control with words' : 'control');
 
   function setSlot(index, controlId) {
     mapping = mapping.map((entry, i) => (i === index ? controlId : entry));

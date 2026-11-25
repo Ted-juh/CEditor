@@ -953,6 +953,39 @@ Verified locally:
   panel's one knob, and a scene saved as a preset comes back as a new scene with its clips on the same
   controls, offered same type first.
 
+## As built: value effects on the Macro and meters (2026-11-25)
+
+Step 6 did knobs first, and sliders came with them. The two other families that draw a value of
+their own now take the same effects:
+
+- **The Macro.** It has no Behavior section; its position is `Macro.__value`, or `value`.
+  `MacroRenderer` takes `drawnValue` for its ring, its pointer and its lanes' bars. A Macro that
+  hosts its control set's knob passes the drawn value to that knob's runtime.
+  - Its numbers do not move: the figure under the knob and each lane's percentage keep reading
+    the real position. WebKitGTK showed the figure at 99 mid-sweep before that was separated,
+    which broke the promise the other families keep.
+- **Meters and progress bars.** Their position is `meterPosition` of `Meter.__value` or `value`,
+  on a linear or decibel scale. `MeterRenderer`, and the meter forms and meter parts the anatomy
+  draws, take the drawn value as the needle's or the bar's place, 0 to 1 of the scale. A sweep
+  up and back is the power-up needle test. The meter draws no reading of its own; its labels are
+  controls of their own, so nothing there changes.
+- **Which controls.** `controlDrawsValue` takes the Macro, the Meter and the ProgressBar by type.
+  `liveDrawnValue` says what each draws now, to start from and hand back to: the Macro's position,
+  the meter's place on its scale, or a knob's or slider's signals. Every refusal now names the four
+  families.
+- **Their own animations.** These work as on a knob: the keyframe catalogue does not care which
+  family it is.
+
+Verified locally:
+- `test/valueDrawnFamilies.test.js` (new): the families, and each one's live value, a decibel scale
+  included;
+- `scenePlayback`: the Macro and a meter sweep with a scene and hand back exactly, the Macro's number
+  unchanged at the peak. A meter's own value animation plays from `ce.anim.play` and returns to its
+  reading;
+- `macroSetKnob`, `anatomyForms`, `panelMotion` and `animationDesigner`;
+- WebKitGTK 2.52: the Macro 0.28 → 0.998 → 0.28 and the meter 0.72 → 0.997 → 0.72, the number holding at
+  28.
+
 ## Open
 
 Nothing for the owner at present.

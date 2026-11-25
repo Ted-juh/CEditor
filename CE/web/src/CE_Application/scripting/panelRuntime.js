@@ -5629,7 +5629,7 @@ function animateEffectImpl(target, effectName, opts, scriptId = '') {
   if (!named) return false;
   const place = isText && named.place === 'Transform' ? 'Text' : isValue && named.place === 'Transform' ? 'Value' : named.place;
   if (isValue && (place !== 'Value' || !controlDrawsValue(named.control))) {
-    addScriptTrace('error', '', `${verb}: "${entry.label}" moves what a knob's or a slider's value draws; ${named.controlName} draws none there.`);
+    addScriptTrace('error', '', `${verb}: "${entry.label}" moves what a value draws — on a knob, a slider, a Macro or a meter; ${named.controlName} draws none there.`);
     return false;
   }
   if (!isValue && place === 'Value') { addScriptTrace('error', '', `${verb}: "${entry.label}" does not play on what a value draws; give ${named.controlName} or one of its parts.`); return false; }

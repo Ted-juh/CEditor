@@ -272,7 +272,7 @@
     else if (place === 'Value') place = entry.target && entry.target !== 'Value' ? entry.target : 'Transform';
     if (entry.effect.kind === 'text' && !String(place).startsWith('Parts.')) place = 'Text';
     if (place === 'Text' && !control._children?.Text) { note = `${control._children.Core.name || controlId} has no words of its own: a text effect plays on a Label, or on a part with text.`; return; }
-    if (place === 'Value' && !controlDrawsValue(control)) { note = `${control._children.Core.name || controlId} draws no value to move: a value effect plays on a knob or a slider.`; return; }
+    if (place === 'Value' && !controlDrawsValue(control)) { note = `${control._children.Core.name || controlId} draws no value to move: a value effect plays on a knob, a slider, a Macro or a meter.`; return; }
     let base = scene;
     let list = panelScenes;
     if (!base) {
@@ -376,7 +376,7 @@
     if (!clip) return;
     const kind = clip.effect.kind;
     const { preset, reason } = saveEffectAsPreset(clipAnimation(clip), { name, category: kind === 'text' ? 'Text' : kind === 'value' ? 'Value' : 'Move' });
-    note = reason ?? `${preset.name} is in your library (Mine), to drop on any ${kind === 'value' ? 'knob or slider' : 'control'}.`;
+    note = reason ?? `${preset.name} is in your library (Mine), to drop on any ${kind === 'value' ? 'knob, slider, Macro or meter' : 'control'}.`;
   }
 </script>
 

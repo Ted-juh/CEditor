@@ -214,7 +214,7 @@ export function presetDoesNotFit(preset, control) {
   if (missingSections.length) return `It animates this control's ${missingSections.join(' and ')}, and it has none.`;
   if (needs.states.length && !control._children.States) return `It plays on ${needs.states.join(', ')}, and this control has no states.`;
   if (Object.values(preset.animations ?? {}).some((node) => node?.kind === 'value') && !controlDrawsValue(control)) {
-    return 'It moves what a value draws, and this control draws none: it goes on a knob or a slider.';
+    return 'It moves what a value draws, and this control draws none: it goes on a knob, a slider, a Macro or a meter.';
   }
   return '';
 }

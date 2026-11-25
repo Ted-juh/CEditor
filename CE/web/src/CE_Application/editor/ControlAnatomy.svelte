@@ -13,7 +13,7 @@
   import { meterFigures } from '../utils/meterParts.js';
   // `captionShown`: a Label of its own shows this button's text (utils/attachedLabels.js
   // textShownOwners), so a key or switch drawn from its parts prints no caption and fills its box.
-  // `drawnValue`: what a value effect draws instead of a knob's value, 0 to 1, or null (step 6).
+  // `drawnValue`: what a value effect draws instead of a knob's value or a meter's place, 0 to 1, or null (step 6).
   let { control, runtime = null, drawnValue = null, width = 160, height = 160, checked = false, label = '', captionShown = false } = $props();
   const uid = $props.id();
   let core = $derived(control?._children?.Core ?? {});
@@ -30,7 +30,7 @@
   let signals = $derived(runtime?.signals ?? {});
   let value = $derived(anatomyValue(control, signals));
   let cfg = $derived(meterConfig(control));
-  let p = $derived(meter ? meterPosition(cfg.__value ?? cfg.value, cfg) : (Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : value.normalized));
+  let p = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : (meter ? meterPosition(cfg.__value ?? cfg.value, cfg) : value.normalized));
   let active = $derived(toggle ? checked : signals.pressed === true);
   let depth = $derived(Math.max(0, Math.min(1, Number(core.formDepth ?? 60) / 100)));
   let detail = $derived(Math.max(4, Math.min(48, Math.round(Number(core.formDivisions) || 12))));

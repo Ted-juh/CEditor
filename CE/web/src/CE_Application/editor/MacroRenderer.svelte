@@ -12,7 +12,9 @@
 
   // ownKnob false: the canvas draws the set's knob under this (utils/macroKnob.js), and this draws
   // only the caption, the readout and the lanes.
-  let { control = null, width = 0, height = 0, dragging = false, idPrefix = '', series = null, tone = (colour) => colour, ownKnob = true } = $props();
+  // `drawnValue`: what a value effect draws instead of the Macro's position, 0 to 1, or null
+  // (utils/valueDrawn.js): its ring, its knob and the lanes it drives move with it; nothing is sent.
+  let { control = null, width = 0, height = 0, dragging = false, idPrefix = '', series = null, tone = (colour) => colour, ownKnob = true, drawnValue = null } = $props();
   let svgId = $derived(`macro-${idPrefix || String(control?._children?.Core?.id ?? 'x')}`);
 
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -33,7 +35,10 @@
   let palette = $derived(Array.isArray(series) && series.length >= 6 ? SERIES_ORDER.map((n, i) => css(series[n - 1], LANE_PALETTE[i])) : LANE_PALETTE);
 
   let cfg = $derived(macroConfig(control));
-  let value = $derived(cfg.__value !== undefined ? Math.max(0, Math.min(1, n(cfg.__value, 0.5))) : macroValue(control));
+  // The Macro's position, which its numbers always say; and where it is drawn, which a value effect
+  // may move for a moment: the ring, the pointer and the lanes' bars, never what they read.
+  let realValue = $derived(cfg.__value !== undefined ? Math.max(0, Math.min(1, n(cfg.__value, 0.5))) : macroValue(control));
+  let value = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : realValue);
   let slots = $derived(macroSlots(control));
   let geom = $derived(macroGeometry(width, height, control));
 
@@ -67,10 +72,11 @@
     const labelW = Math.round(Math.min(geom.lanesW * 0.46, Math.max(70, geom.lanesW - valW - 90)));
     return slots.map((s, i) => {
       const val = s.enabled ? macroSlotValue(value, s) : 0;
+      const realVal = s.enabled ? macroSlotValue(realValue, s) : 0;
       const trackX = geom.lanesX0 + labelW + 8;
       const trackW = Math.max(8, geom.lanesX0 + geom.lanesW - valW - 6 - trackX);
       return {
-        i, s, val,
+        i, s, val, realVal,
         y: y0 + i * rowH, rowH, labelW,
         trackX, trackW, valW,
         colour: s.colour ? css(s.colour) : palette[i % palette.length],
@@ -86,7 +92,7 @@
     : { major: [], minor: [] });
 </script>
 
-<svg class="macro" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
+<svg class="macro" data-drawn={value.toFixed(4)} width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <defs>
     <radialGradient id={`${svgId}-face`} cx="50%" cy="36%" r="72%">
       <stop offset="0" stop-color="rgba(255,255,255,0.14)" />
@@ -108,7 +114,7 @@
 
   <!-- Knob readout / label -->
   {#if cfg.showValues !== false}
-    <text x={geom.knobCX} y={geom.knobCY + geom.knobR + 15} font-size={Math.max(12, geom.knobR * 0.42)} fill={tone('rgba(240,240,245,0.95)')} text-anchor="middle" style="font-variant-numeric:tabular-nums;font-weight:700">{Math.round(value * 100)}</text>
+    <text x={geom.knobCX} y={geom.knobCY + geom.knobR + 15} font-size={Math.max(12, geom.knobR * 0.42)} fill={tone('rgba(240,240,245,0.95)')} text-anchor="middle" style="font-variant-numeric:tabular-nums;font-weight:700">{Math.round(realValue * 100)}</text>
   {/if}
   {#if cfg.label}
     <text x={geom.knobCX} y={geom.knobCY - geom.knobR - 7} font-size={labelSize} fill={labelCss} text-anchor="middle" style="letter-spacing:.12em;text-transform:uppercase" opacity="0.85">{cfg.label}</text>
@@ -134,7 +140,7 @@
     {/each}
     <rect x={row.trackX} y={cy - 4} width={Math.max(0, row.val * row.trackW)} height="8" rx="4" fill={row.colour} opacity={row.s.enabled ? 1 : 0.4} />
     {#if row.valW > 0}
-      <text x={geom.lanesX0 + geom.lanesW} y={cy} font-size={Math.max(8, labelSize - 1)} fill={tone('rgba(232,232,238,1)')} text-anchor="end" dominant-baseline="middle" style="font-variant-numeric:tabular-nums">{Math.round(row.val * 100)}%</text>
+      <text x={geom.lanesX0 + geom.lanesW} y={cy} font-size={Math.max(8, labelSize - 1)} fill={tone('rgba(232,232,238,1)')} text-anchor="end" dominant-baseline="middle" style="font-variant-numeric:tabular-nums">{Math.round(row.realVal * 100)}%</text>
     {/if}
   {/each}
 </svg>

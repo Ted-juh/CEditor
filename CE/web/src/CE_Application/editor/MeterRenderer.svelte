@@ -11,7 +11,9 @@
     meterArcPath, meterArcAngle, meterPolar,
   } from '../utils/meterLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  // `drawnValue`: where a value effect puts the needle or the bar instead, 0 to 1 of the scale, or
+  // null (utils/valueDrawn.js) — a power-up sweep; the reading and the peak stay the meter's own.
+  let { control = null, width = 0, height = 0, drawnValue = null } = $props();
 
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
     const s = String(hex ?? '').replace(/^#/, '').trim();
@@ -28,7 +30,7 @@
 
   let cfg = $derived(meterConfig(control));
   let value = $derived(cfg.__value !== undefined ? cfg.__value : cfg.value);
-  let pos = $derived(meterPosition(value, cfg));
+  let pos = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : meterPosition(value, cfg));
   let peak = $derived(cfg.__peak); // normalized 0..1, or undefined in static editor view
   let orientation = $derived(String(cfg.orientation ?? 'horizontal'));
   let vertical = $derived(orientation === 'vertical');
@@ -92,7 +94,7 @@
   });
 </script>
 
-<div class="meter" class:vertical style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px;`}>
+<div class="meter" data-drawn={pos.toFixed(4)} class:vertical style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px;`}>
   <div class="meter-body">
     {#if arc}
       <svg class="meter-arc" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} preserveAspectRatio="xMidYMid meet">

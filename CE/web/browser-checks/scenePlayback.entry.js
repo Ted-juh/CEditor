@@ -49,9 +49,16 @@ function panel(prefix) {
   dial._children.Core.controlForm = 'disc';
   // And a linear slider, which the same renderer draws.
   const fader = place(createControl('Slider'), `${prefix}fader`, 'Fader', 220, 255, 180, 24);
+  // A Macro and a meter, which draw a value of their own; the meter has its own needle test too.
+  const macro = place(createControl('Macro'), `${prefix}macro`, 'Macro', 20, 300, 160, 160);
+  const vu = place(createControl('Meter'), `${prefix}vu`, 'VU', 220, 300, 200, 40);
+  vu._children.Animations = { _type: 'Animations', enabled: true, _children: { needle: {
+    _type: 'Animation', name: 'needle', enabled: true, kind: 'value', duration: 1000, delay: 0, iterations: 1, easing: 'inOutCubic',
+    frames: sceneEffect('value:sweep').effect.frames, trigger: { type: 'script' }, targets: [{ path: 'Value' }],
+  } } };
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 280, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 480, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -70,7 +77,8 @@ function panel(prefix) {
         clips: [clip('c7', `${prefix}gauge`, 'Transform', 0, 1000, fade)] },
       // Step 6: what the Level knob's value draws, swept round to full and handed back.
       { id: 'sc_sweep', name: 'Sweep', trigger: { type: 'script' }, length: 1200, loop: false,
-        clips: [clip('c8', `${prefix}level`, 'Value', 0, 1200, ringSweep), clip('c9', `${prefix}dial`, 'Value', 0, 1200, ringSweep), clip('c10', `${prefix}fader`, 'Value', 0, 1200, ringSweep)] },
+        clips: [clip('c8', `${prefix}level`, 'Value', 0, 1200, ringSweep), clip('c9', `${prefix}dial`, 'Value', 0, 1200, ringSweep), clip('c10', `${prefix}fader`, 'Value', 0, 1200, ringSweep),
+          clip('c11', `${prefix}macro`, 'Value', 0, 1200, ringSweep), clip('c12', `${prefix}vu`, 'Value', 0, 1200, ringSweep)] },
     ],
   };
 }
@@ -88,7 +96,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -115,7 +123,12 @@ window.__scenes = {
     const at = (round, square) => Number(pointer?.getAttribute(round) ?? pointer?.getAttribute(square));
     if (svg) return { drawn: Number(svg.dataset.drawn), x: at('cx', 'x'), y: at('cy', 'y') };
     const form = root(id)?.querySelector('svg.anatomy');
-    return form ? { drawn: Number(form.dataset.position) } : null;
+    if (form) return { drawn: Number(form.dataset.position) };
+    // The Macro and a meter say where they draw too (MacroRenderer, MeterRenderer).
+    const own = root(id)?.querySelector('svg.macro, .meter');
+    // The Macro's number under its knob: what it reads, which an effect leaves alone.
+    const reading = own?.querySelector('text[style*="font-weight:700"]')?.textContent ?? null;
+    return own ? { drawn: Number(own.dataset.drawn), reading } : null;
   },
   /** A script's call, as a panel script makes it; `done` is recorded under `doneKey`. */
   script: (name, args, doneKey = '') => {

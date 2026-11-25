@@ -12,6 +12,7 @@
  *   - a control's value moves the scene it drives, from where the value was at the start (step 5c)
  *   - a ring sweep moves what a knob's value draws round to full and hands back to the value (step 6)
  *   - a knob's own value animation loops while it is hovered, and hands back when the pointer leaves
+ *   - the Macro's ring and a meter sweep with the scene, and a meter's own needle test plays from a script
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -195,6 +196,8 @@ try {
   const level0 = await s('drawn', 'level');
   const dial0 = await s('drawn', 'dial');
   const fader0 = await s('drawn', 'fader');
+  const macro0 = await s('drawn', 'macro');
+  const vu0 = await s('drawn', 'vu');
   await page.evaluate(() => window.__scenes.script('animatePlay', ['Sweep', {}], 'sweep'));
   await page.waitForTimeout(90);
   const sweepEarly = await s('drawn', 'level');
@@ -202,10 +205,14 @@ try {
   const sweepPeak = await s('drawn', 'level');
   const dialPeak = await s('drawn', 'dial');
   const faderPeak = await s('drawn', 'fader');
+  const macroPeak = await s('drawn', 'macro');
+  const vuPeak = await s('drawn', 'vu');
   await page.waitForTimeout(800);
   const sweepAfter = await s('drawn', 'level');
   const dialAfter = await s('drawn', 'dial');
   const faderAfter = await s('drawn', 'fader');
+  const macroAfter = await s('drawn', 'macro');
+  const vuAfter = await s('drawn', 'vu');
   const sweepDone = await page.evaluate(() => window.__scenes.dones.sweep);
   check('a ring sweep moves what a knob\'s value draws round to full, then hands back to the value', () => {
     assert.ok(level0.drawn > 0.3 && level0.drawn < 0.95, `the knob's own value first: ${JSON.stringify(level0)}`);
@@ -231,9 +238,30 @@ try {
   await page.evaluate(() => window.__scenes.script('animateSeek', ['Sweep', 1]));
   await page.waitForTimeout(60);
   const sweepEnd = await s('drawn', 'level');
+  check('the Macro\'s ring and a meter sweep with the scene, and hand back to their own values', () => {
+    assert.ok(Number.isFinite(macro0?.drawn) && Number.isFinite(vu0?.drawn), JSON.stringify({ macro0, vu0 }));
+    assert.ok(macroPeak.drawn > 0.9, `the Macro round to full: ${macroPeak.drawn}`);
+    assert.ok(vuPeak.drawn > 0.9, `the meter to the top: ${vuPeak.drawn}`);
+    assert.equal(macroAfter.drawn, macro0.drawn);
+    assert.equal(macroPeak.reading, macro0.reading, `its number still says what it is: ${macro0.reading}`);
+    assert.equal(vuAfter.drawn, vu0.drawn);
+  });
   check('held by a script mid-sweep, the knob draws full; at the end, its value', () => {
     assert.equal(sweepHeld.drawn, 1);
     assert.equal(sweepEnd.drawn, level0.drawn);
+  });
+
+  // A meter's own value animation, from a script: the needle test.
+  const vuBefore = (await s('drawn', 'vu')).drawn;
+  const needlePlayed = await page.evaluate(() => window.__scenes.script('animatePlay', ['VU', 'needle']));
+  await page.waitForTimeout(560);
+  const vuNeedle = (await s('drawn', 'vu')).drawn;
+  await page.waitForTimeout(700);
+  const vuRested = (await s('drawn', 'vu')).drawn;
+  check('a meter\'s own value animation plays from a script: the needle up and back to its reading', () => {
+    assert.equal(needlePlayed, true);
+    assert.ok(vuNeedle > 0.9, `up: ${vuNeedle}`);
+    assert.equal(vuRested, vuBefore);
   });
 
   // A knob's own value animation: the wiggle loops while Cutoff is hovered.

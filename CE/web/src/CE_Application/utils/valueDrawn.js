@@ -17,6 +17,12 @@
 import { readEasing, easeAt } from './easing.js';
 import { VALUE_TARGET } from './sceneFormat.js';
 import { isSliderBehavior, getSliderGeometry, getSliderValueMode } from './sliderBehavior.js';
+import { macroConfig, macroValue } from './macroLayout.js';
+import { meterConfig, meterPosition } from './meterLayout.js';
+
+/** The controls that draw a value of their own rather than through a Behavior: the Macro, the meters. */
+const METER_TYPES = new Set(['Meter', 'ProgressBar']);
+const typeOf = (control) => String(control?._children?.Core?.controlType ?? '');
 
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
 
@@ -118,10 +124,34 @@ export function drawnValueFor(plays, controlId, live, { elapsedOf = () => 0, dra
   return { value, running };
 }
 
-/** Whether a control draws a value a value effect can move: a knob or a slider, one value. */
+/**
+ * Whether a control draws a value a value effect can move: a knob or a slider with one value, the
+ * Macro (its ring, its knob and the lanes it drives), a meter or a progress bar (its needle or bar).
+ */
 export function controlDrawsValue(control) {
+  const type = typeOf(control);
+  if (type === 'Macro' || METER_TYPES.has(type)) return true;
   const behavior = control?._children?.Behavior ?? null;
   return isSliderBehavior(behavior) && getSliderValueMode(behavior) === 'single';
+}
+
+/**
+ * The value a control draws now, 0 to 1, which an effect starts from and hands back to: the Macro's
+ * own position, a meter's place on its scale (linear or decibels), a knob's or a slider's signals.
+ */
+export function liveDrawnValue(control, signals = {}) {
+  const type = typeOf(control);
+  if (type === 'Macro') {
+    const cfg = macroConfig(control);
+    return cfg.__value !== undefined ? clamp01(cfg.__value) : macroValue(control);
+  }
+  if (METER_TYPES.has(type)) {
+    const cfg = meterConfig(control);
+    return clamp01(meterPosition(cfg.__value !== undefined ? cfg.__value : cfg.value, cfg));
+  }
+  const current = Number(signals?.currentValueNormalized);
+  if (signals?.currentValueNormalized !== undefined && signals?.currentValueNormalized !== null && Number.isFinite(current)) return clamp01(current);
+  return clamp01(signals?.valueNormalized);
 }
 
 /** Whether it is a knob — drawn round a circle — which is what the value effects were made for. */

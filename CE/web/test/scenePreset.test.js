@@ -84,7 +84,7 @@ test('one slot, started by nothing on a control: repeated over every control tha
   assert.deepEqual(scene.trigger, { type: 'panelOpen' });
   const typed = repeatedScene(labelsTypeIn, panel(), { stagger: 100 });
   assert.deepEqual(typed.scene.clips.map((c) => c.controlId), ['l1', 'b1'], 'everything with words of its own');
-  assert.match(repeatedScene(knobsSweepIn, [control('Label', 'x', 'X', 0, 0)]).reason, /wants a knob or a slider/);
+  assert.match(repeatedScene(knobsSweepIn, [control('Label', 'x', 'X', 0, 0)]).reason, /wants a knob, a slider, a Macro or a meter/);
   const triggered = buildScenePreset({ id: 's', name: 'Hover', length: 1000, trigger: { type: 'state', controlId: 'k1', to: 'hover' }, clips: [clip('a', 'k1', 'Value', 0, sweep)] }, panel());
   assert.equal(canRepeat(triggered), false, 'a hover on which knob would start them all?');
   assert.match(repeatedScene(triggered, panel()).reason, /Only a preset of one control/);

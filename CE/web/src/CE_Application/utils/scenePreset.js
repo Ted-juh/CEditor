@@ -224,7 +224,7 @@ export function repeatedScene(preset, controls, { stagger = REPEAT_STAGGER, id =
   if (!canRepeat(preset)) return { reason: 'Only a preset of one control, which nothing on a control starts, repeats over many.' };
   const slot = preset.slots[0];
   const takers = candidatesFor(slot, controls);
-  if (!takers.length) return { reason: `Nothing on this panel can take it: ${slot.needs.value ? 'it wants a knob or a slider' : slot.needs.text ? 'it wants a control with words of its own' : 'no control fits'}.` };
+  if (!takers.length) return { reason: `Nothing on this panel can take it: ${slot.needs.value ? 'it wants a knob, a slider, a Macro or a meter' : slot.needs.text ? 'it wants a control with words of its own' : 'no control fits'}.` };
   const gap = Math.max(0, Math.round(Number(stagger) || 0));
   const clips = takers.flatMap((control, index) => preset.clips.map((clip) => ({
     ...deepCopy(clip), id: newSceneId('cl'), controlId: idOf(control), start: clip.start + index * gap,

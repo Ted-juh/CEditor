@@ -83,7 +83,7 @@ test('plays: posed at a moment or running; the later one wins; the hand always w
     'dragged: the value as it is, while the clip runs on underneath');
 });
 
-test('knobs and sliders draw a value an effect can move; a range slider, a label and a macro do not', () => {
+test('knobs and sliders draw a value an effect can move; a range slider and a label do not', () => {
   const knob = createControl('Knob');
   const slider = createControl('Slider');
   assert.equal(controlDrawsValue(knob), true);
@@ -93,7 +93,6 @@ test('knobs and sliders draw a value an effect can move; a range slider, a label
   slider._children.Behavior.valueMode = 'range';
   assert.equal(controlDrawsValue(slider), false, 'two handles: which one would it move?');
   assert.equal(controlDrawsValue(createControl('Label')), false);
-  assert.equal(controlDrawsValue(createControl('Macro')), false);
 });
 
 test('a looping value clip counts two against the loop budget, as a moving gradient does', () => {
@@ -174,7 +173,7 @@ test('a value effect saved as a preset goes on a knob or a slider, and back into
   assert.ok(preset, 'the format keeps a value animation');
   assert.equal(presetDoesNotFit(preset, createControl('Knob')), '');
   assert.equal(presetDoesNotFit(preset, createControl('Slider')), '');
-  assert.match(presetDoesNotFit(preset, createControl('Label')), /draws none: it goes on a knob or a slider/);
+  assert.match(presetDoesNotFit(preset, createControl('Label')), /draws none: it goes on a knob, a slider, a Macro or a meter/);
   const entry = effectFromPreset(preset);
   assert.equal(entry.target, VALUE_TARGET);
   assert.equal(entry.effect.kind, 'value');

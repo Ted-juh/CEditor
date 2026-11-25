@@ -110,7 +110,7 @@ test('ce.anim.effect plays a value effect on what a knob\'s value draws (step 6)
     assert.equal(calls[0][2].clips[0].effect.kind, 'value');
     assert.equal(script.animateEffect('Cutoff.Value', 'value:wiggle'), true, 'or named');
     assert.equal(script.animateEffect('Title', 'Ring sweep'), false);
-    assert.match(traced(), /"Ring sweep" moves what a knob's or a slider's value draws; Title draws none there/);
+    assert.match(traced(), /"Ring sweep" moves what a value draws — on a knob, a slider, a Macro or a meter; Title draws none there/);
     clearScriptTrace();
     assert.equal(script.animateEffect('Cutoff.Value', 'Pop'), false);
     assert.match(traced(), /"Pop" does not play on what a value draws/);

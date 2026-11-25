@@ -213,7 +213,7 @@ check('a ring sweep on a knob plays on what its value draws, and the stage is po
   assert.equal(frameRows, 3, 'its three frames: from nothing, to full, back to the value');
   assert.ok(Math.abs(posedDrawn - expected) < 0.002, `${sweepTime} ms in: drawn ${posedDrawn}, the engine says ${expected}`);
   assert.notEqual(posedDrawn, liveDrawn, 'not the value itself');
-  assert.match(valueNote, /Wave draws no value to move: a value effect plays on a knob or a slider/);
+  assert.match(valueNote, /Wave draws no value to move: a value effect plays on a knob, a slider, a Macro or a meter/);
 });
 
 // Scene presets: a built-in one repeated over every knob, and the first scene kept and put back.
@@ -230,7 +230,7 @@ const scenesAfter = await d('scenes');
 const swept2 = scenesAfter.at(-1);
 check('a built-in scene preset repeats over every knob on the panel, as a new scene', () => {
   assert.deepEqual(builtIns.map(([id]) => id), ['builtin:knobsSweepIn', 'builtin:labelsTypeIn']);
-  assert.match(applyText, /On every knob or slider that fits \(1\)/, applyText);
+  assert.match(applyText, /On every knob, slider, Macro or meter that fits \(1\)/, applyText);
   assert.equal(scenesAfter.length, scenesBefore + 1);
   assert.equal(swept2.name, 'Knobs sweep in');
   assert.deepEqual(swept2.clips.map((c) => [c.controlId, c.target]), [['cutoff', 'Value']]);

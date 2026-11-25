@@ -161,7 +161,7 @@
   import { getContext, setContext, untrack } from 'svelte';
   import { SCENE_STAGE } from '../stores/sceneStage.js';
   import { sceneControlOutput, mergeKeyframeOutputs } from '../utils/sceneModel.js';
-  import { drawnValueFor, ownValuePlay } from '../utils/valueDrawn.js';
+  import { drawnValueFor, ownValuePlay, liveDrawnValue } from '../utils/valueDrawn.js';
   import { VALUE_TARGET } from '../utils/sceneFormat.js';
   import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
   import { pictureColour, pictureColourSources, withColourFollows, withPictureColourSources } from '../utils/pictureRecolour.js';
@@ -429,7 +429,7 @@
   });
   let macroKnobBase = $derived(macroKnobBaseRuntime(macroKnob));
   let macroKnobState = $derived(macroKnob
-    ? macroKnobRuntime(macroKnobBase, renderControl?._children?.Macro?.__value ?? macroValue(renderControl), previewSession?.dragging === true)
+    ? macroKnobRuntime(macroKnobBase, Number.isFinite(drawnValue) ? drawnValue : (renderControl?._children?.Macro?.__value ?? macroValue(renderControl)), previewSession?.dragging === true)
     : null);
   let svgIdSeed = $derived.by(() => {
     const baseId = safeSvgId(core?.id);
@@ -1849,7 +1849,9 @@
   let valueFrame = 0;
   const valuePlayKey = (play) => `${play.scene?.id}:${play.phase ?? 'a'}`;
   const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  let liveNormalized = $derived(numberOr(interactionRuntime?.signals?.currentValueNormalized, numberOr(interactionRuntime?.signals?.valueNormalized, 0)));
+  // What it draws now, which an effect starts from and hands back to: a knob's signals, the Macro's
+  // own position, a meter's place on its scale.
+  let liveNormalized = $derived(liveDrawnValue(renderControl ?? control, interactionRuntime?.signals));
   let drawnValueState = $derived(valuePlays.length
     ? drawnValueFor(valuePlays, core.id, liveNormalized, {
       elapsedOf: (play) => Math.max(0, valueNow - (Number.isFinite(play.startedAt) ? play.startedAt : (valueStarts.get(valuePlayKey(play)) ?? valueNow))),
@@ -3508,7 +3510,7 @@
       <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
       {/if}
     {:else if ownRenderer === 'Meter' && !hasAnatomy}
-      <MeterRenderer control={renderControl} width={displayW} height={displayH} />
+      <MeterRenderer control={renderControl} width={displayW} height={displayH} {drawnValue} />
     {:else if ownRenderer === 'Shape'}
       <ShapeRenderer control={renderControl} width={displayW} height={displayH} />
     {:else if ownRenderer === 'Keyboard'}
@@ -3558,7 +3560,7 @@
           renderIdNamespace={`${svgIdSeed}-knob`}
         />
       {/if}
-      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} ownKnob={!macroKnob} />
+      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} ownKnob={!macroKnob} {drawnValue} />
     {:else if ownRenderer === 'Orbit'}
       <OrbitRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} />
     {:else if ownRenderer === 'Looper'}

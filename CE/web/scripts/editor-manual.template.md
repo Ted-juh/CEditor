@@ -1254,7 +1254,7 @@ There are four kinds, and a fifth on a knob or a slider:
   **Push**, **Wipe**, **Crossfade** and **Shimmer**, each **In** or **Out**, cut into letters, words
   or lines that start one after another (**ms apart**), forwards, backwards, from the centre or in
   a random order. It can wait for the words to change: to the value, or to the name.
-- **Value** (knobs and sliders) — moves what the value draws, its arc, ring and pointer, then hands
+- **Value** (knobs, sliders, the Macro and meters) — moves what the value draws, its arc, ring, pointer, needle or bar, then hands
   back to the value: a new one is a ring sweep, round to full and back. It plays on the same
   triggers as **Keyframes** except **all the time**, and with **Loop** it repeats while its state
   holds (a wiggle while the pointer is over the knob). Each frame is the value itself, a point of
@@ -1320,9 +1320,11 @@ There is one Designer per panel, and it closes with its panel.
   **Wiggle**. Only the drawing moves: the value, its readout and what it sends stay as they are.
   A clip always ends on the value, wherever the value went meanwhile, and while you turn the
   knob it shows where you turned it to. Each frame of a value clip is the value itself, a point
-  of the range, or so far from the value. They play on knobs and on sliders with one value. A
+  of the range, or so far from the value. They play on knobs, on sliders with one value, on the
+  Macro (its ring, its knob and its lanes' bars; its numbers keep reading the Macro's value), and
+  on meters and progress bars (the needle or the bar: a power-up sweep). A
   knob's own **Value** animations (the Animation tool's fifth kind) show under **Controls' own**,
-  and **Save as preset** keeps a value clip in your library, to drop on any knob or slider.
+  and **Save as preset** keeps a value clip in your library, to drop on any knob, slider, Macro or meter.
 - **Stage** (middle). The panel as it looks, posed at the playhead. Click a control to pick it.
   Nothing on the stage reaches the synth. **Try a trigger** holds **Hover** or **Press** for a
   moment, so you can see a control's state animations.
