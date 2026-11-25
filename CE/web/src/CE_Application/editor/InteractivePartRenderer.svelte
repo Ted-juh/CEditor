@@ -39,7 +39,7 @@
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
-  import { splitText, textPieceStyles } from '../utils/textEffects.js';
+  import { splitText, textPieceStyles, reelColumns, REEL_WINDOW } from '../utils/textEffects.js';
   import { isFramesImage, imageFrameLayers, imageFrameLayerStyle } from '../utils/imageFrames.js';
   import { pictureColour, recolourPicture, withRecolouredPicture } from '../utils/pictureRecolour.js';
 
@@ -138,8 +138,10 @@
   let textPieces = $derived.by(() => {
     if (!textEffect?.effect || !text) return null;
     const pieces = splitText(String(text.content ?? ''), textEffect.effect.split);
-    const styles = textPieceStyles(textEffect.effect, pieces, { phase: textEffect.phase, seedText: `${partName}:${textEffect.name}`, at: textEffect.at ?? null });
-    return pieces.map((piece, index) => ({ ...piece, style: styles[index] }));
+    const seedText = `${partName}:${textEffect.name}`;
+    const styles = textPieceStyles(textEffect.effect, pieces, { phase: textEffect.phase, seedText, at: textEffect.at ?? null, columns: true });
+    const columns = reelColumns(textEffect.effect, pieces, { seedText });
+    return pieces.map((piece, index) => ({ ...piece, style: styles[index], column: columns[index] }));
   });
   let image = $derived(colouredPart?._children?.Image ?? null);
   // A panel knob or slider carried by a component (utils/sliderControlPart.js): the panel's own
@@ -1144,7 +1146,7 @@
       <div class="interactive-part-text ce-colour-anim" style={textStyle}>
         {#if textPieces}
           <!-- One flex item holding the pieces, so they flow as the words did. -->
-          <span class="interactive-part-text-pieces">{#each textPieces as piece}<span style={piece.style}>{piece.text}</span>{/each}</span>
+          <span class="interactive-part-text-pieces" style="--ce-part-reach:{Math.round(layoutFrame.width || 0)}px">{#each textPieces as piece}{#if piece.column}<span style={REEL_WINDOW}><span style={piece.style}>{piece.column}</span></span>{:else}<span style={piece.style}>{piece.text}</span>{/if}{/each}</span>
         {:else}
           {text?.content ?? ''}
         {/if}

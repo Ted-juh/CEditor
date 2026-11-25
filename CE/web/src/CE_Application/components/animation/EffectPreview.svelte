@@ -9,6 +9,7 @@
    */
   import { onDestroy, untrack } from 'svelte';
   import { previewOf, previewKind, PREVIEW_VALUE, PREVIEW_WORD } from '../../utils/effectPreview.js';
+  import { REEL_WINDOW } from '../../utils/textEffects.js';
   import { valueEffectAt } from '../../utils/valueDrawn.js';
 
   let { entry = null, active = false, delay = 0, period = null, small = false } = $props();
@@ -68,7 +69,7 @@
       <span class="w" style={shown?.word}>Aa</span>
     </span>
   {:else if kind === 'word'}
-    <span class="word">{#if shown}{#each shown.pieces as piece, i (i)}<span style={piece.style}>{piece.text}</span>{/each}{:else}{PREVIEW_WORD}{/if}</span>
+    <span class="word">{#if shown}{#each shown.pieces as piece, i (i)}{#if piece.column}<span style={REEL_WINDOW}><span style={piece.style}>{piece.column}</span></span>{:else}<span style={piece.style}>{piece.text}</span>{/if}{/each}{:else}{PREVIEW_WORD}{/if}</span>
   {:else if kind === 'pattern'}
     <span class="frame"><span class="stripes" style={shown?.pattern}></span></span>
   {:else if kind === 'ring'}

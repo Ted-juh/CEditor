@@ -2,7 +2,8 @@
   /**
    * A text effect's settings (utils/textEffects.js): which effect, in or out, how the words are cut
    * and in what order, the stagger between pieces, and what only some effects have — a direction
-   * (roll, push, wipe), how far and how large (explode), a colour (typewriter, shimmer). And where it
+   * (roll, push, wipe), how far and how large (explode), a colour (typewriter, shimmer), how many
+   * glyphs a reel passes and which. And where it
    * plays: the control's own words, or a part's.
    *
    * Every change is one write of the fields it touches (`onpatch`); the tab merges them into the
@@ -22,10 +23,13 @@
   let has = $derived({
     direction: ['roll', 'push', 'wipe'].includes(effect?.effect),
     burst: effect?.effect === 'explode',
+    reel: effect?.effect === 'reel',
     colour: effect?.effect === 'typewriter' || effect?.effect === 'shimmer',
   });
   let colourText = $state('');
   $effect(() => { colourText = effect?.colour ?? ''; });
+  let glyphsText = $state('');
+  $effect(() => { glyphsText = effect?.glyphs ?? ''; });
 
   /** A new effect starts from its own defaults; the way and where it plays stay. */
   function pickEffect(name) {
@@ -39,6 +43,7 @@
       duration: base.duration,
       ...(base.direction ? { direction: base.direction } : {}),
       ...(name === 'explode' ? { scatter: base.scatter, scale: base.scale } : {}),
+      ...(name === 'reel' ? { spins: base.spins } : {}),
       colour: base.colour ?? null,
     });
   }
@@ -95,6 +100,19 @@
           onchange={(value) => onpatch({ scatter: Math.max(0, Math.round(value)) })} /></div>
         <div class="cell"><NumberCell label="× size" value={effect.scale} min={0.1} step={0.1}
           onchange={(value) => onpatch({ scale: Math.max(0.1, Math.round(value * 100) / 100) })} /></div>
+      </div>
+    {/if}
+    {#if has.reel}
+      <div class="r">
+        <span class="lab">Spins</span>
+        <div class="cell"><NumberCell label="glyphs" value={effect.spins} min={1} max={30} step={1}
+          onchange={(value) => onpatch({ spins: Math.max(1, Math.min(30, Math.round(value))) })} /></div>
+      </div>
+      <div class="r">
+        <label class="lab" for="txfx-glyphs">Through</label>
+        <input id="txfx-glyphs" class="txt" type="text" bind:value={glyphsText} placeholder="A–Z, 0–9 and signs"
+               title="The glyphs each letter rolls past, any you like; empty for letters, numbers and signs"
+               onchange={() => onpatch({ glyphs: glyphsText.trim() || null })} />
       </div>
     {/if}
     {#if has.colour}

@@ -20,7 +20,7 @@
  */
 import { sceneControlOutput } from './sceneModel.js';
 import { patternPlace } from './sceneFormat.js';
-import { splitText, textEffectSpan, textPieceStyles } from './textEffects.js';
+import { splitText, textEffectSpan, textPieceStyles, reelColumns } from './textEffects.js';
 import { canRepeat, REPEAT_STAGGER } from './scenePreset.js';
 
 /** The pause between plays, ms. */
@@ -48,7 +48,7 @@ const join = (list) => (list?.length ? `animation:${list.join(', ')};` : '');
  * `{ kind: 'none' }` for what has nothing to show (a transition, which needs a state change).
  *
  *   box:     { box, fill, image, word, gradient, image? }   styles of the box, its fill, image and word
- *   word:    { pieces: [{ text, style }] }
+ *   word:    { pieces: [{ text, style, column }] }   (column: a reel's, drawn in a window)
  *   pattern: { pattern }                                     the striped layer's style
  *   ring:    { effect, length, delay }                       drawn by the component, a frame at a time
  */
@@ -67,11 +67,12 @@ export function previewOf(entry, { phase = 'a', delay = 0 } = {}) {
     if (!item) return { kind: 'none', rules: '', period: 0 };
     // The clip's start is already the effect's delay (sceneModel.js clipAnimation), and in its span.
     const pieces = splitText(PREVIEW_WORD, item.effect.split);
-    const styles = textPieceStyles(item.effect, pieces, { phase, seedText: 'preview' });
+    const styles = textPieceStyles(item.effect, pieces, { phase, seedText: 'preview', columns: true });
+    const columns = reelColumns(item.effect, pieces, { seedText: 'preview' });
     const count = pieces.filter((piece) => piece.animated).length;
     return {
       kind, rules: out.rules, period: textEffectSpan(item.effect, count) + PREVIEW_REST,
-      pieces: pieces.map((piece, index) => ({ text: piece.text, style: styles[index] })),
+      pieces: pieces.map((piece, index) => ({ text: piece.text, style: styles[index], column: columns[index] })),
     };
   }
   if (kind === 'pattern') {

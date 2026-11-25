@@ -99,9 +99,14 @@ function panel(prefix) {
   // Two clips on one place: fades in then out, types in then out (sceneModel.js, SEVERAL CLIPS ON ONE PLACE).
   const sign = place(createControl('Label'), `${prefix}sign`, 'Sign', 460, 480, 140, 40);
   sign._children.Text.content = 'OPEN';
+  // The Part and Reel text effects: words that open like doors, letters that roll up a column.
+  const doors = place(createControl('Label'), `${prefix}doors`, 'Doors', 110, 470, 120, 36);
+  doors._children.Text.content = 'OPEN';
+  const code = place(createControl('Label'), `${prefix}code`, 'Code', 110, 515, 120, 36);
+  code._children.Text.content = 'C0DE';
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale, strip, sign],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale, strip, sign, doors, code],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -152,6 +157,10 @@ function panel(prefix) {
       { id: 'sc_in_out', name: 'In and out', trigger: { type: 'script' }, length: 2000, loop: false,
         clips: [clip('c24', `${prefix}sign`, 'Text', 1000, 1000, sceneEffect('text:typewriter:out').effect), clip('c25', `${prefix}sign`, 'Text', 0, 900, typewriter),
           clip('c27', `${prefix}sign`, 'Transform', 0, 500, fade), clip('c26', `${prefix}sign`, 'Transform', 1300, 500, sceneEffect('move:fadeOut').effect)] },
+      { id: 'sc_doors', name: 'Doors', trigger: { type: 'script' }, length: 900, loop: false,
+        clips: [clip('c28', `${prefix}doors`, 'Text', 0, 900, sceneEffect('text:part:out').effect)] },
+      { id: 'sc_code', name: 'Code', trigger: { type: 'script' }, length: 1200, loop: false,
+        clips: [clip('c29', `${prefix}code`, 'Text', 0, 1200, sceneEffect('text:reel:in').effect)] },
       // Step 6: what the Level knob's value draws, swept round to full and handed back.
       { id: 'sc_sweep', name: 'Sweep', trigger: { type: 'script' }, length: 1200, loop: false,
         clips: [clip('c8', `${prefix}level`, 'Value', 0, 1200, ringSweep), clip('c9', `${prefix}dial`, 'Value', 0, 1200, ringSweep), clip('c10', `${prefix}fader`, 'Value', 0, 1200, ringSweep),
@@ -177,7 +186,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'scale', 'strip', 'sign', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'scale', 'strip', 'sign', 'doors', 'code', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -266,6 +275,16 @@ window.__scenes = {
     const clip = text.parentElement?.getAttribute('clip-path') ?? '';
     return { piece: text.hasAttribute('data-word-piece'), name: style.animationName, fill: text.getAttribute('fill'), transform: style.transform,
       clipped: !!clip && !!document.getElementById(/#([^)]+)/.exec(clip)?.[1] ?? '') };
+  },
+  /** A control's words as drawn now, a piece each: a reel's window and its column, and where each has moved. */
+  pieces: (id) => {
+    const glyphs = root(id)?.querySelector('.text-glyphs');
+    const moved = (el) => { const m = new DOMMatrixReadOnly(getComputedStyle(el).transform === 'none' ? undefined : getComputedStyle(el).transform); return { x: m.m41, y: m.m42 }; };
+    return [...(glyphs?.children ?? [])].filter((el) => !el.classList.contains('text-line')).map((el) => {
+      const column = el.style.overflow === 'hidden' ? el.firstElementChild : null;
+      const shown = column ?? el;
+      return { window: !!column, text: shown.textContent, height: el.getBoundingClientRect().height, ...moved(shown) };
+    });
   },
   /** A control's opacity as drawn now. */
   opacity: (id) => Number(getComputedStyle(root(id)).opacity),

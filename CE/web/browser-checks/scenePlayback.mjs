@@ -21,6 +21,7 @@
  *   - a clip on a part's pattern pulses that pattern, and not the part or the control
  *   - a scene's markers call the scripts' actions as it passes them; one no script defines is said
  *   - two clips on one place: a fade in then out, and words typed in then out, each seen in turn
+ *   - Part opens words down their middle, and Reel rolls a column of glyphs down onto each letter
  *   - a knob drawn as a form takes a text effect on its readout, whole
  *   - a scene types a knob's scale numbers round the dial, one number at a time, and rolls them each through a box of its
  *     own (utils/anatomyWords.js)
@@ -408,9 +409,11 @@ try {
   await page.evaluate(() => window.__scenes.script('animatePlay', ['In and out', {}]));
   await page.waitForTimeout(150);
   const signIn = { opacity: await s('opacity', 'sign'), letter: await s('letters', 'sign') };
-  await page.waitForTimeout(1100);
+  // The words move on as the out clip starts, a second in, counted from when the control saw the
+  // play; a busy page can see it a little late, so wait for it rather than guess the moment.
+  await page.waitForFunction((name) => window.__scenes.letters('sign')?.name !== name, signIn.letter?.name, { timeout: 3000 }).catch(() => {});
   const signOut = { letter: await s('letters', 'sign') };
-  await page.waitForTimeout(900);
+  await page.waitForFunction(() => window.__scenes.opacity('sign') < 0.05, null, { timeout: 3000 }).catch(() => {});
   const signEnd = { opacity: await s('opacity', 'sign') };
   check('fade in then out, type in then out: the first clip is seen, and the later one takes over', () => {
     assert.ok(signIn.opacity > 0.05 && signIn.opacity < 0.95, `fading in, not held at the fade out's first frame: ${signIn.opacity}`);
@@ -420,6 +423,28 @@ try {
     assert.notEqual(signOut.letter.name, signIn.letter.name, `the words moved on to the out clip as it started: ${JSON.stringify({ signIn, signOut })}`);
     assert.ok(Math.abs(parseFloat(signOut.letter.delay)) < 400, `counted from when it took over: ${signOut.letter.delay}`);
     assert.ok(signEnd.opacity < 0.05, `held faded out at the end: ${signEnd.opacity}`);
+  });
+
+  // Part and Reel, held half way through: the doors apart, each letter's column part way up.
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Doors', 0.5]));
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Code', 0.4]));
+  await page.waitForTimeout(120);
+  const doorPieces = await s('pieces', 'doors');
+  const codePieces = await s('pieces', 'code');
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Code', 1]));
+  await page.waitForTimeout(120);
+  const codeEnd = await s('pieces', 'code');
+  check('Part opens the words down their middle, and Reel rolls each letter\'s column down onto it', () => {
+    assert.deepEqual(doorPieces.map((piece) => piece.text), ['O', 'P', 'E', 'N'], JSON.stringify(doorPieces));
+    assert.ok(doorPieces[0].x < -5 && doorPieces[1].x < -5, `the first door to the left: ${JSON.stringify(doorPieces)}`);
+    assert.ok(doorPieces[2].x > 5 && doorPieces[3].x > 5, `the second to the right: ${JSON.stringify(doorPieces)}`);
+    assert.equal(codePieces.length, 4, JSON.stringify(codePieces));
+    assert.ok(codePieces.every((piece) => piece.window), 'each letter in a window');
+    assert.deepEqual(codePieces.map((piece) => piece.text.split('\n')[0]), ['C', '0', 'D', 'E'], 'each column the letter and the glyphs below it');
+    assert.ok(codePieces.every((piece) => piece.text.split('\n').length === 7), 'the letter and six glyphs');
+    assert.ok(codePieces.every((piece) => piece.height > 8 && piece.height < 40), `a window one line high: ${JSON.stringify(codePieces.map((piece) => piece.height))}`);
+    assert.ok(codePieces[0].y < -1, `the first column part way down onto its letter: ${codePieces[0].y}`);
+    assert.ok(codeEnd.every((piece) => Math.abs(piece.y) < 0.5), `at the end each window rests on its letter: ${JSON.stringify(codeEnd.map((piece) => piece.y))}`);
   });
 
   // A knob's own words: a typewriter on its scale numbers, one number at a time round the dial.

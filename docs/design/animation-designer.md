@@ -1570,6 +1570,41 @@ Verified locally:
 - The browser checks `animationDesigner`, `animationTab`, `panelMotion`, `anatomyForms` and
   `macroSetKnob` pass.
 
+## As built: two text effects, Part and Reel (2026-11-25)
+
+Two effects after the first seven, asked for with the film-themed panels (The Shining's elevator,
+The Matrix's decoding title). Each one is in the library's In and Out, and in scripts' swaps.
+- **Part** (`textEffects.js`). The words open down their middle: the first half of the animated
+  pieces moves one way and the rest the other, each half travelling into the edge of the box. In,
+  the halves close.
+  - Each half travels `--ce-part-reach` and a letter more. A control's text sets that to the
+    control's width, and a part's text to the part's. Elsewhere it is 3em.
+  - The halves move together (no stagger).
+  - Pieces of the first half are variant 0, the rest variant 1.
+- **Reel.** Each letter is a window one line high (`REEL_WINDOW`, `height: 1lh`) on a column: the
+  letter, then **Spins** glyphs from its own list (**Through**) or `REEL_GLYPHS`, seeded per control
+  and piece.
+  - Going in, the column rolls down from its last glyph onto the letter, staggered 70 ms. Going
+    out, it rolls up off the letter and fades.
+  - The letter is at the top of its column, so a window at rest shows it. An "in" holds no frame
+    after its run (fill `backwards`), so the column falls back to where it was laid out: with the
+    letter at the bottom, a finished reel showed a random glyph. WebKitGTK showed this first.
+  - Three places draw a piece of words as HTML, and each draws a reel's letter as its window:
+    `CanvasControl` (a control's words), `InteractivePartRenderer` (a part's) and the library's
+    previews. Everywhere else (SVG marks, a readout, words drawn whole) a reel rolls the piece up
+    into place instead (variant 1), so it never draws wrong.
+- The clip editor offers a Reel's **Spins** and **Through**. The editor manual and the scripting
+  manual name both effects.
+
+Verified locally:
+- `test/textEffectsPartReel.test.js` (new): the doors' halves and their poses, a reel's columns,
+  seeded and with its own glyphs, the window and the fallback, and the previews.
+- The browser check `scenePlayback` holds a Part half way, each half on its side. It holds a Reel
+  half way, each letter in a one-line window with its column part way down, and at the end, each
+  window on its letter.
+- WebKitGTK 2.52 under Xvfb shows the same: the doors at ±102 px half way and ±132 px at the end,
+  windows 14.4 px high, every window resting on its letter at the end.
+
 ## Open
 
 Nothing for the owner at present.

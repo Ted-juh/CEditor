@@ -10,6 +10,7 @@
  *     stagger, duration, delay, easing,     // ms; duration is one piece's, stagger the gap between
  *     direction,                            // roll, push, wipe: which way the text moves
  *     scatter, scale,                       // explode: how far the letters fly, how large they get
+ *     spins, glyphs,                        // reel: how many other glyphs a letter rolls past, and which
  *     colour,                               // typewriter: the colour a letter arrives in; shimmer: the light
  *     iterations,                           // 1, or 'infinite' (a shimmer that keeps running)
  *     trigger, targets: [{ path: 'Text' | 'Parts.<part>' }] }
@@ -51,8 +52,15 @@ export const TEXT_TRIGGER_LABELS = Object.freeze({
 });
 
 /**
- * The first seven effects, as the owner approved them (2026-11-24): each one's defaults. `order`
- * may differ by way — a typewriter types forwards and deletes backwards.
+ * The first seven effects, as the owner approved them (2026-11-24), and two since: each one's
+ * defaults. `order` may differ by way — a typewriter types forwards and deletes backwards.
+ *
+ *   - part (2026-11-25): the words open down their middle, the first half of the pieces one way and
+ *     the rest the other, each half into the edge of the box — elevator doors. In, they close.
+ *   - reel (2026-11-25): each letter is a window on a column of other glyphs that rolls down onto
+ *     it, a glyph a line — a slot machine, a code breaking. Out, it rolls up off the letter and fades.
+ *     Where a piece has no window to roll in (SVG text, a readout, the words drawn whole) it rolls
+ *     up into place instead.
  */
 export const TEXT_EFFECTS = Object.freeze({
   typewriter: { label: 'Typewriter', split: 'letter', order: { in: 'forward', out: 'reverse' }, stagger: 45, duration: 300 },
@@ -62,10 +70,21 @@ export const TEXT_EFFECTS = Object.freeze({
   wipe: { label: 'Wipe', split: 'whole', order: { in: 'forward', out: 'forward' }, stagger: 0, duration: 500, direction: 'right' },
   crossfade: { label: 'Crossfade', split: 'whole', order: { in: 'forward', out: 'forward' }, stagger: 0, duration: 300 },
   shimmer: { label: 'Shimmer', split: 'letter', order: { in: 'forward', out: 'reverse' }, stagger: 40, duration: 600, colour: 'FFFFFFFF' },
+  part: { label: 'Part', split: 'letter', order: { in: 'forward', out: 'forward' }, stagger: 0, duration: 900 },
+  reel: { label: 'Reel', split: 'letter', order: { in: 'forward', out: 'reverse' }, stagger: 70, duration: 900, spins: 6 },
 });
 export const TEXT_EFFECT_NAMES = Object.freeze(Object.keys(TEXT_EFFECTS));
 
-const LIMITS = { stagger: [0, 2000], duration: [1, 20000], delay: [0, 20000], scatter: [0, 400], scale: [0.05, 8] };
+const LIMITS = { stagger: [0, 2000], duration: [1, 20000], delay: [0, 20000], scatter: [0, 400], scale: [0.05, 8], spins: [1, 30] };
+
+/** What a reel rolls through, unless it names its own glyphs. */
+export const REEL_GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=?@';
+/** A reel's own glyphs: up to 64 of them, or null for REEL_GLYPHS. They are drawn as text, never as CSS. */
+function cleanGlyphs(value) {
+  if (typeof value !== 'string') return null;
+  const kept = graphemes(value).filter((glyph) => /\S/.test(glyph)).slice(0, 64).join('');
+  return kept || null;
+}
 
 function clampNumber(value, [lo, hi], fallback) {
   const n = Number(value);
@@ -105,6 +124,8 @@ export function readTextEffect(animation, key = '', { timeScale = 1 } = {}) {
     direction: TEXT_DIRECTIONS.includes(animation.direction) ? animation.direction : (base.direction ?? 'right'),
     scatter: clampNumber(animation.scatter, LIMITS.scatter, base.scatter ?? 40),
     scale: clampNumber(animation.scale, LIMITS.scale, base.scale ?? 2.6),
+    spins: Math.round(clampNumber(animation.spins, LIMITS.spins, base.spins ?? 6)),
+    glyphs: cleanGlyphs(animation.glyphs),
     colour: cleanFrameColour(animation.colour) ?? (effect === 'shimmer' ? base.colour : null),
     iterations,
     part: textEffectPart(animation),
@@ -226,6 +247,12 @@ function poseDeclarations(effect, variant) {
       return `transform:translateY(${num(sign * (away[1] || -1) * 110)}%)`;
     case 'push':
       return `transform:translateX(${num(sign * (away[0] || 1) * 110)}%)`;
+    case 'part': {
+      // Each half travels into the box's edge: as far as `--ce-part-reach` (the box's width, where the
+      // renderer knows it) and a letter more. Variant 0 is the first half, 1 the rest.
+      const side = variant === 0 ? '-1' : '1';
+      return `transform:translateX(calc(${side} * (var(--ce-part-reach, 3em) + 1em)))`;
+    }
     case 'wipe': {
       // In: revealed from the side it travels from; out: hidden towards the side it travels to.
       const edge = effect.way === 'in'
@@ -245,6 +272,18 @@ function keyframesBody(effect, variant, colourProperty) {
   if (effect.effect === 'shimmer') {
     return `0%,100%{}50%{${colourProperty}:${colourCss(effect.colour ?? 'FFFFFFFF')}}`;
   }
+  if (effect.effect === 'reel') {
+    // Variant 0 is a letter's window. Its column is the letter, then the glyphs (`--ce-reel` of them,
+    // set on the piece), a line each: going in, it rolls down from the last glyph onto the letter,
+    // which is where it rests when the run is over; going out, it rolls up off the letter and fades.
+    // Variant 1 has no window, and rolls up into place.
+    if (variant === 0) {
+      const rolled = 'transform:translateY(calc(var(--ce-reel, 6) * -1lh))';
+      return effect.way === 'in' ? `0%{${rolled}}100%{transform:translateY(0)}` : `0%{transform:translateY(0)}100%{${rolled};opacity:0}`;
+    }
+    const roll = poseDeclarations({ ...effect, effect: 'roll', direction: 'up' }, 0);
+    return effect.way === 'in' ? `0%{${roll}}100%{}` : `0%{}100%{${roll}}`;
+  }
   if (effect.effect === 'typewriter') {
     const colour = effect.colour ? `${colourProperty}:${colourCss(effect.colour)};` : '';
     // A letter appears at once, in its arriving colour, and takes its own colour over the duration.
@@ -261,7 +300,7 @@ export function textEffectHash(effect, colourProperty = 'color') {
   return hashText(JSON.stringify([effect.effect, effect.way, effect.direction, effect.scatter, effect.scale, effect.colour, colourProperty])).toString(36);
 }
 
-const variantsOf = (effect) => (effect.effect === 'explode' ? DIRECTIONS : 1);
+const variantsOf = (effect) => (effect.effect === 'explode' ? DIRECTIONS : (effect.effect === 'part' || effect.effect === 'reel' ? 2 : 1));
 
 /** Every @keyframes rule an effect needs in a phase ('a' or 'b': flipped to restart it). */
 export function textEffectRules(effect, { phase = 'a', colourProperty = 'color' } = {}) {
@@ -277,17 +316,26 @@ export function textEffectRules(effect, { phase = 'a', colourProperty = 'color' 
  * The inline style of each piece for one run of an effect over `pieces`: `animation` on the animated
  * ones, nothing on white space, and the display that lets a transform apply to a piece of a line.
  * A shimmer that loops starts each piece in step with the others, so the light keeps travelling.
+ * `columns`: the caller draws a reel's pieces as windows on their columns (reelColumns), and this is
+ * the style of the column inside each window; otherwise a reel rolls each piece up into place.
  */
-export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 'color', seedText = '', at = null } = {}) {
+export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 'color', seedText = '', at = null, columns = false } = {}) {
   const hash = textEffectHash(effect, colourProperty);
   const ranks = pieceRanks(pieces, effect.order, seedText);
   const count = effect.iterations === 'infinite' ? 'infinite' : String(effect.iterations);
   const fill = effect.way === 'out' ? 'both' : 'backwards';
-  const moves = ['explode', 'roll', 'push'].includes(effect.effect);
+  const moves = ['explode', 'roll', 'push', 'part', 'reel'].includes(effect.effect);
+  // Part: the first half of the animated pieces is one door, the rest the other.
+  const animated = pieces.map((piece, index) => (piece.animated ? index : -1)).filter((index) => index >= 0);
+  const firstHalf = new Set(animated.slice(0, Math.ceil(animated.length / 2)));
+  const reelWindow = effect.effect === 'reel' && columns;
   return pieces.map((piece, index) => {
-    const display = moves ? 'display:inline-block;white-space:pre;' : '';
+    const display = moves ? `display:inline-block;white-space:pre;${reelWindow ? `vertical-align:top;--ce-reel:${effect.spins ?? 6};` : ''}` : '';
     if (ranks[index] < 0) return display;
-    const variant = effect.effect === 'explode' ? hashText(`${seedText}:${index}`) % DIRECTIONS : 0;
+    let variant = 0;
+    if (effect.effect === 'explode') variant = hashText(`${seedText}:${index}`) % DIRECTIONS;
+    else if (effect.effect === 'part') variant = firstHalf.has(index) ? 0 : 1;
+    else if (effect.effect === 'reel') variant = reelWindow ? 0 : 1;
     // `at` poses the effect at that moment instead of playing it (the Animation Designer's playhead):
     // every piece's delay moves back by it, and the pieces are paused (keyframeAnimation.js timing).
     const posed = Number.isFinite(at);
@@ -298,7 +346,27 @@ export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 
 
 /** Whether an effect slides the text across its own box, which then has to clip it. */
 export function textEffectClips(effect) {
-  return effect?.effect === 'roll' || effect?.effect === 'push';
+  return ['roll', 'push', 'part', 'reel'].includes(effect?.effect);
+}
+
+/** The window a reel's letter rolls in: one line high, the column inside it cut off above and below. */
+export const REEL_WINDOW = 'display:inline-block;height:1lh;overflow:hidden;vertical-align:bottom;';
+
+/**
+ * Each piece's reel column, or null where the piece shows its own text: a reel's animated pieces
+ * only. A column is the letter and then the glyphs it rolls past, a line each, chosen from the
+ * effect's glyphs and seeded, so a run rolls the same every time. The letter is on top, so a window
+ * at rest shows it.
+ */
+export function reelColumns(effect, pieces, { seedText = '' } = {}) {
+  if (effect?.effect !== 'reel') return pieces.map(() => null);
+  const pool = graphemes(effect.glyphs || REEL_GLYPHS);
+  return pieces.map((piece, index) => {
+    if (!piece.animated) return null;
+    const random = seeded(hashText(`${seedText}:reel:${index}`));
+    const others = Array.from({ length: effect.spins ?? 6 }, () => pool[Math.floor(random() * pool.length)]);
+    return [piece.text, ...others].join('\n');
+  });
 }
 
 /** A new text animation, as the Animation tab and the States tab make one. */

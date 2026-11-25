@@ -98,7 +98,7 @@
   import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { noteAnimationsFired, animationPlays, requestAnimationPlay } from '../stores/animationActivity.js';
-  import { splitText, textEffectSpan, textPieceStyles } from '../utils/textEffects.js';
+  import { splitText, textEffectSpan, textPieceStyles, reelColumns, REEL_WINDOW } from '../utils/textEffects.js';
   import { createKeyframePlayer, animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { transport } from '../stores/transport.js';
   import {
@@ -1976,8 +1976,11 @@
     lines.forEach((line, index) => {
       for (const piece of splitText(line === '' ? '\u200B' : line, item.effect.split)) all.push({ ...piece, line: index });
     });
-    const styles = textPieceStyles(item.effect, all, { phase: item.phase, seedText: `${core?.id ?? ''}:${item.name}`, at: item.at ?? null });
-    const pieces = all.map((piece, index) => ({ ...piece, style: styles[index] }));
+    const seedText = `${core?.id ?? ''}:${item.name}`;
+    // A reel's letters are windows on their columns (textEffects.js reelColumns).
+    const styles = textPieceStyles(item.effect, all, { phase: item.phase, seedText, at: item.at ?? null, columns: true });
+    const columns = reelColumns(item.effect, all, { seedText });
+    const pieces = all.map((piece, index) => ({ ...piece, style: styles[index], column: columns[index] }));
     return lines.map((_, index) => pieces.filter((piece) => piece.line === index));
   }
 
@@ -3112,7 +3115,8 @@
    * pair. Both of those are invisible in the server-rendered string a golden baseline reads; only
    * the browser's parse shows the loss.
    */
-  let textGlyphAndLineStyle = $derived([textGlyphStyle, soleLineStyle].filter(Boolean).join('; '));
+  // How far a Part effect's halves travel to leave the box: its width (textEffects.js).
+  let textGlyphAndLineStyle = $derived([textGlyphStyle, soleLineStyle, `--ce-part-reach:${Math.round(displayW || 0)}px`].filter(Boolean).join('; '));
   // The live words as pieces while a text effect plays on them, per line; null when none does.
   let livePieces = $derived(liveTextEffect && !showBlockTextVisual ? textPiecesFor(svgTextLines, liveTextEffect) : null);
   let ghostPieces = $derived(ghostText && ghostTextEffect && !showBlockTextVisual ? textPiecesFor(ghostText.lines, ghostTextEffect) : null);
@@ -4090,6 +4094,8 @@
       <img class="native-text-preview" style={nativePreviewStyle} src={nativePreviewData} alt="" />
     {/if}
 
+    <!-- A piece of words with a text effect on it; a reel's letter is a window on its column. -->
+    {#snippet wordPiece(piece)}{#if piece.column}<span style={REEL_WINDOW}><span style={piece.style}>{piece.column}</span></span>{:else}<span style={piece.style}>{piece.text}</span>{/if}{/snippet}
     {#if hasText && !textSet.usesCustomFlow && (!shouldUseNativeTextPreview || !nativePreviewData || showBlockTextVisual)}
       <div class="text-content" style={textStyle}>
         <!--
@@ -4110,7 +4116,7 @@
             <span class="text-span text-ghost" aria-hidden="true" style="{ghostText.anchor}; {ghostText.span}">
               <span class="text-glyphs" style={ghostText.glyph}>
                 {#each ghostPieces as linePieces}
-                  <span class="text-line ghost-line">{#each linePieces as piece}<span style={piece.style}>{piece.text}</span>{/each}</span>
+                  <span class="text-line ghost-line">{#each linePieces as piece}{@render wordPiece(piece)}{/each}</span>
                 {/each}
               </span>
             </span>
@@ -4125,13 +4131,13 @@
           >
             {#if foldsSoleLine}
               {#if livePieces}
-                {#each livePieces[0] as piece}<span style={piece.style}>{piece.text}</span>{/each}
+                {#each livePieces[0] as piece}{@render wordPiece(piece)}{/each}
               {:else}
                 {blockLineDomText(svgTextLines[0])}
               {/if}
             {:else}
               {#each svgTextLines as line, index}
-                <span class="text-line" style={blockLineDomStyleFor(index)}>{#if livePieces}{#each livePieces[index] as piece}<span style={piece.style}>{piece.text}</span>{/each}{:else}{blockLineDomText(line)}{/if}</span>
+                <span class="text-line" style={blockLineDomStyleFor(index)}>{#if livePieces}{#each livePieces[index] as piece}{@render wordPiece(piece)}{/each}{:else}{blockLineDomText(line)}{/if}</span>
               {/each}
             {/if}
           </span>

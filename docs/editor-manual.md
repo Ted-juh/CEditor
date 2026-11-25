@@ -1259,7 +1259,11 @@ There are four kinds, and a fifth on a knob or a slider:
   spin** in the Animation Designer's **Paint** effects are ready-made ones.
 - **Sequence** — a timeline of keyframes on several tracks, which you can scrub with a playhead.
 - **Text** — an effect on the control's words themselves: **Typewriter**, **Explode**, **Roll**,
-  **Push**, **Wipe**, **Crossfade** and **Shimmer**, each **In** or **Out**, cut into letters, words
+  **Push**, **Wipe**, **Crossfade**, **Shimmer**, **Part** and **Reel**, each **In** or **Out**. **Part**
+  opens the words down their middle like a pair of doors, each half into the edge of the box (in,
+  they close). **Reel** rolls each letter up through a column of other glyphs to the letter, like a
+  slot machine or a code breaking; its **Spins** say how many glyphs it passes, and **Through**
+  gives it glyphs of its own. Each is cut into letters, words
   or lines that start one after another (**ms apart**), forwards, backwards, from the centre or in
   a random order. It can wait for the words to change: to the value, or to the name. A knob or a
   slider has no words of its own (its name and value are Labels beside it), so on one it plays on

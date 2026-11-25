@@ -1553,7 +1553,7 @@ export const COMMANDS = [
     summary: 'Change a control\'s words with a transition: the old ones leave, the new ones arrive.',
     example: '`animateSwap("Readout", "Saw", "roll")` rolls the old words out and "Saw" in.',
     notes: [
-      'The effect is a text effect\'s name: roll, push, wipe, crossfade, typewriter, explode, shimmer. Its "out" plays on the old words, its "in" on the new.',
+      'The effect is a text effect\'s name: roll, push, wipe, crossfade, typewriter, explode, shimmer, part, reel. Its "out" plays on the old words, its "in" on the new.',
       'The new words are written when the old ones have left. Cut short by another effect on the same words: done(false), and they are not written.',
       'With the panel\'s window closed: returns false and the words are not changed; set them with set().',
     ],

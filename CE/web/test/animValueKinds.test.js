@@ -47,7 +47,7 @@ test('a swap\'s effect is a text effect, by name, its "in" what the preview play
   const roll = readSwapEffect('Roll in');
   assert.equal(roll.meaning.found, true);
   assert.equal(roll.meaning.entry.effect.effect, 'roll');
-  assert.deepEqual(roll.meaning.choices, ['typewriter', 'explode', 'roll', 'push', 'wipe', 'crossfade', 'shimmer']);
+  assert.deepEqual(roll.meaning.choices, ['typewriter', 'explode', 'roll', 'push', 'wipe', 'crossfade', 'shimmer', 'part', 'reel']);
   assert.equal(roll.meaning.choiceNames.roll, 'Roll');
   assert.match(readSwapEffect('zoom').problem.message, /is not a text effect; try typewriter/);
 });

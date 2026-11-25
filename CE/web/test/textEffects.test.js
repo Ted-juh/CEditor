@@ -19,8 +19,8 @@ import {
   textPieceStyles,
 } from '../src/CE_Application/utils/textEffects.js';
 
-test('the seven effects the owner approved, each reads with its own defaults, in and out', () => {
-  assert.deepEqual(TEXT_EFFECT_NAMES, ['typewriter', 'explode', 'roll', 'push', 'wipe', 'crossfade', 'shimmer']);
+test('the seven effects the owner approved, and Part and Reel since, each reads with its own defaults, in and out', () => {
+  assert.deepEqual(TEXT_EFFECT_NAMES, ['typewriter', 'explode', 'roll', 'push', 'wipe', 'crossfade', 'shimmer', 'part', 'reel']);
   for (const name of TEXT_EFFECT_NAMES) {
     for (const way of ['in', 'out']) {
       const effect = readTextEffect(newTextEffectShape('a', name, way));
