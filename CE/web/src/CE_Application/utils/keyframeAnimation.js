@@ -45,6 +45,12 @@
  * are the fifth channel, `gradient`, carried to the gradient layer as `--ce-kf-gradient` like the
  * colours, so a sheen can sweep across a chrome fill or a conic gradient spin while the control does
  * not move. 2026-11-24, the Animation Designer's step 3.
+ *
+ * AND AN IMAGE. `panX`, `panY`, `zoom` and `spin` frames move a fill's background image inside its
+ * clip: a slow zoom and drift across a photograph, a dial face turning behind the knob. They are
+ * the sixth channel, `image`, carried as `--ce-kf-image` to the element that paints the picture
+ * (BackgroundRenderer's `.bg-fill-paint`), whose own `translate`, `scale` and `rotate` they animate —
+ * individual properties, so they add to the rotation and flips the image is set with.
  */
 import { readTrigger } from './interactionRuntime.js';
 import { easingToCss } from './easing.js';
@@ -71,6 +77,13 @@ export const FRAME_COLOURS = ['fill', 'text'];
 /** What a frame can do to a fill gradient: turn it (degrees) and shift its stops (percent). */
 export const FRAME_GRADIENT = ['turn', 'shift'];
 const GRADIENT_LIMITS = { turn: [-3600, 3600], shift: [-200, 200] };
+
+/**
+ * What a frame can do to a fill's image (AND AN IMAGE, below): pan it across and down (percent of
+ * the box), zoom it (times its size) and spin it (degrees), inside the clip it is painted in.
+ */
+export const FRAME_IMAGE = ['panX', 'panY', 'zoom', 'spin'];
+const IMAGE_LIMITS = { panX: [-200, 200], panY: [-200, 200], zoom: [0.1, 10], spin: [-3600, 3600] };
 
 /**
  * A frame colour as the document stores colours — AARRGGBB, upper case — or null. Six digits are
@@ -101,7 +114,9 @@ export const COLOUR_CHANNELS = Object.freeze({
 });
 /** The fifth channel: a fill gradient's turn and shift (see AND A GRADIENT). */
 export const GRADIENT_CHANNEL = 'gradient';
-const CHANNEL_NAMES = [...Object.keys(COLOUR_CHANNELS), GRADIENT_CHANNEL];
+/** The sixth: a fill image's pan, zoom and spin (see AND AN IMAGE). */
+export const IMAGE_CHANNEL = 'image';
+const CHANNEL_NAMES = [...Object.keys(COLOUR_CHANNELS), GRADIENT_CHANNEL, IMAGE_CHANNEL];
 
 /** A new keyframe animation's frames: a gentle pulse that ends where it starts. */
 export const PULSE_FRAMES = Object.freeze([
@@ -148,6 +163,12 @@ export function cleanFrames(frames) {
       const value = Number(frame[key]);
       if (frame[key] === undefined || frame[key] === null || frame[key] === '' || !Number.isFinite(value)) continue;
       const [lo, hi] = GRADIENT_LIMITS[key];
+      clean[key] = Math.min(hi, Math.max(lo, value));
+    }
+    for (const key of FRAME_IMAGE) {
+      const value = Number(frame[key]);
+      if (frame[key] === undefined || frame[key] === null || frame[key] === '' || !Number.isFinite(value)) continue;
+      const [lo, hi] = IMAGE_LIMITS[key];
       clean[key] = Math.min(hi, Math.max(lo, value));
     }
     out.push(clean);
@@ -283,6 +304,11 @@ export function animationValue(entry, phase = 'a', options = {}) {
  * channel, the frames that turn or shift it, as [{ at, turn?, shift? }].
  */
 export function channelFrames(entry, channel) {
+  if (channel === IMAGE_CHANNEL) {
+    return entry.frames
+      .filter((frame) => FRAME_IMAGE.some((key) => frame[key] !== undefined))
+      .map((frame) => ({ at: frame.at, ...Object.fromEntries(FRAME_IMAGE.filter((key) => frame[key] !== undefined).map((key) => [key, frame[key]])) }));
+  }
   if (channel === GRADIENT_CHANNEL) {
     return entry.frames
       .filter((frame) => frame.turn !== undefined || frame.shift !== undefined)
@@ -303,6 +329,18 @@ export function channelFrames(entry, channel) {
  */
 export function colourKeyframesRule(entry, channel, phase = 'a') {
   const frames = channelFrames(entry, channel);
+  if (channel === IMAGE_CHANNEL) {
+    // A frame that pans writes both axes (a pan along one is none along the other); one that only
+    // zooms or spins leaves translate out, so the pan eases through it from the frames either side.
+    const body = frames.map((frame) => {
+      const declarations = [];
+      if (frame.panX !== undefined || frame.panY !== undefined) declarations.push(`translate:${number(frame.panX ?? 0)}% ${number(frame.panY ?? 0)}%`);
+      if (frame.zoom !== undefined) declarations.push(`scale:${number(frame.zoom)}`);
+      if (frame.spin !== undefined) declarations.push(`rotate:${number(frame.spin)}deg`);
+      return `${number(frame.at * 100)}%{${declarations.join(';')}}`;
+    }).join('');
+    return `@keyframes ce-kf-${channel}-${framesHash(frames)}-${phase}{${body}}`;
+  }
   if (channel === GRADIENT_CHANNEL) {
     const body = frames.map((frame) => {
       const declarations = [];
@@ -479,7 +517,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
   };
 }
 
-const emptyChannels = () => ({ paint: [], shape: [], stroke: [], text: [], gradient: [] });
+const emptyChannels = () => ({ paint: [], shape: [], stroke: [], text: [], gradient: [], image: [] });
 
 /**
  * The CSS for one part's (or the control's) animations: `animation:…;`, or ''.

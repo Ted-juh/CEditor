@@ -64,6 +64,14 @@ function panel(prefix) {
   pedal._children.Text.content = 'Pedal';
   // A drag heard on a button's key only: its margin, outside the key, moves nothing.
   const knock = place(createControl('Button'), `${prefix}knock`, 'Knock', 20, 400, 200, 60);
+  // A background image a scene drifts: zoomed and panned inside its clip, the label still.
+  const photo = place(createControl('Label'), `${prefix}photo`, 'Photo', 460, 400, 140, 60);
+  photo._children.Text.content = 'Photo';
+  Object.assign(photo._children.Background._children.Fill, {
+    imageEnabled: true,
+    imageSrc: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="20" height="20" fill="#c33"/><rect x="20" y="20" width="20" height="20" fill="#3c3"/></svg>')}`,
+    imageFit: 'tile',
+  });
   // A pattern a state changes — fainter, larger, faster on Hover — on a colour timing of 600 ms.
   const glow = place(createControl('Label'), `${prefix}glow`, 'Glow', 240, 400, 200, 60);
   glow._children.Text.content = 'Glow';
@@ -79,7 +87,7 @@ function panel(prefix) {
   } } };
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 480, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 480, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -103,6 +111,8 @@ function panel(prefix) {
       { id: 'sc_keydrag', name: 'Key drag', trigger: { type: 'script' }, length: 1000, loop: false,
         clock: exactly('drag', `${prefix}knock`, { span: 100, direction: 'up', release: 'stay', part: 'key' }),
         clips: [clip('c16', `${prefix}knock`, 'Transform', 0, 1000, fade)] },
+      { id: 'sc_drift', name: 'Drift', trigger: { type: 'script' }, length: 6000, loop: false,
+        clips: [clip('c17', `${prefix}photo`, 'Transform', 0, 6000, sceneEffect('paint:imageDrift').effect)] },
       // A pattern clip: Wave's pattern pulsed, its scroll going on underneath.
       { id: 'sc_shimmer', name: 'Shimmer', trigger: { type: 'script' }, length: 800, loop: false,
         clips: [clip('c13', `${prefix}wave`, 'Patterns.pattern1', 0, 800, sceneEffect('pattern:pulse').effect)] },
@@ -127,7 +137,7 @@ mount(SceneStageHost, { target: document.getElementById('still'), props: { panel
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
 window.__scenes = {
-  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'still_wave'].every((id) => root(id)),
+  ready: () => ['wave', 'cutoff', 'start', 'lamp', 'pad', 'level', 'gauge', 'dial', 'fader', 'macro', 'vu', 'kick', 'pedal', 'knock', 'glow', 'photo', 'still_wave'].every((id) => root(id)),
   /** Every animation drawn on a control's box: name, delay, state. */
   box: (id) => {
     const el = root(id);
@@ -155,6 +165,15 @@ window.__scenes = {
     return {
       clip: { name: clipStyle.animationName, state: clipStyle.animationPlayState, delay: clipStyle.animationDelay },
       scroll: mover ? { name: getComputedStyle(mover).animationName, state: getComputedStyle(mover).animationPlayState } : null,
+    };
+  },
+  /** A control's background image as drawn: the picture's own animation, and the control's. */
+  imageMotion: (id) => {
+    const paint = root(id)?.querySelector('.bg-fill-paint.image');
+    const style = paint ? getComputedStyle(paint) : null;
+    return {
+      picture: style ? { name: style.animationName, state: style.animationPlayState, delay: style.animationDelay, scale: style.scale, translate: style.translate } : null,
+      control: getComputedStyle(root(id)).animationName,
     };
   },
   /** A pattern as drawn now: its layer's opacity, its tile's size, and its scroll's place and rate. */

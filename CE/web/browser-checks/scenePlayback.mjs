@@ -17,6 +17,7 @@
  *   - MIDI in starts scenes: a kick drum's note, and the sustain pedal as it goes down, once
  *   - a drag heard on one part: on a button's key it moves the scene, on its margin it does not
  *   - a state that changes a pattern eases its opacity, size and speed, and its scroll keeps its place
+ *   - a scene drifts a background image — zoomed and panned inside its clip — and not the control
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -319,6 +320,24 @@ try {
     assert.ok(placeGap(glowAtOnce.place, glowRest.place) < 0.08, `the scroll kept its place: ${glowRest.place} -> ${glowAtOnce.place}`);
     assert.ok(glowMid.rate > 0.3 && glowMid.rate < 0.98, `its speed easing to the new: rate ${glowMid.rate}`);
     assert.equal(glowHover.rate, 1, 'at the new speed');
+  });
+
+  // An image drift: the picture inside the Photo label's fill moves, the label does not.
+  const photoBefore = await s('imageMotion', 'photo');
+  await page.evaluate(() => window.__scenes.script('animatePlay', ['Drift', {}]));
+  await page.waitForTimeout(150);
+  const photoDrifting = await s('imageMotion', 'photo');
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Drift', 0.5]));
+  await page.waitForTimeout(80);
+  const photoHeld = await s('imageMotion', 'photo');
+  check('a scene drifts a background image, zoomed and panned inside its clip, and not the control', () => {
+    assert.ok(!photoBefore.picture || photoBefore.picture.name === 'none', `still before: ${JSON.stringify(photoBefore)}`);
+    assert.match(photoDrifting.picture?.name ?? '', /^ce-kf-image-/, JSON.stringify(photoDrifting));
+    assert.equal(photoDrifting.picture.state, 'running');
+    assert.ok(!/ce-kf-/.test(photoDrifting.control), `the label itself does not move: ${photoDrifting.control}`);
+    assert.equal(photoHeld.picture.state, 'paused');
+    assert.match(photoHeld.picture.delay, /^-3s$/, `held half way: ${photoHeld.picture.delay}`);
+    assert.ok(Number(photoHeld.picture.scale) > 1.05 && Number(photoHeld.picture.scale) < 1.15, `zoomed part way: ${photoHeld.picture.scale}`);
   });
 
   // MIDI in: the kick's note starts its scene; the pedal starts its own going down, not while held.

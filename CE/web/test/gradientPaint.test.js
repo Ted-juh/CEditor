@@ -183,5 +183,5 @@ test('a sheen plays on the gradient channel, carried to the layer that paints th
   assert.equal(channels.paint.length, 0);
   assert.equal(out.parts.size, 0, 'no motion keyframes');
   assert.match(out.rules, /@keyframes ce-kf-gradient-[a-z0-9]+-a\{0%\{--ce-g-shift:-100%\}100%\{--ce-g-turn:45deg;--ce-g-shift:100%\}\}/);
-  assert.match(colourVariables(channels), /--ce-kf-gradient:ce-kf-gradient-[a-z0-9]+-a 2000ms linear 0ms infinite normal none;$/);
+  assert.match(colourVariables(channels), /--ce-kf-gradient:ce-kf-gradient-[a-z0-9]+-a 2000ms linear 0ms infinite normal none;--ce-kf-image:none;$/);
 });

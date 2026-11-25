@@ -1138,6 +1138,44 @@ Verified locally:
 - WebKitGTK 2.52, the same hover: opacity 1 → 0.86 → 0.54 → 0.3, tile 64 → 77 → 106 → 128 px, rate
   0.55 → 0.77 → 1, the place kept.
 
+## As built: image fills that animate (2026-11-25)
+
+Paint's last item, left out of step 3. A fill's background image now moves under keyframes, inside
+its clip, while the control stays put.
+
+- **Frames** may set `panX` and `panY` (percent of the box, ±200), `zoom` (0.1 to 10) and `spin`
+  (degrees), kept in range by `cleanFrames` like the rest (`FRAME_IMAGE`).
+- **The sixth channel**, `image` (`IMAGE_CHANNEL`), beside the four colours and the gradient. Its
+  keyframes animate the picture's own `translate`, `scale` and `rotate`.
+  - These are individual properties, so they add to the rotation and flips the image is set with.
+  - No registered property is needed, unlike the gradient's.
+  - A frame that pans writes both axes; one that only zooms or spins leaves `translate` out, so the
+    pan eases through it.
+- **Drawing.** `BackgroundRenderer` draws a moving image as its clip with the picture inside
+  (`.bg-fill-paint.image`, which plays `--ce-kf-image`). That is the two-element form a rotated or
+  flipped image already had, so the picture moves and the clip does not.
+  - A control or a part with a moving image does not absorb its fill onto its content element:
+    moving it there would move the words with it.
+  - Both cases switch back when the animation is gone.
+- **The editors.** The frames editor shows image pan, zoom and spin where the place paints an
+  image (the Animation tab and the Designer's clip settings), or where a frame already sets one,
+  as it does the gradient's.
+- **The library** gains **Image drift** (a slow push in and pan over six seconds) and **Image spin**
+  (a turn over eight), under Paint.
+- **Scenes** carry the channel like the others (`sceneControlOutput`, `mergeKeyframeOutputs`).
+
+Verified locally:
+- `test/imageMotion.test.js` (new): the frames and their limits, the channel's keyframes and value,
+  a spin-only frame leaving the pan alone, and the library's drift in a scene with nothing on the
+  control itself;
+- `test/keyframeAnimation.test.js` and `test/gradientPaint.test.js`, updated for the sixth channel's
+  variable;
+- the browser checks `scenePlayback` (a script-started drift plays on the picture and not the label,
+  and a seek holds it half way, zoomed part way), `panelMotion`, `animationTab`, `effectsTab`,
+  `animationDesigner` and `anatomyForms`;
+- WebKitGTK 2.52: the drift held near its end, scale 1.149 and pan −4 % −3 %. The checker image moved
+  inside the label's border while the label and its words stayed put.
+
 ## Open
 
 Nothing for the owner at present.

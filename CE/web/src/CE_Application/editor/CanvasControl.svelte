@@ -2043,7 +2043,10 @@
   // The one thing this does move: `.control-content` carries `overflow: hidden`, so a rounded fill
   // now rounds the clip as well as the paint. Content in the corner of a rounded control used to
   // be drawn outside its own visible shape; it is cut to it instead.
-  let absorbedFillCSS = $derived(background ? plainFillCSS(background, displayW, displayH) : null);
+  // A fill whose image a keyframe animation moves (keyframeAnimation.js, AND AN IMAGE) is drawn as
+  // a layer: absorbed onto .control-content, moving the picture would move the content with it.
+  let imageMoves = $derived(!!keyframeColours?.get?.('')?.image?.length);
+  let absorbedFillCSS = $derived(background && !imageMoves ? plainFillCSS(background, displayW, displayH) : null);
 
   function textShapeMaskId(kind = 'block') {
     return `text-shape-mask-${svgIdSeed}-${kind}`;
@@ -3492,7 +3495,7 @@
   <EffectSurface effects={hasAnatomy ? null : effects} width={displayW} height={displayH} shadowsOnly target="component">
   {#if separateBackground && !hasAnatomy}
     <div class="control-background" style={filterCSS}>
-      <BackgroundRenderer {background} width={displayW} height={displayH} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} {imageMoves} />
     </div>
   {/if}
   <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
@@ -3500,7 +3503,7 @@
       <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
-      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} {imageMoves} />
     {/if}
 
     {#if ownRenderer === 'LcdDisplay'}

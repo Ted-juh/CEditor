@@ -41,6 +41,7 @@
   });
   let isText = $derived(clip?.effect?.kind === 'text');
   let gradient = $derived(!!(control?._children?.Background?._children?.Fill?.gradientEnabled));
+  let image = $derived(control?._children?.Background?._children?.Fill?.imageEnabled === true && !!control?._children?.Background?._children?.Fill?.imageSrc);
   let controlName = $derived(String(control?._children?.Core?.name || clip?.controlId || ''));
   let presetName = $state('');
   $effect(() => { presetName = clip ? `${controlName} ${isText ? (clip.effect.effect ?? 'text') : isValue ? (clip.label || 'value') : 'effect'}` : ''; });
@@ -92,7 +93,7 @@
     {:else if isValue}
       <ValueFramesEditor frames={clip.effect.frames ?? []} onchange={(frames) => onpatch({ frames })} />
     {:else}
-      <FramesEditor frames={clip.effect.frames ?? []} {gradient} onchange={(frames) => onpatch({ frames })} />
+      <FramesEditor frames={clip.effect.frames ?? []} {gradient} {image} onchange={(frames) => onpatch({ frames })} />
     {/if}
     <div class="grp">Script</div>
     <p class="mono" title="What a script names this place by">{controlName}{clip.target === 'Transform' || clip.target === 'Value' ? '' : `.${clip.target}`}</p>

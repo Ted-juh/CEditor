@@ -18,14 +18,14 @@
 import { newSceneId, cleanClip, cleanScene, SCENE_MAX_LENGTH, VALUE_TARGET } from './sceneFormat.js';
 import {
   readKeyframes, animationValue, keyframesRule, channelFrames, colourAnimationValue, colourKeyframesRule,
-  COLOUR_CHANNELS, GRADIENT_CHANNEL,
+  COLOUR_CHANNELS, GRADIENT_CHANNEL, IMAGE_CHANNEL,
 } from './keyframeAnimation.js';
 import { readTextEffect, textEffectRules, TEXT_EFFECTS, TEXT_EFFECT_NAMES } from './textEffects.js';
 import { flatControls } from './containment.js';
 import { patternEntries, patternLabel } from './patternLayers.js';
 import { partPlace } from './targetPaths.js';
 
-const CHANNELS = [...Object.keys(COLOUR_CHANNELS), GRADIENT_CHANNEL];
+const CHANNELS = [...Object.keys(COLOUR_CHANNELS), GRADIENT_CHANNEL, IMAGE_CHANNEL];
 const deepCopy = (value) => JSON.parse(JSON.stringify(value));
 
 // --- The library's effects ------------------------------------------------------------------------
@@ -57,6 +57,10 @@ export const SCENE_EFFECTS = Object.freeze([
   { id: 'paint:sheen', label: 'Gradient sheen', category: 'Paint', target: 'Transform', length: 1600, effect: keyframesEffect([{ at: 0, shift: -100 }, { at: 1, shift: 100 }], { easing: 'linear' }) },
   { id: 'paint:turn', label: 'Gradient turn', category: 'Paint', target: 'Transform', length: 2000, effect: keyframesEffect([{ at: 0, turn: 0 }, { at: 1, turn: 360 }], { easing: 'linear' }) },
   { id: 'paint:flash', label: 'Colour flash', category: 'Paint', target: 'Transform', length: 400, effect: keyframesEffect([{ at: 0, fill: 'FFFFFFFF' }, { at: 1 }], { easing: 'outQuad' }) },
+  // The fill's image, inside its clip (keyframeAnimation.js, AND AN IMAGE): a slow zoom and drift
+  // across a photograph, and a face turning behind the control.
+  { id: 'paint:imageDrift', label: 'Image drift', category: 'Paint', target: 'Transform', length: 6000, effect: keyframesEffect([{ at: 0, zoom: 1, panX: 0, panY: 0 }, { at: 1, zoom: 1.15, panX: -4, panY: -3 }], { easing: 'inOutQuad' }) },
+  { id: 'paint:imageSpin', label: 'Image spin', category: 'Paint', target: 'Transform', length: 8000, effect: keyframesEffect([{ at: 0, spin: 0 }, { at: 1, spin: 360 }], { easing: 'linear' }) },
   // On one of the control's patterns (target 'Patterns': its first, unless dropped on another's track):
   // the pattern as a whole, faded or moved, its own scroll going on underneath.
   { id: 'pattern:fadeIn', label: 'Pattern fades in', category: 'Pattern', target: 'Patterns', length: 700, effect: keyframesEffect([{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }]) },
@@ -292,7 +296,7 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a' } 
     }
     for (const channel of CHANNELS) {
       if (!channelFrames(entry, channel).length) continue;
-      const lists = colours.get(part) ?? { paint: [], shape: [], stroke: [], text: [], gradient: [] };
+      const lists = colours.get(part) ?? { paint: [], shape: [], stroke: [], text: [], gradient: [], image: [] };
       lists[channel].push(colourAnimationValue(entry, channel, phase, options));
       colours.set(part, lists);
       rules.push(colourKeyframesRule(entry, channel, phase));
@@ -315,7 +319,7 @@ export function mergeKeyframeOutputs(own, scene) {
   };
   const colours = new Map(own.colours ?? []);
   for (const [part, lists] of scene.colours ?? []) {
-    const current = colours.get(part) ?? { paint: [], shape: [], stroke: [], text: [], gradient: [] };
+    const current = colours.get(part) ?? { paint: [], shape: [], stroke: [], text: [], gradient: [], image: [] };
     colours.set(part, Object.fromEntries(CHANNELS.map((channel) => [channel, [...(current[channel] ?? []), ...(lists[channel] ?? [])]])));
   }
   return {

@@ -1253,7 +1253,10 @@ There are four kinds, and a fifth on a knob or a slider:
 - **Keyframes** — a little loop of poses, played all the time, in a state, when the value changes,
   on the beat, on a gesture, or when a script asks for it. Besides the poses, a frame can **turn**
   the fill's gradient (degrees) and **shift** its stops (percent), so a sheen sweeps across or a
-  conic gradient spins while the control stays put.
+  conic gradient spins while the control stays put. Where the fill has an image, a frame can also
+  **pan** it across or down (percent of the box), **zoom** it and **spin** it, inside its clip: a
+  slow push into a photograph, or a dial face turning behind the knob. **Image drift** and **Image
+  spin** in the Animation Designer's **Paint** effects are ready-made ones.
 - **Sequence** — a timeline of keyframes on several tracks, which you can scrub with a playhead.
 - **Text** — an effect on the control's words themselves: **Typewriter**, **Explode**, **Roll**,
   **Push**, **Wipe**, **Crossfade** and **Shimmer**, each **In** or **Out**, cut into letters, words

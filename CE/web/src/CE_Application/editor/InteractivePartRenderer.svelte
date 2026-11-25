@@ -360,8 +360,10 @@
   // Not on a layer that casts a control's shadows: its fill must be inside the surface that casts
   // them, or only its border would.
   let absorbedChannel = $derived(/gradient\(/.test(absorbedFillCSS ?? '') ? 'gradient' : 'paint');
+  // A fill whose image a keyframe animation moves is drawn as a layer, as on a control (CanvasControl).
+  let imageMoves = $derived(!!colourChannels?.image?.length);
   let absorbedFillCSS = $derived(
-    background && !surfaceEffects && !renderedImage && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
+    background && !imageMoves && !surfaceEffects && !renderedImage && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
       ? plainFillCSS(background, frame.width, frame.height)
       : null,
   );
@@ -952,7 +954,7 @@
           </svg>
         {/if}
         {#if background}
-          <BackgroundRenderer {background} width={frame.width} height={frame.height} {outline} patternTiming={transitionBucket?.colour ?? null} />
+          <BackgroundRenderer {background} width={frame.width} height={frame.height} {outline} patternTiming={transitionBucket?.colour ?? null} {imageMoves} />
         {/if}
         {#if shadowLayers?.inner.length}
           <svg class="interactive-outline-shadow" viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
@@ -991,7 +993,7 @@
            holds the colour and thickness that fall back to, and drawn as a box it put a full ring,
            radius 999 and the arc's own colour, under every arc the Arc pen made, so the arc's gap
            never showed. -->
-      <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} patternTiming={transitionBucket?.colour ?? null} />
+      <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} patternTiming={transitionBucket?.colour ?? null} {imageMoves} />
     {/if}
 
     {#if polygonFillStyle}

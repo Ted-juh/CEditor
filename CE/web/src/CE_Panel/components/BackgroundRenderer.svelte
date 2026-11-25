@@ -28,7 +28,9 @@
   // (PatternLayers.svelte), which read the operating system's setting themselves.
   // `patternAnimations`: a scene's clips on its patterns, by name (PatternLayers.svelte).
   // `patternTiming`: the colour timing its patterns ease a state's change on (PatternLayers.svelte).
-  let { background = null, width = 0, height = 0, absorbFill = false, outline = null, reducedMotion = false, patternAnimations = null, patternTiming = null } = $props();
+  // `imageMoves`: a keyframe animation moves the fill's image (keyframeAnimation.js, AND AN IMAGE), so
+  // it is drawn as a clip with its picture inside, which plays `--ce-kf-image`.
+  let { background = null, width = 0, height = 0, absorbFill = false, outline = null, reducedMotion = false, patternAnimations = null, patternTiming = null, imageMoves = false } = $props();
 
   // The two border drawings that need SVG, the segmented one and the one along an outline, are
   // components of their own (SegmentedBorder.svelte, OutlineBorder.svelte), made only for a
@@ -178,7 +180,7 @@
         image = buildImageFillParts('overlay', resolvedFillSource(fill.overlaySrc));
       }
 
-      if (image?.transformed) {
+      if (image?.transformed || (image && layerId === 'image' && imageMoves)) {
         // The outer element keeps the clip in the component's frame, and `overflow: hidden` holds
         // the cover-scaled picture to the component's box when the clip mode is "none".
         styles[layerId] = [image.compositing, fillLayerClipCSS(layerId), 'overflow: hidden;'].filter(Boolean).join(' ');
@@ -224,7 +226,7 @@
   <EffectSurface effects={fill?._children?.[`${layerId[0].toUpperCase()}${layerId.slice(1)}Effects`]} {width} {height} target={layerId}
     blend={fill?.[`${layerId}Blend`] ?? 'normal'}>
     <div class="bg-fill-layer" class:solid={layerId === 'solid'} class:gradient={layerId === 'gradient'} style={fillLayerStyles[layerId]}>
-      {#if fillLayerPaints[layerId]}<div class="bg-fill-paint" style={fillLayerPaints[layerId]}></div>{/if}
+      {#if fillLayerPaints[layerId]}<div class="bg-fill-paint" class:image={layerId === 'image'} style={fillLayerPaints[layerId]}></div>{/if}
     </div>
   </EffectSurface>
 {/each}
@@ -281,4 +283,6 @@
     inset: 0;
     pointer-events: none;
   }
+  /* …and the fill image's pan, zoom and spin frames (the `image` channel). */
+  .bg-fill-paint.image { animation: var(--ce-kf-image, none); }
 </style>
