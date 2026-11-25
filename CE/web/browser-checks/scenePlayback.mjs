@@ -21,6 +21,7 @@
  *   - a clip on a part's pattern pulses that pattern, and not the part or the control
  *   - a scene's markers call the scripts' actions as it passes them; one no script defines is said
  *   - two clips on one place: a fade in then out, and words typed in then out, each seen in turn
+ *   - a Label laid over another's words covers them: each control stacks as one, in document order
  *   - Part opens words down their middle, and Reel rolls a column of glyphs down onto each letter
  *   - a knob drawn as a form takes a text effect on its readout, whole
  *   - a scene types a knob's scale numbers round the dial, one number at a time, and rolls them each through a box of its
@@ -445,6 +446,27 @@ try {
     assert.ok(codePieces.every((piece) => piece.height > 8 && piece.height < 40), `a window one line high: ${JSON.stringify(codePieces.map((piece) => piece.height))}`);
     assert.ok(codePieces[0].y < -1, `the first column part way down onto its letter: ${codePieces[0].y}`);
     assert.ok(codeEnd.every((piece) => Math.abs(piece.y) < 0.5), `at the end each window rests on its letter: ${JSON.stringify(codeEnd.map((piece) => piece.y))}`);
+  });
+
+  // A Label laid over another's words covers them. The words sit at z-index 2 inside their control;
+  // before each control was a stacking context of its own they joined the surface's stacking and
+  // painted over the later Label's fill (CanvasControl.svelte, .canvas-control).
+  const surface = await s('surfaceRect');
+  const shot = await page.screenshot({ clip: { x: surface.x + 262 * surface.scale, y: surface.y + 480 * surface.scale, width: 96 * surface.scale, height: 20 * surface.scale } });
+  const through = await page.evaluate(async (png) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${png}`;
+    await image.decode();
+    const canvas = Object.assign(document.createElement('canvas'), { width: image.width, height: image.height });
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let off = 0;
+    for (let i = 0; i < data.length; i += 4) if (Math.abs(data[i] - 0xA0) + Math.abs(data[i + 1] - 0x30) + Math.abs(data[i + 2] - 0x30) > 30) off += 1;
+    return { off, of: data.length / 4 };
+  }, shot.toString('base64'));
+  check('a Label laid over another\'s words covers them: each control stacks as one, in document order', () => {
+    assert.equal(through.off, 0, `${through.off} of ${through.of} pixels are not the cover's red: the words under it show through`);
   });
 
   // A knob's own words: a typewriter on its scale numbers, one number at a time round the dial.

@@ -4435,10 +4435,17 @@
 </div>
 
 <style>
+  /* `isolation` makes each control a stacking context of its own, still in the document-order band
+     (no z-index: SceneryGround says why there is none). Without it the layers inside a control —
+     its words at z-index 2, a part's frames — joined the SURFACE's stacking and painted over every
+     later control drawn above them: a Label's words showed through the panel laid over it. The
+     Film Festival's Inception cut to black and kept its title. A control's own blend mode sits on
+     this element, so it still blends with what is behind the control. */
   .canvas-control {
     position: absolute;
     box-sizing: border-box;
     cursor: default;
+    isolation: isolate;
   }
   .canvas-control.embedded { pointer-events: none; }
   .macro-knob-ring { position: absolute; border-radius: 50%; pointer-events: none; }

@@ -104,9 +104,13 @@ function panel(prefix) {
   doors._children.Text.content = 'OPEN';
   const code = place(createControl('Label'), `${prefix}code`, 'Code', 110, 515, 120, 36);
   code._children.Text.content = 'C0DE';
+  // A Label laid exactly over another's words, which stay under it (CanvasControl.svelte's isolation).
+  const under = place(createControl('Label', { Text: { content: 'UNDER', _children: { Font: { size: 28 }, Fill: { colour: 'FFFFFFFF' } } } }), `${prefix}under`, 'Under', 250, 470, 120, 40);
+  const over = place(createControl('Label', { Text: { content: '' } }), `${prefix}over`, 'Over', 250, 470, 120, 40);
+  over._children.Background._children.Fill = { ...over._children.Background._children.Fill, colour: 'FFA03030' };
   const exactly = (source, controlId, more = {}) => ({ source, controlId, follow: 'exact', ...more });
   return {
-    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale, strip, sign, doors, code],
+    id: `${prefix}p`, name: 'Scenes', width: 620, height: 560, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp, pad, level, gauge, dial, fader, macro, vu, kick, pedal, knock, glow, photo, scale, strip, sign, doors, code, under, over],
     scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
@@ -204,6 +208,8 @@ window.__scenes = {
     const style = getComputedStyle(piece);
     return { name: style.animationName, delay: style.animationDelay, state: style.animationPlayState };
   },
+  /** Where the live surface is on the page, and its scale. */
+  surfaceRect: () => { const r = root('wave').closest('.panel-surface').getBoundingClientRect(); return { x: r.x, y: r.y, scale: r.width / 620 }; },
   rect: (id) => { const r = root(id).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; },
   /** A pattern's clip animation, and its scroll's (PatternLayers.svelte); `part` for a part's pattern. */
   pattern: (id, name, part = '') => {
