@@ -21,6 +21,8 @@
   import { flatControls } from '../../utils/containment.js';
   import { COMPONENT_TYPES, createControl } from '../../models/componentTypes.js';
   import { openTypedDocument, saveTypedDocumentAs } from '../../stores/typedDocuments.js';
+  import { effectFromPreset } from '../../utils/sceneModel.js';
+  import EffectPreview from './EffectPreview.svelte';
 
   let {
     mode = 'library',
@@ -44,6 +46,15 @@
     return counts;
   });
   let mineIds = $derived(new Set($animationPresetLibrary.map((preset) => preset.id)));
+  // The row whose preview plays (EffectPreview.svelte): pointed at, or with focus inside it. A preset
+  // of transitions has none: what it eases is a state change, which a stand-in does not have.
+  let previewId = $state('');
+  const previewOn = (id) => ({
+    onpointerenter: () => { previewId = id; },
+    onpointerleave: () => { if (previewId === id) previewId = ''; },
+    onfocusin: () => { previewId = id; },
+    onfocusout: () => { if (previewId === id) previewId = ''; },
+  });
   let panelById = $derived(new Map($panelAnimationPresets.map((preset) => [preset.id, preset])));
 
   const sizeWord = (preset) => (preset.size === 'recipe' ? `recipe of ${Object.keys(preset.animations).length}` : 'effect');
@@ -169,7 +180,9 @@
       </div>
       {#each $animationPresetLibrary as preset (preset.id)}
         {@const carried = panelById.get(preset.id)}
-        <div class="row" data-preset={preset.id}>
+        {@const shown = effectFromPreset(preset)}
+        <div class="row" data-preset={preset.id} {...previewOn(`mine:${preset.id}`)}>
+          {#if shown}<EffectPreview entry={shown} active={previewId === `mine:${preset.id}`} />{:else}<span class="nopv" aria-hidden="true"></span>{/if}
           <span class="nm" title={[preset.category, ...preset.tags].filter(Boolean).join(' · ')}>{preset.name}</span>
           <span class="meta">{preset.category ? `${preset.category} · ` : ''}{sizeWord(preset)} · v{preset.revision}</span>
           <span class="btns">
@@ -188,7 +201,9 @@
     <div class="sect">
       <div class="sh"><b>This panel</b> <span>{$panelAnimationPresets.length}</span></div>
       {#each $panelAnimationPresets as preset (preset.id)}
-        <div class="row" data-panel-preset={preset.id}>
+        {@const shown = effectFromPreset(preset)}
+        <div class="row" data-panel-preset={preset.id} {...previewOn(`panel:${preset.id}`)}>
+          {#if shown}<EffectPreview entry={shown} active={previewId === `panel:${preset.id}`} />{:else}<span class="nopv" aria-hidden="true"></span>{/if}
           <span class="nm">{preset.name}</span>
           <span class="meta">{plural(followers.get(preset.id) ?? 0, 'follower')} · {mineIds.has(preset.id) ? 'in your library' : 'only here'}</span>
           <span class="btns">
@@ -236,9 +251,10 @@
   .sh { display: flex; align-items: center; gap: 6px; }
   .sh span { color: #8A96A3; font-size: 12px; }
   .sh .imp { margin-left: auto; }
-  .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 8px; padding: 5px 6px; border-radius: 5px; background: #1E2328; }
-  .nm { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .meta { grid-row: 2; font-size: 12px; color: #8A96A3; }
-  .btns { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: 4px; }
+  .row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 8px; padding: 5px 6px; border-radius: 5px; background: #1E2328; }
+  .row > :global(.pv), .nopv { grid-column: 1; grid-row: 1 / span 2; align-self: center; }
+  .nm { grid-column: 2; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { grid-column: 2; grid-row: 2; font-size: 12px; color: #8A96A3; }
+  .btns { grid-column: 3; grid-row: 1 / span 2; display: flex; align-items: center; gap: 4px; }
   .none { margin: 0; font-size: 12px; color: #8A96A3; }
 </style>

@@ -1293,7 +1293,7 @@ or all of the control's as a recipe, with a name, a category and tags, in **My l
 state changes the animation eases with it, and says before you save what it needs (a state, a part)
 and which kinds of control it goes on. **Library…** at the end of the presets lists **Mine** and
 **This panel**, each with **Apply**, **Export…** and **Remove**, and **Import…** for a `.ceanim`
-file. A preset is applied linked: the animation follows it. Change a setting on the animation and it
+file; a preset with a keyframe, text or value animation previews it while you point at it. A preset is applied linked: the animation follows it. Change a setting on the animation and it
 is an override, marked with a blue bar in the card above **Kind**, with **Revert**; **Apply to
 preset** makes your change the preset's, for every animation that follows it; **Clear overrides**
 and **Detach** work as they do for a control set. A panel carries the presets it uses, so it plays
@@ -1327,7 +1327,10 @@ There is one Designer per panel, and it closes with its panel.
 
 - **Library** (left). Effects by kind (**Text**, **Swap**, **Move**, **Paint**, **Pattern**,
   **Value**) and **Mine**, your own presets. Drag one onto a control on the stage or onto a track,
-  or pick a control and click the effect.
+  or pick a control and click the effect. Each card shows the effect on a small stand-in while you
+  point at it: a box that moves or is painted, the word "Text", a framed pattern, a knob's ring. A
+  scene preset's card plays on one stand-in for each control it uses, or on three for one that
+  repeats over every knob. With reduced motion turned on, they stay still.
 
   **Pattern** effects (fades in or out, rises in, a pulse, a flicker) play on one of the control's
   patterns, the first unless you drop one on another pattern's track. The pattern moves and fades

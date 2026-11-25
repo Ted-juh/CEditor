@@ -81,6 +81,20 @@ window.__designer = {
   /** A button of the picked scene preset's panel, by its data attribute: data-preset-export, -carry, -keep, -remove. */
   presetAction: (attr) => document.querySelector(`[${attr}]`)?.click(),
   importScenePreset: () => document.querySelector('[data-import-scene-preset]')?.click(),
+  /** A card's preview as drawn (EffectPreview.svelte): playing or not, and what moves in it now. */
+  preview: (selector) => {
+    const pv = document.querySelector(`${selector} .pv`);
+    if (!pv) return null;
+    const named = (el) => (el ? getComputedStyle(el).animationName : 'none');
+    return {
+      kind: pv.dataset.preview,
+      playing: pv.hasAttribute('data-playing'),
+      box: named(pv.querySelector('.box')),
+      letters: [...pv.querySelectorAll('.word span')].map((span) => getComputedStyle(span).animationName),
+      ring: Number(pv.querySelector('[data-ring-value]')?.dataset.ringValue ?? NaN),
+      minis: pv.parentElement?.classList.contains('minis') ? pv.parentElement.querySelectorAll('.pv').length : 1,
+    };
+  },
   savedScenePresets: () => JSON.parse(serializePanel(panel())).scenePresets ?? null,
   presetApplyText: () => text(document.querySelector('[data-scene-preset-apply]')),
   presetSlots: () => [...document.querySelectorAll('[data-preset-slot]')].map((el) => el.value),

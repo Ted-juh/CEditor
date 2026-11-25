@@ -41,6 +41,8 @@
   import { sliderWordsPlace, sliderWordsRefusal } from '../../utils/anatomyWords.js';
   import { midiTriggerText, midiNoteName } from '../../utils/sceneMidi.js';
   import ScenePresetPanel from './ScenePresetPanel.svelte';
+  import EffectPreview from '../animation/EffectPreview.svelte';
+  import { scenePresetPreview } from '../../utils/effectPreview.js';
   import { partRectOf } from '../../utils/sceneClock.js';
   import {
     scenePresetLibrary, scenePresetEntries, scenePresetsOf, saveScenePreset, removeScenePreset, carryScenePreset,
@@ -345,6 +347,14 @@
   let pickedEntry = $derived(category === 'Scenes' ? scenePresetCards.find((entry) => entry.preset.id === presetPick) ?? null : null);
   let pickedPreset = $derived(pickedEntry?.preset ?? null);
   const WHERE_LABEL = { builtin: 'Built in', mine: 'Mine', panel: 'This panel' };
+  // The card whose preview plays: the one pointed at, or focused (EffectPreview.svelte).
+  let previewId = $state('');
+  const previewOn = (id) => ({
+    onpointerenter: () => { previewId = id; },
+    onpointerleave: () => { if (previewId === id) previewId = ''; },
+    onfocus: () => { previewId = id; },
+    onblur: () => { if (previewId === id) previewId = ''; },
+  });
   async function exportScenePreset(preset) {
     const result = await saveTypedDocumentAs('scenePreset', preset.name, scenePresetFileText(preset));
     if (result.ok) note = `${preset.name} saved as ${result.name || 'a .cescene file'}.`;
@@ -488,9 +498,12 @@
         <button type="button" class="tb import" data-import-scene-preset onclick={importScenePreset}
                 title="Bring in a .cescene file someone sent you, into your scene presets">Import…</button>
         {#each scenePresetCards as entry (entry.preset.id)}
+          {@const shown = scenePresetPreview(entry.preset)}
           <button type="button" class="card" class:sel={presetPick === entry.preset.id} data-scene-preset={entry.preset.id} data-where={entry.where}
                   onclick={() => { presetPick = presetPick === entry.preset.id ? '' : entry.preset.id; }}
+                  {...previewOn(entry.preset.id)}
                   title="A whole scene: click to put it on this panel">
+            <span class="minis">{#each shown.minis as mini, i (i)}<EffectPreview entry={mini.entry} delay={mini.delay} period={shown.period} small active={previewId === entry.preset.id} />{/each}</span>
             <span class="cn named">{entry.preset.name}</span><span class="cc">{WHERE_LABEL[entry.where]}{entry.carried && entry.where !== 'panel' ? ' · on this panel' : ''}</span>
           </button>
         {/each}
@@ -498,7 +511,9 @@
       {#each shownEffects as entry (entry.id)}
         <button type="button" class="card" draggable="true" data-effect={entry.id}
                 title={pickedId ? `Click: onto ${picked?._children?.Core?.name ?? pickedId} at the playhead. Or drag onto a control or a track.` : 'Drag onto a control on the stage or a track, or pick a control and click'}
+                {...previewOn(entry.id)}
                 ondragstart={(event) => dragEffect(event, entry.id)} onclick={() => (pickedId ? placeEffect(entry.id, pickedId) : (note = 'Pick a control on the stage, or drag the effect onto one.'))}>
+          <EffectPreview {entry} active={previewId === entry.id} />
           <span class="cn">{entry.label}</span><span class="cc">{entry.category}</span>
         </button>
       {:else}
@@ -726,6 +741,8 @@
   .cats button.on { border-color: #5AA9E6; background: #173A5A; color: #E8F4FF; }
   .cards { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 4px; padding: 0 10px 8px; }
   .cards .tb.import { align-self: flex-start; flex: 0 0 auto; }
+  .card .cn { flex: 1; min-width: 0; }
+  .minis { display: inline-flex; gap: 2px; flex: 0 0 auto; }
   .card { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 32px; padding: 0 9px; border: 1px solid #2B323A; border-radius: 6px; background: #1A1F24; color: #E8EEF3; font: inherit; text-align: left; cursor: grab; }
   .card:hover { border-color: #5B6670; }
   .cn { text-transform: capitalize; }

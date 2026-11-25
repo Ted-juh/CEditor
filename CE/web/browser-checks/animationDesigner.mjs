@@ -344,6 +344,40 @@ check('Import brings a .cescene file into your scene presets', () => {
   assert.match(importedNote, /From a friend added in your scene presets/, importedNote);
 });
 
+// Previews on the cards (EffectPreview.svelte): still until pointed at, then the effect on a stand-in.
+const knobsCard = '[data-scene-preset="builtin:knobsSweepIn"]';
+const minisAtRest = await d('preview', knobsCard);
+await page.hover(knobsCard);
+await wait(250);
+const minisPlaying = await d('preview', knobsCard);
+await d('showCategory', 'All');
+await wait(80);
+const popAtRest = await d('preview', '[data-effect="move:pop"]');
+await page.hover('[data-effect="move:pop"]');
+await wait(80);
+const popPlaying = await d('preview', '[data-effect="move:pop"]');
+await page.hover('[data-effect="text:typewriter:in"]');
+await wait(80);
+const typing = await d('preview', '[data-effect="text:typewriter:in"]');
+const popLeft = await d('preview', '[data-effect="move:pop"]');
+await page.hover('[data-effect="value:sweep"]');
+await wait(400);
+const sweeping = await d('preview', '[data-effect="value:sweep"]');
+check('each library card previews its effect on a stand-in while pointed at, and is still otherwise', () => {
+  assert.deepEqual([popAtRest.kind, popAtRest.playing, popAtRest.box], ['box', false, 'none'], JSON.stringify(popAtRest));
+  assert.equal(popPlaying.playing, true);
+  assert.match(popPlaying.box, /^ce-kf-/, JSON.stringify(popPlaying));
+  assert.equal(typing.kind, 'word');
+  assert.equal(typing.letters.length, 4);
+  assert.ok(typing.letters.every((name) => /^ce-tx-/.test(name)), JSON.stringify(typing));
+  assert.equal(popLeft.playing, false, 'pointing away stops it');
+  assert.equal(sweeping.kind, 'ring');
+  assert.ok(sweeping.ring > 0.4, `the ring swept up from 0.35: ${sweeping.ring}`);
+  assert.equal(minisAtRest.minis, 3, 'a sweep over knobs shows three');
+  assert.equal(minisAtRest.playing, false);
+  assert.equal(minisPlaying.playing, true);
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();

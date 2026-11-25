@@ -560,8 +560,8 @@ caught it (`exportToolsPlainNode.test.js`). The format — reading, checking, wr
 kinds, the rule for a name) held to the model's by a test.
 
 Not built: previews recorded from the stage on each card (the library shows name, category, size and
-version), scene presets (step 5), and an offer at the moment a panel opens rather than in the
-library. Built-in presets are not linkable; save the applied result as your own to link it.
+version; built since as stand-ins, "As built: previews on the library cards", below), scene presets
+(step 5), and an offer at the moment a panel opens rather than in the library. Built-in presets are not linkable; save the applied result as your own to link it.
 
 Verified locally: `npm run test:all`, `npm run build`, `npm run lint`, svelte-check over the whole
 project, the browser checks (the Animation tab check now saves a preset from the tab, overrides and
@@ -1348,6 +1348,50 @@ Verified locally:
   the saved panel and the card says so; Import through the file picker adds one.
 - The C++ change compiled with GCC (`-fsyntax-only`, as `CLAUDE.md` gives it). Not run: MSVC, which
   CI's Windows build gives it, and the app's own file dialogs.
+
+## As built: previews on the library cards (2026-11-25)
+
+The record had each library card show "a preview recorded from the stage". Built as stand-ins
+instead, with the owner's go-ahead.
+- **Why not a recording.** It would be pictures of one control at one size, and out of date the
+  moment the engine changed. It would also be blurred on a high-density screen and have to be
+  stored with every preset.
+- **What a stand-in is.** Something small of the kind the effect plays on, with the effect itself
+  played on it through the engines a control uses.
+- **The four stand-ins** (`utils/effectPreview.js`). An effect is a one-clip scene on a stand-in,
+  read by `sceneControlOutput` exactly as a control reads a scene.
+  - **box**, for a move or a paint: the box moves, its fill is painted (a colour, or a gradient
+    turned and shifted through the registered gradient properties), an image under it pans and
+    zooms, and its word is coloured;
+  - **word**: "Text", cut and played as a Label's words are;
+  - **pattern**: a framed box whose striped pattern moves and fades while the frame stays still;
+  - **ring**: a knob's ring, drawn a frame at a time by `valueEffectAt` from a live value of 0.35.
+  - A transition has none: what it eases is a state change, which a stand-in does not have.
+- **When it plays** (`EffectPreview.svelte`).
+  - Only while its card is pointed at or has focus. It then plays again after a 0.7 s rest, a new
+    phase each time so the CSS animation starts afresh. Otherwise it is still: a library of
+    forty-odd cards is not forty-odd running animations.
+  - With reduced motion it is always still.
+  - It counts nothing against the panel's ten loops: it is the editor's, not the panel's.
+- **Where.**
+  - The Designer's effect cards (the built-in effects and Mine).
+  - Its scene preset cards. These have one stand-in a slot (the first three), each at its first
+    clip's start; for a preset that repeats, three of its one slot, each a stagger after the last,
+    so Knobs sweep in sweeps three rings.
+  - The Animation tab's preset library rows, through `effectFromPreset`. A preset of transitions
+    keeps an empty space so the names line up.
+
+Verified locally:
+- `test/effectPreview.test.js` (new):
+  - every library effect's kind;
+  - a move on the box, an image under it, a gradient on the fill;
+  - a text effect's pieces and delay;
+  - a scene preset's stand-ins and period;
+  - still at rest when drawn.
+- The `animationDesigner` browser check: Pop's box and the typewriter's letters animate only while
+  pointed at, pointing away stops them, the sweep's ring climbs past 0.35, and Knobs sweep in has
+  three stand-ins that play together.
+- WebKitGTK 2.52: the same three cards play, the ring at 0.925 half a second into its sweep.
 
 ## Open
 
