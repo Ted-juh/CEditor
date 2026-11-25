@@ -1816,11 +1816,35 @@
     { reducedMotion: $systemReducedMotion, beats: beatsNow, plays: playsNow }));
   // The Animation Designer's stage (stores/sceneStage.js): the scene it shows, posed at its playhead
   // or playing, joins this control's own animations. Anywhere else there is no stage, and nothing.
+  // In Preview and the plug-in (step 5b) the surface's scene runtime gives every scene playing, each
+  // running or held at its end: they all draw here, one on top of the next.
   const sceneStage = getContext(SCENE_STAGE) ?? null;
   let stageFrame = $derived(sceneStage ? $sceneStage : null);
-  let sceneKeyframes = $derived(stageFrame?.scene && core?.id
-    ? sceneControlOutput(stageFrame.scene, core.id, { at: stageFrame.playing ? null : stageFrame.at, phase: stageFrame.phase ?? 'a' })
+  let stagePlays = $derived(stageFrame?.plays
+    ?? (stageFrame?.scene ? [{ scene: stageFrame.scene, at: stageFrame.playing ? null : stageFrame.at, phase: stageFrame.phase ?? 'a' }] : []));
+  let sceneKeyframes = $derived(core?.id && stagePlays.length
+    ? stagePlays.reduce((drawn, play) => {
+      const output = sceneControlOutput(play.scene, core.id, { at: play.at, phase: play.phase });
+      return output ? mergeKeyframeOutputs(drawn, output) : drawn;
+    }, null)
     : null);
+  // A control some scene waits on tells the runtime which states it enters (sceneRuntime.js): each
+  // state that starts to hold, and `default` when the last one stops. Not on the first look, as the
+  // keyframe player does not: a toggle that opens switched on does not set off its scene.
+  let statesBefore = null;
+  let reportsStates = $derived(!!(sceneStage?.fire && core?.id && stageFrame?.listeners?.state?.has?.(core.id)));
+  $effect(() => {
+    if (!reportsStates) { statesBefore = null; return; }
+    const now = new Set((interactionRuntime?.activeStates ?? []).map((state) => String(state).trim().toLowerCase()).filter(Boolean));
+    const before = statesBefore;
+    statesBefore = now;
+    if (!before) return;
+    const id = core.id;
+    untrack(() => {
+      for (const state of now) if (!before.has(state)) sceneStage.fire({ type: 'state', controlId: id, to: state });
+      if (now.size === 0 && before.size > 0) sceneStage.fire({ type: 'state', controlId: id, to: 'default' });
+    });
+  });
   let activeKeyframes = $derived(mergeKeyframeOutputs(playerKeyframes, sceneKeyframes));
   $effect(() => {
     const fired = activeKeyframes?.fired;

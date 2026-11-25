@@ -135,13 +135,15 @@ const eventTime = (event) => (Number.isFinite(event?.timeStamp) && event.timeSta
  * Watch one press on a control from its pointerdown to its release, and play what it was: a click,
  * a long press (once per hold its animations wait for), a flick. `onLongPress(payload)` and
  * `onFlick(payload)` are for a surface that raises script events (the Preview and the player);
- * the Animation tab's stage passes neither. Returns a function that stops watching.
+ * the Animation tab's stage passes neither. `onGesture(eventId)` hears each gesture once — a click,
+ * a long press at the usual hold, a flick — for the scenes that wait on one (utils/sceneRuntime.js).
+ * Returns a function that stops watching.
  *
  * Its listeners are its own, on the window in the capture phase: a surface's press handling returns
  * early for many kinds of control, and its own pointerup handler stops the event once it has used
  * it. `event.currentTarget` is the control's element; its bounds at the press decide "inside".
  */
-export function watchGesture(control, event, { scale = 1, onLongPress = null, onFlick = null } = {}) {
+export function watchGesture(control, event, { scale = 1, onLongPress = null, onFlick = null, onGesture = null } = {}) {
   if (typeof window === 'undefined' || !event) return () => {};
   const rect = event.currentTarget?.getBoundingClientRect?.() ?? null;
   const local = (at) => (rect
@@ -167,17 +169,20 @@ export function watchGesture(control, event, { scale = 1, onLongPress = null, on
     const result = tracker.up(eventTime(up), up.clientX, up.clientY, { inside });
     stop();
     if (!result) return;
-    if (result.click) playGesture(control, 'click');
+    if (result.click) { playGesture(control, 'click'); onGesture?.('click'); }
     if (result.moved) {
       playGesture(control, 'flick', result);
-      if (isFlick(result)) onFlick?.({ ...local(up), direction: result.direction, speed: Math.round(result.speed) });
+      if (isFlick(result)) {
+        onFlick?.({ ...local(up), direction: result.direction, speed: Math.round(result.speed) });
+        onGesture?.('flick');
+      }
     }
   }
   for (const hold of longPressHolds(control)) {
     timers.push(setTimeout(() => {
       if (!live || !tracker.stillHeld()) return;
       playGesture(control, 'longPress', { hold });
-      if (hold === LONG_PRESS_MS) onLongPress?.({ ...downPoint, held: hold });
+      if (hold === LONG_PRESS_MS) { onLongPress?.({ ...downPoint, held: hold }); onGesture?.('longPress'); }
     }, hold));
   }
   window.addEventListener('pointermove', onMove, true);

@@ -674,6 +674,54 @@ gave a shadow — LCDs, group frames, the Macro, XY pads, dropdowns, blank on Li
 filter's region was given in fractions of its box — and every one of the 79 sets now draws in
 WebKitGTK as in Chromium.
 
+## As built: step 5b (2026-11-24)
+
+Panel scenes play by themselves where the panel is live: the editor's Preview and the exported
+plug-in, which are the same surface (`PanelPreviewSurface`, which `Player.svelte` mounts).
+
+- **The runtime** (`utils/sceneRuntime.js`) says which scenes run and in which phase; each clip is
+  the CSS animation its control already plays (`sceneControlOutput`, step 5a). Starting a scene flips
+  its phase, which restarts all its animations. The surface owns one (`createSceneRunStore`,
+  `stores/sceneStage.js`) and hands it to its controls as the context the Designer's stage uses, now
+  holding a list of plays; every control draws each scene running on it.
+- **Triggers.**
+  - **Panel opens:** when the surface first shows a panel, and when it shows another. Preview mounts
+    the surface each time it starts, so starting Preview plays the opening again.
+  - **A control enters a state:** reported by the control itself, but only when some scene waits on
+    it (`listeners.state`). It fires on each state that starts to hold, and `default` when the last
+    one stops ("Back to Base"). Not on the first look, as the keyframe player does not.
+  - **A gesture:** the Events row's recogniser (`utils/gestureEvents.js`) tells the surface through a
+    new `onGesture` (click, flick, and a long press at the usual hold), and the surface reports the
+    double-click and the wheel itself.
+  - **The beat:** every so many beats while the transport runs, heard only when some scene waits on
+    it. Not on the first look, so a transport already running does not set off every beat scene.
+  - **A script:** waits for step 5c; the runtime's `start(idOrName)` is there for it.
+- **The defaults put to the owner with step 5b's questions**, to be changed in `sceneRuntime.js` if
+  the answers differ:
+  - a scene that ends holds its last frame, posed and paused, so nothing keeps running;
+  - a trigger that comes again restarts it from the top;
+  - a loop starts again each time its length has passed;
+  - with reduced motion, a scene goes straight to its last frame;
+  - entering Preview plays the opening.
+- **Not inside the Designer.** Its stage is a live surface too. A surface inside another's stage makes
+  no runtime of its own, so there a scene still moves only under the playhead.
+- **The Designer** now says what a scene waits for. A state scene picks its control and the state
+  (the control's own list, from `buildStateTargetOptions`, plus Back to Base). An event scene picks
+  its gesture, and a beat scene how many beats. Each scene's row names its trigger in words: "Cutoff
+  enters Hover", "Click on Start", "Every 4 beats".
+- **The loop budget** counts a looping scene's clips, 1 each and 2 for one that turns a gradient, as
+  the controls' own loops are counted. Its click-through opens the Designer for a scene's loop.
+- **Into the plug-in.** The export payload is the editor's own serialised panel, so it carries
+  `animationScenes`. The C++ player hands the panel to the page as the JSON text it is, and the page
+  reads it with `deserializePanel`. `test/sceneExport.test.js` holds both ends.
+
+Verified locally: `npm run test:all`, `npm run build`, `npm run lint`, svelte-check, and the browser
+checks, among them a new one, `scenePlayback`, run in Chromium and in WebKitGTK 2.52. It checks
+that the opening scene runs by itself and then holds its end, posed; that a click and a hover start
+their scenes, and a second click restarts one; that a loop restarts; that the Designer's stage stays
+still; and that reduced motion goes straight to the end. `test/sceneRuntime.test.js` holds the
+runtime's timing on a fake clock. No C++ changed.
+
 ## Open
 
 Nothing for the owner at present.

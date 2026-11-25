@@ -106,3 +106,19 @@ test('the three places say it: the status bar, the Animation tab\'s chip, the Ex
   assert.match(exportTab, /The plug-in still builds\./);
   assert.match(exportTab, /setExportSetting\('patternFps'/);
 });
+
+test('a looping scene counts each of its clips; one that plays once counts nothing', () => {
+  const knob = { _type: 'Knob', _children: { Core: { id: 'cutoff', name: 'Cutoff' } } };
+  const clip = (id, effect, label = '') => ({ id, controlId: 'cutoff', target: 'Transform', start: 0, length: 400, effect, ...(label ? { label } : {}) });
+  const fade = { kind: 'keyframes', frames: [{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }] };
+  const sheen = { kind: 'keyframes', frames: [{ at: 0, turn: 0 }, { at: 1, turn: 360 }] };
+  const scenes = [
+    { id: 'sc1', name: 'Glow', trigger: { type: 'panelOpen' }, loop: true, length: 800, clips: [clip('a', fade, 'Fade in'), clip('b', sheen)] },
+    { id: 'sc2', name: 'Intro', trigger: { type: 'panelOpen' }, loop: false, length: 800, clips: [clip('c', fade)] },
+  ];
+  const summary = panelLoops([knob], undefined, { scenes });
+  assert.equal(summary.count, 3, 'a fade 1, a turning gradient 2; the scene that plays once nothing');
+  assert.deepEqual(loopLines(summary.items), ['Cutoff › scene Glow › Fade in', 'Cutoff › scene Glow › Transform (counts 2)']);
+  assert.equal(summary.items[0].kind, 'scene');
+  assert.equal(panelLoops([knob]).count, 0, 'and no scenes, no change');
+});

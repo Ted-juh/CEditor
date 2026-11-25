@@ -5,7 +5,7 @@
   import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { sharedAnimationFrame } from '../utils/sharedAnimationFrame.js';
   import { hostWindowShown } from '../stores/hostWindow.js';
-  import { onDestroy, setContext, untrack, tick } from 'svelte';
+  import { getContext, onDestroy, setContext, untrack, tick } from 'svelte';
   import { choiceKeyIndex } from '../utils/choiceKeyboard.js';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
   import { PANEL_SURFACE_CONTEXT_KEY } from '../utils/linearEdges.js';
@@ -65,6 +65,8 @@
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { sceneControlIds } from '../utils/sceneFormat.js';
+  import { SCENE_STAGE, createSceneRunStore } from '../stores/sceneStage.js';
+  import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
@@ -408,6 +410,36 @@
   });
   let previewPlan = $derived(buildSceneryRenderPlan(panel,
     { preview: true, fold: true, neverFold }));
+
+  // The panel's scenes, playing on their triggers (stores/sceneStage.js, utils/sceneRuntime.js): in
+  // Preview and the plug-in, which are this surface. Not inside the Animation Designer's stage, which
+  // is this surface too and has a stage of its own: there a scene moves only under the playhead.
+  const outerSceneStage = getContext(SCENE_STAGE) ?? null;
+  const sceneRun = outerSceneStage ? null : createSceneRunStore();
+  if (sceneRun) setContext(SCENE_STAGE, sceneRun);
+  $effect(() => { sceneRun?.setScenes(panel?.animationScenes ?? []); });
+  $effect(() => { sceneRun?.setReducedMotion($systemReducedMotion); });
+  // The panel opens: when this surface first shows it, and when it shows another. Preview mounts the
+  // surface each time it starts, so entering Preview plays the panel's opening again.
+  let openedPanelId;
+  $effect(() => {
+    const id = panel?.id ?? null;
+    if (!sceneRun || id === openedPanelId) return;
+    openedPanelId = id;
+    untrack(() => sceneRun.open());
+  });
+  // The beat, only while some scene waits on it: a panel without one does not hear the transport.
+  let sceneBeatWanted = $derived(!!sceneRun && (panel?.animationScenes ?? []).some((scene) => scene?.trigger?.type === 'beat'));
+  $effect(() => {
+    if (!sceneBeatWanted) return undefined;
+    return transport.subscribe((state) => sceneRun.beat(state?.running ? state.beats : null));
+  });
+  onDestroy(() => sceneRun?.destroy());
+  /** A gesture on a control, for the scenes that wait on it. */
+  const sceneGesture = (control, eventId) => {
+    const id = getControlId(control);
+    if (sceneRun && id) sceneRun.fire({ type: 'event', controlId: id, event: eventId });
+  };
 
   /**
    * Which folded controls are drawn live over their own ground.
@@ -7958,6 +7990,7 @@
       scale: scale || 1,
       onLongPress: (payload) => dispatchInteraction(id, 'onLongPress', payload),
       onFlick: (payload) => dispatchInteraction(id, 'onFlick', payload),
+      onGesture: (eventId) => sceneGesture(control, eventId),
     });
   }
 
@@ -7997,6 +8030,7 @@
       deltaY: event.deltaY,
     });
     playGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
+    sceneGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
     // Hardware style: while an LCD edit zone is active, the wheel acts as a data
     // knob — cycling the char under the caret (text) or the option (choice).
     if (lcdEdit.active && lcdEdit.id === getControlId(control)) {
@@ -8474,6 +8508,7 @@
     if (isDoubleTap) {
       dispatchInteraction(downId, 'onDoubleClick', controlLocalPoint(event));
       playGesture(control, 'doubleClick');
+      sceneGesture(control, 'doubleClick');
       if (!lastPointerMoved && Math.hypot(event.clientX - lastPointerDownPosition.x,
         event.clientY - lastPointerDownPosition.y) <= 5 && resetRangeOnDoubleClick(control, event)) {
         event.preventDefault(); event.stopPropagation();

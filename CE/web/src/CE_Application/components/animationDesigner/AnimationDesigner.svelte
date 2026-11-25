@@ -35,6 +35,8 @@
   import { fileCache } from '../../stores/fileCache.js';
   import { SCENE_STAGE } from '../../stores/sceneStage.js';
   import { cleanSceneList, SCENE_TRIGGER_TYPES } from '../../utils/sceneFormat.js';
+  import { MOTION_EVENTS } from '../../utils/stateMotion.js';
+  import { buildStateTargetOptions } from '../../utils/stateTargets.js';
   import {
     SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
     resizeClip, removeClip, duplicateClip, setClipEffect, setClipTarget, tracksOf, controlScenes, clipAnimation,
@@ -180,6 +182,33 @@
     at = 0;
   }
   const TRIGGER_LABELS = { panelOpen: 'Panel opens', state: 'A control enters a state', event: 'A gesture on a control', beat: 'The beat', script: 'A script asks' };
+  const controlLabel = (id) => {
+    const control = flat.find((entry) => entry._children.Core.id === id);
+    return String(control?._children?.Core?.name || id || 'a control');
+  };
+  /** The states a scene can wait for on a control: its own (Hover, Pressed, one it was given), and Base. */
+  function triggerStatesOf(controlId) {
+    const control = flat.find((entry) => entry._children.Core.id === controlId);
+    const options = buildStateTargetOptions(control?._children?.States, { includeBase: false })
+      .map((option) => ({ value: String(option.id).trim().toLowerCase(), label: option.fullLabel }));
+    return [...options, { value: 'default', label: 'Back to Base' }];
+  }
+  let triggerStates = $derived(scene?.trigger?.type === 'state' ? triggerStatesOf(scene.trigger.controlId) : []);
+  /** What a scene waits for, in words: "Cutoff enters Hover", "Click on Start", "Every 4 beats". */
+  function triggerText(trigger) {
+    if (trigger?.type === 'state') {
+      if (trigger.to === 'default') return `${controlLabel(trigger.controlId)} returns to Base`;
+      const state = triggerStatesOf(trigger.controlId).find((option) => option.value === trigger.to);
+      return `${controlLabel(trigger.controlId)} enters ${state?.label ?? trigger.to}`;
+    }
+    if (trigger?.type === 'event') {
+      const gesture = MOTION_EVENTS.find((event) => event.id === trigger.event);
+      return `${gesture?.label ?? trigger.event} on ${controlLabel(trigger.controlId)}`;
+    }
+    if (trigger?.type === 'beat') return Number(trigger.every) > 1 ? `Every ${trigger.every} beats` : 'Every beat';
+    return TRIGGER_LABELS[trigger?.type] ?? '';
+  }
+  const setTrigger = (patch) => changeScene({ ...scene, trigger: { ...scene.trigger, ...patch } }, 'scene:trigger');
 
   // --- Clips ----------------------------------------------------------------------------------------
   function effectFor(id) {
@@ -289,7 +318,7 @@
   <header class="head">
     <div class="title">
       <b>Animation Designer</b>
-      <span>{panel?.name ?? 'No panel'} · plays here under the playhead; in Preview and the plug-in from step 5b</span>
+      <span>{panel?.name ?? 'No panel'} · plays here under the playhead; in Preview and the plug-in by itself, when what it waits for happens</span>
     </div>
     <div class="transport">
       <button type="button" class="tbtn" data-play aria-label={playing ? 'Stop' : 'Play scene'} disabled={!scene} onclick={() => (playing ? stop() : play())}>
@@ -380,7 +409,7 @@
       <div class="ph">Scenes <button type="button" class="tb add" data-add-scene onclick={addScene}><Plus size={12} /> Scene</button></div>
       {#each panelScenes as entry (entry.id)}
         <button type="button" class="srow" class:sel={scene?.id === entry.id} data-scene={entry.id} onclick={() => selectScene(entry.id)}>
-          <span class="sn">{entry.name}</span><span class="st">{TRIGGER_LABELS[entry.trigger.type]}</span>
+          <span class="sn">{entry.name}</span><span class="st">{triggerText(entry.trigger)}</span>
         </button>
       {/each}
       {#if ownScenes.length}
@@ -401,9 +430,25 @@
           </select>
           {#if scene.trigger.type === 'state' || scene.trigger.type === 'event'}
             <select class="txt" value={scene.trigger.controlId ?? ''} aria-label="Trigger control"
-                    onchange={(event) => changeScene({ ...scene, trigger: { ...scene.trigger, controlId: event.currentTarget.value } }, 'scene:trigger')}>
+                    onchange={(event) => setTrigger({ controlId: event.currentTarget.value })}>
               {#each flat as control (control._children.Core.id)}<option value={control._children.Core.id}>{control._children.Core.name || control._children.Core.id}</option>{/each}
             </select>
+          {/if}
+          {#if scene.trigger.type === 'state'}
+            <select class="txt" value={scene.trigger.to ?? 'hover'} aria-label="Trigger state" data-trigger-state
+                    onchange={(event) => setTrigger({ to: event.currentTarget.value })}>
+              {#each triggerStates as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+            </select>
+          {:else if scene.trigger.type === 'event'}
+            <select class="txt" value={scene.trigger.event ?? 'click'} aria-label="Trigger gesture" data-trigger-event
+                    onchange={(event) => setTrigger({ event: event.currentTarget.value })}>
+              {#each MOTION_EVENTS as gesture (gesture.id)}<option value={gesture.id}>{gesture.label}</option>{/each}
+            </select>
+          {:else if scene.trigger.type === 'beat'}
+            <label class="beats">Every
+              <input class="txt num" type="number" min="1" max="64" step="1" value={scene.trigger.every ?? 1} aria-label="Beats between plays" data-trigger-beats
+                     onchange={(event) => setTrigger({ every: Math.max(1, Math.min(64, Math.round(Number(event.currentTarget.value) || 1))) })} />
+              beats</label>
           {/if}
           <span class="srowtools">
             <label class="chk"><input type="checkbox" checked={scene.loop} onchange={(event) => changeScene({ ...scene, loop: event.currentTarget.checked }, 'scene:loop')} /> Loop</label>
@@ -477,6 +522,8 @@
   .sedit { display: flex; flex-direction: column; gap: 5px; margin: 8px 8px 0; padding-top: 8px; border-top: 1px solid #20262C; }
   .srowtools { display: flex; align-items: center; justify-content: space-between; }
   .chk { display: inline-flex; gap: 5px; align-items: center; color: #CCD3DA; font-size: 12px; }
+  .beats { display: inline-flex; gap: 6px; align-items: center; color: #CCD3DA; font-size: 12px; }
+  .beats .num { width: 56px; }
   .tb { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border: 1px solid #3A434D; border-radius: 5px; background: #1E2328; color: #E8EEF3; font: 400 12px/1 'IBM Plex Sans', system-ui, sans-serif; cursor: pointer; text-transform: none; letter-spacing: 0; }
   .tb:hover { border-color: #5B6670; }
   .tb.add { font-weight: 500; }

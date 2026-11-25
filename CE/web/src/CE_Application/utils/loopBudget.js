@@ -14,9 +14,12 @@
  *     always or a state trigger (keyframeAnimation.js defaultIterations): 1, or 2 when it turns or
  *     shifts a gradient, which is repainted every frame and measured at about twice a pattern;
  *   - a text effect set to loop: 1;
- *   - a sequence set to loop: 1.
+ *   - a sequence set to loop: 1;
+ *   - a panel scene set to loop (sceneRuntime.js, step 5b): each of its clips, 1 each — 2 for one
+ *     that turns or shifts a gradient — since each one moves again every time the scene does.
  * A loop that plays only while a state holds counts: it is what the panel can be doing. A transition,
- * a one-shot, a still pattern, a switched-off animation or Animations section count nothing.
+ * a one-shot, a still pattern, a switched-off animation or Animations section, and a scene that
+ * plays once, count nothing.
  */
 import { flatControls } from './containment.js';
 import { patternEntries, patternLabel, readPattern } from './patternLayers.js';
@@ -52,7 +55,7 @@ function movingPatterns(background, where) {
  * Everything a panel keeps moving: `{ count, over, items: [{ controlId, control, what, kind, weight,
  * animation?, pattern? }] }`, `count` weighted, `over` when it passes the budget.
  */
-export function panelLoops(controls, budget = LOOP_BUDGET) {
+export function panelLoops(controls, budget = LOOP_BUDGET, { scenes = [] } = {}) {
   const items = [];
   for (const control of flatControls(controls ?? [])) {
     const controlId = control?._children?.Core?.id ?? '';
@@ -68,6 +71,22 @@ export function panelLoops(controls, budget = LOOP_BUDGET) {
         const weight = animationLoopWeight(node);
         if (weight) add({ what: key, kind: String(node.kind ?? 'transition'), animation: key, weight });
       }
+    }
+  }
+  const names = new Map(flatControls(controls ?? []).map((control) => [control?._children?.Core?.id, controlName(control)]));
+  for (const scene of Array.isArray(scenes) ? scenes : []) {
+    if (scene?.loop !== true) continue;
+    for (const clip of scene.clips ?? []) {
+      const paintsGradient = clip.effect?.kind === 'keyframes'
+        && (clip.effect.frames ?? []).some((frame) => frame && (frame.turn !== undefined || frame.shift !== undefined));
+      items.push({
+        controlId: clip.controlId,
+        control: names.get(clip.controlId) ?? clip.controlId,
+        what: `scene ${scene.name} › ${clip.label || clip.target}`,
+        kind: 'scene',
+        scene: scene.id,
+        weight: paintsGradient ? 2 : 1,
+      });
     }
   }
   const count = items.reduce((sum, item) => sum + item.weight, 0);

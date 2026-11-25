@@ -688,7 +688,8 @@ A pattern's tint can be animated like a fill colour: in the **Animation** tool i
 **Background › Pattern 1 tint**.
 
 A moving pattern costs the computer a little every frame, and so does every animation that loops. A
-panel can keep up to ten things moving (a gradient that turns or sweeps counts as two); over that,
+panel can keep up to ten things moving (a gradient that turns or sweeps counts as two, and a looping
+scene counts each of its clips); over that,
 the status bar shows the count in amber, the **Animation** tool shows **Panel: … loops**, and the
 **Export** tab says so above **Export Plugin** — the plugin still builds. Click any of them to go to
 the loops one by one. In the **Export** tab, **Patterns at 30 fps** makes moving patterns in the
@@ -1316,8 +1317,16 @@ There is one Designer per panel, and it closes with its panel.
   - the effect itself, in the same editors the Animation tool uses.
 
   **Save as preset** keeps the effect in your library.
-- **Scenes** (bottom left). **+ Scene** makes one. Give it a name, choose what starts it (the
-  panel opening, a state, an event, the beat, or a script), and tick **Loop** to repeat it. Under
+- **Scenes** (bottom left). **+ Scene** makes one. Give it a name, choose what starts it, and tick
+  **Loop** to repeat it:
+  - **Panel opens**: when the plugin's window opens, and each time you start Preview;
+  - **A control enters a state**: pick the control and the state, such as **Hover** (the pointer
+    over it), **Pressed**, a state of its own, or **Back to Base** (when no state holds any more);
+  - **A gesture on a control**: a click, double-click, long press, flick or wheel turn;
+  - **The beat**: every so many beats while the transport runs;
+  - **A script asks**: from a script, which comes in a later version.
+
+  Under
   **Controls' own** is every animation the controls already have, each shown as a scene of one
   clip. It is the same animation, not a copy: move or stretch it here and the control's animation
   changes.
@@ -1331,8 +1340,15 @@ There is one Designer per panel, and it closes with its panel.
 playhead. While you are designing, a scene does not start by itself. Undo (Ctrl+Z) in the Designer
 undoes the Designer's own changes. Scenes are saved in the panel, and Ctrl+S in the Designer saves it.
 
-In this version, scenes play only in the Designer. Playing them on their trigger in Preview and in
-the exported plugin, and starting them from a script, come next.
+In Preview and in the exported plugin, a scene plays by itself when what it waits for happens:
+
+- **A scene that ends holds its last frame** until something starts it again.
+- **A trigger that comes again while the scene plays** starts it again from the beginning.
+- **A looping scene** starts again each time its length has passed.
+- **With your system's "reduce motion" setting on**, a scene goes straight to its last frame.
+
+On the design canvas nothing moves by itself, and in the Designer a scene moves only under the
+playhead. Starting a scene from a script comes in a later version.
 
 ## 9. Scripts
 
