@@ -1324,7 +1324,7 @@ There is one Designer per panel, and it closes with its panel.
     over it), **Pressed**, a state of its own, or **Back to Base** (when no state holds any more);
   - **A gesture on a control**: a click, double-click, long press, flick or wheel turn;
   - **The beat**: every so many beats while the transport runs;
-  - **A script asks**: from a script, which comes in a later version.
+  - **A script asks**: `ce.anim.play("Intro")` from a script.
 
   Under
   **Controls' own** is every animation the controls already have, each shown as a scene of one
@@ -1348,7 +1348,17 @@ In Preview and in the exported plugin, a scene plays by itself when what it wait
 - **With your system's "reduce motion" setting on**, a scene goes straight to its last frame.
 
 On the design canvas nothing moves by itself, and in the Designer a scene moves only under the
-playhead. Starting a scene from a script comes in a later version.
+playhead.
+
+A script can do the same:
+- `ce.anim.play("Intro")` plays a scene by its name.
+- `ce.anim.seek("Cover", 0.5)` holds a scene at a point, which lets a script be its clock.
+- `ce.anim.effect("Lamp", "Pop")` plays one effect from the library, or one of the panel's presets,
+  without a scene.
+- `ce.anim.swap("Readout", "Saw", "roll")` changes a control's words with a transition.
+- `ce.anim.pattern("Wave", { speed = 40 })` changes a pattern while it moves.
+
+The scripting manual has the details.
 
 ## 9. Scripts
 

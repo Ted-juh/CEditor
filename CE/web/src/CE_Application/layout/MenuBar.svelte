@@ -47,7 +47,6 @@
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
   import { openPictureExport } from '../stores/pictureExport.js';
-  import { newPanelFromCtrlrPanel } from '../stores/ctrlrImportActions.js';
   import { createScreenDocument, openScreenDocumentFromFile } from '../stores/screenBuilder.js';
   import { clearSelection } from '../stores/panels.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
@@ -219,7 +218,9 @@
       { label: 'Update Panel from Photoshop Artwork...', enabled: hasPanel, action: () => updatePanelFromPsdArtwork() },
       // Somebody else's Ctrlr panel: its MIDI map as a device profile, its controls on a new panel,
       // its Lua kept in the notes to port (stores/ctrlrImportActions.js; what does not convert is said).
-      { label: 'New Panel from Ctrlr Panel...', action: () => newPanelFromCtrlrPanel() },
+      // Loaded when it is chosen: the Ctrlr reader, its Lua and its harvest are some 100 kB that
+      // every start used to parse for a menu item most sessions never pick (vite.config.js).
+      { label: 'New Panel from Ctrlr Panel...', action: async () => (await import('../stores/ctrlrImportActions.js')).newPanelFromCtrlrPanel() },
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },

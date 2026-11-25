@@ -7,6 +7,7 @@
  *   - a click on a button starts the scene waiting on it; a second click starts it again
  *   - the pointer over the knob — the knob entering Hover — starts the scene waiting on that
  *   - a looping scene starts again each time its length has passed
+ *   - a script plays a scene, holds it at a point, plays a library effect and swaps words (step 5c)
  *   - inside the Designer's stage nothing plays by itself
  *   - with reduced motion a scene goes straight to its last frame
  */
@@ -106,6 +107,46 @@ try {
   check('a looping scene starts again each time its length has passed', () => {
     assert.ok(new Set(loopNames).size >= 2, loopNames.join(' '));
     assert.ok(loopNames.every((name) => /^ce-kf-/.test(name)));
+  });
+
+  // A script (step 5c): it finds the surface's runtime by the panel it belongs to.
+  const knobBefore = kf(await s('box', 'cutoff'))[0];
+  const played = await page.evaluate(() => window.__scenes.script('animatePlay', ['Intro', {}], 'intro'));
+  await page.waitForTimeout(100);
+  const knobPlayed = kf(await s('box', 'cutoff'))[0];
+  await page.waitForTimeout(1000);
+  const introDone = await page.evaluate(() => window.__scenes.dones.intro);
+  check('a script plays a panel scene by its name, and hears done(true) at its end', () => {
+    assert.equal(played, true);
+    assert.equal(knobPlayed.state, 'running');
+    assert.notEqual(knobPlayed.name, knobBefore.name, 'started again');
+    assert.equal(introDone, true);
+  });
+  await page.evaluate(() => window.__scenes.script('animateSeek', ['Intro', 0.5]));
+  await page.waitForTimeout(100);
+  const sought = kf(await s('box', 'cutoff'))[0];
+  check('a script holds a scene at a point of its length', () => {
+    assert.equal(sought.state, 'paused');
+    assert.match(sought.delay, /^-0\.35s/, `450 ms into the scene, 350 into a clip starting at 100: ${sought.delay}`);
+  });
+  const startBefore = kf(await s('box', 'start')).length;
+  await page.evaluate(() => window.__scenes.script('animateEffect', ['Start', 'Spin']));
+  await page.waitForTimeout(100);
+  const spun = kf(await s('box', 'start'));
+  check('a script plays a library effect on a control, without a scene', () => {
+    assert.equal(spun.length, startBefore + 1, JSON.stringify(spun));
+    assert.equal(spun.at(-1).state, 'running');
+  });
+  await page.evaluate(() => window.__scenes.script('animateSwap', ['Wave', 'Hi', 'roll', {}], 'swap'));
+  await page.waitForTimeout(80);
+  const leaving = await s('letters', 'wave');
+  await page.waitForTimeout(1600);
+  const writes = await page.evaluate(() => window.__scenes.writes());
+  const swapDone = await page.evaluate(() => window.__scenes.dones.swap);
+  check('a script swaps a control\'s words: the old ones roll out, then the new ones are written and roll in', () => {
+    assert.match(leaving?.name ?? '', /^ce-tx-/);
+    assert.deepEqual(writes, [['Wave', 'Text.content', 'Hi']]);
+    assert.equal(swapDone, true);
   });
 
   const still = { wave: await s('letters', 'still_wave'), cutoff: kf(await s('box', 'still_cutoff')) };

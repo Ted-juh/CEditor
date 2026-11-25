@@ -88,7 +88,7 @@
     {/if}
     <div class="grp">Script</div>
     <p class="mono" title="What a script names this place by">{controlName}.{clip.target === 'Transform' ? '' : clip.target}</p>
-    {#if !own && sceneName}<p class="mono dim">ce.anim.play("{sceneName}") — from a script, in a later version</p>{/if}
+    {#if !own && sceneName}<p class="mono dim" title="What a script plays this scene with">ce.anim.play("{sceneName}")</p>{/if}
     <div class="acts">
       <input class="txt" type="text" bind:value={presetName} aria-label="Preset name" />
       <button type="button" class="tb" data-save-clip-preset disabled={!presetName.trim()} onclick={() => onsavepreset(presetName.trim())}

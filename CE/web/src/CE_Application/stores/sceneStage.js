@@ -46,9 +46,31 @@ export function createSceneRunStore({ timers } = {}) {
     open: () => runtime.open(),
     fire: (trigger) => runtime.fire(trigger),
     beat: (beats) => runtime.beat(beats),
-    start: (idOrName) => runtime.start(idOrName),
+    start: (idOrName, options) => runtime.start(idOrName, options),
+    seek: (idOrName, position) => runtime.seek(idOrName, position),
+    effect: (key, scene, options) => runtime.effect(key, scene, options),
+    find: (idOrName) => runtime.find(idOrName),
     /** Whether any scene waits on the beat: only then is the transport listened to. */
     wantsBeat: () => beatWanted,
     destroy: () => runtime.destroy(),
   };
+}
+
+/**
+ * The live surfaces' runtimes by the panel they draw, for the scripts (scripting/panelRuntime.js:
+ * ce.anim.play(scene), seek, effect, swap): a script knows its panel, not the surface showing it.
+ * Preview and the plug-in each register theirs; the last one registered for a panel is the one
+ * that answers, and it leaves when its surface does.
+ */
+const runsByPanel = new Map();
+
+export function registerSceneRun(panelId, run) {
+  if (panelId == null || !run) return () => {};
+  const key = String(panelId);
+  runsByPanel.set(key, run);
+  return () => { if (runsByPanel.get(key) === run) runsByPanel.delete(key); };
+}
+
+export function sceneRunFor(panelId) {
+  return panelId == null ? null : runsByPanel.get(String(panelId)) ?? null;
 }

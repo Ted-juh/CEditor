@@ -696,6 +696,12 @@ function classify(arg, node, param, site, index) {
       const read = readControl(value, site.env.ctx);
       return setRead(arg, 'control', read, read.meaning.choices ? 'choice' : null);
     }
+    // ce.anim.play's first name: a control when an animation follows it, a panel scene when alone.
+    case 'controlOrScene': {
+      if (sibling(site, 'animation') === undefined) return byForm(arg, value);
+      const read = readControl(value, site.env.ctx);
+      return setRead(arg, 'control', read, read.meaning.choices ? 'choice' : null);
+    }
     case 'path': {
       const read = readPath(value, { ...site.env.ctx, self: site.resolved?.self ? site.env.ctx.self : null });
       return setRead(arg, 'path', read, null);

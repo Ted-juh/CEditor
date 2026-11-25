@@ -120,3 +120,61 @@ test('a scene taken out of the panel stops; one edited keeps playing as it now i
   assert.equal(runtime.start('renamed'), true, 'started by name, as a script will in 5c');
   assert.equal(runtime.start('nope'), false);
 });
+
+test('a script starts a scene by name and hears how it ends: done(true) at the end, done(false) cut short', () => {
+  const timers = fakeTimers();
+  const runtime = createSceneRuntime({ timers });
+  runtime.setScenes([scene('sc_intro', { type: 'script' }, { name: 'Intro' })]);
+  const heard = [];
+  assert.equal(runtime.start('intro', { done: (completed) => heard.push(['first', completed]) }), true, 'any case');
+  timers.advance(400);
+  runtime.start('Intro', { done: (completed) => heard.push(['second', completed]) });
+  assert.deepEqual(heard, [['first', false]], 'started again: the first run was cut short');
+  timers.advance(1000);
+  assert.deepEqual(heard, [['first', false], ['second', true]]);
+  runtime.start('Intro', { done: (completed) => heard.push(['third', completed]) });
+  runtime.seek('Intro', 0.5);
+  assert.deepEqual(heard.at(-1), ['third', false], 'a seek interrupts it');
+});
+
+test('seek holds a scene at a point of its length, paused, until it is started or sought again', () => {
+  const timers = fakeTimers();
+  const runtime = createSceneRuntime({ timers });
+  runtime.setScenes([scene('s', { type: 'script' }, { length: 2000 })]);
+  assert.equal(runtime.seek('s', 0.25), true);
+  assert.deepEqual(brief(runtime), [['s', 'a', 500]]);
+  runtime.seek('s', 7);
+  assert.deepEqual(brief(runtime), [['s', 'a', 2000]], 'clamped to the end');
+  assert.equal(timers.pending, 0, 'nothing runs while it is held');
+  assert.equal(runtime.seek('nope', 0.5), false);
+  assert.equal(runtime.seek('s', 'half'), false);
+});
+
+test('a one-off effect plays on its place, and a new one there replaces it', () => {
+  const timers = fakeTimers();
+  const runtime = createSceneRuntime({ timers });
+  runtime.setScenes([]);
+  const heard = [];
+  runtime.effect('lamp|Transform', scene('fx1', { type: 'script' }, { length: 300 }), { done: (c) => heard.push(['fx1', c]) });
+  runtime.effect('lamp|Text', scene('fx2', { type: 'script' }, { length: 300 }));
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['fx1', 'fx2'], 'two places, two effects');
+  runtime.effect('lamp|Transform', scene('fx3', { type: 'script' }, { length: 300 }));
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['fx2', 'fx3'], 'the box\'s first effect is gone');
+  assert.deepEqual(heard, [['fx1', false]]);
+  runtime.setScenes([scene('panel', { type: 'panelOpen' })]);
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['fx2', 'fx3'], 'the panel\'s scenes changing leaves them be');
+  timers.advance(300);
+  assert.deepEqual(runtime.plays().map((p) => p.at), [300, 300], 'held at their ends');
+});
+
+test('with reduced motion a script still hears done(true), once the call has returned', () => {
+  const timers = fakeTimers();
+  const runtime = createSceneRuntime({ timers });
+  runtime.setReducedMotion(true);
+  runtime.setScenes([scene('s', { type: 'script' })]);
+  const heard = [];
+  runtime.start('s', { done: (c) => heard.push(c) });
+  assert.deepEqual(heard, []);
+  timers.advance(0);
+  assert.deepEqual(heard, [true]);
+});

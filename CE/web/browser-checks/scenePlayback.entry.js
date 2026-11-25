@@ -10,6 +10,7 @@ import PanelPreviewSurface from '../src/CE_Application/editor/PanelPreviewSurfac
 import SceneStageHost from './SceneStageHost.svelte';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { sceneEffect } from '../src/CE_Application/utils/sceneModel.js';
+import { setRuntimeHost, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
 function place(control, id, name, x, y, w, h) {
   control._children.Core.id = id;
@@ -31,6 +32,7 @@ function panel(prefix) {
   lamp._children.Text.content = 'Lamp';
   return {
     id: `${prefix}p`, name: 'Scenes', width: 620, height: 280, bgColour: 'FF1E1E1E', controls: [wave, cutoff, start, lamp],
+    scripting: { modules: ['ce.core', 'ce.anim'] },
     animationScenes: [
       { id: 'sc_open', name: 'Intro', trigger: { type: 'panelOpen' }, length: 900, loop: false,
         clips: [clip('c1', `${prefix}wave`, 'Text', 0, 800, typewriter), clip('c2', `${prefix}cutoff`, 'Transform', 100, 600, fade)] },
@@ -44,7 +46,15 @@ function panel(prefix) {
   };
 }
 
-mount(PanelPreviewSurface, { target: document.getElementById('live'), props: { panel: panel(''), scale: 1, bgLayers: {}, gridStyle: '' } });
+const livePanel = panel('');
+mount(PanelPreviewSurface, { target: document.getElementById('live'), props: { panel: livePanel, scale: 1, bgLayers: {}, gridStyle: '' } });
+// A script on the live panel (step 5c): its calls find the surface's runtime by the panel's id.
+const textWrites = [];
+setRuntimeHost({
+  panel: livePanel, scripts: [], readValue: () => undefined,
+  writeValue: (control, path, value) => { textWrites.push([control._children.Core.name, path, value]); return true; },
+});
+const script = scriptApiForTesting('', 'scene-fixture');
 mount(SceneStageHost, { target: document.getElementById('still'), props: { panel: panel('still_') } });
 
 const root = (id) => document.querySelector(`.canvas-control[data-control-id="${id}"]`);
@@ -68,5 +78,13 @@ window.__scenes = {
     return { name: style.animationName, delay: style.animationDelay, state: style.animationPlayState };
   },
   rect: (id) => { const r = root(id).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; },
+  /** A script's call, as a panel script makes it; `done` is recorded under `doneKey`. */
+  script: (name, args, doneKey = '') => {
+    const list = [...args];
+    if (doneKey) list.push({ ...(list.pop() ?? {}), done: (completed) => { window.__scenes.dones[doneKey] = completed; } });
+    return script[name](...list);
+  },
+  dones: {},
+  writes: () => textWrites.slice(),
 };
 window.__scenesMounted = true;

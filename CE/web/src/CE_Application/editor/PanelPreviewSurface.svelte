@@ -65,7 +65,7 @@
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { sceneControlIds } from '../utils/sceneFormat.js';
-  import { SCENE_STAGE, createSceneRunStore } from '../stores/sceneStage.js';
+  import { SCENE_STAGE, createSceneRunStore, registerSceneRun } from '../stores/sceneStage.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
@@ -433,6 +433,12 @@
   $effect(() => {
     if (!sceneBeatWanted) return undefined;
     return transport.subscribe((state) => sceneRun.beat(state?.running ? state.beats : null));
+  });
+  // Scripts reach it by the panel they belong to (ce.anim.play(scene), seek, effect, swap).
+  $effect(() => {
+    const id = panel?.id ?? null;
+    if (!sceneRun || id == null) return undefined;
+    return registerSceneRun(id, sceneRun);
   });
   onDestroy(() => sceneRun?.destroy());
   /** A gesture on a control, for the scenes that wait on it. */
