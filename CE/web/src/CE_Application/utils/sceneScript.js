@@ -10,7 +10,7 @@
  * `.Patterns.<name>` one of its own background patterns.
  */
 import { SCENE_EFFECTS, effectFromPreset } from './sceneModel.js';
-import { TEXT_EFFECTS, TEXT_EFFECT_NAMES, splitText, textEffectSpan } from './textEffects.js';
+import { TEXT_EFFECTS, TEXT_EFFECT_NAMES, readTextEffect, splitText, textEffectSpan } from './textEffects.js';
 import { controlDrawsValue } from './valueDrawn.js';
 
 const lower = (value) => String(value ?? '').trim().toLowerCase();
@@ -71,10 +71,17 @@ export function resolvePlace(control, rest) {
   return pattern ? `Parts.${key}.Patterns.${pattern}` : null;
 }
 
-/** How long a text effect takes over these words: each piece a little after the last. */
-export function textSpanFor(effect, words) {
-  const count = splitText(String(words ?? ''), effect?.split).filter((piece) => piece.animated).length;
-  return Math.max(10, Math.round(textEffectSpan(effect, Math.max(1, count))));
+/**
+ * How long a text effect takes over these words: each piece a little after the last. `pieces`, where
+ * given, is how many there are instead (a scale's marks: one piece a mark, utils/anatomyWords.js).
+ * The effect is read with its defaults, as a library effect names only the effect and the way.
+ */
+export function textSpanFor(effect, words, { pieces = null } = {}) {
+  const read = readTextEffect({ ...(effect ?? {}), kind: 'text', enabled: true });
+  const count = Number.isInteger(pieces)
+    ? (read.split === 'whole' ? 1 : pieces)
+    : splitText(String(words ?? ''), read.split).filter((piece) => piece.animated).length;
+  return Math.max(10, Math.round(textEffectSpan(read, Math.max(1, count))));
 }
 
 let seq = 0;

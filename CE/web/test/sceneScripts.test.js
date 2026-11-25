@@ -101,6 +101,23 @@ test('ce.anim.effect plays a library effect on a box, words or a part, one per p
   });
 });
 
+test('ce.anim.effect puts a text effect on a knob\'s own words, as long as its pieces take, and says why where it draws none', () => {
+  withPanel((script, { calls, knob }) => {
+    knob._children.Behavior.scaleNumberCount = 6;
+    assert.equal(script.animateEffect('Cutoff', 'Typewriter in'), true, 'the knob alone: its scale\'s numbers');
+    const [, key, scene] = calls[0];
+    assert.match(key, /\|Parts\.tickNumber$/);
+    assert.equal(scene.clips[0].target, 'Parts.tickNumber');
+    assert.equal(scene.clips[0].length, 5 * 45 + 300, 'six numbers, one piece each');
+    assert.equal(script.animateEffect('Cutoff.tickMajor', 'Typewriter in'), true, 'or its ticks, named');
+    assert.equal(calls[1][2].clips[0].length, 10 * 45 + 300, 'eleven major ticks');
+    assert.equal(script.animateEffect('Cutoff.bodyCap', 'Typewriter in'), false);
+    assert.match(traced(), /That part of Cutoff draws no words/);
+    assert.equal(script.animateEffect('Title', 'Typewriter in'), true);
+    assert.equal(calls.at(-1)[2].clips[0].length, 4 * 45 + 300, 'a Label\'s words: "Hello", five letters, not a guess');
+  });
+});
+
 test('ce.anim.effect plays a value effect on what a knob\'s value draws (step 6)', () => {
   withPanel((script, { calls, knob }) => {
     const knobId = knob._children.Core.id;
@@ -118,12 +135,14 @@ test('ce.anim.effect plays a value effect on what a knob\'s value draws (step 6)
 });
 
 test('ce.anim.effect refuses what it cannot play, and says what it can', () => {
-  withPanel((script) => {
+  withPanel((script, { knob }) => {
     assert.equal(script.animateEffect('Title', 'Wobble'), false);
     assert.match(traced(), /no effect or preset called "Wobble"\. The effects: .*Fade in.*Pop/);
     clearScriptTrace();
+    // A knob showing no numbers, ticks or handle labels has no words at all for a text effect.
+    Object.assign(knob._children.Behavior, { showTicks: false, scaleNumberCount: 0, showHandleLabels: false });
     assert.equal(script.animateEffect('Cutoff', 'Typewriter in'), false);
-    assert.match(traced(), /Cutoff has no words of its own/);
+    assert.match(traced(), /Cutoff has no words of its own: a text effect plays on its scale’s numbers/);
     clearScriptTrace();
     assert.equal(script.animateEffect('Cutoff.nothing', 'Pop'), false);
     assert.match(traced(), /"nothing" is not on Cutoff/);

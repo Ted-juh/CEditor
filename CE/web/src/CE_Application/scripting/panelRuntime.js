@@ -215,6 +215,7 @@ import { patternEntries } from '../utils/patternLayers.js';
 import { findEffect, effectNames, resolvePlace, textSpanFor, oneOffScene, swapFamily } from '../utils/sceneScript.js';
 import { patternPlacesOf } from '../utils/sceneModel.js';
 import { patternPlace } from '../utils/sceneFormat.js';
+import { isSliderFamily, sliderMarkCount, sliderWordsPlace, sliderWordsRefusal } from '../utils/anatomyWords.js';
 import { controlDrawsValue } from '../utils/valueDrawn.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
@@ -5635,7 +5636,10 @@ function animateEffectImpl(target, effectName, opts, scriptId = '') {
     addScriptTrace('error', '', `${verb}: "${entry.label}" plays on a pattern, and ${named.controlName} has none, nor do its parts.`);
     return false;
   }
-  const place = isText && named.place === 'Transform' ? 'Text'
+  // A knob has no words of its own: a text effect on it alone plays on those it draws, its scale's
+  // numbers, its ticks or its handle labels (utils/anatomyWords.js), as in the Designer.
+  const wordsHome = () => (isSliderFamily(named.control) ? sliderWordsPlace(named.control) ?? 'Text' : 'Text');
+  const place = isText && named.place === 'Transform' ? wordsHome()
     : isValue && named.place === 'Transform' ? 'Value'
       : entry.target === 'Patterns' && named.place === 'Transform' ? firstPattern
         : named.place;
@@ -5645,9 +5649,15 @@ function animateEffectImpl(target, effectName, opts, scriptId = '') {
   }
   if (!isValue && place === 'Value') { addScriptTrace('error', '', `${verb}: "${entry.label}" does not play on what a value draws; give ${named.controlName} or one of its parts.`); return false; }
   if (patternPlace(place) && entry.effect?.kind !== 'keyframes') { addScriptTrace('error', '', `${verb}: "${entry.label}" does not play on a pattern; a pattern takes a move or a fade.`); return false; }
-  if (isText && place !== 'Text') { addScriptTrace('error', '', `${verb}: "${entry.label}" plays on words; give ${named.controlName} or ${named.controlName}.Text.`); return false; }
-  if (isText && !named.control._children?.Text) { addScriptTrace('error', '', `${verb}: ${named.controlName} has no words of its own for "${entry.label}".`); return false; }
-  const length = animTiming(verb, opts, 'duration', isText ? textSpanFor(entry.effect, named.control._children?.Text?.content) : entry.length);
+  // Words are the control's own (Text) or a part's; a pattern has none.
+  const wordsPart = place.startsWith('Parts.') && !patternPlace(place) ? place.slice('Parts.'.length) : null;
+  if (isText && place !== 'Text' && wordsPart === null) { addScriptTrace('error', '', `${verb}: "${entry.label}" plays on words; give ${named.controlName}, ${named.controlName}.Text or one of its parts.`); return false; }
+  const noWords = isText ? sliderWordsRefusal(named.control, wordsPart ?? '') : '';
+  if (noWords) { addScriptTrace('error', '', `${verb}: ${noWords}`); return false; }
+  if (isText && place === 'Text' && !named.control._children?.Text) { addScriptTrace('error', '', `${verb}: ${named.controlName} has no words of its own for "${entry.label}".`); return false; }
+  const words = wordsPart === null ? named.control._children?.Text?.content : named.control._children?.Parts?._children?.[wordsPart]?._children?.Text?.content;
+  const marks = wordsPart === null ? null : sliderMarkCount(named.control, wordsPart);
+  const length = animTiming(verb, opts, 'duration', isText ? textSpanFor(entry.effect, words, { pieces: marks }) : entry.length);
   const delay = Math.max(0, animTiming(verb, opts, 'delay', 0));
   const run = liveSceneRun();
   if (!run) return false;

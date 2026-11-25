@@ -24,6 +24,7 @@
 import { knobTrackOf } from './knobTrack.js';
 import { isSliderBehavior, getSliderValueMode } from './sliderBehavior.js';
 import { resolveSliderSemanticParts } from './sliderEntityFactory.js';
+import { buildSliderTickStops } from './sliderGeometry.js';
 import { textPieceStyles } from './textEffects.js';
 
 /** The marks of a scale, drawn in the SVG: one piece each. */
@@ -96,6 +97,17 @@ export function sliderWordsRefusal(control, part = '') {
   if (!isSliderRendererPart(part)) return '';
   if (part.startsWith('label')) return `${name} prints its name, value and range as Labels of their own beside it: put the effect on that Label.`;
   return `That part of ${name} draws no words: a text effect plays on ${WORD_PLACES}.`;
+}
+
+/**
+ * How many marks a scale part draws, the pieces an effect on it plays over (its second scale's
+ * left out), or null for a part that is not a scale's: a handle label's pieces are its words.
+ */
+export function sliderMarkCount(control, part) {
+  if (!SLIDER_MARK_PARTS.includes(part) || !isSliderFamily(control)) return null;
+  if (part === 'tickNumber') return knobTrackOf(control, 100, 100).scaleNumberCount;
+  const stops = buildSliderTickStops(control._children.Behavior);
+  return part === 'tickMajor' ? stops.major.length : stops.minor.length;
 }
 
 const INLINE_PIECE = 'display:inline-block;white-space:pre;';

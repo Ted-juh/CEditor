@@ -1222,6 +1222,22 @@ over `textEffects.js`).
 Left out: a knob drawn as a form (`Core.controlForm`, ControlAnatomy) and a knob carried inside a
 component's part. Both draw their scales elsewhere, and neither plays these effects yet.
 
+**Scripts too (a commit of its own, after).**
+- `ce.anim.effect` put a text effect only on a control's own words, so
+  `ce.anim.effect("Cutoff", "Typewriter in")` was refused although the Designer now plays it on the
+  knob's numbers.
+  - The knob alone now goes where the Designer puts it, and a part's words (`Cutoff.tickNumber`,
+    `Strip.band`) are accepted.
+  - The refusals are `sliderWordsRefusal`'s, so a script hears the same reason the Designer gives.
+- **Found on the way, and fixed: every script text effect lasted 600 ms.**
+  - `textSpanFor` summed a library effect's stagger and duration, which it does not carry (it names
+    only the effect and the way), so the sum was NaN and the one-off scene fell back to 600 ms.
+  - A typewriter over a long label was cut off, and `done` came before its last letter.
+  - It now reads the effect with its defaults, and counts a scale's marks (`sliderMarkCount`)
+  rather than its letters.
+- Held by `test/sceneScripts.test.js`: six numbers at 525 ms, eleven ticks at 750, "Hello" at 480,
+  and a knob's cap refused with the reason.
+
 Verified locally:
 - `test/anatomyWords.test.js` (new):
   - which words a knob shows, and where a dropped effect goes;
