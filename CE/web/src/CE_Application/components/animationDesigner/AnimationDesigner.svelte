@@ -38,6 +38,8 @@
   import { MOTION_EVENTS } from '../../utils/stateMotion.js';
   import { isRangeBehavior } from '../../utils/rangeBehavior.js';
   import { controlDrawsValue } from '../../utils/valueDrawn.js';
+  import ScenePresetPanel from './ScenePresetPanel.svelte';
+  import { scenePresetLibrary, allScenePresets, saveScenePreset, removeScenePreset } from '../../stores/scenePresetLibrary.js';
   import { buildStateTargetOptions } from '../../utils/stateTargets.js';
   import {
     SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
@@ -297,6 +299,26 @@
     .filter(({ entry }) => entry)
     .map(({ preset, entry }) => ({ id: `mine:${preset.id}`, label: preset.name, category: 'Mine', ...entry })));
   let shownEffects = $derived(category === 'Mine' ? mine : category === 'All' ? [...SCENE_EFFECTS, ...mine] : SCENE_EFFECTS.filter((entry) => entry.category === category));
+  // Whole scenes kept to use again (utils/scenePreset.js): the built-in ones and yours, under Scenes.
+  const LIBRARY_CATEGORIES = [...SCENE_EFFECT_CATEGORIES, 'Scenes'];
+  let scenePresets = $derived(allScenePresets($scenePresetLibrary));
+  let presetPick = $state('');
+  let pickedPreset = $derived(category === 'Scenes' ? scenePresets.find((entry) => entry.id === presetPick) ?? null : null);
+  let pickedPresetMine = $derived(!!pickedPreset && $scenePresetLibrary.some((entry) => entry.id === pickedPreset.id));
+  function addSceneFromPreset(made) {
+    writeScenes([...panelScenes, made], 'scene:preset');
+    sceneId = made.id;
+    clipId = '';
+    at = 0;
+    presetPick = '';
+    const controlsIn = new Set(made.clips.map((entry) => entry.controlId)).size;
+    note = `${made.name}: a new scene on ${controlsIn} ${controlsIn === 1 ? 'control' : 'controls'}.`;
+  }
+  function saveSceneAsPreset() {
+    if (!scene || scene.own) return;
+    const { preset, reason } = saveScenePreset(scene, controls);
+    note = reason ?? `${preset.name} is in your scene presets: Library › Scenes, for this panel or any other.`;
+  }
   function dragEffect(event, id) {
     event.dataTransfer?.setData('application/x-ce-effect', id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
@@ -386,11 +408,19 @@
   <aside class="lib" aria-label="Library">
     <div class="ph">Library</div>
     <div class="cats" role="group" aria-label="Library filter">
-      {#each SCENE_EFFECT_CATEGORIES as name (name)}
+      {#each LIBRARY_CATEGORIES as name (name)}
         <button type="button" class:on={category === name} aria-pressed={category === name} onclick={() => { category = name; }}>{name}</button>
       {/each}
     </div>
     <div class="cards">
+      {#if category === 'Scenes'}
+        {#each scenePresets as entry (entry.id)}
+          <button type="button" class="card" class:sel={presetPick === entry.id} data-scene-preset={entry.id} onclick={() => { presetPick = presetPick === entry.id ? '' : entry.id; }}
+                  title="A whole scene: click to put it on this panel">
+            <span class="cn named">{entry.name}</span><span class="cc">{String(entry.id).startsWith('builtin:') ? 'Built in' : 'Mine'}</span>
+          </button>
+        {/each}
+      {:else}
       {#each shownEffects as entry (entry.id)}
         <button type="button" class="card" draggable="true" data-effect={entry.id}
                 title={pickedId ? `Click: onto ${picked?._children?.Core?.name ?? pickedId} at the playhead. Or drag onto a control or a track.` : 'Drag onto a control on the stage or a track, or pick a control and click'}
@@ -400,8 +430,13 @@
       {:else}
         <p class="empty">Nothing here yet. Save an effect as a preset and it is here.</p>
       {/each}
+      {/if}
     </div>
-    <p class="hint">Drag an effect onto a control, or onto a track.</p>
+    {#if pickedPreset}
+      <ScenePresetPanel preset={pickedPreset} {controls} mine={pickedPresetMine} onadd={addSceneFromPreset}
+                        oncancel={() => { presetPick = ''; }} onremove={(id) => { removeScenePreset(id); presetPick = ''; }} />
+    {/if}
+    <p class="hint">{category === 'Scenes' ? 'A scene preset becomes a new scene: on controls you choose, or on every one that fits.' : 'Drag an effect onto a control, or onto a track.'}</p>
   </aside>
 
   <section class="stage" aria-label="Stage">
@@ -537,6 +572,8 @@
             {#if scene.clock}<span></span>{:else}
             <label class="chk"><input type="checkbox" checked={scene.loop} onchange={(event) => changeScene({ ...scene, loop: event.currentTarget.checked }, 'scene:loop')} /> Loop</label>
             {/if}
+            <button type="button" class="tb" data-save-scene-preset disabled={!scene.clips.length} onclick={saveSceneAsPreset}
+                    title="Keep this whole scene, to put on other controls or another panel">Save as preset</button>
             <button type="button" class="tb" aria-label="Remove scene" onclick={removeScene}><Trash2 size={12} /></button>
           </span>
         </div>
@@ -584,6 +621,8 @@
   .card { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 32px; padding: 0 9px; border: 1px solid #2B323A; border-radius: 6px; background: #1A1F24; color: #E8EEF3; font: inherit; text-align: left; cursor: grab; }
   .card:hover { border-color: #5B6670; }
   .cn { text-transform: capitalize; }
+  .card.sel { border-color: #5AA9E6; }
+  .cn.named { text-transform: none; }
   .cc { font-size: 11px; color: #8A96A3; }
   .hint, .empty { margin: 0; padding: 8px 10px; font-size: 12px; color: #8A96A3; }
   .cnote { font-size: 12px; color: #8A96A3; }
@@ -606,7 +645,7 @@
   .st { font-size: 11px; color: #8A96A3; }
   .sub { margin: 6px 14px 2px; font-size: 11px; color: #8A96A3; }
   .sedit { display: flex; flex-direction: column; gap: 5px; margin: 8px 8px 0; padding-top: 8px; border-top: 1px solid #20262C; }
-  .srowtools { display: flex; align-items: center; justify-content: space-between; }
+  .srowtools { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
   .chk { display: inline-flex; gap: 5px; align-items: center; color: #CCD3DA; font-size: 12px; }
   .beats { display: inline-flex; gap: 6px; align-items: center; color: #CCD3DA; font-size: 12px; }
   .beats .num { width: 56px; }

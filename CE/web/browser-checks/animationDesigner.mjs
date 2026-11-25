@@ -216,6 +216,51 @@ check('a ring sweep on a knob plays on what its value draws, and the stage is po
   assert.match(valueNote, /Wave draws no value to move: a value effect plays on a knob or a slider/);
 });
 
+// Scene presets: a built-in one repeated over every knob, and the first scene kept and put back.
+const scenesBefore = (await d('scenes')).length;
+await d('showCategory', 'Scenes');
+await wait(100);
+const builtIns = await d('presetCards');
+await d('clickPreset', 'builtin:knobsSweepIn');
+await wait(100);
+const applyText = await d('presetApplyText');
+await d('addFromPreset');
+await wait(150);
+const scenesAfter = await d('scenes');
+const swept2 = scenesAfter.at(-1);
+check('a built-in scene preset repeats over every knob on the panel, as a new scene', () => {
+  assert.deepEqual(builtIns.map(([id]) => id), ['builtin:knobsSweepIn', 'builtin:labelsTypeIn']);
+  assert.match(applyText, /On every knob or slider that fits \(1\)/, applyText);
+  assert.equal(scenesAfter.length, scenesBefore + 1);
+  assert.equal(swept2.name, 'Knobs sweep in');
+  assert.deepEqual(swept2.clips.map((c) => [c.controlId, c.target]), [['cutoff', 'Value']]);
+  assert.deepEqual(swept2.trigger, { type: 'panelOpen' });
+});
+await d('clickScene', saved[0].id);
+await wait(150);
+await d('saveScenePreset');
+await wait(100);
+const savedNote = await d('note');
+await d('showCategory', 'Scenes');
+await wait(100);
+const withMine = await d('presetCards');
+const mineId = withMine.find(([id]) => !id.startsWith('builtin:'))?.[0];
+await d('clickPreset', mineId);
+await wait(100);
+const slots = await d('presetSlots');
+await d('addFromPreset');
+await wait(150);
+const putBack = (await d('scenes')).at(-1);
+const original = saved[0];
+check('a scene kept as a preset goes back on the panel, each part on the control the Designer offers', () => {
+  assert.match(savedNote, /is in your scene presets/, savedNote);
+  assert.ok(mineId, JSON.stringify(withMine));
+  assert.deepEqual(slots, ['wave', 'cutoff'], 'its two controls, the same types first');
+  assert.equal(putBack.clips.length, original.clips.length);
+  assert.deepEqual(putBack.clips.map((c) => [c.controlId, c.target, c.start]).sort(), original.clips.map((c) => [c.controlId, c.target, c.start]).sort());
+  assert.notEqual(putBack.id, original.id, 'a new scene, not the old one');
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();

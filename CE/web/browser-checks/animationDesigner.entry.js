@@ -70,6 +70,14 @@ window.__designer = {
   /** Where the stage draws a knob's value (step 6), and how many frames its value clip shows. */
   stageDrawn: (id) => Number(document.querySelector(`.board .canvas-control[data-control-id="${id}"] svg.slider-svg`)?.dataset.drawn),
   valueFrameRows: () => document.querySelectorAll('[data-value-frame]').length,
+  /** The library's filter, by its label. */
+  showCategory: (name) => [...document.querySelectorAll('.cats button')].find((b) => b.textContent.trim() === name)?.click(),
+  clickPreset: (id) => document.querySelector(`[data-scene-preset="${id}"]`)?.click(),
+  presetCards: () => [...document.querySelectorAll('[data-scene-preset]')].map((el) => [el.dataset.scenePreset, text(el)]),
+  presetApplyText: () => text(document.querySelector('[data-scene-preset-apply]')),
+  presetSlots: () => [...document.querySelectorAll('[data-preset-slot]')].map((el) => el.value),
+  addFromPreset: () => document.querySelector('[data-preset-add]')?.click(),
+  saveScenePreset: () => document.querySelector('[data-save-scene-preset]')?.click(),
   /** Where the engine says a ring sweep draws, that far through it, from that value. */
   sweepAt: (progress, live) => valueEffectAt(sceneEffect('value:sweep').effect, progress, live),
   /** What the stage draws on a control's words and its own box right now. */

@@ -1357,6 +1357,17 @@ There is one Designer per panel, and it closes with its panel.
   **Follows** says how closely: **Exactly**, **Smoothly** (a little behind), or **On a spring**.
   With "reduce motion" on, a driven scene follows exactly and does not carry on after you let go.
 
+  **Save as preset** keeps the whole scene, to put on other controls or another panel. **Library ›
+  Scenes** has yours and two built in: **Knobs sweep in** and **Labels type in**. Click one, then:
+  - **On one I choose**: pick a control for each part of it; the Designer offers one of the same
+    kind first, and only controls that can play it (a value effect wants a knob or a slider, a text
+    effect a control with words);
+  - **On every … that fits**, for a preset of one control that nothing on a control starts: every
+    control that can take it, left to right, each so many milliseconds after the last. A ring sweep
+    over every knob, 0.15 s apart, is **Knobs sweep in**.
+
+  Either way it becomes a new scene, which you edit like any other.
+
   Under
   **Controls' own** is every animation the controls already have, each shown as a scene of one
   clip. It is the same animation, not a copy: move or stretch it here and the control's animation

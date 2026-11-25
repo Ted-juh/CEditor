@@ -914,6 +914,45 @@ Verified locally:
   `panelMotion`, `animationDesigner` and `anatomyForms`, which exercise the keyframe player and the
   knob drawers.
 
+## As built: scene presets (2026-11-25)
+
+The third size of preset, the one step 4 and step 5a left out: a whole scene, kept to use again.
+The record's example is "a ring sweep over any knobs, 0.15 s apart".
+
+- **Slots, not controls.** A scene names its controls by id, and a preset is for any panel, so a
+  preset names slots (`utils/scenePreset.js`). There is one slot per control the scene used, in the
+  order they first play; the trigger's and the clock's control get slots too. Each slot keeps what
+  the control was (its type and name, for choosing) and what its clips need of whichever control
+  takes it: words for a text effect, a value for a value effect, the parts a clip plays on. A slot
+  fits a control that has what it needs, whatever its type.
+- **Two ways back onto a panel:**
+  - **Mapped:** a control per slot. `defaultMapping` offers one of the same type first, in reading
+    order, and never the same control twice.
+  - **Repeated:** a preset of one slot, on every control that fits, left to right, each a gap after
+    the last (150 ms unless changed). This is allowed only when nothing on a control starts or
+    drives the preset: a hover on which knob would start them all?
+
+  Either way the result is an ordinary new scene, which the panel carries, so a panel needs no copy
+  of the preset.
+- **The library** is `stores/scenePresetLibrary.js`: yours, in this machine's storage, as your
+  animation presets are. Two are built in: **Knobs sweep in** (the ring sweep, repeated) and
+  **Labels type in** (the typewriter, on everything with words of its own).
+- **The Designer.** The scene row has **Save as preset**. The library has a **Scenes** category,
+  whose cards open a small panel to map or repeat (`ScenePresetPanel.svelte`); one of yours can be
+  removed there, and scenes already made from it stay.
+
+Left out: scene presets in files and carried by a panel, as animation presets are (.ceanim, "This
+panel"). A scene preset's place for that is the same typed-document route; nothing has needed it
+yet.
+
+Verified locally:
+- `test/scenePreset.test.js` (new): slots and their needs, no control ids left in a preset, fitting by
+  what a control has, a mapping same type first, a trigger following its slot, a refusal that names
+  the control, a repeat left to right 150 ms apart, and a hover-started preset refusing to repeat;
+- the browser check `animationDesigner`: the built-in **Knobs sweep in** makes a new scene on the
+  panel's one knob, and a scene saved as a preset comes back as a new scene with its clips on the same
+  controls, offered same type first.
+
 ## Open
 
 Nothing for the owner at present.
