@@ -205,7 +205,7 @@ test('in the library: a built-in applies linked, the panel carries it, and nobod
   initHistory(); addPanel(createPanel('Knobs')); flushHistory();
   const knob = addControl('Knob')._children.Core.id;
   const label = addControl('Label')._children.Core.id;
-  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob']);
+  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider']);
   assert.equal(COMPONENT_PRESETS[0].groups.reduce((n, group) => n + group.entries.length, 0), KNOB_PRESETS.length);
 
   const result = applyAnimationPreset([knob, label], byId('lift').id);
@@ -223,8 +223,9 @@ test('the showcase: one panel a group and Together, every knob wearing its prese
   const sets = new Set();
   for (const [id, make] of KNOB_PANELS) {
     const panel = make();
-    assert.ok(!sets.has(panel.controlSet), `${id}: a set of its own`);
-    sets.add(panel.controlSet);
+    // A panel stores its set as `{ id }`: compared by id, or two panels in one set pass.
+    assert.ok(!sets.has(panel.controlSet.id), `${id}: a set of its own (${panel.controlSet.id})`);
+    sets.add(panel.controlSet.id);
     if (id === 'knob-together') {
       assert.deepEqual(panel.animationScenes.map((scene) => scene.name), ['Sweep in', 'Wave', 'Follow the leader']);
       continue;

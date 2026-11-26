@@ -6,7 +6,8 @@
  *
  *   - Built-in: the code presets in utils/animationPresets.js. Applied as they always were (a copy,
  *     with the state change they need); "Save as preset" on the result makes one of your own.
- *     And each component's presets (utils/knobPresets.js, the Knob's), which are data like yours:
+ *     And each component's presets (utils/knobPresets.js, the Knob's; utils/sliderPresets.js, the
+ *     Slider's), which are data like yours:
  *     listed under their component, applied linked, carried by the panel that uses one. They are
  *     everyone's, so a panel that carries one never offers to add it to your library.
  *   - Mine: your library, in this machine's storage (localStorage, as control sets, card presets and
@@ -30,6 +31,7 @@ import { beginHistoryTransaction, commitHistoryTransaction } from './history.js'
 import { flatControls } from '../utils/containment.js';
 import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
 import { KNOB_PRESETS, KNOB_PRESET_GROUPS } from '../utils/knobPresets.js';
+import { SLIDER_PRESETS, SLIDER_PRESET_GROUPS } from '../utils/sliderPresets.js';
 import {
   LINK_KEY,
   PRESET_FORMAT,
@@ -55,13 +57,13 @@ const cleanList = (list) => (Array.isArray(list) ? list.map(cleanPreset).filter(
 
 /**
  * The components' built-in presets, as the library lists them: each component, its groups, and in
- * each group its presets with what plays them and what they do. The Knob's are the first.
+ * each group its presets with what plays them and what they do. The Knob's are the first, then the
+ * Slider's.
  */
+const byGroups = (groups, presets) => groups.map((group) => ({ ...group, entries: presets.filter((entry) => entry.group === group.id) }));
 export const COMPONENT_PRESETS = Object.freeze([
-  {
-    component: 'Knob',
-    groups: KNOB_PRESET_GROUPS.map((group) => ({ ...group, entries: KNOB_PRESETS.filter((entry) => entry.group === group.id) })),
-  },
+  { component: 'Knob', groups: byGroups(KNOB_PRESET_GROUPS, KNOB_PRESETS) },
+  { component: 'Slider', groups: byGroups(SLIDER_PRESET_GROUPS, SLIDER_PRESETS) },
 ]);
 
 const BUILT_IN_BY_ID = new Map(COMPONENT_PRESETS.flatMap(({ groups }) => groups.flatMap((group) => group.entries.map((entry) => [entry.id, entry.preset]))));

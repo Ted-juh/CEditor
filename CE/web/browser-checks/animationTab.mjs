@@ -834,9 +834,11 @@ const copy = await ev(() => window.__anim.storedAnimation('pressEcho2'));
 assert.equal(copy.preset.id, savedPreset.id);
 assert.match(await ev(() => window.__anim.presetReport()), /on 1 control, linked/);
 
-check('the Knob\'s built-in presets are listed under it, by group; one applies linked, one that needs a cap is refused', async () => {});
+check('the Knob\'s and the Slider\'s built-in presets are listed under them, by group; one applies linked, one that needs a cap is refused', async () => {});
 assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
   component: 'Knob', groups: ['Numbers', 'Ticks', 'Touch', 'Turning', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
+}, {
+  component: 'Slider', groups: ['Numbers', 'Ticks', 'Touch', 'Moving', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
 }]);
 await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
 await settle();

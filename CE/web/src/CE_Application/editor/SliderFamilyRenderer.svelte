@@ -204,6 +204,7 @@
     return [
       `left:${numberOr(anchor?.x, 0)}px`,
       `top:${numberOr(anchor?.y, 0)}px`,
+      anchor?.align === 'start' ? 'transform:translate(0, -50%)' : '',
       `color:${argbToCss(fill?.colour, '#FFFFFF')}`,
       `font-family:${JSON.stringify(font?.family ?? 'Arial')}`,
       `font-size:${numberOr(font?.size, 11)}px`,
@@ -609,11 +610,27 @@
     x: circularMetrics.centerX,
     y: circularMetrics.centerY,
   });
-  let labelAnchors = $derived(buildSliderHandleLabelAnchors(behavior, width, height, normalizedValues, {
+  let builtAnchors = $derived(buildSliderHandleLabelAnchors(behavior, width, height, normalizedValues, {
     trackThickness,
     pointerSize: maxPointerSize,
     circle: circularMetrics,
   }));
+  // On a vertical slider a handle's readout starts just past its cap's edge and reads away from it
+  // (`align: start`): centred a fixed 22 px out, a word ran under a wide fader cap ("Pulse" as
+  // "ulse"). How far across a cap is: a bar's or a block's height, a round one's diameter.
+  const capAcross = (part) => {
+    const kind = capKindOf(part);
+    const layout = part?._children?.Layout;
+    return Math.max(2, numberOr(RECT_CAP_KINDS.includes(kind) || kind === 'line' ? layout?.height : layout?.width, 20));
+  };
+  let labelAnchors = $derived.by(() => {
+    if (geometry !== 'linear' || orientation !== 'vertical') return builtAnchors;
+    const beside = (role, part) => {
+      const point = linearPointerPoint(role);
+      return { x: point.x + capAcross(part) / 2 + 6, y: point.y, align: 'start' };
+    };
+    return { start: beside('start', pointerStartPart), current: beside('current', pointerCurrentPart), end: beside('end', pointerEndPart) };
+  });
   let tickStops = $derived(buildSliderTickStops(behavior));
   // How a tick is drawn (utils/sliderEntityFactory.js): a line, a dot, the stop's numeral, or a
   // line engraved into the plate. And which major stops draw at all — every one, the two ends, or
@@ -789,13 +806,24 @@
    */
   function marksFx(partName, item, marks) {
     if (!item || !marks.length) return null;
-    // Where each mark is round the dial, for an effect that moves it about the centre (fly, fan).
+    // Where each mark is round the dial, for an effect that moves it about the centre (fly, fan); on
+    // a slider, where it is beside the track, and the point on the track it stands at.
+    const points = marks.map((mark) => markCentre(mark.box));
     const around = geometry === 'circular'
-      ? { centre: circularCenter, points: marks.map((mark) => markCentre(mark.box)) }
-      : null;
+      ? { centre: circularCenter, points }
+      : { linear: true, points, origins: points.map(onTrack), normal: awayFromTrack };
     const styles = markPieceStyles(item.effect, marks.map((mark) => mark.label), { phase: item.phase, seedText: `${partName}:${item.name}`, at: item.at ?? null, geometry: around });
     const clips = textEffectClips(item.effect);
     return marks.map((mark, i) => ({ style: styles[i], clip: clips ? { id: maskIdFor(`${partName}Word${i}`), ...markClipBox(mark.box) } : null }));
+  }
+
+  /** The point on a slider's track nearest to `point`. */
+  function onTrack(point) {
+    const { x1, y1, x2, y2 } = lineFrame;
+    const lx = x2 - x1;
+    const ly = y2 - y1;
+    const t = Math.max(0, Math.min(1, ((point.x - x1) * lx + (point.y - y1) * ly) / Math.max(1e-6, lx * lx + ly * ly)));
+    return { x: x1 + lx * t, y: y1 + ly * t };
   }
 
   /** The middle of what a mark covers: a number's or a dot's centre, a tick line's midpoint. */
@@ -877,20 +905,43 @@
     const precision = Math.max(0, Math.min(6, Math.round(numberOr(behavior?.precision, 2))));
     return `${change >= 0 ? '+' : '\u2212'}${Math.abs(change).toFixed(precision)}`;
   }
-  let emittedWords = $derived.by(() => {
-    if (!wordsInFlight.length || geometry !== 'circular') return [];
-    return wordsInFlight.map((word) => {
-      const angle = (sliderNormalizedToAngle(behavior, numberOr(word.value, 0)) * Math.PI) / 180;
+  // Away from a slider's track: to the right of a vertical one, up from a horizontal one.
+  let awayFromTrack = $derived(orientation === 'vertical' ? { x: 1, y: 0 } : { x: 0, y: -1 });
+  /**
+   * Where a word leaves from and which way it flies. Round a dial: from the pointer's tip (14 px past
+   * the track) or the centre, along the pointer or up. On a slider: from the cap's outer edge, or the
+   * cap itself (`centre`), away from the track or up; both where the cap is at the word's value.
+   */
+  function wordFlight(word) {
+    const normalized = numberOr(word.value, 0);
+    if (geometry === 'circular') {
+      const angle = (sliderNormalizedToAngle(behavior, normalized) * Math.PI) / 180;
       const start = word.emit.from === 'centre'
         ? circularCenter
-        : resolveCircularPoint(width, height, sliderNormalizedToAngle(behavior, numberOr(word.value, 0)), circularMetrics.radius + 14, circularCenter);
-      const [dx, dy] = word.emit.direction === 'up' ? [0, -word.emit.travel] : [Math.cos(angle) * word.emit.travel, Math.sin(angle) * word.emit.travel];
+        : resolveCircularPoint(width, height, sliderNormalizedToAngle(behavior, normalized), circularMetrics.radius + 14, circularCenter);
+      const way = word.emit.direction === 'up' ? { x: 0, y: -1 } : { x: Math.cos(angle), y: Math.sin(angle) };
+      return { start, way };
+    }
+    const cap = resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, pointerCurrentSize);
+    // Beside a vertical fader's cap a word starts just past its edge and reads away from it, as the
+    // readout does; above a horizontal one it is centred over it.
+    const beside = word.emit.from !== 'centre' && orientation === 'vertical';
+    const out = word.emit.from === 'centre' ? 0 : capAcross(pointerCurrentPart) / 2 + (beside ? 6 : 10);
+    const start = { x: cap.x + awayFromTrack.x * out, y: cap.y + awayFromTrack.y * out };
+    return { start, way: word.emit.direction === 'up' ? { x: 0, y: -1 } : awayFromTrack, align: beside ? 'start' : 'centre' };
+  }
+  let emittedWords = $derived.by(() => {
+    if (!wordsInFlight.length) return [];
+    return wordsInFlight.map((word) => {
+      const { start, way, align } = wordFlight(word);
+      const [dx, dy] = [way.x * word.emit.travel, way.y * word.emit.travel];
       const colour = word.emit.colour ? argbToCss(word.emit.colour) : argbToCss(labelParts.current?._children?.Text?._children?.Fill?.colour, '#FFFFFF');
       return {
         id: word.id,
         text: emittedText(word),
         style: [
           `left:${start.x.toFixed(1)}px`, `top:${start.y.toFixed(1)}px`, `color:${colour}`, `font-size:${word.emit.size}px`,
+          ...(align === 'start' ? ['transform:translate(0, -50%)'] : []),
           `--ce-emit-x:${dx.toFixed(1)}px`, `--ce-emit-y:${dy.toFixed(1)}px`,
           `animation-duration:${Math.round(word.emit.duration)}ms`, `animation-delay:${Math.round(word.emit.delay)}ms`,
           // The move eases as the animation says; the fade holds, then drops in the last part.
@@ -1126,6 +1177,30 @@
     ].filter(Boolean).join(';');
   }
 
+  /**
+   * How far a fader cap stands out toward you (the part's Layout.lift, 1 by default: what a Hover
+   * state that lifts it, or a Pressed one that squeezes it, patches), drawn as a scale about the
+   * cap's centre, on a group round the whole cap. Not Layout.scale: every slider and knob ships
+   * states that patch its pointer's scale (1.08 while it is the active handle, which a single value
+   * always is), never drawn on a fader cap; drawing them now would enlarge every slider there is.
+   * Only the scale, and its own transition: the cap's keyframes are on its pieces already
+   * (pointerStyleFor), and as a part the value moves, it takes no transform transition there, which
+   * would make it lag the value. Only a cap that has a lift at all (Lift and Grip set it to 1): the
+   * value's own glide is a transform transition on every slider's pointers, so a timing alone would
+   * wrap every cap there is.
+   */
+  function capLiftStyle(part, role, point) {
+    const raw = part?._children?.Layout?.lift;
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    const scale = numberOr(raw, 1);
+    const timing = partTransitions?.get?.(role)?.transform ?? null;
+    return [
+      `transform-origin:${point.x.toFixed(2)}px ${point.y.toFixed(2)}px`,
+      `scale:${Number(scale.toFixed(4))}`,
+      timing ? `transition:scale ${timing}` : '',
+    ].filter(Boolean).join(';');
+  }
+
   function oppositeDirection(direction) {
     return direction === 'ccw' ? 'cw' : 'ccw';
   }
@@ -1262,7 +1337,18 @@
     {/if}
 
     <!-- One cap, whatever its kind and whichever handle it is: the part says how it is drawn. -->
+    <!-- A fader cap, in a group that lifts it only when it is lifted (capLiftStyle): every other
+         cap is drawn straight into the SVG, as it always was, which what finds a cap relies on. -->
     {#snippet linearCap(part, point, name)}
+      {@const lift = capLiftStyle(part, name, point)}
+      {#if lift}
+        <g style={lift}>{@render capBody(part, point, name)}</g>
+      {:else}
+        {@render capBody(part, point, name)}
+      {/if}
+    {/snippet}
+
+    {#snippet capBody(part, point, name)}
       {@const g = capGeometry(part, point)}
       {@const fill = argbToCss(part?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
       {@const border = partBorderColour(part, '#333333')}

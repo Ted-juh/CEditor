@@ -296,7 +296,8 @@ in too, the value as a layer that follows the knob's value.
 The labels that ride a knob's or slider's handles as they move are still its own: **Handle Labels**
 on its Labels tab. On a knob, **Sits** puts the value's label **At the tip** of its pointer, riding
 it round, or **In the cap**, still, in the middle of the dial; there a line or bar pointer becomes a
-tick at the rim, so the number is not struck through.
+tick at the rim, so the number is not struck through. On a vertical slider the label starts just past
+its cap and reads away from it.
 
 A meter works the same way. It draws no reading and no caption of its own; the **Labels** section
 at the top of its **Meter** tab adds **+ Value** (the reading, printed with the meter's precision,
@@ -1328,19 +1329,22 @@ on another computer and in the exported plugin; open one that carries presets yo
 the library offers to add them to yours.
 
 Below them are the presets each kind of control comes with, under its name: **Knob**, by group —
-**Numbers**, **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words**. Each row
+**Numbers**, **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words** — and
+**Slider**, the same groups read for a fader (**Moving** for **Turning**), with a few of its own:
+**Unfold** slides the ticks up out of the bottom one, **Throw** sends the cap past where a flick
+left it and back, **Lift** and **Grip** lift and squeeze the fader cap. Each row
 says what plays it (hover, let go, panel opens, a flick) and what it does, and **Apply** puts it on
 the selected controls, linked, as one of yours. A few need something the control may not show: a
 preset on the scale's numbers is refused on a knob whose numbers are off, with the reason. **Glide**,
 **Snap** and **Spring** take the place of the knob's own glide rather than adding a second one.
-**Name ↔ value** and **Decode** go on the knob's name Label, not on the knob. The **Components**
-showcase (below) shows every one of them on a knob. They come with CEditor, so a panel that uses one
-never asks you to add it to your library.
+**Name ↔ value** and **Decode** go on the control's name Label, not on the control. The
+**Components** showcase (below) shows every one of them on a knob or a fader. They come with
+CEditor, so a panel that uses one never asks you to add it to your library.
 
 The **States** tab has a **Motion** section for the state you are editing: **Entering** (mouse over,
 for Hover), **While in** and **Leaving** (mouse exit), each showing the animations that fill it and
-**New** to make one. Under it, **Events** plays a keyframe animation on a click, a double-click, a
-long press, a flick or a turn of the wheel.
+**New** to make one. Under it, **Events** plays an animation on a click, a double-click, a long
+press, a flick or a turn of the wheel: keyframes, a text effect, a value effect, or words thrown.
 
 The **Preview** side of the tool is a small stage where you can hover, press and drag the control
 and watch the animation, with **0.25×** slow motion. Animations also play in Preview mode and in the
@@ -1512,7 +1516,9 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
   comes with. Every control wears one preset, captioned with its name, what plays it and what it
   does, and each panel is in a control set of its own. **Knob** is the first: **Knob Numbers**,
   **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words**, and **Knob
-  Together**, whose scenes play one effect along a row of knobs.
+  Together**, whose scenes play one effect along a row of knobs. **Slider** is the second, on
+  faders: **Slider Numbers**, **Ticks**, **Touch**, **Moving**, **Attention**, **Gestures** and
+  **Words**, and **Slider Together**, a mixing desk's row.
 
 Most of them play by themselves. A few wait for you:
 
@@ -1524,10 +1530,10 @@ Most of them play by themselves. A few wait for you:
   scripts' actions says so in the script console.
 - The **Animated Synths** answer MIDI from the synth or a keyboard, and the minilogue's step lamps
   and the JU-06A's beat lamp follow the transport.
-- Most of the **Components** knobs wait for your hand: hover, press, turn, let go, flick, a turn of
-  the wheel or a double-click, as each caption says. **Knob Numbers** and **Knob Attention** run a
-  small script each (a synth sending new values; a "look here"), and **Beat pulse** follows the
-  transport.
+- Most of the **Components** knobs and faders wait for your hand: hover, press, turn or move, let
+  go, flick, a turn of the wheel or a double-click, as each caption says. **Numbers** and
+  **Attention** run a small script each (a synth sending new values; a "look here"), and **Beat
+  pulse** follows the transport.
 
 ## 9. Scripts
 

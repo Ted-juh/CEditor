@@ -198,7 +198,8 @@ test('a fly comes from where its marks say, and a fan turns about the dial; on a
     'away by a pair of its own, so the fly back on the same marks keeps its own');
   const fan = readTextEffect(newTextEffectShape('n', 'fan'));
   assert.equal(fan.stagger, 0, 'every mark turns at once, the far ones further');
-  assert.match(textEffectRules(fan, { phase: 'a' }), /0%\{opacity:0;transform:rotate\(var\(--ce-fan-turn, -30deg\)\)\}/);
+  assert.match(textEffectRules(fan, { phase: 'a' }), /0%\{opacity:0;transform:translate\(var\(--ce-fan-x, 0px\), var\(--ce-fan-y, 0px\)\) rotate\(var\(--ce-fan-turn, -30deg\)\)\}/,
+    'turned round a dial, slid along a slider\'s track');
   assert.equal(textEffectClips(fly), false, 'a mark flying is not cut off at its own box');
   assert.equal(textEffectClips(fan), false);
 });

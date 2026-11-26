@@ -184,6 +184,59 @@ test('a knob throws the words its emit animation made, from the tip or the centr
   assert.notDeepEqual(at(tipped), [60, 60], 'by default, at the tip');
 });
 
+// --- On a slider's track (2026-11-26, the Components showcase's Slider) ---------------------------
+
+test('on a slider a fly comes in from the side and goes out to it, and a fan slides up the track from the first mark', () => {
+  const along = { linear: true, points: [{ x: 70, y: 180 }, { x: 70, y: 100 }, { x: 60, y: 20 }], origins: [{ x: 60, y: 180 }, { x: 60, y: 100 }, { x: 60, y: 20 }], normal: { x: 1, y: 0 } };
+  assert.deepEqual(markGeometry(effect({ effect: 'fly', way: 'in' }), along), [
+    '--ce-fly-x:40px;--ce-fly-y:0px;', '--ce-fly-x:40px;--ce-fly-y:0px;', '--ce-fly-x:40px;--ce-fly-y:0px;',
+  ], 'from 40 px out, along the line from the track through it; one on the track goes along the normal');
+  assert.equal(markGeometry(effect({ effect: 'fly', way: 'out' }), along)[0], '--ce-fly-out-x:40px;--ce-fly-out-y:0px;');
+  assert.deepEqual(markGeometry(effect({ effect: 'fan', way: 'in' }), along), [
+    '--ce-fan-x:0px;--ce-fan-y:0px;--ce-fan-turn:0deg;', '--ce-fan-x:0px;--ce-fan-y:80px;--ce-fan-turn:0deg;', '--ce-fan-x:10px;--ce-fan-y:160px;--ce-fan-turn:0deg;',
+  ], 'each from the first mark\'s place, unturned');
+});
+
+const fader = (behavior = {}, parts = {}) => {
+  const control = createControl('Slider', { Core: { id: 's1', name: 'Level' } });
+  Object.assign(control._children.Behavior, { orientation: 'vertical', ...behavior });
+  for (const [name, fields] of Object.entries(parts)) Object.assign(control._children.Parts._children[name], fields);
+  return control;
+};
+const cap = (html) => /<circle data-pointer="current" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/.exec(html)?.slice(1).map(Number);
+
+test('a vertical slider\'s readout starts just past its cap and reads away from it', () => {
+  const html = render(SliderFamilyRenderer, { props: { control: fader({ showHandleLabels: true }), width: 120, height: 200 } }).body;
+  const [cx, , r] = cap(html);
+  const label = /class="slider-label[^"]*"[^>]*style="([^"]*)"/.exec(html)?.[1] ?? '';
+  assert.match(label, /transform:translate\(0, -50%\)/, 'its left edge at the anchor, not its middle');
+  assert.equal(Number(/left:([\d.]+)px/.exec(label)[1]), cx + r + 6, 'past the cap\'s edge');
+  const flat = render(SliderFamilyRenderer, { props: { control: fader({ orientation: 'horizontal', showHandleLabels: true }), width: 200, height: 80 } }).body;
+  assert.doesNotMatch(/class="slider-label[^"]*"[^>]*style="([^"]*)"/.exec(flat)[1], /translate\(0, -50%\)/, 'above a horizontal one, centred as before');
+});
+
+test('a fader cap draws its lift about its own centre, and nothing when it has none', () => {
+  const still = render(SliderFamilyRenderer, { props: { control: fader(), width: 120, height: 200 } }).body;
+  assert.doesNotMatch(still, /scale:/, 'a slider\'s own states patch Layout.scale, which a fader cap does not draw');
+  const lifted = fader({}, { pointerCurrent: { _children: { ...createControl('Slider')._children.Parts._children.pointerCurrent._children, Layout: { ...createControl('Slider')._children.Parts._children.pointerCurrent._children.Layout, lift: 1.12 } } } });
+  const html = render(SliderFamilyRenderer, { props: { control: lifted, width: 120, height: 200 } }).body;
+  const [cx, cy] = cap(html);
+  assert.match(html, new RegExp(`<g style="transform-origin:${cx.toFixed(2)}px ${cy.toFixed(2)}px;scale:1.12">`));
+});
+
+test('a fader throws its words out from beside its cap, away from the track', () => {
+  const word = { id: 1, name: 'stream', at: performance.now(), value: 0.5, from: 0.25, turn: 1,
+    emit: { shows: 'value', from: 'tip', direction: 'pointer', travel: 24, size: 12, colour: null, duration: 700, delay: 0, easing: 'ease-out' } };
+  const html = render(SliderFamilyRenderer, { props: { control: fader({ min: 0, max: 10, precision: 1 }), width: 120, height: 200, emits: [word] } }).body;
+  const [cx, , r] = cap(html);
+  const style = /data-emitted-word="" style="([^"]*)">([^<]*)</.exec(html);
+  assert.equal(style[2], '5.0');
+  assert.equal(Number(/left:([\d.]+)px/.exec(style[1])[1]), Number((cx + r + 6).toFixed(1)));
+  assert.match(style[1], /transform:translate\(0, -50%\);--ce-emit-x:24\.0px;--ce-emit-y:0\.0px;/, 'out to the right, reading away from the cap');
+  const up = render(SliderFamilyRenderer, { props: { control: fader({ min: 0, max: 10, precision: 1 }), width: 120, height: 200, emits: [{ ...word, emit: { ...word.emit, direction: 'up' } }] } }).body;
+  assert.match(up, /--ce-emit-x:0\.0px;--ce-emit-y:-24\.0px;/);
+});
+
 // --- A knob drawn as a form (ControlAnatomy), and one carried by a component's part -----------------
 
 const formKnob = (form, core = {}) => {

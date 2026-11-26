@@ -78,9 +78,14 @@ export function isFlick(result, minSpeed = FLICK_MIN_SPEED) {
   return !!result?.moved && result.speed >= minSpeed;
 }
 
+// What a gesture can play: keyframes, a text effect, a value effect (the Slider's Throw, on a flick)
+// and words thrown. The Animation tab offers each of them every gesture, and a value effect or words
+// on one used to be offered and never play.
+const GESTURE_KINDS = ['keyframes', 'text', 'value', 'emit'];
+
 function eventRows(control, eventId) {
   return readAnimations(control).filter((row) => row.enabled !== false
-    && (row.kind === 'keyframes' || row.kind === 'text')
+    && GESTURE_KINDS.includes(row.kind)
     && row.trigger?.type === 'event'
     && row.trigger.event === eventId);
 }

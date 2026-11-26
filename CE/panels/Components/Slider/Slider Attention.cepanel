@@ -1,0 +1,786 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "7cb4f961-c0b5-4e1a-9f3d-7cb4f9617cb4",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Slider Attention",
+  "scriptId": "component_slider-attention",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1440,
+  "height": 460,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF101317",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "FillSweep.value",
+      "label": "FillSweep",
+      "controlName": "FillSweep",
+      "path": "FillSweep.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.4,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "RiseToValue.value",
+      "label": "RiseToValue",
+      "controlName": "RiseToValue",
+      "path": "RiseToValue.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.65,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FallToValue.value",
+      "label": "FallToValue",
+      "controlName": "FallToValue",
+      "path": "FallToValue.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.3,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ReachFull.value",
+      "label": "ReachFull",
+      "controlName": "ReachFull",
+      "path": "ReachFull.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wiggle.value",
+      "label": "Wiggle",
+      "controlName": "Wiggle",
+      "path": "Wiggle.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "BeatPulse.value",
+      "label": "BeatPulse",
+      "controlName": "BeatPulse",
+      "path": "BeatPulse.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [
+    {
+      "id": "component_slider-attention_1",
+      "name": "Look here",
+      "language": "javascript",
+      "source": "// Plays the Reach full slider's own animation every four seconds, as a panel would to draw\n// the eye to one control: ce.anim.play(control, animation).\nfunction lookHere() {\n  ce.anim.play('ReachFull', 'reachFull');\n  after(4000, lookHere);\n}\nafter(1500, lookHere);\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "backlit"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1722235105000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Slider · Attention","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1722235105001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":1380,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"only the drawing moves, never the value. Each slider wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF98A4B0"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FillSweep","id":"ctrl_1722235105002","description":"Fill sweep: the fill sweeps to full and back to the value.","controlType":"Slider"},
+        "Transform": {"x":113,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","defaultCurrentValue":0.4},
+        "Animations": {"_children":{"fillSweep":{"_type":"Animation","name":"fillSweep","enabled":true,"kind":"value","trigger":{"type":"always"},"targets":[{"path":"Value"}],"frames":[{"at":0,"value":0},{"at":0.55,"value":1},{"at":1}],"duration":1500,"delay":400,"easing":"inOutCubic","iterations":1,"preset":{"id":"ce:slider:fill-sweep","revision":1,"from":"fillSweep"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FillSweepCaption","id":"ctrl_1722235105003","controlType":"Label"},
+        "Transform": {"x":38,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Fill sweep","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FillSweepHow","id":"ctrl_1722235105004","controlType":"Label"},
+        "Transform": {"x":38,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF8FD3FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FillSweepWhat","id":"ctrl_1722235105005","controlType":"Label"},
+        "Transform": {"x":40,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the fill sweeps to full and back to the value","_children":{"Fill":{"colour":"FF98A4B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RiseToValue","id":"ctrl_1722235105006","description":"Rise to value: from nothing up to the value.","controlType":"Slider"},
+        "Transform": {"x":343,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","defaultCurrentValue":0.65},
+        "Animations": {"_children":{"rise":{"_type":"Animation","name":"rise","enabled":true,"kind":"value","trigger":{"type":"always"},"targets":[{"path":"Value"}],"frames":[{"at":0,"value":0},{"at":1}],"duration":1000,"delay":400,"easing":"outCubic","iterations":1,"preset":{"id":"ce:slider:rise-to-value","revision":1,"from":"rise"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RiseToValueCaption","id":"ctrl_1722235105007","controlType":"Label"},
+        "Transform": {"x":268,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Rise to value","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RiseToValueHow","id":"ctrl_1722235105008","controlType":"Label"},
+        "Transform": {"x":268,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF8FD3FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RiseToValueWhat","id":"ctrl_1722235105009","controlType":"Label"},
+        "Transform": {"x":270,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"from nothing up to the value","_children":{"Fill":{"colour":"FF98A4B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FallToValue","id":"ctrl_1722235105010","description":"Fall to value: from full down to the value.","controlType":"Slider"},
+        "Transform": {"x":573,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","defaultCurrentValue":0.3},
+        "Animations": {"_children":{"fall":{"_type":"Animation","name":"fall","enabled":true,"kind":"value","trigger":{"type":"always"},"targets":[{"path":"Value"}],"frames":[{"at":0,"value":1},{"at":1}],"duration":1000,"delay":400,"easing":"outCubic","iterations":1,"preset":{"id":"ce:slider:fall-to-value","revision":1,"from":"fall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FallToValueCaption","id":"ctrl_1722235105011","controlType":"Label"},
+        "Transform": {"x":498,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Fall to value","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FallToValueHow","id":"ctrl_1722235105012","controlType":"Label"},
+        "Transform": {"x":498,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF8FD3FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FallToValueWhat","id":"ctrl_1722235105013","controlType":"Label"},
+        "Transform": {"x":500,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"from full down to the value","_children":{"Fill":{"colour":"FF98A4B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReachFull","id":"ctrl_1722235105014","description":"Reach full: to full and back: \"look here\".","controlType":"Slider"},
+        "Transform": {"x":803,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"reachFull":{"_type":"Animation","name":"reachFull","enabled":true,"kind":"value","trigger":{"type":"script","from":["*"],"to":[]},"targets":[{"path":"Value"}],"frames":[{"at":0},{"at":0.45,"value":1},{"at":1}],"duration":1100,"delay":0,"easing":"inOutCubic","iterations":1,"preset":{"id":"ce:slider:reach-full","revision":1,"from":"reachFull"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReachFullCaption","id":"ctrl_1722235105015","controlType":"Label"},
+        "Transform": {"x":728,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Reach full","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReachFullHow","id":"ctrl_1722235105016","controlType":"Label"},
+        "Transform": {"x":728,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A SCRIPT PLAYS IT","_children":{"Fill":{"colour":"FF8FD3FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReachFullWhat","id":"ctrl_1722235105017","controlType":"Label"},
+        "Transform": {"x":730,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"to full and back: \"look here\"","_children":{"Fill":{"colour":"FF98A4B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wiggle","id":"ctrl_1722235105018","description":"Wiggle: a small shake of the cap: \"move me\".","controlType":"Slider"},
+        "Transform": {"x":1033,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"wiggle":{"_type":"Animation","name":"wiggle","enabled":true,"kind":"value","trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Value"}],"frames":[{"at":0},{"at":0.15,"by":0.07},{"at":0.35,"by":-0.07},{"at":0.55,"by":0.045},{"at":0.75,"by":-0.02},{"at":1}],"duration":700,"delay":0,"easing":"inOutSine","iterations":1,"preset":{"id":"ce:slider:wiggle","revision":1,"from":"wiggle"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleCaption","id":"ctrl_1722235105019","controlType":"Label"},
+        "Transform": {"x":958,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wiggle","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleHow","id":"ctrl_1722235105020","controlType":"Label"},
+        "Transform": {"x":958,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF8FD3FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleWhat","id":"ctrl_1722235105021","controlType":"Label"},
+        "Transform": {"x":960,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a small shake of the cap: \"move me\"","_children":{"Fill":{"colour":"FF98A4B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulse","id":"ctrl_1722235105022","description":"Beat pulse: pulses on each beat while the transport plays.","controlType":"Slider"},
+        "Transform": {"x":1263,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"beatPulse":{"_type":"Animation","name":"beatPulse","enabled":true,"kind":"keyframes","trigger":{"type":"beat","every":1},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.2,"scale":1.05},{"at":1,"scale":1}],"duration":280,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:slider:beat-pulse","revision":1,"from":"beatPulse"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseCaption","id":"ctrl_1722235105023","controlType":"Label"},
+        "Transform": {"x":1188,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Beat pulse","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseHow","id":"ctrl_1722235105024","controlType":"Label"},
+        "Transform": {"x":1188,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TRANSPORT BEAT","_children":{"Fill":{"colour":"FF8FD3FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseWhat","id":"ctrl_1722235105025","controlType":"Label"},
+        "Transform": {"x":1190,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"pulses on each beat while the transport plays","_children":{"Fill":{"colour":"FF98A4B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:fill-sweep",
+      "name": "Fill sweep",
+      "category": "Slider",
+      "tags": [
+        "Attention",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "fillSweep": {
+          "_type": "Animation",
+          "name": "fillSweep",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "value": 0
+            },
+            {
+              "at": 0.55,
+              "value": 1
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1500,
+          "delay": 400,
+          "easing": "inOutCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:rise-to-value",
+      "name": "Rise to value",
+      "category": "Slider",
+      "tags": [
+        "Attention",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "rise": {
+          "_type": "Animation",
+          "name": "rise",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "value": 0
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1000,
+          "delay": 400,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:fall-to-value",
+      "name": "Fall to value",
+      "category": "Slider",
+      "tags": [
+        "Attention",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "fall": {
+          "_type": "Animation",
+          "name": "fall",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "value": 1
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1000,
+          "delay": 400,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:reach-full",
+      "name": "Reach full",
+      "category": "Slider",
+      "tags": [
+        "Attention",
+        "a script plays it"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "reachFull": {
+          "_type": "Animation",
+          "name": "reachFull",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "script",
+            "from": [
+              "*"
+            ],
+            "to": []
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0
+            },
+            {
+              "at": 0.45,
+              "value": 1
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1100,
+          "delay": 0,
+          "easing": "inOutCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:wiggle",
+      "name": "Wiggle",
+      "category": "Slider",
+      "tags": [
+        "Attention",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "wiggle": {
+          "_type": "Animation",
+          "name": "wiggle",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0
+            },
+            {
+              "at": 0.15,
+              "by": 0.07
+            },
+            {
+              "at": 0.35,
+              "by": -0.07
+            },
+            {
+              "at": 0.55,
+              "by": 0.045
+            },
+            {
+              "at": 0.75,
+              "by": -0.02
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:beat-pulse",
+      "name": "Beat pulse",
+      "category": "Slider",
+      "tags": [
+        "Attention",
+        "transport beat"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "beatPulse": {
+          "_type": "Animation",
+          "name": "beatPulse",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "beat",
+            "every": 1
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.2,
+              "scale": 1.05
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 280,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

@@ -1,0 +1,1198 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "1f8e68f1-c0b5-4e1a-9f3d-1f8e68f11f8e",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Slider Ticks",
+  "scriptId": "component_slider-ticks",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 980,
+  "height": 800,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF121416",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "BigThenSmall.value",
+      "label": "BigThenSmall",
+      "controlName": "BigThenSmall",
+      "path": "BigThenSmall.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Grow.value",
+      "label": "Grow",
+      "controlName": "Grow",
+      "path": "Grow.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "MiddleOut.value",
+      "label": "MiddleOut",
+      "controlName": "MiddleOut",
+      "path": "MiddleOut.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Countdown.value",
+      "label": "Countdown",
+      "controlName": "Countdown",
+      "path": "Countdown.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ripple.value",
+      "label": "Ripple",
+      "controlName": "Ripple",
+      "path": "Ripple.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Burst.value",
+      "label": "Burst",
+      "controlName": "Burst",
+      "path": "Burst.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FlyAway.value",
+      "label": "FlyAway",
+      "controlName": "FlyAway",
+      "path": "FlyAway.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Unfold.value",
+      "label": "Unfold",
+      "controlName": "Unfold",
+      "path": "Unfold.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "dual-scale"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1779426673000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Slider · Ticks","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1779426673001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":920,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the marks along the track, big and small, arriving in order. Each slider wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigThenSmall","id":"ctrl_1779426673002","description":"Big, then small: the big ticks in order, then the small ones.","controlType":"Slider"},
+        "Transform": {"x":113,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","majorTickCount":6,"minorTickCount":4},
+        "Animations": {"_children":{"bigTicks":{"_type":"Animation","name":"bigTicks","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":300,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":80,"duration":260,"colour":"FFFFFFFF","trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:big-then-small","revision":1,"from":"bigTicks"}},"smallTicks":{"_type":"Animation","name":"smallTicks","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":1250,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":22,"duration":220,"colour":"FFFFFFFF","trigger":{"type":"always"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:big-then-small","revision":1,"from":"smallTicks"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigThenSmallCaption","id":"ctrl_1779426673003","controlType":"Label"},
+        "Transform": {"x":38,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Big, then small","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigThenSmallHow","id":"ctrl_1779426673004","controlType":"Label"},
+        "Transform": {"x":38,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigThenSmallWhat","id":"ctrl_1779426673005","controlType":"Label"},
+        "Transform": {"x":40,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the big ticks in order, then the small ones","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Grow","id":"ctrl_1779426673006","description":"Grow: each tick grows in, in order, the big ones first.","controlType":"Slider"},
+        "Transform": {"x":343,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","majorTickCount":6,"minorTickCount":4},
+        "Animations": {"_children":{"growBig":{"_type":"Animation","name":"growBig","enabled":true,"kind":"text","effect":"explode","way":"in","delay":300,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":70,"duration":380,"scatter":0,"scale":0.05,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:grow","revision":1,"from":"growBig"}},"growSmall":{"_type":"Animation","name":"growSmall","enabled":true,"kind":"text","effect":"explode","way":"in","delay":1100,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":20,"duration":300,"scatter":0,"scale":0.05,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:grow","revision":1,"from":"growSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GrowCaption","id":"ctrl_1779426673007","controlType":"Label"},
+        "Transform": {"x":268,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Grow","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GrowHow","id":"ctrl_1779426673008","controlType":"Label"},
+        "Transform": {"x":268,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GrowWhat","id":"ctrl_1779426673009","controlType":"Label"},
+        "Transform": {"x":270,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each tick grows in, in order, the big ones first","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MiddleOut","id":"ctrl_1779426673010","description":"Middle out: from the middle of the track outward both ways, the big ones first.","controlType":"Slider"},
+        "Transform": {"x":573,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","majorTickCount":6,"minorTickCount":4},
+        "Animations": {"_children":{"middleBig":{"_type":"Animation","name":"middleBig","enabled":true,"kind":"text","effect":"crossfade","way":"in","delay":300,"easing":"outQuad","iterations":1,"split":"letter","order":"centre","stagger":110,"duration":300,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:middle-out","revision":1,"from":"middleBig"}},"middleSmall":{"_type":"Animation","name":"middleSmall","enabled":true,"kind":"text","effect":"crossfade","way":"in","delay":1000,"easing":"outQuad","iterations":1,"split":"letter","order":"centre","stagger":35,"duration":260,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:middle-out","revision":1,"from":"middleSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MiddleOutCaption","id":"ctrl_1779426673011","controlType":"Label"},
+        "Transform": {"x":498,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Middle out","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MiddleOutHow","id":"ctrl_1779426673012","controlType":"Label"},
+        "Transform": {"x":498,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MiddleOutWhat","id":"ctrl_1779426673013","controlType":"Label"},
+        "Transform": {"x":500,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"from the middle of the track outward both ways, the big ones first","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Countdown","id":"ctrl_1779426673014","description":"Countdown: the ticks go out from the top down as it resets, and come back.","controlType":"Slider"},
+        "Transform": {"x":803,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","majorTickCount":6,"minorTickCount":4},
+        "Animations": {"_children":{"countOut":{"_type":"Animation","name":"countOut","enabled":true,"kind":"text","effect":"crossfade","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"reverse","stagger":45,"duration":160,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:countdown","revision":1,"from":"countOut"}},"countOutSmall":{"_type":"Animation","name":"countOutSmall","enabled":true,"kind":"text","effect":"crossfade","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"reverse","stagger":15,"duration":140,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:countdown","revision":1,"from":"countOutSmall"}},"countIn":{"_type":"Animation","name":"countIn","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":700,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":45,"duration":220,"colour":"FFFFFFFF","trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:countdown","revision":1,"from":"countIn"}},"countInSmall":{"_type":"Animation","name":"countInSmall","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":700,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":15,"duration":200,"colour":"FFFFFFFF","trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:countdown","revision":1,"from":"countInSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CountdownCaption","id":"ctrl_1779426673015","controlType":"Label"},
+        "Transform": {"x":728,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Countdown","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CountdownHow","id":"ctrl_1779426673016","controlType":"Label"},
+        "Transform": {"x":728,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CountdownWhat","id":"ctrl_1779426673017","controlType":"Label"},
+        "Transform": {"x":730,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the ticks go out from the top down as it resets, and come back","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple","id":"ctrl_1779426673018","description":"Ripple: a wave of light runs up the ticks.","controlType":"Slider"},
+        "Transform": {"x":113,"y":436,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","majorTickCount":6,"minorTickCount":4},
+        "Animations": {"_children":{"ripple":{"_type":"Animation","name":"ripple","enabled":true,"kind":"text","effect":"shimmer","way":"in","delay":0,"easing":"outQuad","iterations":"infinite","split":"letter","order":"forward","stagger":60,"duration":500,"colour":"FFFFC24D","trigger":{"type":"stateChange","to":["hover"]},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:ripple","revision":1,"from":"ripple"}},"rippleSmall":{"_type":"Animation","name":"rippleSmall","enabled":true,"kind":"text","effect":"shimmer","way":"in","delay":0,"easing":"outQuad","iterations":"infinite","split":"letter","order":"forward","stagger":20,"duration":500,"colour":"FFFFC24D","trigger":{"type":"stateChange","to":["hover"]},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:ripple","revision":1,"from":"rippleSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleCaption","id":"ctrl_1779426673019","controlType":"Label"},
+        "Transform": {"x":38,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Ripple","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleHow","id":"ctrl_1779426673020","controlType":"Label"},
+        "Transform": {"x":38,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleWhat","id":"ctrl_1779426673021","controlType":"Label"},
+        "Transform": {"x":40,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a wave of light runs up the ticks","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Burst","id":"ctrl_1779426673022","description":"Burst: each tick flies out of the track into place, the big ones first.","controlType":"Slider"},
+        "Transform": {"x":343,"y":436,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","majorTickCount":6,"minorTickCount":4},
+        "Animations": {"_children":{"burstBig":{"_type":"Animation","name":"burstBig","enabled":true,"kind":"text","effect":"fly","way":"in","delay":300,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":45,"duration":560,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:burst","revision":1,"from":"burstBig"}},"burstSmall":{"_type":"Animation","name":"burstSmall","enabled":true,"kind":"text","effect":"fly","way":"in","delay":850,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":12,"duration":500,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:burst","revision":1,"from":"burstSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BurstCaption","id":"ctrl_1779426673023","controlType":"Label"},
+        "Transform": {"x":268,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Burst","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BurstHow","id":"ctrl_1779426673024","controlType":"Label"},
+        "Transform": {"x":268,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BurstWhat","id":"ctrl_1779426673025","controlType":"Label"},
+        "Transform": {"x":270,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each tick flies out of the track into place, the big ones first","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyAway","id":"ctrl_1779426673026","description":"Fly away: the ticks fly off the track as it resets, and fly back.","controlType":"Slider"},
+        "Transform": {"x":573,"y":436,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","majorTickCount":6,"minorTickCount":4},
+        "Animations": {"_children":{"awayBig":{"_type":"Animation","name":"awayBig","enabled":true,"kind":"text","effect":"fly","way":"out","delay":0,"easing":"inQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":360,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:fly-away","revision":1,"from":"awayBig"}},"awaySmall":{"_type":"Animation","name":"awaySmall","enabled":true,"kind":"text","effect":"fly","way":"out","delay":0,"easing":"inQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":320,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:fly-away","revision":1,"from":"awaySmall"}},"backBig":{"_type":"Animation","name":"backBig","enabled":true,"kind":"text","effect":"fly","way":"in","delay":650,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":30,"duration":420,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:fly-away","revision":1,"from":"backBig"}},"backSmall":{"_type":"Animation","name":"backSmall","enabled":true,"kind":"text","effect":"fly","way":"in","delay":800,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":8,"duration":380,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:fly-away","revision":1,"from":"backSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyAwayCaption","id":"ctrl_1779426673027","controlType":"Label"},
+        "Transform": {"x":498,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Fly away","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyAwayHow","id":"ctrl_1779426673028","controlType":"Label"},
+        "Transform": {"x":498,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyAwayWhat","id":"ctrl_1779426673029","controlType":"Label"},
+        "Transform": {"x":500,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the ticks fly off the track as it resets, and fly back","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Unfold","id":"ctrl_1779426673030","description":"Unfold: the ticks slide up out of the bottom one, as a folding rule opens.","controlType":"Slider"},
+        "Transform": {"x":803,"y":436,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","majorTickCount":6,"minorTickCount":4},
+        "Animations": {"_children":{"unfoldBig":{"_type":"Animation","name":"unfoldBig","enabled":true,"kind":"text","effect":"fan","way":"in","delay":300,"easing":"inOutCubic","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":1000,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:unfold","revision":1,"from":"unfoldBig"}},"unfoldSmall":{"_type":"Animation","name":"unfoldSmall","enabled":true,"kind":"text","effect":"fan","way":"in","delay":450,"easing":"inOutCubic","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":1000,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:slider:unfold","revision":1,"from":"unfoldSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnfoldCaption","id":"ctrl_1779426673031","controlType":"Label"},
+        "Transform": {"x":728,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Unfold","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnfoldHow","id":"ctrl_1779426673032","controlType":"Label"},
+        "Transform": {"x":728,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnfoldWhat","id":"ctrl_1779426673033","controlType":"Label"},
+        "Transform": {"x":730,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the ticks slide up out of the bottom one, as a folding rule opens","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:big-then-small",
+      "name": "Big, then small",
+      "category": "Slider",
+      "tags": [
+        "Ticks",
+        "panel opens"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "bigTicks": {
+          "_type": "Animation",
+          "name": "bigTicks",
+          "enabled": true,
+          "kind": "text",
+          "effect": "typewriter",
+          "way": "in",
+          "delay": 300,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 80,
+          "duration": 260,
+          "colour": "FFFFFFFF",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "smallTicks": {
+          "_type": "Animation",
+          "name": "smallTicks",
+          "enabled": true,
+          "kind": "text",
+          "effect": "typewriter",
+          "way": "in",
+          "delay": 1250,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 22,
+          "duration": 220,
+          "colour": "FFFFFFFF",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:grow",
+      "name": "Grow",
+      "category": "Slider",
+      "tags": [
+        "Ticks",
+        "panel opens"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "growBig": {
+          "_type": "Animation",
+          "name": "growBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "explode",
+          "way": "in",
+          "delay": 300,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 70,
+          "duration": 380,
+          "scatter": 0,
+          "scale": 0.05,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "growSmall": {
+          "_type": "Animation",
+          "name": "growSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "explode",
+          "way": "in",
+          "delay": 1100,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 20,
+          "duration": 300,
+          "scatter": 0,
+          "scale": 0.05,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:middle-out",
+      "name": "Middle out",
+      "category": "Slider",
+      "tags": [
+        "Ticks",
+        "panel opens"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "middleBig": {
+          "_type": "Animation",
+          "name": "middleBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "in",
+          "delay": 300,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "centre",
+          "stagger": 110,
+          "duration": 300,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "middleSmall": {
+          "_type": "Animation",
+          "name": "middleSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "in",
+          "delay": 1000,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "centre",
+          "stagger": 35,
+          "duration": 260,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:countdown",
+      "name": "Countdown",
+      "category": "Slider",
+      "tags": [
+        "Ticks",
+        "double-click"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "countOut": {
+          "_type": "Animation",
+          "name": "countOut",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "out",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "reverse",
+          "stagger": 45,
+          "duration": 160,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "countOutSmall": {
+          "_type": "Animation",
+          "name": "countOutSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "out",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "reverse",
+          "stagger": 15,
+          "duration": 140,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        },
+        "countIn": {
+          "_type": "Animation",
+          "name": "countIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "typewriter",
+          "way": "in",
+          "delay": 700,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 45,
+          "duration": 220,
+          "colour": "FFFFFFFF",
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "countInSmall": {
+          "_type": "Animation",
+          "name": "countInSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "typewriter",
+          "way": "in",
+          "delay": 700,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 15,
+          "duration": 200,
+          "colour": "FFFFFFFF",
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:ripple",
+      "name": "Ripple",
+      "category": "Slider",
+      "tags": [
+        "Ticks",
+        "hover"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "ripple": {
+          "_type": "Animation",
+          "name": "ripple",
+          "enabled": true,
+          "kind": "text",
+          "effect": "shimmer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": "infinite",
+          "split": "letter",
+          "order": "forward",
+          "stagger": 60,
+          "duration": 500,
+          "colour": "FFFFC24D",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "rippleSmall": {
+          "_type": "Animation",
+          "name": "rippleSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "shimmer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": "infinite",
+          "split": "letter",
+          "order": "forward",
+          "stagger": 20,
+          "duration": 500,
+          "colour": "FFFFC24D",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:burst",
+      "name": "Burst",
+      "category": "Slider",
+      "tags": [
+        "Ticks",
+        "panel opens"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "burstBig": {
+          "_type": "Animation",
+          "name": "burstBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "in",
+          "delay": 300,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 45,
+          "duration": 560,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "burstSmall": {
+          "_type": "Animation",
+          "name": "burstSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "in",
+          "delay": 850,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 12,
+          "duration": 500,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:fly-away",
+      "name": "Fly away",
+      "category": "Slider",
+      "tags": [
+        "Ticks",
+        "double-click"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "awayBig": {
+          "_type": "Animation",
+          "name": "awayBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "out",
+          "delay": 0,
+          "easing": "inQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 360,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "awaySmall": {
+          "_type": "Animation",
+          "name": "awaySmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "out",
+          "delay": 0,
+          "easing": "inQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 320,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        },
+        "backBig": {
+          "_type": "Animation",
+          "name": "backBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "in",
+          "delay": 650,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 30,
+          "duration": 420,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "backSmall": {
+          "_type": "Animation",
+          "name": "backSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "in",
+          "delay": 800,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 8,
+          "duration": 380,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:unfold",
+      "name": "Unfold",
+      "category": "Slider",
+      "tags": [
+        "Ticks",
+        "panel opens"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "unfoldBig": {
+          "_type": "Animation",
+          "name": "unfoldBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fan",
+          "way": "in",
+          "delay": 300,
+          "easing": "inOutCubic",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 1000,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "unfoldSmall": {
+          "_type": "Animation",
+          "name": "unfoldSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fan",
+          "way": "in",
+          "delay": 450,
+          "easing": "inOutCubic",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 1000,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

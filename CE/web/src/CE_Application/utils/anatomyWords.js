@@ -175,7 +175,9 @@ export function markGeometry(effect, geometry) {
   const kind = effect?.effect;
   const centre = geometry?.centre;
   const points = geometry?.points ?? [];
-  if (!['fly', 'fan'].includes(kind) || !centre || !points.length) return [];
+  if (!['fly', 'fan'].includes(kind) || !points.length) return [];
+  if (geometry.linear) return linearMarkGeometry(effect, geometry);
+  if (!centre) return [];
   if (kind === 'fly') {
     const outward = effect.way === 'out';
     return points.map((point) => {
@@ -192,6 +194,28 @@ export function markGeometry(effect, geometry) {
   return points.map((point) => {
     const back = ((angleOf(point) - first) % 360 + 360) % 360;
     return `--ce-fan-turn:${round(-back)}deg;${origin}`;
+  });
+}
+
+/**
+ * The same on a slider (`geometry`: `{ linear: true, points, origins, normal }`, the origins the
+ * points on the track each mark stands at, `normal` the way away from the track). A fly comes in
+ * from the side, 40 px out along the line from the track through the mark, and goes out that way;
+ * a mark that crosses the track goes along `normal`. A fan is a fan on a line: every mark starts at
+ * the first one and slides along the track into its place (`--ce-fan-x`, `--ce-fan-y`), unturned.
+ */
+function linearMarkGeometry(effect, { points, origins = [], normal = { x: 1, y: 0 } }) {
+  if (effect.effect === 'fan') {
+    const [first] = points;
+    return points.map((point) => `--ce-fan-x:${round(first.x - point.x)}px;--ce-fan-y:${round(first.y - point.y)}px;--ce-fan-turn:0deg;`);
+  }
+  const REACH = 40;
+  return points.map((point, i) => {
+    const origin = origins[i] ?? point;
+    const length = Math.hypot(point.x - origin.x, point.y - origin.y);
+    const way = length < 0.5 ? normal : { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length };
+    const [x, y] = [round(way.x * REACH), round(way.y * REACH)];
+    return effect.way === 'out' ? `--ce-fly-out-x:${x}px;--ce-fly-out-y:${y}px;` : `--ce-fly-x:${x}px;--ce-fly-y:${y}px;`;
   });
 }
 

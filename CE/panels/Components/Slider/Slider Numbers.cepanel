@@ -1,0 +1,1705 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "d5898a87-c0b5-4e1a-9f3d-d5898a87d589",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Slider Numbers",
+  "scriptId": "component_slider-numbers",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1440,
+  "height": 800,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF16171D",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "FlyOut.value",
+      "label": "FlyOut",
+      "controlName": "FlyOut",
+      "path": "FlyOut.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Level.value",
+      "label": "Level",
+      "controlName": "Level",
+      "path": "Level.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Pan.value",
+      "label": "Pan",
+      "controlName": "Pan",
+      "path": "Pan.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CapLabel.value",
+      "label": "CapLabel",
+      "controlName": "CapLabel",
+      "path": "CapLabel.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "MaxStamp.value",
+      "label": "MaxStamp",
+      "controlName": "MaxStamp",
+      "path": "MaxStamp.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.9,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FromTheSynth.value",
+      "label": "FromTheSynth",
+      "controlName": "FromTheSynth",
+      "path": "FromTheSynth.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.4,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "NumberStream.value",
+      "label": "NumberStream",
+      "controlName": "NumberStream",
+      "path": "NumberStream.value",
+      "min": 0,
+      "max": 10,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Odometer.value",
+      "label": "Odometer",
+      "controlName": "Odometer",
+      "path": "Odometer.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Delta.value",
+      "label": "Delta",
+      "controlName": "Delta",
+      "path": "Delta.value",
+      "min": 0,
+      "max": 10,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Units.value",
+      "label": "Units",
+      "controlName": "Units",
+      "path": "Units.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "ms",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "BigNumber.value",
+      "label": "BigNumber",
+      "controlName": "BigNumber",
+      "path": "BigNumber.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ChoiceNames.value",
+      "label": "ChoiceNames",
+      "controlName": "ChoiceNames",
+      "path": "ChoiceNames.value",
+      "min": 0,
+      "max": 4,
+      "defaultValue": 2,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [
+    {
+      "id": "component_slider-numbers_1",
+      "name": "The synth",
+      "language": "javascript",
+      "source": "// Stands in for a synth sending this slider new values: a value from outside, which the\n// From the synth preset answers and a move by hand does not.\nfunction send() {\n  set('FromTheSynth.normalizedValue', 0.15 + Math.random() * 0.7);\n  after(2500, send);\n}\nafter(1200, send);\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "soft"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1772560903000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Slider · Numbers","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1772560903001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":1380,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value and the name as text in motion. Each slider wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyOut","id":"ctrl_1772560903002","description":"Fly-out: the value floats up off the cap and fades.","controlType":"Slider"},
+        "Transform": {"x":43,"y":96,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "Animations": {"_children":{"flyOut":{"_type":"Animation","name":"flyOut","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["dragging"],"to":["*"],"leaving":true},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"opacity":1,"y":0,"scale":1},{"at":0.2,"opacity":1,"y":-5,"scale":1.2},{"at":1,"opacity":0,"y":-34,"scale":1.45}],"duration":900,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:slider:fly-out","revision":1,"from":"flyOut"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyOutCaption","id":"ctrl_1772560903003","controlType":"Label"},
+        "Transform": {"x":38,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Fly-out","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyOutHow","id":"ctrl_1772560903004","controlType":"Label"},
+        "Transform": {"x":38,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyOutWhat","id":"ctrl_1772560903005","controlType":"Label"},
+        "Transform": {"x":40,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value floats up off the cap and fades","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Level","id":"ctrl_1772560903006","description":"Name ↔ value: its name pushes over to the value, and types itself back.","controlType":"Slider"},
+        "Transform": {"x":343,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LevelName","id":"ctrl_1772560903007","attachedTo":"ctrl_1772560903006","controlType":"Label"},
+        "Transform": {"x":275,"y":322,"width":200,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":14}},"shows":"nameValue","showsControl":"ctrl_1772560903006"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"valueIn":{"_type":"Animation","name":"valueIn","enabled":true,"kind":"text","effect":"push","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":320,"direction":"right","trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:name-value","revision":1,"from":"valueIn"}},"nameOut":{"_type":"Animation","name":"nameOut","enabled":true,"kind":"text","effect":"push","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":320,"direction":"right","trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:name-value","revision":1,"from":"nameOut"}},"valueOut":{"_type":"Animation","name":"valueOut","enabled":true,"kind":"text","effect":"crossfade","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":220,"trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:name-value","revision":1,"from":"valueOut"}},"nameIn":{"_type":"Animation","name":"nameIn","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":150,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":45,"duration":300,"colour":"FFFFE3E3","trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:name-value","revision":1,"from":"nameIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LevelCaption","id":"ctrl_1772560903008","controlType":"Label"},
+        "Transform": {"x":268,"y":350,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Name ↔ value","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LevelHow","id":"ctrl_1772560903009","controlType":"Label"},
+        "Transform": {"x":268,"y":372,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE MOVING","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LevelWhat","id":"ctrl_1772560903010","controlType":"Label"},
+        "Transform": {"x":270,"y":390,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its name pushes over to the value, and types itself back","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pan","id":"ctrl_1772560903011","description":"Decode: the value while moving; let go, the name decodes back through glyphs.","controlType":"Slider"},
+        "Transform": {"x":573,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PanName","id":"ctrl_1772560903012","attachedTo":"ctrl_1772560903011","controlType":"Label"},
+        "Transform": {"x":505,"y":322,"width":200,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":14}},"shows":"nameValue","showsControl":"ctrl_1772560903011"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"valueIn":{"_type":"Animation","name":"valueIn","enabled":true,"kind":"text","effect":"crossfade","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":160,"trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:decode","revision":1,"from":"valueIn"}},"decode":{"_type":"Animation","name":"decode","enabled":true,"kind":"text","effect":"reel","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":70,"duration":800,"spins":7,"glyphs":"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=?","trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:decode","revision":1,"from":"decode"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PanCaption","id":"ctrl_1772560903013","controlType":"Label"},
+        "Transform": {"x":498,"y":350,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Decode","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PanHow","id":"ctrl_1772560903014","controlType":"Label"},
+        "Transform": {"x":498,"y":372,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PanWhat","id":"ctrl_1772560903015","controlType":"Label"},
+        "Transform": {"x":500,"y":390,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value while moving; let go, the name decodes back through glyphs","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CapLabel","id":"ctrl_1772560903016","description":"Cap label: the value rides beside the cap.","controlType":"Slider"},
+        "Transform": {"x":733,"y":96,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "States": {"_children":{"Dragging":{"patches":{"parts":{"labelCurrent":{"opacity":1}}}}}},
+        "Animations": {"_children":{"capLabel":{"_type":"Animation","name":"capLabel","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["dragging"],"reverse":true},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]}],"duration":160,"delay":0,"easing":"outCubic","preset":{"id":"ce:slider:cap-label","revision":1,"from":"capLabel"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CapLabelCaption","id":"ctrl_1772560903017","controlType":"Label"},
+        "Transform": {"x":728,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Cap label","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CapLabelHow","id":"ctrl_1772560903018","controlType":"Label"},
+        "Transform": {"x":728,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE MOVING","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CapLabelWhat","id":"ctrl_1772560903019","controlType":"Label"},
+        "Transform": {"x":730,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value rides beside the cap","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MaxStamp","id":"ctrl_1772560903020","description":"MAX stamp: MAX or MIN stamps on in red.","controlType":"Slider"},
+        "Transform": {"x":963,"y":96,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","defaultCurrentValue":0.9,"showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "States": {"_children":{"AtMax":{"_type":"State","name":"AtMax","group":"interaction","description":"MAX stamp (animation preset).","enabled":true,"when":{},"rule":"valueNormalized >= 0.999","patches":{"component":{},"parts":{"labelCurrent":{"opacity":1,"Text.content":"MAX","Text.Fill.colour":"FFFF4D4D","Text.Font.size":16,"Text.Font.weightValue":800}}}},"AtMin":{"_type":"State","name":"AtMin","group":"interaction","description":"MAX stamp (animation preset).","enabled":true,"when":{},"rule":"valueNormalized <= 0.001","patches":{"component":{},"parts":{"labelCurrent":{"opacity":1,"Text.content":"MIN","Text.Fill.colour":"FFFF4D4D","Text.Font.size":16,"Text.Font.weightValue":800}}}}}},
+        "Animations": {"_children":{"stampMax":{"_type":"Animation","name":"stampMax","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["atmax"]},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"scale":2.4,"opacity":0},{"at":0.6,"scale":0.92,"opacity":1},{"at":1,"scale":1,"opacity":1}],"duration":320,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:slider:max-stamp","revision":1,"from":"stampMax"}},"stampMin":{"_type":"Animation","name":"stampMin","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["atmin"]},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"scale":2.4,"opacity":0},{"at":0.6,"scale":0.92,"opacity":1},{"at":1,"scale":1,"opacity":1}],"duration":320,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:slider:max-stamp","revision":1,"from":"stampMin"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MaxStampCaption","id":"ctrl_1772560903021","controlType":"Label"},
+        "Transform": {"x":958,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MAX stamp","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MaxStampHow","id":"ctrl_1772560903022","controlType":"Label"},
+        "Transform": {"x":958,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"AT AN END","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MaxStampWhat","id":"ctrl_1772560903023","controlType":"Label"},
+        "Transform": {"x":960,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MAX or MIN stamps on in red","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynth","id":"ctrl_1772560903024","description":"From the synth: a value the synth sends flashes the fill; your own moves do not.","controlType":"Slider"},
+        "Transform": {"x":1263,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","defaultCurrentValue":0.4},
+        "Animations": {"_children":{"fromSynth":{"_type":"Animation","name":"fromSynth","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized","origin":"external"},"targets":[{"path":"Parts.bodyTrackFill"}],"frames":[{"at":0,"fill":"FFFFD23F","opacity":1},{"at":0.35,"fill":"FFFFD23F","opacity":1},{"at":1,"opacity":1}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:slider:from-the-synth","revision":1,"from":"fromSynth"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthCaption","id":"ctrl_1772560903025","controlType":"Label"},
+        "Transform": {"x":1188,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"From the synth","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthHow","id":"ctrl_1772560903026","controlType":"Label"},
+        "Transform": {"x":1188,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MIDI IN","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthWhat","id":"ctrl_1772560903027","controlType":"Label"},
+        "Transform": {"x":1190,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a value the synth sends flashes the fill; your own moves do not","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStream","id":"ctrl_1772560903028","description":"Number stream: every step throws its value out from the cap.","controlType":"Slider"},
+        "Transform": {"x":43,"y":436,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","max":10,"defaultCurrentValue":5,"precision":1},
+        "Animations": {"_children":{"stream":{"_type":"Animation","name":"stream","enabled":true,"kind":"emit","trigger":{"type":"valueStep"},"targets":[],"shows":"value","from":"tip","direction":"pointer","travel":24,"size":12,"duration":650,"delay":0,"easing":"outCubic","iterations":1,"preset":{"id":"ce:slider:number-stream","revision":1,"from":"stream"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamCaption","id":"ctrl_1772560903029","controlType":"Label"},
+        "Transform": {"x":38,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Number stream","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamHow","id":"ctrl_1772560903030","controlType":"Label"},
+        "Transform": {"x":38,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamWhat","id":"ctrl_1772560903031","controlType":"Label"},
+        "Transform": {"x":40,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"every step throws its value out from the cap","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Odometer","id":"ctrl_1772560903032","description":"Odometer: only the digits that changed roll, the way you moved.","controlType":"Slider"},
+        "Transform": {"x":273,"y":436,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","max":100,"step":1,"defaultCurrentValue":50,"showHandleLabels":true,"precision":0},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "Animations": {"_children":{"odometer":{"_type":"Animation","name":"odometer","enabled":true,"kind":"text","effect":"odometer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":240,"direction":"turn","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:slider:odometer","revision":1,"from":"odometer"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerCaption","id":"ctrl_1772560903033","controlType":"Label"},
+        "Transform": {"x":268,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Odometer","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerHow","id":"ctrl_1772560903034","controlType":"Label"},
+        "Transform": {"x":268,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerWhat","id":"ctrl_1772560903035","controlType":"Label"},
+        "Transform": {"x":270,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"only the digits that changed roll, the way you moved","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Delta","id":"ctrl_1772560903036","description":"Delta: how far you moved it rises off the cap, \"+2.4\", and fades.","controlType":"Slider"},
+        "Transform": {"x":503,"y":436,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","max":10,"defaultCurrentValue":5,"precision":1},
+        "Animations": {"_children":{"delta":{"_type":"Animation","name":"delta","enabled":true,"kind":"emit","trigger":{"type":"stateChange","from":["dragging"],"to":["*"],"leaving":true},"targets":[],"shows":"delta","from":"tip","direction":"up","travel":30,"size":16,"duration":1200,"delay":0,"easing":"outCubic","iterations":1,"preset":{"id":"ce:slider:delta","revision":1,"from":"delta"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaCaption","id":"ctrl_1772560903037","controlType":"Label"},
+        "Transform": {"x":498,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Delta","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaHow","id":"ctrl_1772560903038","controlType":"Label"},
+        "Transform": {"x":498,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaWhat","id":"ctrl_1772560903039","controlType":"Label"},
+        "Transform": {"x":500,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how far you moved it rises off the cap, \"+2.4\", and fades","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Units","id":"ctrl_1772560903040","description":"Units: the unit rolls in after the value.","controlType":"Slider"},
+        "Transform": {"x":733,"y":436,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","max":100,"step":1,"defaultCurrentValue":50,"showHandleLabels":true,"precision":0,"unit":"ms"},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "States": {"_children":{"Resting":{"_type":"State","name":"Resting","group":"interaction","description":"Units (animation preset).","enabled":true,"when":{"hover":false},"patches":{"component":{"Behavior.unit":""},"parts":{}}}}},
+        "Animations": {"_children":{"unitIn":{"_type":"Animation","name":"unitIn","enabled":true,"kind":"text","effect":"odometer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":300,"direction":"up","trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:slider:units","revision":1,"from":"unitIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsCaption","id":"ctrl_1772560903041","controlType":"Label"},
+        "Transform": {"x":728,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Units","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsHow","id":"ctrl_1772560903042","controlType":"Label"},
+        "Transform": {"x":728,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsWhat","id":"ctrl_1772560903043","controlType":"Label"},
+        "Transform": {"x":730,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the unit rolls in after the value","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumber","id":"ctrl_1772560903044","description":"Big number: the value, large, beside the cap while you hold it.","controlType":"Slider"},
+        "Transform": {"x":963,"y":436,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","max":100,"step":1,"defaultCurrentValue":50,"showHandleLabels":true,"precision":0},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "States": {"_children":{"Pressed":{"patches":{"parts":{"labelCurrent":{"opacity":1,"Text.Font.size":30,"Text.Font.weightValue":700}}}}}},
+        "Animations": {"_children":{"bigNumber":{"_type":"Animation","name":"bigNumber","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["pressed"],"reverse":true},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]}],"duration":160,"delay":0,"easing":"outQuad","preset":{"id":"ce:slider:big-number","revision":1,"from":"bigNumber"}},"bigPop":{"_type":"Animation","name":"bigPop","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["pressed"]},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"scale":0.55},{"at":1,"scale":1}],"duration":240,"delay":0,"easing":"outBack","iterations":1,"direction":"normal","preset":{"id":"ce:slider:big-number","revision":1,"from":"bigPop"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberCaption","id":"ctrl_1772560903045","controlType":"Label"},
+        "Transform": {"x":958,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Big number","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberHow","id":"ctrl_1772560903046","controlType":"Label"},
+        "Transform": {"x":958,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberWhat","id":"ctrl_1772560903047","controlType":"Label"},
+        "Transform": {"x":960,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value, large, beside the cap while you hold it","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNames","id":"ctrl_1772560903048","description":"Choice names: a stepped fader: the next name rolls in the way you moved.","controlType":"Slider"},
+        "Transform": {"x":1193,"y":436,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","max":4,"step":1,"defaultCurrentValue":2,"showHandleLabels":true,"displayTable":["Saw","Square","Pulse","Triangle","Sine"]},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "Animations": {"_children":{"choice":{"_type":"Animation","name":"choice","enabled":true,"kind":"text","effect":"roll","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":260,"direction":"turn","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:slider:choice-names","revision":1,"from":"choice"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesCaption","id":"ctrl_1772560903049","controlType":"Label"},
+        "Transform": {"x":1188,"y":668,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Choice names","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesHow","id":"ctrl_1772560903050","controlType":"Label"},
+        "Transform": {"x":1188,"y":690,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesWhat","id":"ctrl_1772560903051","controlType":"Label"},
+        "Transform": {"x":1190,"y":708,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a stepped fader: the next name rolls in the way you moved","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:fly-out",
+      "name": "Fly-out",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "let go"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "flyOut": {
+          "_type": "Animation",
+          "name": "flyOut",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "dragging"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1,
+              "y": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.2,
+              "opacity": 1,
+              "y": -5,
+              "scale": 1.2
+            },
+            {
+              "at": 1,
+              "opacity": 0,
+              "y": -34,
+              "scale": 1.45
+            }
+          ],
+          "duration": 900,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:name-value",
+      "name": "Name ↔ value",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "while moving"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "valueIn": {
+          "_type": "Animation",
+          "name": "valueIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 320,
+          "direction": "right",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "value"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "nameOut": {
+          "_type": "Animation",
+          "name": "nameOut",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "out",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 320,
+          "direction": "right",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "value"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "valueOut": {
+          "_type": "Animation",
+          "name": "valueOut",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "out",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 220,
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "name"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "nameIn": {
+          "_type": "Animation",
+          "name": "nameIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "typewriter",
+          "way": "in",
+          "delay": 150,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 45,
+          "duration": 300,
+          "colour": "FFFFE3E3",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "name"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "nameValue"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:decode",
+      "name": "Decode",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "let go"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "valueIn": {
+          "_type": "Animation",
+          "name": "valueIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 160,
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "value"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "decode": {
+          "_type": "Animation",
+          "name": "decode",
+          "enabled": true,
+          "kind": "text",
+          "effect": "reel",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 70,
+          "duration": 800,
+          "spins": 7,
+          "glyphs": "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=?",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "name"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "nameValue"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:cap-label",
+      "name": "Cap label",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "while moving"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "capLabel": {
+          "_type": "Animation",
+          "name": "capLabel",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "dragging"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outCubic"
+        }
+      },
+      "states": {
+        "Dragging": {
+          "when": {
+            "dragging": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:max-stamp",
+      "name": "MAX stamp",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "at an end"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "stampMax": {
+          "_type": "Animation",
+          "name": "stampMax",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "atmax"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 2.4,
+              "opacity": 0
+            },
+            {
+              "at": 0.6,
+              "scale": 0.92,
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        },
+        "stampMin": {
+          "_type": "Animation",
+          "name": "stampMin",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "atmin"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 2.4,
+              "opacity": 0
+            },
+            {
+              "at": 0.6,
+              "scale": 0.92,
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {
+        "AtMax": {
+          "when": {},
+          "rule": "valueNormalized >= 0.999",
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1,
+                "Text.content": "MAX",
+                "Text.Fill.colour": "FFFF4D4D",
+                "Text.Font.size": 16,
+                "Text.Font.weightValue": 800
+              }
+            }
+          }
+        },
+        "AtMin": {
+          "when": {},
+          "rule": "valueNormalized <= 0.001",
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1,
+                "Text.content": "MIN",
+                "Text.Fill.colour": "FFFF4D4D",
+                "Text.Font.size": 16,
+                "Text.Font.weightValue": 800
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:from-the-synth",
+      "name": "From the synth",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "MIDI in"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "fromSynth": {
+          "_type": "Animation",
+          "name": "fromSynth",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized",
+            "origin": "external"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FFFFD23F",
+              "opacity": 1
+            },
+            {
+              "at": 0.35,
+              "fill": "FFFFD23F",
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:number-stream",
+      "name": "Number stream",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "stream": {
+          "_type": "Animation",
+          "name": "stream",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [],
+          "shows": "value",
+          "from": "tip",
+          "direction": "pointer",
+          "travel": 24,
+          "size": 12,
+          "duration": 650,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:odometer",
+      "name": "Odometer",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "odometer": {
+          "_type": "Animation",
+          "name": "odometer",
+          "enabled": true,
+          "kind": "text",
+          "effect": "odometer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 240,
+          "direction": "turn",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:delta",
+      "name": "Delta",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "let go"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "delta": {
+          "_type": "Animation",
+          "name": "delta",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "dragging"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [],
+          "shows": "delta",
+          "from": "tip",
+          "direction": "up",
+          "travel": 30,
+          "size": 16,
+          "duration": 1200,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:units",
+      "name": "Units",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "unitIn": {
+          "_type": "Animation",
+          "name": "unitIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "odometer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 300,
+          "direction": "up",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {
+        "Resting": {
+          "when": {
+            "hover": false
+          },
+          "patches": {
+            "component": {
+              "Behavior.unit": ""
+            },
+            "parts": {}
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:big-number",
+      "name": "Big number",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "press"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "bigNumber": {
+          "_type": "Animation",
+          "name": "bigNumber",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outQuad"
+        },
+        "bigPop": {
+          "_type": "Animation",
+          "name": "bigPop",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 0.55
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 240,
+          "delay": 0,
+          "easing": "outBack",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {
+        "Pressed": {
+          "when": {
+            "pressed": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1,
+                "Text.Font.size": 30,
+                "Text.Font.weightValue": 700
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:choice-names",
+      "name": "Choice names",
+      "category": "Slider",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "choice": {
+          "_type": "Animation",
+          "name": "choice",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 260,
+          "direction": "turn",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true
+      }
+    }
+  ]
+}

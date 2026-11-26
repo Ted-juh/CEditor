@@ -86,6 +86,17 @@ test('each gesture plays the control\'s own Events-row animations, and only thos
   assert.deepEqual(animationsForGesture(control, 'click'), []);
 });
 
+test('a gesture plays a value effect and words thrown too, as the Animation tab offers them (2026-11-26)', () => {
+  const control = createControl('Slider', { Core: { id: 'gs1', name: 'Fader' } });
+  const animations = control._children.Animations._children;
+  animations.throw = { _type: 'Animation', name: 'throw', enabled: true, kind: 'value', trigger: { type: 'event', event: 'flick' },
+    targets: [{ path: 'Value' }], frames: [{ at: 0 }, { at: 0.3, by: 0.12 }, { at: 1 }], duration: 800 };
+  animations.told = { _type: 'Animation', name: 'told', enabled: true, kind: 'emit', trigger: { type: 'event', event: 'click' },
+    targets: [], shows: 'value', duration: 700 };
+  assert.deepEqual(animationsForGesture(control, 'flick', { moved: true, direction: 'up', speed: 900 }), ['throw'], 'the Slider\'s Throw');
+  assert.deepEqual(animationsForGesture(control, 'click'), ['told']);
+});
+
 test('playing a gesture is the same request ce.anim.play makes', () => {
   const control = createControl('Knob', { Core: { id: 'gk2', name: 'Knob02' } });
   const name = withEvent(control, 'wheelUp');

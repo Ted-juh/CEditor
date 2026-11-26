@@ -242,3 +242,87 @@ Verified locally:
 - WebKitGTK 2.52 draws the fan about the dial's centre, the flights, the thrown words and the
   odometer as Chromium does, posed part-way through each.
 
+
+## The Slider (2026-11-26)
+
+The owner's next component after the Knob: the linear slider, read as a fader. Built on the Knob's
+decisions as they stand (eight panels, every preset in the library under the component, a set a
+panel, what plays today first), so nothing new was put to the owner; what differs is recorded here.
+
+**Its presets** (`utils/sliderPresets.js`, ids `ce:slider:<name>`, category Slider) are the Knob's
+groups, read for a control that travels along a line: its cap is the pointer (`pointerCurrent`), its
+fill the arc (`bodyTrackFill`), its readout rides beside the cap, and its ticks, and the numbers it
+prints with its big ticks (`Behavior.tickNumerals: 'value'`), stand along the track. Both components
+are written with one kit (`utils/componentPresetKit.js`: the shapes, the triggers, the name ↔ value
+and Decode recipes, and the catalogue they are built into); the Knob's came out byte for byte as
+before. The library lists **Slider** after **Knob**.
+
+| Group | Slider preset | How it differs from the Knob's |
+|---|---|---|
+| Numbers | Fly-out, Name ↔ value, Decode, Cap label, MAX stamp, From the synth, Number stream, Odometer, Delta, Units, Big number, Choice names | Cap label is the Knob's Tip label; words are thrown out beside the cap; Odometer, Units and Choice names read beside the cap (there is no cap to sit in); Choice names **rolls** up and down, the way a fader's choices go |
+| Ticks | Big then small, Grow, Middle out, Countdown, Ripple, Burst, Fly away, **Unfold** | Middle out is Centre out; Burst flies each tick in from the side; Unfold is Fan in on a line: every tick slides up the track out of the first one |
+| Touch | Lift, Grip, Glow, Readout, Focus ring, **Nod** | Lift and Grip move the cap through `Layout.lift`; Glow breathes the fill (a slider lights it while dragged already); Nod replaces Sheen, which a fader's drawn caps have no gradient for |
+| Moving | Glide, Snap, Spring, Overload, Modulated, Detent | the Knob's Turning |
+| Attention | Fill sweep, Rise to value, Fall to value, Reach full, Wiggle, Beat pulse | Fill sweep is Ring sweep |
+| Gestures | Reset flash, **Throw**, Notch, Pop, Nudge, Default stamp | Throw replaces Spin: on a flick the drawing overshoots along the track and settles; Nudge shakes sideways |
+| Words | Scale types in, Numbers roll, Scale counts up, Readout doors, Shimmer | on the numbers printed with the big ticks |
+
+| Panel | Set | Why that set |
+|---|---|---|
+| Numbers | Soft | a round cap and a fill the readout reads against |
+| Ticks | Dual Scale (small ticks turned on) | a long scale of ticks, a billet cap |
+| Touch | Broadcast | a console cap big enough to see it lift |
+| Moving | Pop | a bold fill, so the way it moves is all there is |
+| Attention | Backlit | a glowing fill whose sweeps read from across the panel |
+| Gestures | Anodised | an orange fill and ticks for Notch |
+| Words | Blueprint | numbers printed up the scale |
+| Together | Aerospace | a mixing desk's row of faders |
+
+None is a set the Knob's panels use.
+
+### As built
+
+What a line needed, each found by watching a preset not play, or play wrong, in Preview:
+
+- **A readout clears the cap.** On a vertical slider the readout was centred a fixed 22 px right of
+  the cap, so a word ran under a wide fader cap ("Pulse" read "ulse"). It now starts just past the
+  cap's edge and reads away from it (SliderFamilyRenderer `labelAnchors`, `align: start`); a
+  horizontal slider's stays centred above it.
+- **A fader cap lifts.** Lift and Grip patched a scale nothing drew on a linear cap. Not
+  `Layout.scale`, though: every slider and knob ships states that patch its pointer's scale (1.08
+  while it is the active handle, which a single value always is), never drawn on a fader cap, and
+  drawing them would have enlarged every slider there is. A cap's **`Layout.lift`** is drawn as a
+  scale about its centre, with its own transition (`capLiftStyle`), in a group round the cap that
+  only a cap with a lift gets: no shipped state touches it, and Lift and Grip set it to 1 at rest (a
+  preset field). Keyed on the field, not on a transform transition, which every slider's own glide
+  is; and a cap without it is drawn straight into the SVG as before, which the component harness's
+  cases rely on (they found the first version, which wrapped every cap). It is a transform to the
+  Animation tab (`PART_PATH_BUCKETS`).
+- **Words are thrown on a line.** The renderer threw words round a dial only. On a slider a word
+  leaves the cap's outer edge (or the cap, `centre`) and flies away from the track, sideways on a
+  vertical fader and up on a horizontal one, or up; beside a vertical cap it reads away from it, as
+  the readout does.
+- **Ticks fly and unfold on a line.** `markGeometry` takes a slider's marks with the points on the
+  track they stand at: a fly comes in from 40 px out along the line from the track through the mark
+  and goes out that way; a fan slides each mark from the first one's place (`--ce-fan-x/-y`, the fan's
+  pose now a translate and a turn, which round a dial is the turn alone).
+- **A gesture plays a value effect, and words.** A click, a flick or a long press played keyframes and
+  text effects only; the Animation tab offers the Value and Words kinds every gesture, and those never
+  played. Throw found it (`gestureEvents.js` `GESTURE_KINDS`).
+- **The showcase's set check compared objects.** A panel stores its set as `{ id }`, and both
+  components' tests put those in a `Set`, so two panels in one set always passed; the Slider's
+  Numbers panel was in the Knob's Numbers set. Compared by id, and moved.
+
+Verified locally:
+- `test/sliderAnimationPresets.test.js` (new): the catalogue; every preset survives its file; each fits a
+  fader, one in its panel's set, and in the other sets fits or says what is missing; Lift and Grip
+  through `Layout.lift` and the shipped scale left alone; the readout presets; Unfold, Throw, the
+  stream; loops; the library; the panels, a set each and none the Knob's.
+- `test/anatomyWords.test.js`: marks on a track, the readout past the cap, a cap's lift (and nothing
+  at rest), words thrown beside a fader. `test/gestureEvents.test.js`: a value effect and words on a
+  gesture.
+- The browser check `sliderShowcase` (new): Unfold, Fly away, Lift and Grip (and no scale at rest),
+  the readout past the cap, Number stream, Delta, Choice names both ways, Throw, Follow the leader.
+  `animationTab`: the library's two sections.
+- WebKitGTK 2.52 draws Unfold, the flights, a lifted cap, the readout and a thrown word as Chromium
+  does, posed part-way through each.

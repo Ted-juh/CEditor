@@ -460,6 +460,9 @@ export const PART_PATH_BUCKETS = {
   'Layout.offsetY': 'transform',
   'Layout.rotation': 'transform',
   'Layout.scale': 'transform',
+  // How far a fader cap stands out toward you, drawn as a scale about its centre (SliderFamilyRenderer
+  // capLiftStyle): the Slider's Lift and Grip.
+  'Layout.lift': 'transform',
   opacity: 'opacity',
   'Layout.width': 'size',
   'Layout.height': 'size',

@@ -16,10 +16,14 @@
  * thrown from the pointer, an odometer, a readout in the cap, and marks that fly along their own
  * line or fan in about the dial.
  *
- * IMPORTS ONLY THE FORMAT, which imports nothing: the export tools and the showcase script read this
- * under plain Node.
+ * Written with componentPresetKit.js, which the Slider's presets share. IMPORTS ONLY THE KIT, which
+ * imports only the format: the export tools and the showcase script read this under plain Node.
  */
-import { PRESET_FORMAT, PRESET_FORMAT_VERSION, cleanPreset } from './animationPresetFormat.js';
+import {
+  keyframes, transition, words, emit, value, movement, state, part, STAMP, LIGHT,
+  ONCE_OPEN, entering, enteringOnce, leaving, gesture, WHILE_HOVER, VALUE_CHANGE, EACH_STEP,
+  READOUT_HIDDEN, READOUT_SHOWN, IN_THE_CAP, buildComponentPresets, nameValueSwap, decodeSwap,
+} from './componentPresetKit.js';
 
 /** The groups, in the order the library and the showcase show them, and what each is about. */
 export const KNOB_PRESET_GROUPS = Object.freeze([
@@ -32,70 +36,12 @@ export const KNOB_PRESET_GROUPS = Object.freeze([
   { id: 'words', label: 'Words', note: 'text effects on its scale and readout' },
 ]);
 
-// --- The shapes ----------------------------------------------------------------------------------
-
-const POINTERS = ['pointerCurrent', 'pointerStart', 'pointerEnd'];
-
-const transition = (name, trigger, paths, duration, easing, extra = {}) => ({
-  _type: 'Animation', name, enabled: true, kind: 'transition', trigger,
-  targets: paths.map(([path, bucket]) => ({ path, properties: [bucket] })),
-  duration, delay: 0, easing, ...extra,
-});
-
-const keyframes = (name, trigger, part, frames, duration, extra = {}) => ({
-  _type: 'Animation', name, enabled: true, kind: 'keyframes', trigger,
-  targets: [{ path: part ? `Parts.${part}` : 'Transform' }],
-  frames, duration, delay: 0, easing: 'inOutQuad', iterations: 1, direction: 'normal', ...extra,
-});
-
-/** A text effect on one of the knob's own words: its scale's numbers or ticks, or its readout. */
-const words = (name, trigger, part, effect, way, settings, extra = {}) => ({
-  _type: 'Animation', name, enabled: true, kind: 'text', effect, way,
-  delay: 0, easing: 'outQuad', iterations: 1, ...settings, trigger,
-  targets: [{ path: `Parts.${part}` }], ...extra,
-});
-
-/** Words thrown from the pointer each time it plays (keyframeAnimation.js EMIT): the value, or the change. */
-const emit = (name, trigger, settings, extra = {}) => ({
-  _type: 'Animation', name, enabled: true, kind: 'emit', trigger, targets: [],
-  shows: 'value', from: 'tip', direction: 'pointer', travel: 36, size: 12,
-  duration: 700, delay: 0, easing: 'outCubic', iterations: 1, ...settings, ...extra,
-});
-
-const value = (name, trigger, frames, duration, extra = {}) => ({
-  _type: 'Animation', name, enabled: true, kind: 'value', trigger,
-  targets: [{ path: 'Value' }], frames, duration, delay: 0, easing: 'inOutCubic', iterations: 1, ...extra,
-});
-
-// The triggers, as the Animation tab writes them.
-const ONCE_OPEN = { type: 'always' };                  // with one run: as the knob first appears
-const entering = (state) => ({ type: 'stateChange', from: ['*'], to: [state], reverse: true });
-const enteringOnce = (state) => ({ type: 'stateChange', from: ['*'], to: [state] });
-const leaving = (state) => ({ type: 'stateChange', from: [state], to: ['*'], leaving: true });
-const gesture = (event) => ({ type: 'event', event });
-const WHILE_HOVER = { type: 'stateChange', to: ['hover'] };   // with a loop: for as long as it holds
-// The light a shimmer runs: warm, so it shows on white ticks and on dark numbers alike.
-const LIGHT = 'FFFFC24D';
-const VALUE_CHANGE = { type: 'valueChange', source: 'value.normalized' };
-// Each step of the value, as many as the knob has (a knob with none: one every 5%), while dragged too.
-const EACH_STEP = { type: 'valueStep' };
-
-// What the knob's readout needs to play: the readout shown, and hidden until the preset shows it.
-const READOUT_HIDDEN = Object.freeze({ 'Behavior.showHandleLabels': true, 'Parts.labelCurrent.opacity': 0 });
-const READOUT_SHOWN = Object.freeze({ 'Behavior.showHandleLabels': true });
-// The readout in the middle of the dial rather than at the pointer's tip.
-const IN_THE_CAP = Object.freeze({ 'Parts.labelCurrent.anchor': 'centre' });
-const part = (name, patch) => ({ [name]: patch });
-const state = (when, parts = {}, { component = {}, rule = '' } = {}) => ({ when, ...(rule ? { rule } : {}), patches: { component, parts } });
-
 // --- The presets ---------------------------------------------------------------------------------
 //
 // `how` is what plays it, as the showcase captions it; `what` is one line of what you see.
 // `knob` is what a knob needs set for the showcase to show it (scale numbers, a unit); a preset's
 // own `fields` are what applying it sets.
 
-/** The readout as a stamp: the word, red, larger and heavy. */
-const STAMP = (word) => ({ opacity: 1, 'Text.content': word, 'Text.Fill.colour': 'FFFF4D4D', 'Text.Font.size': 16, 'Text.Font.weightValue': 800 });
 
 const NUMBERS = [
   {
@@ -113,12 +59,7 @@ const NUMBERS = [
     id: 'name-value', name: 'Name ↔ value', how: 'while turning', what: 'its name pushes over to the value, and types itself back',
     on: 'label', label: { shows: 'nameValue' },
     fields: { 'Text.shows': 'nameValue' },
-    animations: {
-      valueIn: words('valueIn', { type: 'textChange', from: ['*'], to: ['value'] }, '', 'push', 'in', { split: 'whole', order: 'forward', stagger: 0, duration: 320, direction: 'right' }, { targets: [{ path: 'Text' }] }),
-      nameOut: words('nameOut', { type: 'textChange', from: ['*'], to: ['value'] }, '', 'push', 'out', { split: 'whole', order: 'forward', stagger: 0, duration: 320, direction: 'right' }, { targets: [{ path: 'Text' }] }),
-      valueOut: words('valueOut', { type: 'textChange', from: ['*'], to: ['name'] }, '', 'crossfade', 'out', { split: 'whole', order: 'forward', stagger: 0, duration: 220 }, { targets: [{ path: 'Text' }] }),
-      nameIn: words('nameIn', { type: 'textChange', from: ['*'], to: ['name'] }, '', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 45, duration: 300, colour: 'FFFFE3E3' }, { delay: 150, targets: [{ path: 'Text' }] }),
-    },
+    animations: nameValueSwap(),
   },
   {
     // On the name Label: a reel scrambles real text, letter by letter through other glyphs. The
@@ -127,10 +68,7 @@ const NUMBERS = [
     id: 'decode', name: 'Decode', how: 'let go', what: 'the value while turning; let go, the name decodes back through glyphs',
     on: 'label', label: { shows: 'nameValue' },
     fields: { 'Text.shows': 'nameValue' },
-    animations: {
-      valueIn: words('valueIn', { type: 'textChange', from: ['*'], to: ['value'] }, '', 'crossfade', 'in', { split: 'whole', order: 'forward', stagger: 0, duration: 160 }, { targets: [{ path: 'Text' }] }),
-      decode: words('decode', { type: 'textChange', from: ['*'], to: ['name'] }, '', 'reel', 'in', { split: 'letter', order: 'forward', stagger: 70, duration: 800, spins: 7, glyphs: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=?' }, { targets: [{ path: 'Text' }] }),
-    },
+    animations: decodeSwap(),
   },
   {
     id: 'tip-label', name: 'Tip label', how: 'while turning', what: 'the value rides at the pointer\'s tip',
@@ -317,19 +255,6 @@ const TOUCH = [
   },
 ];
 
-const POINTER_PATHS = POINTERS.flatMap((name) => [[`Parts.${name}.Layout.x`, 'transform'], [`Parts.${name}.Layout.y`, 'transform']]);
-const RANGE_PATHS = [['Parts.bodyTrackFill.Layout.width', 'size'], ['Parts.bodySelectedRange.Layout.width', 'size']];
-
-/**
- * The value's own movement: the pointer and the arc together, as a knob's two default glides
- * (pointerSlide and rangeSlide) move them. Applied, each takes the place of the glide that moves the
- * same things on the same change (animationPresetModel.js), rather than tying with it.
- */
-const movement = (duration, easing) => ({
-  pointerSlide: transition('pointerSlide', VALUE_CHANGE, POINTER_PATHS, duration, easing),
-  rangeSlide: transition('rangeSlide', VALUE_CHANGE, RANGE_PATHS, duration, easing),
-});
-
 const TURNING = [
   { id: 'glide', name: 'Glide', how: 'turn', what: 'eases into each new value', animations: movement(320, 'outCubic') },
   { id: 'snap', name: 'Snap', how: 'turn', what: 'no easing: lands at once', animations: movement(0, 'linear') },
@@ -431,38 +356,5 @@ const BY_GROUP = { numbers: NUMBERS, ticks: TICKS, touch: TOUCH, turning: TURNIN
 /** A built-in preset's id: one namespace a component, so none can meet one of yours (`ap_…`). */
 export const knobPresetId = (id) => `ce:knob:${id}`;
 
-/** The revision every built-in starts at; raise one's when it changes, so panels offer the update. */
-const REVISION = 1;
-
-function build(group, entry) {
-  return {
-    id: knobPresetId(entry.id),
-    slug: entry.id,
-    group: group.id,
-    groupLabel: group.label,
-    name: entry.name,
-    how: entry.how,
-    what: entry.what,
-    // Where it goes on a knob: the knob itself, or its name Label (a knob has no words of its own),
-    // and what that Label shows of the knob.
-    on: entry.on ?? 'knob',
-    label: entry.label ?? null,
-    knob: entry.knob ?? {},
-    preset: cleanPreset({
-      format: PRESET_FORMAT,
-      version: PRESET_FORMAT_VERSION,
-      id: knobPresetId(entry.id),
-      name: entry.name,
-      category: 'Knob',
-      tags: [group.label, entry.how],
-      colours: 'keep',
-      revision: entry.revision ?? REVISION,
-      animations: entry.animations,
-      states: entry.states ?? {},
-      fields: entry.fields ?? {},
-    }),
-  };
-}
-
 /** Every knob preset: `{ id, slug, group, groupLabel, name, how, what, on, label, knob, preset }`, in order. */
-export const KNOB_PRESETS = Object.freeze(KNOB_PRESET_GROUPS.flatMap((group) => BY_GROUP[group.id].map((entry) => Object.freeze(build(group, entry)))));
+export const KNOB_PRESETS = buildComponentPresets({ component: 'Knob', prefix: 'knob', groups: KNOB_PRESET_GROUPS, byGroup: BY_GROUP });

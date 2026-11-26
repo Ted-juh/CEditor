@@ -2039,6 +2039,15 @@ marks about the dial's centre; a readout that sits in the cap; two effects on th
 turns rather than hiding each other (the first half's Countdown never showed its ticks leaving); and
 a value effect's clock that always moves (one could stop on its first frame).
 
+## As built: Components, the Slider (2026-11-26)
+
+The second component, recorded in full in [component-presets.md](component-presets.md): 49 presets
+in the Knob's groups, read for a fader, and eight panels. For this record: a fader cap's
+`Layout.lift`, drawn as a scale about its centre (a slider's own states patch its pointer's
+`Layout.scale`, which no renderer drew, and drawing that would have enlarged every slider); a
+vertical slider's readout clear of its cap; words thrown and ticks flying and unfolding on a line;
+and a gesture that plays a value effect or words, which the Animation tab offered and never played.
+
 ## Open
 
 Nothing for the owner at present.

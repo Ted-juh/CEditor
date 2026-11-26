@@ -209,6 +209,8 @@ test('the export bakes each control as it is drawn, and the slider and the butto
   assert.equal(baked.plates, 1);
   const slider = read('CE_Application/editor/SliderFamilyRenderer.svelte');
   assert.match(slider, /\{@const rendered = g\.kind === 'ring' \|\| g\.kind === 'line' \? null : renderedCap\(part, point, g\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{name\}/);
+  // A lifted cap, rendered or drawn, is drawn inside the group that lifts it (capLiftStyle).
+  assert.match(slider, /\{#if lift\}\s*<g style=\{lift\}>\{@render capBody\(part, point, name\)\}<\/g>/);
   assert.match(slider, /const spec = renderedCapSpec\(part, \{\s*vertical: orientation === 'vertical',/);
   const button = read('CE_Application/editor/ButtonDeviceParts.svelte');
   assert.match(button, /rendered: renderedPart\(name, part, box, lit \? part\.activeColour : fill\.colour\),/);

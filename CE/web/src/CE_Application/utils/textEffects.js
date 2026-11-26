@@ -267,7 +267,9 @@ function poseDeclarations(effect, variant) {
         ? 'opacity:0;transform:translate(var(--ce-fly-x, 0px), var(--ce-fly-y, 0.8em))'
         : 'opacity:0;transform:translate(var(--ce-fly-out-x, 0px), var(--ce-fly-out-y, -0.8em))';
     case 'fan':
-      return 'opacity:0;transform:rotate(var(--ce-fan-turn, -30deg))';
+      // Round a dial each mark turns from the first one's angle; on a slider it slides from the first
+      // one's place (anatomyWords.js markGeometry). A Label's letters turn about themselves.
+      return 'opacity:0;transform:translate(var(--ce-fan-x, 0px), var(--ce-fan-y, 0px)) rotate(var(--ce-fan-turn, -30deg))';
     case 'push':
       return `transform:translateX(${num(sign * (away[0] || 1) * 110)}%)`;
     case 'part': {

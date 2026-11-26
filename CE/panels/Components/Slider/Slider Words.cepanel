@@ -1,0 +1,641 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "1f39a98a-c0b5-4e1a-9f3d-1f39a98a1f39",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Slider Words",
+  "scriptId": "component_slider-words",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1210,
+  "height": 460,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF141A22",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "ScaleTypesIn.value",
+      "label": "ScaleTypesIn",
+      "controlName": "ScaleTypesIn",
+      "path": "ScaleTypesIn.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "NumbersRoll.value",
+      "label": "NumbersRoll",
+      "controlName": "NumbersRoll",
+      "path": "NumbersRoll.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ScaleCountsUp.value",
+      "label": "ScaleCountsUp",
+      "controlName": "ScaleCountsUp",
+      "path": "ScaleCountsUp.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ReadoutDoors.value",
+      "label": "ReadoutDoors",
+      "controlName": "ReadoutDoors",
+      "path": "ReadoutDoors.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Shimmer.value",
+      "label": "Shimmer",
+      "controlName": "Shimmer",
+      "path": "Shimmer.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "blueprint"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1773872650000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Slider · Words","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1773872650001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":1150,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"text effects on the numbers along the scale and on the readout. Each slider wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF9FB0C2"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScaleTypesIn","id":"ctrl_1773872650002","description":"Scale types in: the numbers typed up the scale.","controlType":"Slider"},
+        "Transform": {"x":113,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","tickNumerals":"value"},
+        "Animations": {"_children":{"typeIn":{"_type":"Animation","name":"typeIn","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":400,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":140,"duration":300,"colour":"FFFFD23F","trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:scale-types-in","revision":1,"from":"typeIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScaleTypesInCaption","id":"ctrl_1773872650003","controlType":"Label"},
+        "Transform": {"x":38,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Scale types in","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScaleTypesInHow","id":"ctrl_1773872650004","controlType":"Label"},
+        "Transform": {"x":38,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF8EC5FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScaleTypesInWhat","id":"ctrl_1773872650005","controlType":"Label"},
+        "Transform": {"x":40,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the numbers typed up the scale","_children":{"Fill":{"colour":"FF9FB0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumbersRoll","id":"ctrl_1773872650006","description":"Numbers roll: each number rolls up into its place.","controlType":"Slider"},
+        "Transform": {"x":343,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","tickNumerals":"value"},
+        "Animations": {"_children":{"rollIn":{"_type":"Animation","name":"rollIn","enabled":true,"kind":"text","effect":"roll","way":"in","delay":400,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":110,"duration":360,"direction":"up","trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:numbers-roll","revision":1,"from":"rollIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumbersRollCaption","id":"ctrl_1773872650007","controlType":"Label"},
+        "Transform": {"x":268,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Numbers roll","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumbersRollHow","id":"ctrl_1773872650008","controlType":"Label"},
+        "Transform": {"x":268,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF8EC5FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumbersRollWhat","id":"ctrl_1773872650009","controlType":"Label"},
+        "Transform": {"x":270,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each number rolls up into its place","_children":{"Fill":{"colour":"FF9FB0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScaleCountsUp","id":"ctrl_1773872650010","description":"Scale counts up: the numbers arrive low to high, each with a pop.","controlType":"Slider"},
+        "Transform": {"x":573,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","tickNumerals":"value"},
+        "Animations": {"_children":{"countUp":{"_type":"Animation","name":"countUp","enabled":true,"kind":"text","effect":"explode","way":"in","delay":400,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":160,"duration":420,"scatter":0,"scale":2.4,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:scale-counts-up","revision":1,"from":"countUp"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScaleCountsUpCaption","id":"ctrl_1773872650011","controlType":"Label"},
+        "Transform": {"x":498,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Scale counts up","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScaleCountsUpHow","id":"ctrl_1773872650012","controlType":"Label"},
+        "Transform": {"x":498,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF8EC5FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScaleCountsUpWhat","id":"ctrl_1773872650013","controlType":"Label"},
+        "Transform": {"x":500,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the numbers arrive low to high, each with a pop","_children":{"Fill":{"colour":"FF9FB0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutDoors","id":"ctrl_1773872650014","description":"Readout doors: each new value closes in like doors.","controlType":"Slider"},
+        "Transform": {"x":733,"y":96,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "Animations": {"_children":{"doors":{"_type":"Animation","name":"doors","enabled":true,"kind":"text","effect":"part","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":420,"trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:slider:readout-doors","revision":1,"from":"doors"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutDoorsCaption","id":"ctrl_1773872650015","controlType":"Label"},
+        "Transform": {"x":728,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Readout doors","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutDoorsHow","id":"ctrl_1773872650016","controlType":"Label"},
+        "Transform": {"x":728,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHEEL OR KEYS","_children":{"Fill":{"colour":"FF8EC5FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutDoorsWhat","id":"ctrl_1773872650017","controlType":"Label"},
+        "Transform": {"x":730,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each new value closes in like doors","_children":{"Fill":{"colour":"FF9FB0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Shimmer","id":"ctrl_1773872650018","description":"Shimmer: a light runs up the numbers.","controlType":"Slider"},
+        "Transform": {"x":1033,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","tickNumerals":"value"},
+        "Animations": {"_children":{"shimmer":{"_type":"Animation","name":"shimmer","enabled":true,"kind":"text","effect":"shimmer","way":"in","delay":0,"easing":"outQuad","iterations":"infinite","split":"letter","order":"forward","stagger":90,"duration":600,"colour":"FFFFC24D","trigger":{"type":"stateChange","to":["hover"]},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:slider:shimmer","revision":1,"from":"shimmer"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ShimmerCaption","id":"ctrl_1773872650019","controlType":"Label"},
+        "Transform": {"x":958,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Shimmer","_children":{"Fill":{"colour":"FFE6EEF6"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ShimmerHow","id":"ctrl_1773872650020","controlType":"Label"},
+        "Transform": {"x":958,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF8EC5FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ShimmerWhat","id":"ctrl_1773872650021","controlType":"Label"},
+        "Transform": {"x":960,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a light runs up the numbers","_children":{"Fill":{"colour":"FF9FB0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:scale-types-in",
+      "name": "Scale types in",
+      "category": "Slider",
+      "tags": [
+        "Words",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "typeIn": {
+          "_type": "Animation",
+          "name": "typeIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "typewriter",
+          "way": "in",
+          "delay": 400,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 140,
+          "duration": 300,
+          "colour": "FFFFD23F",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:numbers-roll",
+      "name": "Numbers roll",
+      "category": "Slider",
+      "tags": [
+        "Words",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "rollIn": {
+          "_type": "Animation",
+          "name": "rollIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 400,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 110,
+          "duration": 360,
+          "direction": "up",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:scale-counts-up",
+      "name": "Scale counts up",
+      "category": "Slider",
+      "tags": [
+        "Words",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "countUp": {
+          "_type": "Animation",
+          "name": "countUp",
+          "enabled": true,
+          "kind": "text",
+          "effect": "explode",
+          "way": "in",
+          "delay": 400,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 160,
+          "duration": 420,
+          "scatter": 0,
+          "scale": 2.4,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:readout-doors",
+      "name": "Readout doors",
+      "category": "Slider",
+      "tags": [
+        "Words",
+        "wheel or keys"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "doors": {
+          "_type": "Animation",
+          "name": "doors",
+          "enabled": true,
+          "kind": "text",
+          "effect": "part",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 420,
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:shimmer",
+      "name": "Shimmer",
+      "category": "Slider",
+      "tags": [
+        "Words",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "shimmer": {
+          "_type": "Animation",
+          "name": "shimmer",
+          "enabled": true,
+          "kind": "text",
+          "effect": "shimmer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": "infinite",
+          "split": "letter",
+          "order": "forward",
+          "stagger": 90,
+          "duration": 600,
+          "colour": "FFFFC24D",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}
