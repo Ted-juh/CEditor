@@ -15,7 +15,7 @@ import { SLIDER_PRESETS, SLIDER_PRESET_GROUPS, sliderPresetId } from '../src/CE_
 import { KNOB_PRESETS } from '../src/CE_Application/utils/knobPresets.js';
 import { applyPresetPatch, presetDoesNotFit, presetFileText, readPresetFile, presetLink } from '../src/CE_Application/utils/animationPresetModel.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
-import { getControlSet } from '../src/CE_Application/models/controlSets.js';
+import { getControlSet, resolveColourLiteral } from '../src/CE_Application/models/controlSets.js';
 import { resolveControlForSet } from '../src/CE_Application/models/controlSetFamilies.js';
 import { resolveInteractiveControl, targetBuckets } from '../src/CE_Application/utils/interactionRuntime.js';
 import { setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
@@ -122,6 +122,31 @@ test('nothing loops that does not say so, and a value effect hands back to the v
       assert.equal(node.iterations === 'infinite', loops.has(entry.slug), `${entry.slug}: ${node.iterations === 'infinite' ? 'loops' : 'plays once'}`);
     }
   }
+});
+
+// A fader's readout is drawn beside its cap, on the panel's ground, in the cap's colour
+// ({control.cap}). Anodised's is near-black, and on the Gestures panel's dark ground Default stamp
+// stamped the value on where nobody could see it. Every readout a showcase fader shows reads there.
+const luminance = (argb) => [2, 4, 6].map((at) => parseInt(argb.slice(at, at + 2), 16) / 255)
+  .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+  .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+test('every readout a showcase fader shows reads against its panel\'s ground', () => {
+  let readouts = 0;
+  for (const [id, make] of SLIDER_PANELS) {
+    const panel = make();
+    const set = getControlSet(panel.controlSet.id);
+    for (const control of panel.controls.filter((c) => c._children.Core.controlType === 'Slider' && c._children.Behavior.showHandleLabels === true)) {
+      const ink = resolveColourLiteral(control._children.Parts._children.labelCurrent._children.Text._children.Fill.colour, set);
+      assert.ok(contrast(ink, panel.bgColour) >= 3, `${id} ${control._children.Core.name}: its readout ${ink} on ${panel.bgColour}`);
+      readouts += 1;
+    }
+  }
+  assert.ok(readouts >= 10, `the readout presets are all checked (${readouts})`);
 });
 
 test('the library lists them under Slider, after the Knob, by group', () => {

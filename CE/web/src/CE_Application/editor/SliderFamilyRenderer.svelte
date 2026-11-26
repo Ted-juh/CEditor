@@ -623,11 +623,29 @@
     const layout = part?._children?.Layout;
     return Math.max(2, numberOr(RECT_CAP_KINDS.includes(kind) || kind === 'line' ? layout?.height : layout?.width, 20));
   };
+  // How far right of a vertical track's centre its scale reaches: ticks drawn outside the track, or
+  // across it, and a numeral printed past each tick that is one (linearTickLine, tickShape). The
+  // readout starts past it as it does past the cap: Readout doors, on a fader that printed its
+  // values up the scale, put 0.51 over the scale's own 0.5.
+  const NUMERAL_ADVANCE = 0.62;   // a bold digit's width, of its font size; a little over, to be clear
+  let scaleReach = $derived.by(() => {
+    if (geometry !== 'linear' || orientation !== 'vertical' || behavior?.showTicks !== true) return 0;
+    const placement = String(behavior?.tickPlacement ?? 'outside').trim().toLowerCase();
+    if (placement === 'inside') return 0;
+    const reach = (kind, length, stops) => {
+      if (!stops.length) return 0;
+      const end = placement === 'cross' ? length / 2 : trackThickness / 2 + length;
+      if (kind !== 'numeral') return end;
+      const widest = Math.max(...stops.map((stop) => tickNumeral(stop).length));
+      return end + length * 0.6 + (widest * Math.max(6, length * 1.4) * NUMERAL_ADVANCE) / 2;
+    };
+    return Math.max(reach(majorTickKind, majorTickLength, majorStopsShown), reach(minorTickKind, minorTickLength, tickStops.minor ?? []));
+  });
   let labelAnchors = $derived.by(() => {
     if (geometry !== 'linear' || orientation !== 'vertical') return builtAnchors;
     const beside = (role, part) => {
       const point = linearPointerPoint(role);
-      return { x: point.x + capAcross(part) / 2 + 6, y: point.y, align: 'start' };
+      return { x: point.x + Math.max(capAcross(part) / 2, scaleReach) + 6, y: point.y, align: 'start' };
     };
     return { start: beside('start', pointerStartPart), current: beside('current', pointerCurrentPart), end: beside('end', pointerEndPart) };
   });

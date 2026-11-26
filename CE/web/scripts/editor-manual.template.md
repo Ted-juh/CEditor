@@ -297,7 +297,7 @@ The labels that ride a knob's or slider's handles as they move are still its own
 on its Labels tab. On a knob, **Sits** puts the value's label **At the tip** of its pointer, riding
 it round, or **In the cap**, still, in the middle of the dial; there a line or bar pointer becomes a
 tick at the rim, so the number is not struck through. On a vertical slider the label starts just past
-its cap and reads away from it.
+its cap, or past its scale where the ticks and their numbers reach further, and reads away from it.
 
 A meter works the same way. It draws no reading and no caption of its own; the **Labels** section
 at the top of its **Meter** tab adds **+ Value** (the reading, printed with the meter's precision,

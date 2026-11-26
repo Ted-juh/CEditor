@@ -218,7 +218,7 @@
     "runOnExport": true
   },
   "controlSet": {
-    "id": "pop"
+    "id": "frost"
   },
   "controls": [
     {
@@ -262,7 +262,7 @@
         "Core": {"name":"GlideHow","id":"ctrl_1782252995004","controlType":"Label"},
         "Transform": {"x":38,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -298,7 +298,7 @@
         "Core": {"name":"SnapHow","id":"ctrl_1782252995008","controlType":"Label"},
         "Transform": {"x":268,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -334,7 +334,7 @@
         "Core": {"name":"SpringHow","id":"ctrl_1782252995012","controlType":"Label"},
         "Transform": {"x":498,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -371,7 +371,7 @@
         "Core": {"name":"OverloadHow","id":"ctrl_1782252995016","controlType":"Label"},
         "Transform": {"x":728,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"ABOVE 90%","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"ABOVE 90%","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -407,7 +407,7 @@
         "Core": {"name":"ModulatedHow","id":"ctrl_1782252995020","controlType":"Label"},
         "Transform": {"x":958,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -443,7 +443,7 @@
         "Core": {"name":"DetentHow","id":"ctrl_1782252995024","controlType":"Label"},
         "Transform": {"x":1188,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },

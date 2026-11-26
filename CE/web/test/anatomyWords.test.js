@@ -206,13 +206,36 @@ const fader = (behavior = {}, parts = {}) => {
 const cap = (html) => /<circle data-pointer="current" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/.exec(html)?.slice(1).map(Number);
 
 test('a vertical slider\'s readout starts just past its cap and reads away from it', () => {
-  const html = render(SliderFamilyRenderer, { props: { control: fader({ showHandleLabels: true }), width: 120, height: 200 } }).body;
+  const html = render(SliderFamilyRenderer, { props: { control: fader({ showHandleLabels: true, showTicks: false }), width: 120, height: 200 } }).body;
   const [cx, , r] = cap(html);
   const label = /class="slider-label[^"]*"[^>]*style="([^"]*)"/.exec(html)?.[1] ?? '';
   assert.match(label, /transform:translate\(0, -50%\)/, 'its left edge at the anchor, not its middle');
   assert.equal(Number(/left:([\d.]+)px/.exec(label)[1]), cx + r + 6, 'past the cap\'s edge');
   const flat = render(SliderFamilyRenderer, { props: { control: fader({ orientation: 'horizontal', showHandleLabels: true }), width: 200, height: 80 } }).body;
   assert.doesNotMatch(/class="slider-label[^"]*"[^>]*style="([^"]*)"/.exec(flat)[1], /translate\(0, -50%\)/, 'above a horizontal one, centred as before');
+});
+
+// Readout doors, on the Words panel, put 0.51 over the scale's own 0.5: both stood just right of the
+// track. The readout now starts past whichever reaches further, the cap or the scale.
+test('a vertical slider\'s readout starts past its scale too: its ticks, and the numbers printed past them', () => {
+  const left = (html) => Number(/class="slider-label[^"]*"[^>]*style="[^"]*left:([\d.]+)px/.exec(html)[1]);
+  const numbered = fader({ showHandleLabels: true, showTicks: true, tickNumerals: 'value', min: 0, max: 1, precision: 2 }, { tickMajor: { kind: 'numeral' } });
+  const html = render(SliderFamilyRenderer, { props: { control: numbered, width: 160, height: 220 } }).body;
+  const numerals = [...html.matchAll(/<text data-tick="" x="([\d.]+)"[^>]*font-size="([\d.]+)"[^>]*>([^<]+)<\/text>/g)]
+    .map(([, x, size, text]) => ({ x: Number(x), size: Number(size), text }));
+  assert.ok(numerals.some((n) => n.text === '0.5'), 'the scale prints its values');
+  const [cx, , r] = cap(html);
+  const clear = Math.max(...numerals.map((n) => n.x + (n.text.length * n.size * 0.55) / 2));
+  assert.ok(clear > cx + r, 'the numbers reach past the cap');
+  assert.ok(left(html) > clear, `the readout (${left(html)}) starts past the numbers (${clear.toFixed(1)})`);
+
+  const lined = render(SliderFamilyRenderer, { props: { control: fader({ showHandleLabels: true, showTicks: true, majorTickLength: 30 }), width: 160, height: 220 } }).body;
+  const tickEnd = Math.max(...[...lined.matchAll(/<line data-tick="" x1="[\d.]+" y1="[\d.]+" x2="([\d.]+)"/g)].map((m) => Number(m[1])));
+  assert.ok(left(lined) > tickEnd, 'past long ticks drawn outside the track');
+
+  const inside = render(SliderFamilyRenderer, { props: { control: fader({ showHandleLabels: true, showTicks: true, majorTickLength: 30, tickPlacement: 'inside' }), width: 160, height: 220 } }).body;
+  const [icx, , ir] = cap(inside);
+  assert.equal(left(inside), icx + ir + 6, 'ticks on the other side leave it at the cap\'s edge');
 });
 
 test('a fader cap draws its lift about its own centre, and nothing when it has none', () => {

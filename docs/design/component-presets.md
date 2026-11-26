@@ -272,9 +272,9 @@ before. The library lists **Slider** after **Knob**.
 | Numbers | Soft | a round cap and a fill the readout reads against |
 | Ticks | Dual Scale (small ticks turned on) | a long scale of ticks, a billet cap |
 | Touch | Broadcast | a console cap big enough to see it lift |
-| Moving | Pop | a bold fill, so the way it moves is all there is |
+| Moving | Frost | a bold fill, so the way it moves is all there is, and yellow, so Overload's red reads (on Pop's coral it barely did) |
 | Attention | Backlit | a glowing fill whose sweeps read from across the panel |
-| Gestures | Anodised | an orange fill and ticks for Notch |
+| Gestures | Carbon (ticks turned on) | an orange fill and ticks for Notch; a dark cap, so Reset flash's white reads; an orange readout for Default stamp (Anodised's, its cap colour, is near-black, so the stamp went on unseen) |
 | Words | Blueprint | numbers printed up the scale |
 | Together | Aerospace | a mixing desk's row of faders |
 
@@ -288,6 +288,11 @@ What a line needed, each found by watching a preset not play, or play wrong, in 
   the cap, so a word ran under a wide fader cap ("Pulse" read "ulse"). It now starts just past the
   cap's edge and reads away from it (SliderFamilyRenderer `labelAnchors`, `align: start`); a
   horizontal slider's stays centred above it.
+- **And clears the scale.** A vertical slider's ticks stand right of its track, and a numeral past
+  each big tick that is one; Readout doors, on the Words panel, printed 0.51 over the scale's own 0.5.
+  The readout starts past whichever reaches further, the cap or the scale (`scaleReach`: the ticks
+  drawn outside or across the track, a numeral's text at its font size); ticks drawn inside leave it
+  at the cap. It was as close before: centred 22 px right of the cap, it stood on the numbers too.
 - **A fader cap lifts.** Lift and Grip patched a scale nothing drew on a linear cap. Not
   `Layout.scale`, though: every slider and knob ships states that patch its pointer's scale (1.08
   while it is the active handle, which a single value always is), never drawn on a fader cap, and
@@ -309,6 +314,16 @@ What a line needed, each found by watching a preset not play, or play wrong, in 
 - **A gesture plays a value effect, and words.** A click, a flick or a long press played keyframes and
   text effects only; the Animation tab offers the Value and Words kinds every gesture, and those never
   played. Throw found it (`gestureEvents.js` `GESTURE_KINDS`).
+- **Two panels' sets, changed after watching them.** Overload turns the fill red, and the Moving
+  panel's Pop draws a coral fill, against which it barely showed; Frost's is yellow. A fader's
+  readout is drawn in its cap's colour (`{control.cap}`), beside the cap on the panel's ground, and
+  Anodised's is near-black: on the Gestures panel's dark ground Default stamp played and nobody could
+  see it (the Knob's sits in the cap, where the cap's colour reads). Carbon's is orange, and its dark
+  cap shows Reset flash's white, which Anodised's pale one hid. A test now holds every readout a
+  showcase fader shows to 3:1 against its panel's ground. Across the sets it is wider than these two
+  panels: 28 of the 69 draw a slider's readout under 3:1 against a dark panel (FF17181A), and nine,
+  Anodised among them, at about 1:1. On such a panel a fader's readout does not read, with or without
+  a preset. That is the sets' (a fader's readout taking its cap's colour), and not changed here.
 - **The showcase's set check compared objects.** A panel stores its set as `{ id }`, and both
   components' tests put those in a `Set`, so two panels in one set always passed; the Slider's
   Numbers panel was in the Knob's Numbers set. Compared by id, and moved.
@@ -317,8 +332,10 @@ Verified locally:
 - `test/sliderAnimationPresets.test.js` (new): the catalogue; every preset survives its file; each fits a
   fader, one in its panel's set, and in the other sets fits or says what is missing; Lift and Grip
   through `Layout.lift` and the shipped scale left alone; the readout presets; Unfold, Throw, the
-  stream; loops; the library; the panels, a set each and none the Knob's.
-- `test/anatomyWords.test.js`: marks on a track, the readout past the cap, a cap's lift (and nothing
+  stream; loops; the library; the panels, a set each and none the Knob's; every readout a showcase
+  fader shows reads against its panel's ground.
+- `test/anatomyWords.test.js`: marks on a track, the readout past the cap and past the scale (its
+  ticks, its numbers; ticks inside leave it at the cap), a cap's lift (and nothing
   at rest), words thrown beside a fader. `test/gestureEvents.test.js`: a value effect and words on a
   gesture.
 - The browser check `sliderShowcase` (new): Unfold, Fly away, Lift and Grip (and no scale at rest),

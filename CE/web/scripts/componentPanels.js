@@ -194,9 +194,9 @@ const SLIDER_LOOKS = {
   // Small ticks between the big ones, so "big, then small" has both.
   ticks: { set: 'dual-scale', bg: 'FF121416', ink: 'FFEDEDE8', how: 'FFFFC857', what: 'FFA2A7AD', settings: { showTicks: true, majorTickCount: 6, minorTickCount: 4 } },
   touch: { set: 'broadcast', bg: 'FF1B1D20', ink: 'FFEDEFF2', how: 'FF7FD1C7', what: 'FFA0A8B0' },
-  moving: { set: 'pop', bg: 'FF15171A', ink: 'FFE9ECEF', how: 'FFFF9F5A', what: 'FF9EA6AE' },
+  moving: { set: 'frost', bg: 'FF15171A', ink: 'FFE9ECEF', how: 'FFFFD166', what: 'FF9EA6AE' },
   attention: { set: 'backlit', bg: 'FF101317', ink: 'FFE6EEF6', how: 'FF8FD3FF', what: 'FF98A4B0' },
-  gestures: { set: 'anodised', bg: 'FF17181A', ink: 'FFEDEDED', how: 'FFFFD166', what: 'FFA3A3A3', settings: { showTicks: true } },
+  gestures: { set: 'carbon', bg: 'FF17181A', ink: 'FFEDEDED', how: 'FFFFD166', what: 'FFA3A3A3', settings: { showTicks: true } },
   words: { set: 'blueprint', bg: 'FF141A22', ink: 'FFE6EEF6', how: 'FF8EC5FF', what: 'FF9FB0C2' },
 };
 const SLIDER_STARTS = { 'max-stamp': 0.9, overload: 0.8, 'rise-to-value': 0.65, 'fall-to-value': 0.3, 'fill-sweep': 0.4, 'from-the-synth': 0.4 };
