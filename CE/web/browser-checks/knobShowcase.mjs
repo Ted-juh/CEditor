@@ -12,6 +12,7 @@
  *   - Attention: Ring sweep draws past the value as the panel opens and hands back to it.
  *   - Gestures: a flick on Spin turns its whole cap, outline and all.
  *   - Together: the followers' drawings follow the first knob's value.
+ *   - A readout at the tip of a knob that fills its box hangs past the box, whole.
  *
  * And the presets that needed the engine to learn something first (phase 2):
  *
@@ -363,6 +364,33 @@ try {
   const followers = await Promise.all([2, 3, 4, 5].map((k) => drawn(ids[`Follow${k}`])));
   check('Together: the followers\' drawings follow the first knob\'s value', () => {
     for (const value of followers) assert.ok(Math.abs(value - 0.9) < 0.01, `${followers}`);
+  });
+
+  // A knob's readout at its pointer's tip stands 22 px past the dial, and a knob drawn in a tight
+  // fit (Graphite's, a new panel's set) fills its box: at the top of its travel the readout stood
+  // past the box, which cut it off. It hangs outside now, and the drawing is cut to the box as before.
+  await kit.preview(false);
+  await kit.fresh();
+  const tipKnob = await kit.make('Knob', { 'Behavior.showHandleLabels': true, 'Behavior.defaultCurrentValue': 0.5, 'Transform.x': 400, 'Transform.y': 400 });
+  await kit.preview(true);
+  await kit.settle(600);
+  const hang = await page.evaluate((sel) => {
+    const control = document.querySelector(sel);
+    const label = control.querySelector('.slider-label');
+    const box = control.getBoundingClientRect();
+    const at = label.getBoundingClientRect();
+    return {
+      text: label.textContent.trim(),
+      past: Math.max(box.top - at.top, at.bottom - box.bottom, box.left - at.left, at.right - box.right),
+      content: getComputedStyle(control.querySelector('.control-content')).overflow,
+      drawing: getComputedStyle(control.querySelector('.slider-svg')).overflow,
+    };
+  }, inPreview(tipKnob));
+  check('Numbers: a readout at the tip stands past a knob that fills its box, whole; the drawing stays cut to the box', () => {
+    assert.equal(hang.text, '0.50');
+    assert.ok(hang.past > 4, `the readout reaches past the box (${hang.past.toFixed(1)} px)`);
+    assert.equal(hang.content, 'visible', 'the box lets it hang');
+    assert.equal(hang.drawing, 'hidden', 'the drawing cut to the box, as the box cut it');
   });
 
   if (kit.failures.length) throw new Error(`page errors: ${kit.failures.join('; ')}`);

@@ -48,6 +48,9 @@
     // Words an `emit` animation threw (utils/keyframeAnimation.js EMIT): each flies out from the
     // pointer's tip, or the dial's centre, and fades. The keyframe player keeps them while they fly.
     emits = null,
+    // The drawing cut to the box here, where the box it sits in lets the readout and the thrown
+    // words hang past it (CanvasControl `labels-hang`): what was cut before is cut the same.
+    clipDrawing = false,
     debug = false,
   } = $props();
 
@@ -1227,7 +1230,7 @@
 <!-- The control's own colour frames stop here: what is drawn inside belongs to its parts. -->
 <div class="slider-family-renderer" style={partColours ? colourVariables(null) : undefined}>
   <!-- data-drawn: where the value is drawn, 0 to 1 — the value, gliding, or a value effect's (step 6). -->
-  <svg class="slider-svg" data-drawn={normalizedValues.current.toFixed(4)} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
+  <svg class="slider-svg" class:clipped={clipDrawing} data-drawn={normalizedValues.current.toFixed(4)} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
     {#if wordClips.length}
       <!-- The boxes a roll or a push moves the scale's marks through, one a mark. -->
       <defs>
@@ -1890,6 +1893,7 @@
     height: 100%;
     overflow: visible;
   }
+  .slider-svg.clipped { overflow: hidden; }
 
   .slider-label {
     position: absolute;

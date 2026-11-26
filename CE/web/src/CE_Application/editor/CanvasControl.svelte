@@ -2102,6 +2102,13 @@
 
   // --- Effects CSS (applied to .canvas-control and .control-content) ---
   let separateBackground = $derived(hasBackgroundEffects(background));
+  // A knob's readout at its pointer's tip stands 22 px past the dial, and a knob drawn in a tight fit
+  // fills its box: on a 100 px knob it stood up to 28 px past the box in every built-in set, and the
+  // box cut it off. It is meant to hang outside (sliderGeometry.resolveCircularTrackMetrics), so a
+  // knob's or slider's box lets its readout and thrown words hang, and the renderer cuts its drawing
+  // to the box as the box did. Not where the control paints a fill of its own here, whose rounded
+  // corners the box's clip cuts the drawing to.
+  let labelsHang = $derived(isSliderControl && !hasAnatomy && !absorbedFillCSS);
   // Patterns (utils/patternLayers.js): the ones behind are drawn by BackgroundRenderer, the ones in
   // front here, after the text. They move in Preview, the player and the Animation tab's stage, and
   // are drawn still on the design canvas, which never moves on its own (the owner's decision,
@@ -3556,7 +3563,7 @@
       <BackgroundRenderer {background} width={displayW} height={displayH} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} {imageMoves} />
     </div>
   {/if}
-  <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
+  <div bind:this={controlContentElement} class="control-content" class:labels-hang={labelsHang} class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
       <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} partTexts={activeKeyframes?.texts ?? null} />
     {/if}
@@ -3735,6 +3742,7 @@
       <SliderFamilyRenderer
         control={renderControl}
         runtime={interactionRuntime}
+        clipDrawing={labelsHang}
         {drawnValue}
         width={displayW}
         height={displayH}
@@ -4613,6 +4621,9 @@
     overflow: hidden;
     pointer-events: none;
   }
+  /* A knob's or slider's readout and thrown words hang past its box (SliderFamilyRenderer clips its
+     drawing to the box itself instead). */
+  .control-content.labels-hang { overflow: visible; }
 
   /* A plain fill paints on .control-content and text on .text-span; both glide with the control's
      colour timing, which arrives as an inherited custom property (utils/transitionCss.js). */

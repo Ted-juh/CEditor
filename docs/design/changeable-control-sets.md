@@ -1147,6 +1147,13 @@ Taken by the owner, 2026-11-26:
     grain of the relief, which scatters both, is left out. Counting it moved five sets' readout
     colour (Anodised, Machined, Modular Metal, Saddle Brass to black, Obsidian to white).
 
-    Not changed: a readout at the tip near the top of the dial can stand past the knob's box and be
-    cut off by it (seen in Studio White, Pop and Obsidian at about 0.6). That is the knob's layout,
-    not its colour.
+    **And the tip readout is no longer cut off.** A readout at the tip stands 22 px past the dial
+    (`sliderGeometry.buildSliderHandleLabelAnchors`), and the dial leaves room for 0.4 of it, or in a
+    tight fit (which fills the box, as the set's knob forms do) none: on a default 100 px knob it stood
+    past the box somewhere on the travel in every built-in set, by 4 to 28 px, and the control's box
+    (`CanvasControl` `.control-content`, `overflow: hidden`) cut it off. The tight fit says its labels
+    "hang outside the box", so they do now: a knob's or slider's box lets its readout and its thrown
+    words hang past it (`labels-hang`), and the renderer cuts its drawing to the same box itself
+    (`.slider-svg.clipped`), so what the box cut before is cut the same. Not where the control paints a
+    fill of its own on its box, whose rounded corners the box's clip cuts the drawing to. Held by
+    `knobShowcase`, which fails without it.
