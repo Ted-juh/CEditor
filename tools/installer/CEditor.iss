@@ -65,6 +65,7 @@ Source: "{#MySourceDir}\CE\panels\Song Book\*"; DestDir: "{app}\CE\panels\Song B
 Source: "{#MySourceDir}\CE\panels\Mechanisms\*"; DestDir: "{app}\CE\panels\Mechanisms"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MySourceDir}\CE\panels\Gallery\*"; DestDir: "{app}\CE\panels\Gallery"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MySourceDir}\CE\panels\Animated Synths\*"; DestDir: "{app}\CE\panels\Animated Synths"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MySourceDir}\CE\panels\Components\*"; DestDir: "{app}\CE\panels\Components"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MySourceDir}\CEditor.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\CEditorPluginScanner.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\CEditorPluginWorker.exe"; DestDir: "{app}"; Flags: ignoreversion

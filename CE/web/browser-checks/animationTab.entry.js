@@ -296,8 +296,15 @@ window.__anim = {
     mine: [...document.querySelectorAll('[data-preset] .nm')].map(textOf),
     panel: [...document.querySelectorAll('[data-panel-preset] .nm')].map(textOf),
   }),
-  libraryButton: (id, label) => [...(document.querySelector(`[data-preset="${id}"], [data-panel-preset="${id}"]`)?.querySelectorAll('button') ?? [])]
+  libraryButton: (id, label) => [...(document.querySelector(`[data-preset="${id}"], [data-panel-preset="${id}"], [data-builtin-preset="${id}"]`)?.querySelectorAll('button') ?? [])]
     .find((button) => textOf(button) === label)?.click(),
+  // The components' built-in presets: each component, its groups, and how many presets in all.
+  builtinRows: () => [...document.querySelectorAll('[data-builtin-component]')].map((section) => ({
+    component: section.dataset.builtinComponent,
+    groups: [...section.querySelectorAll('[data-builtin-group] b')].map(textOf),
+    count: section.querySelectorAll('[data-builtin-preset]').length,
+    first: textOf(section.querySelector('[data-builtin-preset] .nm')),
+  })),
   importClick: () => document.querySelector('.lib .imp')?.click(),
   adoptNotice: () => textOf(document.querySelector('[data-adopt]')),
   clickAdopt: () => document.querySelector('[data-adopt] button')?.click(),
@@ -445,7 +452,6 @@ window.__anim = {
   clickDebug: () => document.querySelector('.dbg')?.click(),
   debugDock: () => get(debugDockState),
   tabRequest: () => get(displayTabRequest),
-  undo: () => undo(),
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
   jsonBoxes: () => document.querySelectorAll('textarea').length,
 };

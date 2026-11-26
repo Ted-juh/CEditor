@@ -6,6 +6,9 @@
  *
  *   - Built-in: the code presets in utils/animationPresets.js. Applied as they always were (a copy,
  *     with the state change they need); "Save as preset" on the result makes one of your own.
+ *     And each component's presets (utils/knobPresets.js, the Knob's), which are data like yours:
+ *     listed under their component, applied linked, carried by the panel that uses one. They are
+ *     everyone's, so a panel that carries one never offers to add it to your library.
  *   - Mine: your library, in this machine's storage (localStorage, as control sets, card presets and
  *     saved scripts are — app settings drop keys they do not know). Survives every panel.
  *   - This panel: `panel.animationPresets`, written into the document as soon as a preset is used
@@ -26,6 +29,7 @@ import { applyControlPatch } from './controls.js';
 import { beginHistoryTransaction, commitHistoryTransaction } from './history.js';
 import { flatControls } from '../utils/containment.js';
 import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
+import { KNOB_PRESETS, KNOB_PRESET_GROUPS } from '../utils/knobPresets.js';
 import {
   LINK_KEY,
   PRESET_FORMAT,
@@ -49,6 +53,22 @@ const STORAGE_KEY = 'ce.animationPresets.v1';
 
 const cleanList = (list) => (Array.isArray(list) ? list.map(cleanPreset).filter(Boolean) : []);
 
+/**
+ * The components' built-in presets, as the library lists them: each component, its groups, and in
+ * each group its presets with what plays them and what they do. The Knob's are the first.
+ */
+export const COMPONENT_PRESETS = Object.freeze([
+  {
+    component: 'Knob',
+    groups: KNOB_PRESET_GROUPS.map((group) => ({ ...group, entries: KNOB_PRESETS.filter((entry) => entry.group === group.id) })),
+  },
+]);
+
+const BUILT_IN_BY_ID = new Map(COMPONENT_PRESETS.flatMap(({ groups }) => groups.flatMap((group) => group.entries.map((entry) => [entry.id, entry.preset]))));
+
+/** A built-in component preset by id, or null. */
+export const builtInPreset = (id) => BUILT_IN_BY_ID.get(id) ?? null;
+
 /** Mine: your library. Persisted; survives every panel. */
 export const animationPresetLibrary = writable(cleanList(readStoredJson(STORAGE_KEY, [])));
 animationPresetLibrary.subscribe((list) => { writeStoredJson(STORAGE_KEY, list); });
@@ -59,17 +79,20 @@ export const panelAnimationPresets = derived(activePanel, ($panel) => cleanList(
 /** The ids the open panel's animations follow. */
 export const panelPresetsInUse = derived(activePanel, ($panel) => presetsInUse(flatControls($panel?.controls ?? [])));
 
-/** The panel's presets your library does not have: what opening a shared panel offers to add. */
+/**
+ * The panel's presets your library does not have: what opening a shared panel offers to add. A
+ * built-in is not among them: every CEditor has it.
+ */
 export const presetsToAdopt = derived([panelAnimationPresets, animationPresetLibrary], ([$panel, $mine]) => {
   const known = new Set($mine.map((preset) => preset.id));
-  return $panel.filter((preset) => !known.has(preset.id));
+  return $panel.filter((preset) => !known.has(preset.id) && !BUILT_IN_BY_ID.has(preset.id));
 });
 
-/** A preset by id: the panel's copy first, then yours. */
+/** A preset by id: the panel's copy first, then yours, then a built-in. */
 export function presetById(id) {
   return get(panelAnimationPresets).find((preset) => preset.id === id)
     ?? get(animationPresetLibrary).find((preset) => preset.id === id)
-    ?? null;
+    ?? builtInPreset(id);
 }
 
 function controlsOfPanel() {
@@ -206,11 +229,12 @@ export function applyToPreset(controlId, name) {
 }
 
 /**
- * Bring the panel's copy of a preset up to your library's newer version, and every animation that
- * follows it with it. `{ followers }` or `{ reason }`.
+ * Bring the panel's copy of a preset up to your library's newer version (or a built-in's, when a
+ * newer CEditor changed it), and every animation that follows it with it. `{ followers }` or
+ * `{ reason }`.
  */
 export function updatePanelPreset(id) {
-  const mine = get(animationPresetLibrary).find((preset) => preset.id === id);
+  const mine = get(animationPresetLibrary).find((preset) => preset.id === id) ?? builtInPreset(id);
   const carried = get(panelAnimationPresets).find((preset) => preset.id === id);
   if (!mine || !carried) return { reason: 'There is nothing to bring up to date.' };
   if (mine.revision <= carried.revision) return { reason: 'This panel has the newest version already.' };

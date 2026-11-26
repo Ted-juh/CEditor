@@ -281,7 +281,7 @@ await wait(150);
 const scenesAfter = await d('scenes');
 const swept2 = scenesAfter.at(-1);
 check('a built-in scene preset repeats over every knob on the panel, as a new scene', () => {
-  assert.deepEqual(builtIns.map(([id]) => id), ['builtin:knobsSweepIn', 'builtin:labelsTypeIn']);
+  assert.deepEqual(builtIns.map(([id]) => id), ['builtin:knobsSweepIn', 'builtin:labelsTypeIn', 'builtin:knobsWave']);
   assert.match(applyText, /On every knob, slider, Macro or meter that fits \(1\)/, applyText);
   assert.equal(scenesAfter.length, scenesBefore + 1);
   assert.equal(swept2.name, 'Knobs sweep in');

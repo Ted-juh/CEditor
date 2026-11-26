@@ -89,3 +89,14 @@ test('one slot, started by nothing on a control: repeated over every control tha
   assert.equal(canRepeat(triggered), false, 'a hover on which knob would start them all?');
   assert.match(repeatedScene(triggered, panel()).reason, /Only a preset of one control/);
 });
+
+test('Knobs wave: a wiggle along every knob, each a little after the last, over and over, back on the value', () => {
+  const wave = BUILT_IN_SCENE_PRESETS.find((preset) => preset.id === 'builtin:knobsWave');
+  assert.equal(wave.name, 'Knobs wave');
+  assert.equal(canRepeat(wave), true);
+  const { scene, controls } = repeatedScene(wave, panel(), { stagger: 140, id: 'w' });
+  assert.equal(controls, 2);
+  assert.equal(scene.loop, true);
+  assert.deepEqual(scene.clips.map((c) => [c.controlId, c.start]), [['k2', 400], ['k1', 540]]);
+  assert.deepEqual(scene.clips[0].effect.frames.at(-1), { at: 1 }, 'it ends on the value');
+});

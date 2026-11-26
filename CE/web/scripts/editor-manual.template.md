@@ -1307,6 +1307,16 @@ and **Detach** work as they do for a control set. A panel carries the presets it
 on another computer and in the exported plugin; open one that carries presets you do not have, and
 the library offers to add them to yours.
 
+Below them are the presets each kind of control comes with, under its name: **Knob**, by group —
+**Numbers**, **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words**. Each row
+says what plays it (hover, let go, panel opens, a flick) and what it does, and **Apply** puts it on
+the selected controls, linked, as one of yours. A few need something the control may not show: a
+preset on the scale's numbers is refused on a knob whose numbers are off, with the reason. **Glide**,
+**Snap** and **Spring** take the place of the knob's own glide rather than adding a second one.
+**Name ↔ value** and **Decode** go on the knob's name Label, not on the knob. The **Components**
+showcase (below) shows every one of them on a knob. They come with CEditor, so a panel that uses one
+never asks you to add it to your library.
+
 The **States** tab has a **Motion** section for the state you are editing: **Entering** (mouse over,
 for Hover), **While in** and **Leaving** (mouse exit), each showing the animations that fill it and
 **New** to make one. Under it, **Events** plays a keyframe animation on a click, a double-click, a
@@ -1464,7 +1474,7 @@ The scripting manual has the details.
 
 #### Showcases
 
-CEditor installs five folders of example panels next to the **Control set starters**, in
+CEditor installs six folders of example panels next to the **Control set starters**, in
 `CE/panels/`. Each panel shows off something the Designer can do. Open one with **File › Open**,
 then choose **Preview** to play it, or open the **Animation Designer** to see how it is made.
 
@@ -1478,6 +1488,11 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
   lights its keys and steps out each note's echoes, the minilogue's screen names what you touched,
   and the YC61 draws the wave its drawbars make and turns its rotary speaker at the speeds it is set
   to, ramping between slow and fast.
+- **Components:** a folder for each kind of control, with a panel for each group of the presets it
+  comes with. Every control wears one preset, captioned with its name, what plays it and what it
+  does, and each panel is in a control set of its own. **Knob** is the first: **Knob Numbers**,
+  **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words**, and **Knob
+  Together**, whose scenes play one effect along a row of knobs.
 
 Most of them play by themselves. A few wait for you:
 
@@ -1489,6 +1504,10 @@ Most of them play by themselves. A few wait for you:
   scripts' actions says so in the script console.
 - The **Animated Synths** answer MIDI from the synth or a keyboard, and the minilogue's step lamps
   and the JU-06A's beat lamp follow the transport.
+- Most of the **Components** knobs wait for your hand: hover, press, turn, let go, flick, a turn of
+  the wheel or a double-click, as each caption says. **Knob Numbers** and **Knob Attention** run a
+  small script each (a synth sending new values; a "look here"), and **Beat pulse** follows the
+  transport.
 
 ## 9. Scripts
 

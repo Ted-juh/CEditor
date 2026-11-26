@@ -1996,10 +1996,18 @@
     return lines.map((_, index) => pieces.filter((piece) => piece.line === index));
   }
 
-  /** Which text a swap waits for: `to` names 'value', 'name', or any change ('*' or none). */
-  function swapMatches(trigger, shownAs) {
+  /**
+   * Which text a swap waits for: `to` names 'value', 'name', or any change ('*' or none). Waiting for
+   * the value means the words BECOMING the value: on a Label that swaps the two, a turn that changes
+   * the value it already shows is the value following the knob, not a swap, and pushing every new
+   * number in over the last drew two at once. A Label that shows only the value plays on each.
+   */
+  function swapMatches(trigger, shownAs, wasShownAs) {
     const to = trigger?.to ?? [];
-    return !to.length || to.includes('*') || to.includes(String(shownAs ?? '').toLowerCase());
+    if (!to.length || to.includes('*')) return true;
+    const now = String(shownAs ?? '').toLowerCase();
+    if (!to.includes(now)) return false;
+    return !(wasShownAs && String(wasShownAs).toLowerCase() === now && text?.shows === 'nameValue');
   }
 
   // The words as they were last drawn, so a change can leave a ghost of them; and the ghost.
@@ -2022,7 +2030,7 @@
       shownTextFrame = frame;
       if (!live || before.text === null || before.text === frame.text || !core?.id) return;
       const swaps = keyframeEntries.filter((entry) => entry.text && entry.trigger?.type === 'textChange'
-        && swapMatches(entry.trigger, frame.shownAs));
+        && swapMatches(entry.trigger, frame.shownAs, before.shownAs));
       if (!swaps.length) return;
       const out = swaps.find((entry) => entry.text.way === 'out');
       if (out && before.text) {

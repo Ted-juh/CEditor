@@ -178,7 +178,20 @@
     return stop >= startValue || stop <= endValue;
   }
 
-  function labelStyle(part, anchor) {
+  /**
+   * A handle label's own motion: the keyframe animation on its part (a readout that floats up and
+   * fades when the knob is let go) and its part's transitions (a readout a state shows, eased in).
+   * It is HTML beside the drawing, so it takes the part's timing as any part's box does. Its colour
+   * and opacity only: where it stands is the pointer's, which a transform transition would fight.
+   */
+  function labelMotion(partName) {
+    if (!partName) return '';
+    const bucket = partTransitions?.get?.(partName) ?? null;
+    const timing = bucket ? transitionDeclaration({ transform: null, size: null, opacity: bucket.opacity, colour: bucket.colour }, { target: 'part' }) : '';
+    return `${timing}${animationDeclaration(partAnimations?.get?.(partName) ?? null)}`.replace(/;$/, '');
+  }
+
+  function labelStyle(part, anchor, partName = '') {
     const text = part?._children?.Text ?? null;
     const fill = text?._children?.Fill ?? null;
     const font = text?._children?.Font ?? null;
@@ -203,6 +216,7 @@
       `filter:${filter || 'none'}`,
       effects?.outlineEnabled === true ? `-webkit-text-stroke:${Math.max(0, numberOr(effects?.outlineThickness ?? effects?.outlineWidth, 1))}px ${argbToCss(effects?.outlineColour, '#000000')}` : '',
       `opacity:${numberOr(part?.opacity, 1)}`,
+      labelMotion(partName),
     ].filter(Boolean).join(';');
   }
 
@@ -975,7 +989,7 @@
    * masked fill (SliderShapeFill) paints through BackgroundRenderer, which reads the part's colour
    * from the custom property this sets.
    */
-  function pointerStyleFor(partName, paint = '') {
+  function pointerStyleFor(partName, paint = '', { motion = true } = {}) {
     const bucket = partTransitions?.get?.(partName) ?? null;
     const channels = partColours ? (partColours.get(partName) ?? {}) : null;
     const extra = !channels ? [] : [
@@ -983,12 +997,39 @@
       ...(paint === 'stroke' || paint === 'both' ? (channels.stroke ?? []) : []),
     ];
     // A keyframe animation on a part composes with whatever draws it: it uses the individual
-    // transform properties, about the shape's own centre (utils/keyframeAnimation.js).
-    const animation = `${animationDeclaration(partAnimations?.get?.(partName) ?? null, { svg: true, extra })} ${channels ? colourVariables(channels) : ''}`.trim();
+    // transform properties, about the shape's own centre (utils/keyframeAnimation.js). A plate takes
+    // its motion on the group round the whole of it instead (plateScaleStyle), so `motion: false`.
+    const own = motion ? (partAnimations?.get?.(partName) ?? null) : null;
+    const animation = `${animationDeclaration(own, { svg: true, extra })} ${channels ? colourVariables(channels) : ''}`.trim();
     if (VALUE_DRAWN_PARTS.includes(String(partName))) {
       return `${buildTransitionStyle(bucket ? { transform: null, size: null, opacity: bucket.opacity, colour: bucket.colour } : null)} ${animation}`.trim();
     }
     return `${buildTransitionStyle(bucket)} ${animation}`.trim();
+  }
+
+  /**
+   * A plate's own scale and motion, about the dial's centre, on the group round the whole plate —
+   * its fill, its outline, its border and its grooves together.
+   *   - Its scale (the part's Layout.scale): what a Hover state that lifts the cap, or a Pressed one
+   *     that squeezes it, patches. The plate's size is its width, which draws it; its scale is drawn
+   *     on top, so a state can change it and the part's transform timing can ease it, as a part's
+   *     box scales anywhere else.
+   *   - Its keyframe animation (a cap that spins on a flick): here rather than on the fill, which
+   *     turned the paint inside a hexagon's outline and left the outline where it was.
+   * Nothing is written with neither, so a knob that never scales or moves its plates draws as it
+   * always did.
+   */
+  function plateScaleStyle(part, role) {
+    const scale = numberOr(part?._children?.Layout?.scale, 1);
+    const timing = partTransitions?.get?.(role)?.transform ?? null;
+    const motion = partAnimations?.get?.(role) ?? null;
+    if (scale === 1 && !timing && !motion?.length) return undefined;
+    return [
+      `transform-origin:${circularCenter.x.toFixed(2)}px ${circularCenter.y.toFixed(2)}px`,
+      scale !== 1 || timing ? `scale:${Number(scale.toFixed(4))}` : '',
+      timing ? `transition:scale ${timing}` : '',
+      motion?.length ? `animation:${motion.join(', ')}` : '',
+    ].filter(Boolean).join(';');
   }
 
   function oppositeDirection(direction) {
@@ -1012,13 +1053,14 @@
          border. `mask` names its fill's mask; `role` the part the pointer styles follow. -->
     {#snippet bodyPlate(part, r, mask, borderFallback, role = mask)}
       {@const rendered = renderedPlate(part, r)}
+      {@const shape = outlineShapeFor(part, r)}
+      {@const shadow = plateShadow(part, r)}
+      {@const op = numberOr(part?.opacity, 1)}
+      <g data-plate={role} style={plateScaleStyle(part, role)}>
       {#if rendered}
         <image data-rendered-look={role} href={rendered.url} x={rendered.x} y={rendered.y} width={rendered.side} height={rendered.side}
           opacity={numberOr(part?.opacity, 1)} preserveAspectRatio="none" />
       {:else}
-      {@const shape = outlineShapeFor(part, r)}
-      {@const shadow = plateShadow(part, r)}
-      {@const op = numberOr(part?.opacity, 1)}
       {#if shadow}
         {#if shadow.blur > 0}
           <filter id={maskIdFor(`${mask}Shadow`)} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation={(shadow.blur / 2).toFixed(2)} /></filter>
@@ -1039,7 +1081,7 @@
         svgWidth={width}
         svgHeight={height}
         opacity={op}
-        style={pointerStyleFor(role)}
+        style={pointerStyleFor(role, '', { motion: false })}
       />
       {#if partBorderWidth(part, borderFallback) > 0}
         {#if shape.kind === 'circle'}
@@ -1053,6 +1095,7 @@
           stroke={argbToCss(part?.grooveColour, '#253136')} stroke-width={Math.max(0.25, numberOr(part?.grooveWidth, 0.85))} opacity={op} />
       {/each}
       {/if}
+      </g>
     {/snippet}
 
     {#snippet scaleNumber(i, a, fill, opacity, style)}
@@ -1604,9 +1647,9 @@
     {@const words = labelWords(partName, text)}
     {#if words}
       <!-- In a text effect: cut as a Label's words are, and clipped to itself for a roll or a push. -->
-      <div class="slider-label" data-label-words style={`${labelStyle(part, anchor)}${words.clips ? ';overflow:hidden' : ''}`}>{#each words.pieces as piece, i (i)}<span style={piece.style}>{piece.text}</span>{/each}</div>
+      <div class="slider-label" data-label-words style={`${labelStyle(part, anchor, partName)}${words.clips ? ';overflow:hidden' : ''}`}>{#each words.pieces as piece, i (i)}<span style={piece.style}>{piece.text}</span>{/each}</div>
     {:else}
-      <div class="slider-label" style={labelStyle(part, anchor)}>
+      <div class="slider-label" style={labelStyle(part, anchor, partName)}>
         {text}
       </div>
     {/if}

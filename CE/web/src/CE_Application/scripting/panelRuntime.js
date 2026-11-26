@@ -7821,7 +7821,11 @@ const DEFINE_SPECS = {
     // A keyframe animation's playing (utils/keyframeAnimation.js readKeyframes, keyframePlayer.js),
     // and the curve of the "custom" easing and the feel of "spring" (utils/easing.js readEasing).
     // The Animation tab writes all six.
-    extra: ['iterations', 'direction', 'loop', 'hold', 'bezier', 'spring'],
+    // A text effect's own settings (utils/textEffects.js readTextEffect), which the Animation tab
+    // writes for the Text kind; and the preset an animation follows (utils/animationPresetModel.js
+    // LINK_KEY), which Apply writes. The Components showcase's knobs carry all of them.
+    extra: ['iterations', 'direction', 'loop', 'hold', 'bezier', 'spring',
+      'effect', 'way', 'split', 'order', 'stagger', 'scatter', 'scale', 'spins', 'glyphs', 'colour', 'preset'],
   },
   Bindings: {
     templates: [ENTRY_BASELINES.Bindings],

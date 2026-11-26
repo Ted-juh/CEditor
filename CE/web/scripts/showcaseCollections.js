@@ -1,13 +1,15 @@
 // showcaseCollections.js — the showcase collections, each a folder of demo panels under CE/panels/
-// generated from its script: the Film Festival, the Song Book, Mechanisms, the Gallery and the
-// Animated Synths. Where each goes and exactly what each file holds; export-showcases.mjs writes
-// them, and the tests hold the committed files to this.
+// generated from its script: the Film Festival, the Song Book, Mechanisms, the Gallery, the
+// Animated Synths and Components (a folder a component, under Components/). Where each goes and
+// exactly what each file holds; export-showcases.mjs writes them, and the tests hold the committed
+// files to this.
 import { join } from 'node:path';
 import { FILMS } from './filmFestivalPanels.js';
 import { SONGS } from './songBookPanels.js';
 import { MECHANISMS } from './mechanismsPanels.js';
 import { GALLERY } from './galleryPanels.js';
 import { SYNTHS } from './synthPanels.js';
+import { KNOB_PANELS } from './componentPanels.js';
 import { serializePanel } from '../src/CE_Application/stores/panelModel.js';
 
 const PANELS = join(import.meta.dirname, '../../panels');
@@ -18,6 +20,8 @@ export const COLLECTIONS = Object.freeze({
   mechanisms: { folder: 'Mechanisms', list: MECHANISMS },
   gallery: { folder: 'Gallery', list: GALLERY },
   synths: { folder: 'Animated Synths', list: SYNTHS },
+  // Components: a folder a component, a panel a group of its built-in animation presets.
+  knob: { folder: 'Components/Knob', list: KNOB_PANELS },
 });
 
 /** The folder a collection is written to. */

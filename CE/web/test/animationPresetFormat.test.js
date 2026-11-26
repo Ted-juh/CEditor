@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { PRESET_KINDS, cleanPresetAnimationName } from '../src/CE_Application/utils/animationPresetFormat.js';
+import { PRESET_KINDS, cleanPresetAnimationName, cleanPreset, PRESET_FORMAT } from '../src/CE_Application/utils/animationPresetFormat.js';
 import { ANIMATION_KINDS, VALUE_KIND, cleanAnimationName } from '../src/CE_Application/utils/animationModel.js';
 
 test('the format module imports nothing, so plain Node can read a panel\'s presets', () => {
@@ -24,4 +24,26 @@ test('its copies are the model\'s: the kinds, and the rule for an animation\'s n
   for (const name of ['lift', ' hover lift ', 'fade.slower', 'x-y_z9', '', null, 'É', 'a/b']) {
     assert.equal(cleanPresetAnimationName(name), cleanAnimationName(name), String(name));
   }
+});
+
+test('a state keeps its rule; the fields are only those a recipe owns', () => {
+  const preset = cleanPreset({
+    format: PRESET_FORMAT, version: 1, id: 'ap_rules', name: 'Rules',
+    animations: { glow: { kind: 'transition', trigger: { type: 'stateChange', to: ['overload'] }, targets: [] } },
+    states: {
+      Overload: { when: {}, rule: '  valueNormalized > 0.9\n', patches: { parts: { bodyTrackFill: { 'Background.Fill.colour': 'FFFF0000' } } } },
+      Plain: { when: { hover: true } },
+    },
+    fields: {
+      'Text.shows': 'nameValue',
+      'Behavior.showHandleLabels': true,
+      'Parts.labelCurrent.opacity': 3,
+      'Behavior.min': -10,
+      'Parts.labelCurrent.Text.content': 'x',
+      'Behavior.showHandleLabels ': 'yes',
+    },
+  });
+  assert.equal(preset.states.Overload.rule, 'valueNormalized > 0.9', 'trimmed, kept');
+  assert.equal('rule' in preset.states.Plain, false, 'none where it had none');
+  assert.deepEqual(preset.fields, { 'Text.shows': 'nameValue', 'Behavior.showHandleLabels': true, 'Parts.labelCurrent.opacity': 1 });
 });

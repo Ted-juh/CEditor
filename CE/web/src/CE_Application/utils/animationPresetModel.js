@@ -13,8 +13,11 @@
  *     colours,                   // 'keep' its colours, or leave colour to the 'control' it goes on
  *     revision,                  // goes up each time the preset is changed
  *     animations: { name: node },// as the control stores them, minus the link
- *     states: { Key: { when, patches: { component, parts } } },  // the changes they ease
- *     fields: { path: value } }  // settings a recipe needs (the name/value swap's Text.shows)
+ *     states: { Key: { when, rule?, patches: { component, parts } } },  // the changes they ease;
+ *                                // `rule` a condition over the value (Overload: valueNormalized > 0.9)
+ *     fields: { path: value } }  // settings a recipe needs: the name/value swap's Text.shows, a
+ *                                // knob's readout shown (Behavior.showHandleLabels) and hidden at
+ *                                // rest (Parts.labelCurrent.opacity)
  *
  * TARGETS ARE ALREADY RELATIVE. A stored target is a path from the control down — `Parts.bodyCap…`,
  * `Background.Fill.colour`, `Transform` — never the control's name, so "Cutoff › Labels › Title" is
@@ -28,7 +31,7 @@
  * Revert, Clear overrides and Detach work as they do for a control set; Apply to preset writes a
  * control's overrides into the preset and every animation that follows it.
  */
-import { uniqueAnimationName, animationsPatch } from './animationModel.js';
+import { uniqueAnimationName, animationsPatch, triggersTie } from './animationModel.js';
 import { controlDrawsValue } from './valueDrawn.js';
 import {
   LINK_KEY, PRESET_FORMAT, PRESET_FORMAT_VERSION, cleanPreset,
@@ -43,6 +46,7 @@ export {
 } from './animationPresetFormat.js';
 import { readTrigger } from './interactionRuntime.js';
 import { labelShows } from './labelShows.js';
+import { sliderWordsRefusal } from './anatomyWords.js';
 
 /** The fields of an animation that are its identity in a control, not a setting. */
 const IDENTITY = new Set(['_type', 'name', LINK_KEY]);
@@ -131,7 +135,11 @@ export function buildPreset(control, names, { id = newPresetId(), name = '', cat
       const key = stateKey(controlStates, wanted);
       if (!key) continue;
       const source = controlStates[key];
-      const entry = states[key] ?? { when: deepCopy(source?.when ?? {}), patches: { component: {}, parts: {} } };
+      const entry = states[key] ?? {
+        when: deepCopy(source?.when ?? {}),
+        ...(String(source?.rule ?? '').trim() ? { rule: String(source.rule).trim() } : {}),
+        patches: { component: {}, parts: {} },
+      };
       if (String(node.kind ?? 'transition') === 'transition') {
         for (const [path, value] of Object.entries(source?.patches?.component ?? {})) {
           if (!patchMoved(path, targets)) continue;
@@ -192,7 +200,10 @@ export function presetNeeds(preset) {
   for (const [part, patch] of Object.values(preset?.states ?? {}).flatMap((state) => Object.entries(state.patches?.parts ?? {}))) {
     if (patch && Object.keys(patch).length) parts.add(part);
   }
-  if (Object.keys(preset?.fields ?? {}).some((path) => path.startsWith('Text.'))) sections.add('Text');
+  for (const path of Object.keys(preset?.fields ?? {})) {
+    if (path.startsWith('Text.')) sections.add('Text');
+    if (path.startsWith('Parts.')) parts.add(path.split('.')[1]);
+  }
   const states = Object.keys(preset?.states ?? {});
   return { parts: [...parts].sort(), sections: [...sections].sort(), states };
 }
@@ -216,7 +227,49 @@ export function presetDoesNotFit(preset, control) {
   if (Object.values(preset.animations ?? {}).some((node) => node?.kind === 'value') && !controlDrawsValue(control)) {
     return 'It moves what a value draws, and this control draws none: it goes on a knob, a slider, a Macro or a meter.';
   }
+  return wordsNotShown(preset, control);
+}
+
+/**
+ * Why a text effect in the preset would play on words this knob does not show (its scale's numbers
+ * turned off, say), or ''. Judged as the knob will be once the preset's own fields are set, so a
+ * preset that turns the readout on is not refused for its being off.
+ */
+function wordsNotShown(preset, control) {
+  const fields = preset.fields ?? {};
+  const asApplied = 'Behavior.showHandleLabels' in fields && control._children.Behavior
+    ? { ...control, _children: { ...control._children, Behavior: { ...control._children.Behavior, showHandleLabels: fields['Behavior.showHandleLabels'] } } }
+    : control;
+  for (const node of Object.values(preset.animations ?? {})) {
+    if (node?.kind !== 'text') continue;
+    for (const target of node.targets ?? []) {
+      const path = String(target?.path ?? '');
+      if (!path.startsWith('Parts.')) continue;
+      const reason = sliderWordsRefusal(asApplied, path.split('.')[1]);
+      if (reason) return reason;
+    }
+  }
   return '';
+}
+
+/** The target paths of a transition, as a set to compare. */
+const pathSet = (node) => [...new Set((node?.targets ?? []).map((target) => String(target?.path ?? '')))].sort().join('|');
+
+/**
+ * The animation of this control a preset's transition takes the place of: the one of the same name
+ * that eases exactly the same things on the same change (`triggersTie`), unless it already follows
+ * this preset. A knob's own glides are `pointerSlide` and `rangeSlide`; a Glide or a Spring names
+ * its animations so, and means "move the value this way" instead of that glide, not beside it, where
+ * the two would tie and the Animation tab would call it a clash. A Spring after a Glide takes the
+ * Glide's place the same way. Applying a preset a second time to a control that follows it still
+ * adds a copy, and an animation of another name is never taken. Null when there is none.
+ */
+function replacedBy(control, from, node, presetId, taken) {
+  if (String(node?.kind ?? 'transition') !== 'transition') return null;
+  const own = control?._children?.Animations?._children?.[from];
+  if (!own || taken.has(from) || String(own.kind ?? 'transition') !== 'transition') return null;
+  if (presetLink(own)?.id === presetId) return null;
+  return pathSet(own) === pathSet(node) && triggersTie(readTrigger(own), readTrigger(node)) ? from : null;
 }
 
 /** The kinds of control a preset goes on, from the types' own defaults. `create(type)` makes one. */
@@ -229,7 +282,8 @@ export function presetFitsTypes(preset, types, create) {
 // --- Applying it --------------------------------------------------------------------------------
 
 /**
- * The patch that puts a preset on a control: each animation under a name the control does not use,
+ * The patch that puts a preset on a control: each animation under a name the control does not use —
+ * or in the place of the one it would tie with (`replacedBy`: a knob's own glide, for a Glide) —
  * linked (`preset: { id, revision, from }`) unless `link` is false; each state merged into one the
  * control has — it keeps everything, and gains only the values it does not set already, as the
  * built-in presets merge — or made; and the recipe's fields. `{ patch, names }`, or
@@ -241,8 +295,11 @@ export function applyPresetPatch(control, preset, { link = true } = {}) {
   const taken = Object.keys(control._children.Animations?._children ?? {});
   const nodes = {};
   const names = [];
+  const replaced = new Set();
   for (const [from, node] of Object.entries(preset.animations)) {
-    const name = uniqueAnimationName([...taken, ...names], from);
+    const instead = replacedBy(control, from, node, preset.id, replaced);
+    if (instead) replaced.add(instead);
+    const name = instead ?? uniqueAnimationName([...taken, ...names], from);
     names.push(name);
     nodes[name] = { ...deepCopy(node), _type: 'Animation', name, ...(link ? { [LINK_KEY]: { id: preset.id, revision: preset.revision, from } } : {}) };
   }
@@ -271,6 +328,7 @@ export function applyPresetPatch(control, preset, { link = true } = {}) {
         description: `${preset.name} (animation preset).`,
         enabled: true,
         when: deepCopy(wanted.when ?? {}),
+        ...(wanted.rule ? { rule: wanted.rule } : {}),
         patches: { component, parts },
       };
   }

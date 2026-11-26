@@ -5,7 +5,9 @@
    * Library: Mine (your library, on this machine) and This panel (what the panel carries, which is
    * what its linked animations follow), each preset with Apply, Export and Remove; Import a .ceanim;
    * and, when the panel carries presets you lack — a panel someone sent you — the offer to add them.
-   * The built-in presets stay the buttons on the strip.
+   * Then each component's built-in presets (stores/animationPresetLibrary.js COMPONENT_PRESETS), under
+   * its name and by group: Knob › Numbers, Ticks, Touch… Each says what plays it and what it does,
+   * and applies linked, as yours do. The older built-ins stay the buttons on the strip.
    *
    * Save: a name, a category and tags; this animation or all of the control's (a recipe); your
    * library or this panel only; its colours, or the control's. It says what the preset needs and
@@ -14,7 +16,7 @@
   import X from 'lucide-svelte/icons/x';
   import { activePanel } from '../../stores/panels.js';
   import {
-    animationPresetLibrary, panelAnimationPresets, presetsToAdopt, adoptPanelPresets, applyAnimationPreset,
+    animationPresetLibrary, panelAnimationPresets, presetsToAdopt, adoptPanelPresets, applyAnimationPreset, COMPONENT_PRESETS,
     importPresetText, removeFromLibrary, removeFromPanel, saveAnimationPreset, updatePanelPreset,
   } from '../../stores/animationPresetLibrary.js';
   import { buildPreset, presetFileText, presetFitsTypes, presetLink, presetNeeds } from '../../utils/animationPresetModel.js';
@@ -216,6 +218,29 @@
         <p class="none">This panel uses none.</p>
       {/each}
     </div>
+    {#each COMPONENT_PRESETS as component (component.component)}
+      <details class="sect builtin" open data-builtin-component={component.component}>
+        <summary class="sh"><b>{component.component}</b> <span>{plural(component.groups.reduce((n, group) => n + group.entries.length, 0), 'built-in preset')}</span></summary>
+        {#each component.groups as group (group.id)}
+          <div class="gh" data-builtin-group={group.id}><b>{group.label}</b> <span>{group.note}</span></div>
+          {#each group.entries as entry (entry.id)}
+            {@const carried = panelById.get(entry.id)}
+            {@const shown = effectFromPreset(entry.preset)}
+            <div class="row" data-builtin-preset={entry.id} {...previewOn(`builtin:${entry.id}`)}>
+              {#if shown}<EffectPreview entry={shown} active={previewId === `builtin:${entry.id}`} />{:else}<span class="nopv" aria-hidden="true"></span>{/if}
+              <span class="nm">{entry.name} <i>{entry.how}</i></span>
+              <span class="meta" title={entry.what}>{entry.on === 'label' ? `on its name Label: ${entry.what}` : entry.what}</span>
+              <span class="btns">
+                {#if carried && carried.revision < entry.preset.revision}
+                  <button type="button" class="tb" title="Bring this panel's copy and what follows it up to this version" onclick={() => onreport(updatePanelPreset(entry.id).reason ?? `${entry.name} brought up to date here.`)}>Update panel</button>
+                {/if}
+                <button type="button" class="tb" disabled={!targets.length} onclick={() => apply(entry.preset)}>Apply</button>
+              </span>
+            </div>
+          {/each}
+        {/each}
+      </details>
+    {/each}
   {/if}
 </div>
 
@@ -257,4 +282,10 @@
   .meta { grid-column: 2; grid-row: 2; font-size: 12px; color: #8A96A3; }
   .btns { grid-column: 3; grid-row: 1 / span 2; display: flex; align-items: center; gap: 4px; }
   .none { margin: 0; font-size: 12px; color: #8A96A3; }
+  .builtin > summary { cursor: pointer; list-style: revert; }
+  .gh { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; padding: 0 2px; }
+  .gh b { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #CCD3DA; }
+  .gh span { font-size: 12px; color: #8A96A3; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nm i { font-style: normal; font-weight: 400; font-size: 12px; color: #7FC4B8; margin-left: 4px; }
+  .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

@@ -834,6 +834,21 @@ const copy = await ev(() => window.__anim.storedAnimation('pressEcho2'));
 assert.equal(copy.preset.id, savedPreset.id);
 assert.match(await ev(() => window.__anim.presetReport()), /on 1 control, linked/);
 
+check('the Knob\'s built-in presets are listed under it, by group; one applies linked, one that needs a cap is refused', async () => {});
+assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
+  component: 'Knob', groups: ['Numbers', 'Ticks', 'Touch', 'Turning', 'Attention', 'Gestures', 'Words'], count: 39, first: 'Fly-out let go',
+}]);
+await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
+await settle();
+assert.match(await ev(() => window.__anim.presetReport()), /not on 1: It moves a part this control does not have: bodyCap/);
+await ev(() => window.__anim.libraryButton('ce:knob:pop', 'Apply'));
+await settle();
+assert.equal((await ev(() => window.__anim.storedAnimation('pop'))).preset.id, 'ce:knob:pop');
+assert.ok((await ev(() => window.__anim.panelPresets())).some((preset) => preset.id === 'ce:knob:pop'), 'the panel carries it');
+assert.equal(await ev(() => window.__anim.adoptNotice()), '', 'and nobody is offered to adopt a built-in');
+await ev(() => window.__anim.removeAnimation('pop'));
+await settle();
+
 const [download] = await Promise.all([
   page.waitForEvent('download'),
   ev((id) => window.__anim.libraryButton(id, 'Export…'), savedPreset.id),

@@ -61,7 +61,8 @@ test('an exported panel carries its images, and a part finds them without WebGL'
 
 test('the knob draws a rendered plate from its image, and export bakes them', () => {
   const knob = read('CE_Application/editor/SliderFamilyRenderer.svelte');
-  assert.match(knob, /\{@const rendered = renderedPlate\(part, r\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{role\} href=\{rendered\.url\}/);
+  // Inside the group that carries the plate's own scale and motion (plateScaleStyle).
+  assert.match(knob, /\{@const rendered = renderedPlate\(part, r\)\}[\s\S]*?<g data-plate=\{role\} style=\{plateScaleStyle\(part, role\)\}>\s*\{#if rendered\}\s*<image data-rendered-look=\{role\} href=\{rendered\.url\}/);
   assert.match(knob, /if \(String\(part\?\.look \?\? ''\) !== 'rendered' \|\| r <= 0\) return null;/);
   const prep = read('CE_Application/stores/panelExportPreparation.js');
   assert.match(prep, /const looks = await bakeRenderedLooks\(controlsInTree\(panel\.controls\), \{\s*lamp: panelSet\?\.lamp \?\? null,\s*resolve: \(control\) => resolveControlForSet\(control, panelSet, sources\),/);

@@ -82,8 +82,9 @@ test('the knob renderer draws the housing, the outlines, the needle, and hides w
   const housingAt = renderer.indexOf("{@render bodyPlate(bodyHousingPart, bodyHousingRadius, 'bodyHousing'");
   assert.ok(housingAt > 0 && housingAt < renderer.indexOf("maskIdFor('bodyTrackBaseCircle')"), 'the housing under the track');
   // Every plate is drawn the one way: its shadow, its fill in its outline, its border; or, when its
-  // look is rendered (utils/renderedLook.js), as the rendered image in its place.
-  assert.match(renderer, /\{#snippet bodyPlate\(part, r, mask, borderFallback, role = mask\)\}\s*\{@const rendered = renderedPlate\(part, r\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{role\}[\s\S]*?\{:else\}\s*\{@const shape = outlineShapeFor\(part, r\)\}/);
+  // look is rendered (utils/renderedLook.js), as the rendered image in its place. Either way inside
+  // one group that carries the plate's own scale and motion about the dial's centre.
+  assert.match(renderer, /\{#snippet bodyPlate\(part, r, mask, borderFallback, role = mask\)\}\s*\{@const rendered = renderedPlate\(part, r\)\}\s*\{@const shape = outlineShapeFor\(part, r\)\}[\s\S]*?<g data-plate=\{role\} style=\{plateScaleStyle\(part, role\)\}>\s*\{#if rendered\}\s*<image data-rendered-look=\{role\}[\s\S]*?\{:else\}/);
   assert.match(renderer, /\{@render bodyPlate\(bodyCapPart, bodyCapRadius, 'bodyCapCircle', 1, 'bodyCap'\)\}/);
   assert.match(renderer, /kind === 'needle'/);
   assert.match(renderer, /trackBasePart\?\.visible === false/);

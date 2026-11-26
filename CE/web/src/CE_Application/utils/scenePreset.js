@@ -195,17 +195,21 @@ export function repeatedScene(preset, controls, { stagger = REPEAT_STAGGER, id =
   return scene ? { scene, controls: takers.length } : { reason: 'That preset made no scene here.' };
 }
 
-const builtIn = (id, name, slot, clips, trigger = { type: 'panelOpen' }, length = 1200) => cleanScenePreset({
-  format: SCENE_PRESET_FORMAT, version: SCENE_PRESET_VERSION, id, name, length, loop: false, trigger, slots: [slot], clips,
+const builtIn = (id, name, slot, clips, trigger = { type: 'panelOpen' }, length = 1200, loop = false) => cleanScenePreset({
+  format: SCENE_PRESET_FORMAT, version: SCENE_PRESET_VERSION, id, name, length, loop, trigger, slots: [slot], clips,
 });
 
 /**
- * The presets every CEditor has: the record's own example, and its counterpart for words. Both are
- * one slot and start with the panel, so they repeat over every control that fits.
+ * The presets every CEditor has: the record's own example, its counterpart for words, and a wiggle
+ * that runs along a row of knobs over and over (the Components showcase's Together panel). Each is
+ * one slot and starts with the panel, so it repeats over every control that fits.
  */
 export const BUILT_IN_SCENE_PRESETS = Object.freeze([
   builtIn('builtin:knobsSweepIn', 'Knobs sweep in', { type: 'Knob', label: 'a knob', needs: { value: true } },
     [{ slot: 0, target: VALUE_TARGET, start: 0, length: 1200, label: 'Ring sweep', effect: { kind: 'value', easing: 'inOutCubic', frames: [{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }] } }]),
   builtIn('builtin:labelsTypeIn', 'Labels type in', { type: 'Label', label: 'a label', needs: { text: true } },
     [{ slot: 0, target: 'Text', start: 0, length: 900, label: 'Typewriter in', effect: { kind: 'text', effect: 'typewriter', way: 'in', iterations: 1 } }], { type: 'panelOpen' }, 900),
+  builtIn('builtin:knobsWave', 'Knobs wave', { type: 'Knob', label: 'a knob', needs: { value: true } },
+    [{ slot: 0, target: VALUE_TARGET, start: 400, length: 700, label: 'Wiggle', effect: { kind: 'value', easing: 'inOutSine', iterations: 1, frames: [{ at: 0 }, { at: 0.15, by: 0.08 }, { at: 0.35, by: -0.08 }, { at: 0.55, by: 0.05 }, { at: 0.75, by: -0.02 }, { at: 1 }] } }],
+    { type: 'panelOpen' }, 2600, true),
 ].filter(Boolean));

@@ -1,0 +1,820 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "439bf1ae-c0b5-4e1a-9f3d-439bf1ae439b",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Knob Gestures",
+  "scriptId": "component_knob-gestures",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 870,
+  "height": 644,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF17181A",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "ResetFlash.value",
+      "label": "ResetFlash",
+      "controlName": "ResetFlash",
+      "path": "ResetFlash.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Spin.value",
+      "label": "Spin",
+      "controlName": "Spin",
+      "path": "Spin.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Notch.value",
+      "label": "Notch",
+      "controlName": "Notch",
+      "path": "Notch.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Pop.value",
+      "label": "Pop",
+      "controlName": "Pop",
+      "path": "Pop.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Nudge.value",
+      "label": "Nudge",
+      "controlName": "Nudge",
+      "path": "Nudge.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "DefaultStamp.value",
+      "label": "DefaultStamp",
+      "controlName": "DefaultStamp",
+      "path": "DefaultStamp.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "hex-drive"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1754293422000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Knob · Gestures","_children":{"Fill":{"colour":"FFEDEDED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1754293422001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":810,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"what a gesture plays. Each knob wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFA3A3A3"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResetFlash","id":"ctrl_1754293422002","description":"Reset flash: the pointer flashes as it goes home.","controlType":"Knob"},
+        "Transform": {"x":97,"y":96,"width":136,"height":136},
+        "Animations": {"_children":{"resetFlash":{"_type":"Animation","name":"resetFlash","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.pointerCurrent"}],"frames":[{"at":0,"fill":"FFFFFFFF","scale":1.25},{"at":0.45,"fill":"FFFFFFFF","scale":1.1},{"at":1,"scale":1}],"duration":560,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:reset-flash","revision":1,"from":"resetFlash"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResetFlashCaption","id":"ctrl_1754293422003","controlType":"Label"},
+        "Transform": {"x":40,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Reset flash","_children":{"Fill":{"colour":"FFEDEDED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResetFlashHow","id":"ctrl_1754293422004","controlType":"Label"},
+        "Transform": {"x":40,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResetFlashWhat","id":"ctrl_1754293422005","controlType":"Label"},
+        "Transform": {"x":44,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the pointer flashes as it goes home","_children":{"Fill":{"colour":"FFA3A3A3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spin","id":"ctrl_1754293422006","description":"Spin: the cap spins once and settles.","controlType":"Knob"},
+        "Transform": {"x":367,"y":96,"width":136,"height":136},
+        "Animations": {"_children":{"spin":{"_type":"Animation","name":"spin","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"flick"},"targets":[{"path":"Parts.bodyCap"}],"frames":[{"at":0,"rotate":0},{"at":1,"rotate":360}],"duration":700,"delay":0,"easing":"outCubic","iterations":1,"direction":"normal","preset":{"id":"ce:knob:spin","revision":1,"from":"spin"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpinCaption","id":"ctrl_1754293422007","controlType":"Label"},
+        "Transform": {"x":310,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Spin","_children":{"Fill":{"colour":"FFEDEDED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpinHow","id":"ctrl_1754293422008","controlType":"Label"},
+        "Transform": {"x":310,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"FLICK","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpinWhat","id":"ctrl_1754293422009","controlType":"Label"},
+        "Transform": {"x":314,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the cap spins once and settles","_children":{"Fill":{"colour":"FFA3A3A3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Notch","id":"ctrl_1754293422010","description":"Notch: a light runs round the ticks the way you turned.","controlType":"Knob"},
+        "Transform": {"x":637,"y":96,"width":136,"height":136},
+        "Animations": {"_children":{"notchUp":{"_type":"Animation","name":"notchUp","enabled":true,"kind":"text","effect":"shimmer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":30,"duration":300,"colour":"FFFFC24D","trigger":{"type":"event","event":"wheelUp"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:knob:notch","revision":1,"from":"notchUp"}},"notchDown":{"_type":"Animation","name":"notchDown","enabled":true,"kind":"text","effect":"shimmer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"reverse","stagger":30,"duration":300,"colour":"FFFFC24D","trigger":{"type":"event","event":"wheelDown"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:knob:notch","revision":1,"from":"notchDown"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NotchCaption","id":"ctrl_1754293422011","controlType":"Label"},
+        "Transform": {"x":580,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Notch","_children":{"Fill":{"colour":"FFEDEDED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NotchHow","id":"ctrl_1754293422012","controlType":"Label"},
+        "Transform": {"x":580,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHEEL","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NotchWhat","id":"ctrl_1754293422013","controlType":"Label"},
+        "Transform": {"x":584,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a light runs round the ticks the way you turned","_children":{"Fill":{"colour":"FFA3A3A3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pop","id":"ctrl_1754293422014","description":"Pop: the knob pops when the press is held.","controlType":"Knob"},
+        "Transform": {"x":97,"y":358,"width":136,"height":136},
+        "Animations": {"_children":{"pop":{"_type":"Animation","name":"pop","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"longPress"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.4,"scale":1.12},{"at":1,"scale":1}],"duration":320,"delay":0,"easing":"outBack","iterations":1,"direction":"normal","preset":{"id":"ce:knob:pop","revision":1,"from":"pop"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopCaption","id":"ctrl_1754293422015","controlType":"Label"},
+        "Transform": {"x":40,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pop","_children":{"Fill":{"colour":"FFEDEDED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopHow","id":"ctrl_1754293422016","controlType":"Label"},
+        "Transform": {"x":40,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LONG PRESS","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopWhat","id":"ctrl_1754293422017","controlType":"Label"},
+        "Transform": {"x":44,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the knob pops when the press is held","_children":{"Fill":{"colour":"FFA3A3A3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Nudge","id":"ctrl_1754293422018","description":"Nudge: a small wiggle on each click.","controlType":"Knob"},
+        "Transform": {"x":367,"y":358,"width":136,"height":136},
+        "Animations": {"_children":{"nudge":{"_type":"Animation","name":"nudge","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"click"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"rotate":0},{"at":0.25,"rotate":-7},{"at":0.5,"rotate":6},{"at":0.75,"rotate":-3},{"at":1,"rotate":0}],"duration":380,"delay":0,"easing":"inOutQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:nudge","revision":1,"from":"nudge"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NudgeCaption","id":"ctrl_1754293422019","controlType":"Label"},
+        "Transform": {"x":310,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Nudge","_children":{"Fill":{"colour":"FFEDEDED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NudgeHow","id":"ctrl_1754293422020","controlType":"Label"},
+        "Transform": {"x":310,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NudgeWhat","id":"ctrl_1754293422021","controlType":"Label"},
+        "Transform": {"x":314,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a small wiggle on each click","_children":{"Fill":{"colour":"FFA3A3A3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DefaultStamp","id":"ctrl_1754293422022","description":"Default stamp: the default value stamps on as it resets.","controlType":"Knob"},
+        "Transform": {"x":607,"y":328,"width":196,"height":196},
+        "Behavior": {"circularDiameter":105,"showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "Animations": {"_children":{"defaultStamp":{"_type":"Animation","name":"defaultStamp","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"opacity":0,"scale":2.4},{"at":0.15,"opacity":1,"scale":0.95},{"at":0.22,"opacity":1,"scale":1},{"at":0.8,"opacity":1,"scale":1},{"at":1,"opacity":0,"scale":1}],"duration":1400,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:knob:default-stamp","revision":1,"from":"defaultStamp"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DefaultStampCaption","id":"ctrl_1754293422023","controlType":"Label"},
+        "Transform": {"x":580,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Default stamp","_children":{"Fill":{"colour":"FFEDEDED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DefaultStampHow","id":"ctrl_1754293422024","controlType":"Label"},
+        "Transform": {"x":580,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DefaultStampWhat","id":"ctrl_1754293422025","controlType":"Label"},
+        "Transform": {"x":584,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the default value stamps on as it resets","_children":{"Fill":{"colour":"FFA3A3A3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:reset-flash",
+      "name": "Reset flash",
+      "category": "Knob",
+      "tags": [
+        "Gestures",
+        "double-click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "resetFlash": {
+          "_type": "Animation",
+          "name": "resetFlash",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FFFFFFFF",
+              "scale": 1.25
+            },
+            {
+              "at": 0.45,
+              "fill": "FFFFFFFF",
+              "scale": 1.1
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 560,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:spin",
+      "name": "Spin",
+      "category": "Knob",
+      "tags": [
+        "Gestures",
+        "flick"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "spin": {
+          "_type": "Animation",
+          "name": "spin",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "flick"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyCap"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "rotate": 0
+            },
+            {
+              "at": 1,
+              "rotate": 360
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:notch",
+      "name": "Notch",
+      "category": "Knob",
+      "tags": [
+        "Gestures",
+        "wheel"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "notchUp": {
+          "_type": "Animation",
+          "name": "notchUp",
+          "enabled": true,
+          "kind": "text",
+          "effect": "shimmer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 30,
+          "duration": 300,
+          "colour": "FFFFC24D",
+          "trigger": {
+            "type": "event",
+            "event": "wheelUp"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "notchDown": {
+          "_type": "Animation",
+          "name": "notchDown",
+          "enabled": true,
+          "kind": "text",
+          "effect": "shimmer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "reverse",
+          "stagger": 30,
+          "duration": 300,
+          "colour": "FFFFC24D",
+          "trigger": {
+            "type": "event",
+            "event": "wheelDown"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:pop",
+      "name": "Pop",
+      "category": "Knob",
+      "tags": [
+        "Gestures",
+        "long press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pop": {
+          "_type": "Animation",
+          "name": "pop",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "longPress"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.4,
+              "scale": 1.12
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outBack",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:nudge",
+      "name": "Nudge",
+      "category": "Knob",
+      "tags": [
+        "Gestures",
+        "click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "nudge": {
+          "_type": "Animation",
+          "name": "nudge",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "rotate": 0
+            },
+            {
+              "at": 0.25,
+              "rotate": -7
+            },
+            {
+              "at": 0.5,
+              "rotate": 6
+            },
+            {
+              "at": 0.75,
+              "rotate": -3
+            },
+            {
+              "at": 1,
+              "rotate": 0
+            }
+          ],
+          "duration": 380,
+          "delay": 0,
+          "easing": "inOutQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:default-stamp",
+      "name": "Default stamp",
+      "category": "Knob",
+      "tags": [
+        "Gestures",
+        "double-click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "defaultStamp": {
+          "_type": "Animation",
+          "name": "defaultStamp",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 0,
+              "scale": 2.4
+            },
+            {
+              "at": 0.15,
+              "opacity": 1,
+              "scale": 0.95
+            },
+            {
+              "at": 0.22,
+              "opacity": 1,
+              "scale": 1
+            },
+            {
+              "at": 0.8,
+              "opacity": 1,
+              "scale": 1
+            },
+            {
+              "at": 1,
+              "opacity": 0,
+              "scale": 1
+            }
+          ],
+          "duration": 1400,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    }
+  ]
+}

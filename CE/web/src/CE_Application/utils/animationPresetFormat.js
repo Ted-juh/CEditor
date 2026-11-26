@@ -34,7 +34,7 @@ export const PRESET_COLOURS = ['keep', 'control'];
 export const LINK_KEY = 'preset';
 
 /** The most a preset file may hold: past this, a mistake or not a preset. */
-const LIMITS = { animations: 64, bytes: 1024 * 1024, name: 80, category: 40, tags: 12, tag: 24 };
+const LIMITS = { animations: 64, bytes: 1024 * 1024, name: 80, category: 40, tags: 12, tag: 24, rule: 200 };
 
 const text = (value, max) => String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 
@@ -60,8 +60,12 @@ export function cleanPreset(raw) {
   const states = {};
   for (const [key, state] of Object.entries(raw.states ?? {})) {
     if (!/^[A-Za-z][A-Za-z0-9_ -]{0,39}$/.test(key) || !state || typeof state !== 'object') continue;
+    // A state with a rule over the value (`valueNormalized > 0.9`) keeps it: without it, Overload
+    // would hold all the time.
+    const rule = typeof state.rule === 'string' ? state.rule.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, LIMITS.rule) : '';
     states[key] = {
       when: state.when && typeof state.when === 'object' ? deepCopy(state.when) : {},
+      ...(rule ? { rule } : {}),
       patches: {
         component: state.patches?.component && typeof state.patches.component === 'object' ? deepCopy(state.patches.component) : {},
         parts: state.patches?.parts && typeof state.patches.parts === 'object' ? deepCopy(state.patches.parts) : {},
@@ -70,8 +74,11 @@ export function cleanPreset(raw) {
   }
   const fields = {};
   for (const [path, value] of Object.entries(raw.fields ?? {})) {
-    // Only what a recipe is known to need: a path into Text, set to a word.
+    // Only what a recipe is known to need: what a Label shows, set to a word; a knob's readout shown;
+    // a part's resting opacity (a readout hidden until a state shows it).
     if (path === 'Text.shows' && /^[a-zA-Z]{1,24}$/.test(String(value))) fields[path] = String(value);
+    else if (path === 'Behavior.showHandleLabels' && typeof value === 'boolean') fields[path] = value;
+    else if (/^Parts\.[A-Za-z][A-Za-z0-9_]{0,39}\.opacity$/.test(path) && Number.isFinite(Number(value))) fields[path] = Math.min(1, Math.max(0, Number(value)));
   }
   return {
     format: PRESET_FORMAT,

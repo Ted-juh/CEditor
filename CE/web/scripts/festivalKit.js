@@ -24,6 +24,7 @@ export const SONG_KIND = Object.freeze({ seed: 'ceditor-song', script: 'song', g
 export const MECHANISM_KIND = Object.freeze({ seed: 'ceditor-mechanism', script: 'mechanism', guid: '3c4a-4d17-9e21' });
 export const GALLERY_KIND = Object.freeze({ seed: 'ceditor-gallery', script: 'gallery', guid: '9a11-4e7b-b3c0' });
 export const SYNTH_KIND = Object.freeze({ seed: 'ceditor-synth', script: 'synth', guid: '5e17-4a0c-b6d2' });
+export const COMPONENT_KIND = Object.freeze({ seed: 'ceditor-component', script: 'component', guid: 'c0b5-4e1a-9f3d' });
 
 /**
  * One panel of a collection, its controls numbered from a hash of its id. `clip` puts a clip on the

@@ -25,7 +25,7 @@ export const CHECKS = [
   'releaseWorkflow', 'numberCellSelection', 'displayGapReview', 'ctrl49Screen', 'noteModules',
   'hostWorkspace', 'performanceTools', 'soundsPage', 'stageScreen', 'pluginPresets', 'songsPage',
   'templateLabels', 'macroSetKnob', 'setSwatches', 'anatomyForms', 'panelFile', 'valuesSidebar',
-  'valueCompletion', 'pictureColour', 'vectorArtwork', 'scene3d', 'pictureExport', 'accessCheck', 'showcases', 'choiceGroup',
+  'valueCompletion', 'pictureColour', 'vectorArtwork', 'scene3d', 'pictureExport', 'accessCheck', 'showcases', 'choiceGroup', 'knobShowcase',
 ];
 
 // The checks launch the browser CHROMIUM_PATH names, or else the one this repo's Linux containers

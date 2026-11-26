@@ -1,7 +1,8 @@
-// showcaseCollections.test.js — Mechanisms, the Gallery and the Animated Synths (scripts/
-// mechanismsPanels.js, galleryPanels.js and synthPanels.js, written by export-showcases.mjs): the
-// committed files are what the scripts write; each panel opens with every clip of every scene on a
-// control it has (what the synths bind and show is synthPanels.test.js's); and what each
+// showcaseCollections.test.js — Mechanisms, the Gallery, the Animated Synths and the Components'
+// Knob (scripts/mechanismsPanels.js, galleryPanels.js, synthPanels.js and componentPanels.js, written
+// by export-showcases.mjs): the committed files are what the scripts write; each panel opens with
+// every clip of every scene on a control it has, and the presets it carries (what the synths bind and
+// show is synthPanels.test.js's, what the knobs wear knobPresets.test.js's); and what each
 // mechanism shows is what it says: gears at their teeth ratios on a knob's value, reels on the beat,
 // a domino run whose script answers every marker, and a clock whose script holds each hand at the time.
 
@@ -14,7 +15,7 @@ import { DOMINO_SCRIPT, CLOCK_SCRIPT } from '../scripts/mechanismsPanels.js';
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { cleanScene } from '../src/CE_Application/utils/sceneFormat.js';
 
-const NEW = ['mechanisms', 'gallery', 'synths'];
+const NEW = ['mechanisms', 'gallery', 'synths', 'knob'];
 const named = (panel, name) => panel.controls.find((control) => control._children.Core.name === name);
 
 test('the committed panels are what the scripts write: run export-showcases.mjs after changing one', () => {
@@ -35,9 +36,11 @@ test('each opens as a panel, every clip of every scene on a control it has and i
       const panel = deserializePanel(readFileSync(path, 'utf8'), path, null);
       assert.ok(panel, `${id} opens`);
       const authored = collectionPanel(key, id);
-      assert.equal(panel.animationScenes.length, authored.animationScenes.length, id);
+      assert.equal((panel.animationScenes ?? []).length, authored.animationScenes.length, id);
+      // The presets it wears (the Components showcase) come back with it, as it carries them.
+      assert.deepEqual((panel.animationPresets ?? []).map((preset) => preset.id), (authored.animationPresets ?? []).map((preset) => preset.id), `${id}: presets kept`);
       const ids = new Set(panel.controls.map((control) => control._children.Core.id));
-      panel.animationScenes.forEach((scene, i) => {
+      (panel.animationScenes ?? []).forEach((scene, i) => {
         assert.equal(cleanScene(scene).clips.length, authored.animationScenes[i].clips.length, `${id}: no clip dropped`);
         assert.deepEqual((scene.markers ?? []).map((m) => m.action), (authored.animationScenes[i].markers ?? []).map((m) => m.action), `${id}: markers kept`);
         for (const clip of scene.clips) {

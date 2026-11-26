@@ -2017,6 +2017,17 @@ Verified locally:
 - Recorded in the editor's Preview in real time (its rotors run on the script's timers): SLOW, FAST
   and back, three drawbars moved, ROTATION off.
 
+## As built: Components, the Knob first (2026-11-26)
+
+The owner's Components showcase: each kind of control's own animation presets, in the library under
+its name and on panels of their own (`CE/panels/Components/Knob/`). The decisions, the catalogue
+and what the engine needed are in [component-presets.md](component-presets.md). In short, for this
+record: a preset may now carry a state's rule; a knob's readout takes its part's keyframes and
+transitions; a knob's plates take their part's scale and keyframes as a whole, about the dial's
+centre; a preset's transition named as one of the control's own, easing the same things on the same
+change, takes its place; a name ↔ value swap plays when the words become the value, not on each new
+value; and a third built-in scene preset, Knobs wave.
+
 ## Open
 
 Nothing for the owner at present.
