@@ -40,6 +40,7 @@ import { GRAPHITE_SERIES, INSTRUMENT_TYPES, SERIES_ROLES } from './instrumentDes
 import { typeFamilies } from './controlSetRecipes.js';
 import { deepClone } from '../utils/deepClone.js';
 import { conditionOf } from './familyConditions.js';
+import { withReadoutInCap } from './readoutInk.js';
 
 const pristineCache = new Map();
 
@@ -303,7 +304,9 @@ function withSetVoices(control, set) {
  */
 export function resolveControlForSet(control, set, sources = {}) {
   set = controlSetForControl(control, set, sources);
-  return resolveControlTokens(resolveControlFamily(control, set), set);
+  // After the family (it draws the knob's face), before the tokens: a knob's readout in its cap,
+  // lettered to read on that face (models/readoutInk.js).
+  return resolveControlTokens(withReadoutInCap(resolveControlFamily(control, set), set), set);
 }
 
 /**

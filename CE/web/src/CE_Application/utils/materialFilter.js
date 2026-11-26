@@ -82,3 +82,22 @@ export function materialPrimitives(material, setLamp = null) {
     elevation: lamp.elevation,
   };
 }
+
+/**
+ * About what a flat face in `colour` (AARRGGBB) looks like under `material`, as the filter above
+ * draws it on a surface facing the viewer: lit by the lamp's diffuse light (the colour times the
+ * sine of its elevation), with its specular light added (white, by the shine). The relief's grain,
+ * which scatters both, is left out. An estimate for choosing an ink that reads on a finished
+ * surface (a glass knob cap at shine 180 draws its dark navy fill a light silver), not a rendering.
+ */
+export function finishedColour(colour, material, setLamp = null) {
+  const p = materialPrimitives(material, setLamp);
+  const argb = String(colour ?? '');
+  if (!p || !/^[0-9A-F]{8}$/i.test(argb)) return colour;
+  const e = (p.elevation * Math.PI) / 180;
+  const diffuse = Math.sin(e);
+  const towardViewer = (Math.sin(e) + 1) / Math.hypot(Math.cos(e), Math.sin(e) + 1);
+  const specular = Math.min(1, p.specularConstant * towardViewer ** p.specularExponent);
+  const channel = (i) => Math.round(Math.min(255, parseInt(argb.slice(i, i + 2), 16) * diffuse + 255 * specular));
+  return `${argb.slice(0, 2)}${[2, 4, 6].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+}

@@ -32,6 +32,7 @@ import { typeFamilies } from './controlSetRecipes.js';
 import { withLabelDesign } from './labelDesigns.js';
 import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
 import { withInstrumentDesign, withInstrumentTokens, contrast } from './instrumentDesigns.js';
+import { finishedColour } from '../utils/materialFilter.js';
 import { withDisplayDesign } from './displayDesigns.js';
 import { withPersonalDesigns } from './personalSetDesigns.js';
 import { deepClone } from '../utils/deepClone.js';
@@ -313,8 +314,9 @@ const BASE_BUILT_IN_SETS = [
  * in 35 of the 79 built-in sets under 3:1 against the set's own panel (a white cap on a white
  * panel, a dark one on a dark one), so on a panel in that set it could not be read. A set names its
  * readout colour (`control.readout`); one that does not is given the cap's where the cap reads on
- * its panel at 4.5:1, the contrast text asks for, and its label text's where it does not, which
- * every set's reads on its panel. As a reference, not a copy, so it follows the role it names when
+ * its panel as it is drawn (in its finish, utils/materialFilter.js finishedColour) at 4.5:1, the
+ * contrast text asks for, then its label text's, its inverse text's, or white or black, the first
+ * that reads there. A role as a reference, not a copy, so it follows the role it names when
  * that is edited. The roles are read within the set: the base set may not exist yet.
  */
 export const READOUT_CONTRAST = 4.5;
@@ -326,9 +328,15 @@ export function withReadout(set) {
     return COLOUR_LITERAL_PATTERN.test(String(value ?? '')) ? String(value) : null;
   };
   const cap = own('control.cap');
-  const panel = own('panel.surface');
+  // The panel as it is drawn: a finish lights it (Obsidian's glass draws its near-black light grey).
+  const surface = own('panel.surface');
+  const panel = surface && finishedColour(surface.length === 6 ? `FF${surface}` : surface, set.panel?.material, set.lamp);
   if (!cap || !panel || !own('text.label')) return set;
-  const readout = contrast(cap, panel) >= READOUT_CONTRAST ? '{control.cap}' : '{text.label}';
+  // The first that reads: the cap's colour, the label text's, the text it letters on a filled
+  // surface; then white or black, one of which reads at 4.58:1 or better on any opaque colour.
+  const roles = ['control.cap', 'text.label', 'text.inverse'];
+  const role = roles.find((name) => own(name) && contrast(own(name), panel) >= READOUT_CONTRAST);
+  const readout = role ? `{${role}}` : (contrast('FFFFFFFF', panel) >= contrast('FF000000', panel) ? 'FFFFFFFF' : 'FF000000');
   return { ...set, tokens: { ...set.tokens, 'control.readout': readout } };
 }
 

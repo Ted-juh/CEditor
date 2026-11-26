@@ -16,7 +16,6 @@
 import { createControl } from '../models/componentTypes.js';
 import { anatomyOptions } from '../models/controlAnatomy.js';
 import { deepClone } from './deepClone.js';
-import { readoutColour } from './sliderEntityFactory.js';
 
 export const RANGE_CONVERSION = { Knob: 'Slider', Slider: 'Knob' };
 
@@ -65,11 +64,6 @@ export function convertRangeControl(control) {
     behavior.direction = anticlockwise ? 'rtl' : 'ltr';
   }
   sections.Behavior = behavior;
-
-  // The value's readout in the colour the new type reads it in (a fader's beside its cap, on the
-  // panel; a knob's in its cap's), unless its author chose one of their own.
-  const readout = sections.Parts?._children?.labelCurrent?._children?.Text?._children?.Fill;
-  if (readout && readout.colour === readoutColour(fromType)) readout.colour = readoutColour(toType);
 
   const transform = sections.Transform ?? {};
   const width = numberOr(fresh.Transform?.width, toType === 'Knob' ? 100 : 220);

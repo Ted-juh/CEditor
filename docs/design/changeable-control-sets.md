@@ -1107,21 +1107,46 @@ Taken by the owner, 2026-11-26:
    the 79 built-ins put it under 3:1 there (a white cap on a white panel, as Ceramic, Kiln and
    Studio White; a dark one on a dark one, as Chrome, Obsidian and Brassworks).
 
-   As built: a 56th role, `control.readout` (Settings › Control Sets, among the controls' colours,
-   **Fader readout**). A set that does not name one is given it as it is read (`withReadout`, for
-   the built-ins and for a set from a file or a document alike): the cap's colour where the cap
-   reads on the set's panel at 4.5:1, the contrast text asks for, and the label text's where it
-   does not, which every set's reads on its panel (the least, 4.7:1). As a reference, so it follows
-   the role it names when an author edits that. 40 sets keep the cap's colour, 39 take their label
-   text's; the least readout now reads at 4.53:1 on its own panel. A slider's readout part is drawn
-   in it (`sliderEntityFactory.readoutColour`); a knob's stays in the cap's, as its readout can sit
-   in its cap, on the knob, and Change to Knob / Change to Slider swaps the one for the other unless
-   the author chose a colour. A fader saved before opens with it: a file keeps a default as nothing.
-   The base set's is `{control.cap}`, so a set with nothing to judge by follows its own cap as
-   before; the C++ table of the base set's roles (`ScriptColours.generated.h`) carries it. The set
-   files in `CE/sets` carry it, and the shipped starters (`CE/panels/Control set starters`), which
-   bake their colours, draw 28 of their faders' readouts in it now; nothing else in them changed.
-   Of the other shipped panels, ten faders show a readout, and none reads worse on its panel.
+   As built (`03b5f65`, then as decision 10 left it): a 56th role, `control.readout` (Settings ›
+   Control Sets, among the controls' colours, **Fader and knob readout**). A set that does not name
+   one is given it as it is read (`withReadout`, for the built-ins and for a set from a file or a
+   document alike): the first that reads at 4.5:1, the contrast text asks for, on the set's panel
+   as it is drawn, of the cap's colour, the label text's, the inverse text's, then white or black.
+   A role is kept as a reference, so it follows the role it names when an author edits that. 38
+   sets keep the cap's colour, 36 take their label text's, 4 black and 1 white; the least readout
+   reads at 4.53:1 on its drawn panel. A fader saved before opens with it: a file keeps a default as
+   nothing. The base set's is `{control.cap}`, so a set with nothing to judge by follows its own cap
+   as before; the C++ table of the base set's roles (`ScriptColours.generated.h`) carries it. The
+   set files in `CE/sets` carry it, and the shipped starters (`CE/panels/Control set starters`),
+   which bake their colours, draw their readouts in it; nothing else in them changed. Of the other
+   shipped panels, ten faders show a readout, and none reads worse on its panel.
 
-   A knob's readout at the tip of its pointer also stands on the panel, 22 px past the dial, in the
-   cap's colour, and in those sets reads as poorly. Not changed: the owner asked for the fader's.
+10. **The knob's readout too** (2026-11-26). A knob's readout stands in one of two places, and both
+    read as poorly as the fader's did. At the tip of its pointer (the default) it is on the panel,
+    22 px past the dial, in the cap's colour: under 3:1 in the same 35 sets. In its cap (the Labels
+    tab's **Sits**, and the presets that put the value in the middle of the dial) it is on the
+    knob's face, which most sets draw in the cap's own colour: there the readout was the colour of
+    what it stood on, in 57 of the 79 sets, and could not be seen.
+
+    As built: a knob letters its readout in `control.readout` as a fader does, so at the tip it
+    reads on the panel. In its cap, while it is still in that default, it is lettered to read on the
+    knob's face as the set draws it (`models/readoutInk.js`, called by `resolveControlForSet`
+    between the set's design and its colours, so the canvas, the build and a script all see it):
+    the first that reads at 4.5:1 of the set's readout colour, its label text, its inverse text,
+    then white or black. The face is the panel, the knob's housing and its cap laid over one another
+    by their alpha, each in its finish. An author's colour is kept, and a fader is left alone. In
+    every built-in set the readout in the cap now reads at 4.53:1 or better on the face: 43 keep the
+    set's readout colour, 21 take its inverse text, 15 white or black.
+
+    **A finish is counted.** A material lights a surface: the lamp's diffuse light times its fill,
+    then its specular light added (`MaterialFilter.svelte`). Chrome's knob cap is a dark navy under
+    a glass finish at shine 180, drawn a light silver, and the first rule gave it white ink, which
+    did not read on it; Obsidian's panel is near-black under glass, drawn a mid grey. So both rules
+    judge the colour a flat surface is drawn in under its finish (`materialFilter.finishedColour`:
+    the fill times the sine of the lamp's elevation, plus the specular term toward the viewer); the
+    grain of the relief, which scatters both, is left out. Counting it moved five sets' readout
+    colour (Anodised, Machined, Modular Metal, Saddle Brass to black, Obsidian to white).
+
+    Not changed: a readout at the tip near the top of the dial can stand past the knob's box and be
+    cut off by it (seen in Studio White, Pop and Obsidian at about 0.6). That is the knob's layout,
+    not its colour.

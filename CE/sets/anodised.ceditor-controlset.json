@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "54f4afe9",
+  "fingerprint": "0f00ea58",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -71,7 +71,7 @@
       "display.screen": "FF101214",
       "display.backlight": "FF2D2E30",
       "panel.surface": "FF9DA3AA",
-      "control.readout": "{control.cap}",
+      "control.readout": "FF000000",
       "section.surface": "FFBFC3C8"
     },
     "lamp": {

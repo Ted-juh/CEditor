@@ -21,7 +21,7 @@ export const ROLE_GROUPS = [
     ['control.track', 'Track'], ['control.track.edge', 'Track edge'], ['control.fill', 'Value fill'], ['control.fill.hot', 'Value fill, hot'],
     ['control.range', 'Range'], ['control.range.hot', 'Range, hot'], ['control.body', 'Body'], ['control.cap', 'Knob / fader cap'],
     ['control.cap.hot', 'Cap, hot'], ['control.cap.edge', 'Cap edge'], ['control.cap.start', 'Cap, start'], ['control.cap.end', 'Cap, end'],
-    ['control.readout', 'Fader readout'],
+    ['control.readout', 'Fader and knob readout'],
     ['control.marker', 'Marker'], ['control.tick', 'Tick'], ['control.tick.minor', 'Minor tick'],
   ] },
   { id: 'buttons', label: 'Buttons', roles: [

@@ -1178,7 +1178,7 @@ export function createPartsDefaults(type) {
   }
 
   if (type === 'Slider' || type === 'Knob') {
-    return createSliderSemanticParts(type);
+    return createSliderSemanticParts();
   }
 
   return {

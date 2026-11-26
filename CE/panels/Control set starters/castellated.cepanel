@@ -423,7 +423,7 @@
         "Transform": {"x":26,"y":120,"width":150,"height":150},
         "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":7,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","circularFit":"tight"},
         "Parts": {
-          "_drawing": "c14cf932"
+          "_drawing": "cceb9343"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFA35C"},"bodySelectedRange":{"Background.Fill.colour":"FF9C653C"},"pointerCurrent":{"Background.Fill.colour":"FFFFA35C"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFD7A868"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -435,7 +435,7 @@
         "Transform": {"x":194,"y":120,"width":150,"height":150},
         "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":7,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","circularFit":"tight"},
         "Parts": {
-          "_drawing": "c14cf932"
+          "_drawing": "cceb9343"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFA35C"},"bodySelectedRange":{"Background.Fill.colour":"FF9C653C"},"pointerCurrent":{"Background.Fill.colour":"FFFFA35C"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFD7A868"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -812,7 +812,7 @@
     }
   ],
   "drawings": {
-    "c14cf932": {
+    "cceb9343": {
       "_children": {
         "bodyHousing": {"visible":true,"_children":{"Layout":{"width":82.35,"height":82.35},"Background":{"_children":{"Fill":{"colour":"FF4C5657","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"00000000","position":0},{"color":"FF1B2427","position":25},{"color":"FF05090B","position":100}]}},"Border":{"enabled":true,"thickness":2.55,"colour":"FF101719"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":false,"kind":"blast","strength":100,"shine":100,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}}},"outline":"scallop","turns":true,"shadowOffset":21.43,"shadowBlur":7.14,"aspect":100,"shiftY":0,"shadowColour":"FF070B0C","outlineCount":8,"outlineDepth":23.21},
         "bodySkirt": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF111214"}}}}},
@@ -831,7 +831,7 @@
         "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFC26B"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
-        "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF4C5657"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
+        "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFB8C4CC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono","weight":"Regular","weightValue":400,"letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},

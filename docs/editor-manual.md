@@ -298,8 +298,9 @@ on its Labels tab. On a knob, **Sits** puts the value's label **At the tip** of 
 it round, or **In the cap**, still, in the middle of the dial; there a line or bar pointer becomes a
 tick at the rim, so the number is not struck through. On a vertical slider the label starts just past
 its cap, or past its scale where the ticks and their numbers reach further, and reads away from it.
-A slider's value label is drawn in its set's **Fader readout** colour, which reads on the set's panel
-(Settings → Control Sets, among the controls' colours); a knob's in its cap's colour.
+A slider's or a knob's value label is drawn in its set's **Fader and knob readout** colour, which reads
+on the set's panel (Settings → Control Sets, among the controls' colours). A knob's label that sits in
+the cap is lettered to read on the knob instead. A colour you give the label yourself is kept.
 
 A meter works the same way. It draws no reading and no caption of its own; the **Labels** section
 at the top of its **Meter** tab adds **+ Value** (the reading, printed with the meter's precision,

@@ -324,9 +324,9 @@ What a line needed, each found by watching a preset not play, or play wrong, in 
 - **A fader readout colour in every set** (the owner's decision 9 in changeable-control-sets.md).
   Measured against each set's own panel, which is the ground a set is made for, 35 of the 79
   built-ins put the cap-coloured readout under 3:1 (an earlier count here, 28 of 69, measured every
-  set against one dark ground, which is not the question). A set now holds `control.readout`, its
-  cap's colour where that reads on its panel at 4.5:1 and its label text's where it does not, and a
-  fader draws its readout in it. Soft is a set for a light panel, so its readout is its dark label
+  set against one dark ground, which is not the question). A set now holds `control.readout`, which
+  reads on its panel as drawn, and a fader draws its readout in it; a knob too, and in its cap a
+  knob's readout is lettered to read on the knob (decisions 9 and 10 there). Soft is a set for a light panel, so its readout is its dark label
   ink, and the Numbers panel, whose readouts are the point, is on Soft's own panel colour with dark
   captions; the other panels' sets read on their dark grounds as before.
 - **The showcase's set check compared objects.** A panel stores its set as `{ id }`, and both
