@@ -1,7 +1,7 @@
 /**
- * The showcase panels in the editor (CE/panels/Film Festival, Song Book, Mechanisms, Gallery; written
- * by scripts/export-showcases.mjs). Each is opened as File > Open opens a .cepanel and played in
- * Preview, and each kind of clock they show is held to what it does there:
+ * The showcase panels in the editor (CE/panels/Film Festival, Song Book, Mechanisms, Gallery and
+ * Animated Synths; written by scripts/export-showcases.mjs). Each is opened as File > Open opens a
+ * .cepanel and played in Preview, and each kind of clock they show is held to what it does there:
  *
  *   - a film, a song, a mechanism and a gallery panel open and their opening scenes run, no error
  *   - Every Breath You Take: the pointer across the panel moves the eyes' scene
@@ -10,6 +10,11 @@
  *   - Domino Run: its script waits behind the trust banner, and the marker that needs it says so;
  *     once enabled, the dominoes' marker plays the ball and the ball's the bell
  *   - Clockwork: once its script is enabled, each hand's scene is held at the time of day
+ *   - JU-06A: a key lights while its note is held and goes back when it is let go, and stays back
+ *     when another note comes
+ *   - Subsequent 37: a note sends the pulse down the path; the note lamp is lit only while held
+ *   - minilogue xd: once its script is enabled, the screen names a touched control and its choice,
+ *     the scope shows that wave, and a program change rolls its number in
  *
  *   node browser-checks/showcases.mjs
  */
@@ -164,6 +169,79 @@ try {
       const at = (-hand.delay / 1000) * 60;
       assert.ok(Math.abs(at - seconds) <= 2 || Math.abs(at - seconds) >= 58, `the second hand at ${at.toFixed(1)} s, the clock at ${seconds} s`);
       assert.equal(minute?.state, 'paused', JSON.stringify(minute));
+    });
+  }
+  // The Animated Synths: MIDI in, a hand on a bound knob and the minilogue's screen script.
+  const midiIn = (hex) => page.evaluate(async (hex) => {
+    const { latestMidiInputMessage } = await window.__ceImport('/src/CE_Application/stores/deviceProfileStores.js');
+    latestMidiInputMessage.set({ hex, messageType: 'midi', at: performance.now() });
+  }, hex);
+  const paint = (id) => page.evaluate((id) => getComputedStyle(document.querySelector(`.panel-surface .canvas-control[data-control-id="${id}"] .control-content`)).backgroundColor, id);
+  const words = (id) => page.evaluate((id) => document.querySelector(`.panel-surface .canvas-control[data-control-id="${id}"]`)?.innerText.trim(), id);
+  {
+    const ids = await open('Animated Synths', 'Roland JU-06A');
+    const rest = await paint(ids.KeyC4);
+    for (const note of ['39', '3C', '40']) await midiIn(`90 ${note} 64`);
+    await kit.settle(300);
+    const held = await paint(ids.KeyC4);
+    for (const note of ['39', '3C', '40']) await midiIn(`80 ${note} 40`);
+    await kit.settle(800);
+    const letGo = await paint(ids.KeyC4);
+    await midiIn('90 43 64');
+    await kit.settle(300);
+    const afterAnother = await paint(ids.KeyC4);
+    const g4 = await paint(ids.KeyG4);
+    await midiIn('80 43 40');
+    check('JU-06A: a key lights while its note is held and goes back when it is let go', () => {
+      assert.notEqual(held, rest, `lit: ${held}`);
+      assert.equal(letGo, rest, `back to rest: ${letGo}`);
+    });
+    check('JU-06A: a key let go stays dark when another note comes (its two scenes, not the engine, decide)', () => {
+      assert.equal(afterAnother, rest, `C4 after G4 was struck: ${afterAnother}`);
+      assert.equal(g4, held, `G4 lit as C4 was: ${g4}`);
+    });
+  }
+  {
+    const ids = await open('Animated Synths', 'Moog Subsequent 37');
+    const still = await anims(ids.Pulse1);
+    await midiIn('90 30 64');
+    await kit.settle(250);
+    const sent = await anims(ids.Pulse1);
+    const lamp = await paint(ids.Gate);
+    await midiIn('80 30 40');
+    await kit.settle(600);
+    const out = await paint(ids.Gate);
+    check('Subsequent 37: a note sends the pulse down the path, and the note lamp is lit only while it is held', () => {
+      assert.ok(!still?.length, `nothing before a note: ${JSON.stringify(still)}`);
+      assert.ok(sent?.some((a) => a.state === 'running'), `the pulse runs: ${JSON.stringify(sent)}`);
+      assert.notEqual(lamp, out, `${lamp} then ${out}`);
+    });
+  }
+  {
+    const ids = await open('Animated Synths', 'Korg minilogue xd');
+    const banner = await page.locator('.script-trust').count();
+    await page.getByRole('button', { name: 'Enable scripts for this session' }).click();
+    await kit.settle(800);
+    // As a hand turns it: VCO 1's WAVE half way, its middle choice.
+    await page.evaluate(async (id) => {
+      const { updatePanelPreviewSession } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
+      updatePanelPreviewSession(id, { valueOverrideEnabled: true, valueOverride: 0.5 });
+    }, ids.Vco1Wave);
+    await kit.settle(900);
+    const named = [await words(ids.ScreenName), await words(ids.ScreenValue)];
+    const scope = await page.evaluate((list) => list.map((id) => Number(getComputedStyle(document.querySelector(`.panel-surface .canvas-control[data-control-id="${id}"]`)).opacity)), [ids.ScopeSQR, ids.ScopeTRI, ids.ScopeSAW]);
+    await midiIn('C0 29');
+    await kit.settle(1000);
+    const program = await words(ids.ScreenProgram);
+    const errors = await errorsInConsole();
+    check('minilogue xd: once enabled, the screen names the touched control and its choice, and the scope shows that wave', () => {
+      assert.equal(banner, 1);
+      assert.deepEqual(named, ['VCO1 WAVE', 'TRI']);
+      assert.ok(scope[1] > 0.9 && scope[0] < 0.1 && scope[2] < 0.1, `the triangle alone: ${scope}`);
+    });
+    check('minilogue xd: a program change rolls its number in', () => {
+      assert.equal(program, 'PROGRAM 042');
+      assert.deepEqual(errors, []);
     });
   }
   if (kit.failures.length) throw new Error(`page errors: ${kit.failures.join('; ')}`);

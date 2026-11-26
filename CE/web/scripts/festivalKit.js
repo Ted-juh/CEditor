@@ -23,14 +23,16 @@ export const FILM_KIND = Object.freeze({ seed: 'ceditor-film', script: 'film', g
 export const SONG_KIND = Object.freeze({ seed: 'ceditor-song', script: 'song', guid: '50e9-4b00-8c5d' });
 export const MECHANISM_KIND = Object.freeze({ seed: 'ceditor-mechanism', script: 'mechanism', guid: '3c4a-4d17-9e21' });
 export const GALLERY_KIND = Object.freeze({ seed: 'ceditor-gallery', script: 'gallery', guid: '9a11-4e7b-b3c0' });
+export const SYNTH_KIND = Object.freeze({ seed: 'ceditor-synth', script: 'synth', guid: '5e17-4a0c-b6d2' });
 
 /**
  * One panel of a collection, its controls numbered from a hash of its id. `clip` puts a clip on the
  * first scene unless told which; `done` makes the panel with one looping scene played when it opens,
  * `scenes` with several, each of them { name, length, trigger?, loop?, clock?, markers? }. `script`
- * gives the panel a script of its own, in JavaScript.
+ * gives the panel a script of its own, in JavaScript. A panel is W by H unless given its own size;
+ * `fields` are put on the panel as they are (a synth panel's requiredProfiles).
  */
-export function panelMaker(id, name, { set = 'carbon-pro', bg = 'FF000000', kind = FILM_KIND } = {}) {
+export function panelMaker(id, name, { set = 'carbon-pro', bg = 'FF000000', kind = FILM_KIND, width = W, height = H, fields = {} } = {}) {
   let hash = 5381;
   for (const ch of `${kind.seed}:${id}`) hash = ((hash * 33) ^ ch.charCodeAt(0)) >>> 0;
   let n = 1_700_000_000_000 + (hash % 90_000_000) * 1000;
@@ -72,13 +74,14 @@ export function panelMaker(id, name, { set = 'carbon-pro', bg = 'FF000000', kind
     const panel = createPanel(name);
     const h = (hash >>> 0).toString(16).padStart(8, '0');
     Object.assign(panel, {
-      name, width: W, height: H, bgColour: bg, controls,
+      name, width, height, bgColour: bg, controls,
       panelGuid: `${h}-${kind.guid}-${h}${h.slice(0, 4)}`,
       scriptId: `${kind.script}_${id}`,
       filePath: null,
       controlSet: normalizeControlSet(set),
       animationScenes: sceneList,
       ...(scripts.length ? { scripts } : {}),
+      ...fields,
     });
     return panel;
   };

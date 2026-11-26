@@ -223,7 +223,7 @@
   }
   const TRIGGER_LABELS = { panelOpen: 'Panel opens', state: 'A control enters a state', event: 'A gesture on a control', beat: 'The beat', midi: 'MIDI in', script: 'A script asks' };
   // MIDI in (utils/sceneMidi.js): what it listens for, and the choices for each.
-  const MIDI_MESSAGE_LABELS = { note: 'A note', cc: 'A controller past', program: 'A program change' };
+  const MIDI_MESSAGE_LABELS = { note: 'A note', noteOff: 'A note let go', cc: 'A controller past', program: 'A program change' };
   const MIDI_CHANNELS = [{ value: 0, label: 'Any channel' }, ...Array.from({ length: 16 }, (_, i) => ({ value: i + 1, label: `Channel ${i + 1}` }))];
   const MIDI_NOTES = [{ value: -1, label: 'Any note' }, ...Array.from({ length: 128 }, (_, n) => ({ value: n, label: `${midiNoteName(n)} (${n})` }))];
   const MIDI_PROGRAMS = [{ value: -1, label: 'Any program' }, ...Array.from({ length: 128 }, (_, n) => ({ value: n, label: `Program ${n + 1}` }))];

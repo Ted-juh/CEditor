@@ -184,6 +184,37 @@ test('a one-off effect plays on its place, and a new one there replaces it', () 
   assert.deepEqual(runtime.plays().map((p) => p.at), [300, 300], 'held at their ends');
 });
 
+test('scenes draw in the order they last started: a key darkened by a note let go lights again on the next note', () => {
+  const timers = fakeTimers();
+  const runtime = createSceneRuntime({ timers });
+  const on = { type: 'midi', message: 'note', channel: 0, note: 60 };
+  const off = { type: 'midi', message: 'noteOff', channel: 0, note: 60 };
+  // Listed with the dark one last, which under the panel's order alone would win for good.
+  runtime.setScenes([scene('lit', on, { length: 100 }), scene('dark', off, { length: 100 }), scene('loop', { type: 'panelOpen' }, { length: 100, loop: true })]);
+  runtime.open();
+  const order = () => runtime.plays().map((p) => p.scene.id);
+  runtime.fire({ type: 'midi', event: { kind: 'note', channel: 1, note: 60, velocity: 100 } });
+  assert.deepEqual(order(), ['loop', 'lit']);
+  runtime.fire({ type: 'midi', event: { kind: 'noteOff', channel: 1, note: 60 } });
+  timers.advance(250);
+  assert.deepEqual(order(), ['loop', 'lit', 'dark'], 'let go: the dark one on top, the loop going round keeping its place');
+  runtime.fire({ type: 'midi', event: { kind: 'note', channel: 1, note: 60, velocity: 90 } });
+  assert.deepEqual(order(), ['loop', 'dark', 'lit'], 'struck again: lit');
+  runtime.seek('dark', 1);
+  assert.deepEqual(order(), ['loop', 'lit', 'dark'], 'a seek starts it too');
+});
+
+test('a scene a hand drives lies under the rest until the hand moves it', () => {
+  const timers = fakeTimers();
+  const frames = { request: () => 1, cancel: () => {}, now: () => 0 };
+  const runtime = createSceneRuntime({ timers, frames });
+  runtime.setScenes([scene('timed', { type: 'panelOpen' }), scene('hand', { type: 'script' }, { clock: { source: 'value', controlId: 'k', follow: 'exact' } })]);
+  runtime.open();
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['hand', 'timed'], 'never moved: beneath');
+  runtime.input('k', 'value', { normalized: 0.5 });
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['timed', 'hand'], 'moved: on top');
+});
+
 test('with reduced motion a script still hears done(true), once the call has returned', () => {
   const timers = fakeTimers();
   const runtime = createSceneRuntime({ timers });

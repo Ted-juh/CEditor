@@ -13,13 +13,29 @@ test('a MIDI trigger is read with what it needs, and defaults for the rest', () 
   assert.deepEqual(cleanTrigger({ type: 'midi', message: 'cc', channel: 3, cc: 64, above: 63 }), { type: 'midi', message: 'cc', channel: 3, cc: 64, above: 63 });
   assert.deepEqual(cleanTrigger({ type: 'midi', message: 'program', channel: 99, program: 500 }), { type: 'midi', message: 'program', channel: 0, program: 127 });
   assert.equal(cleanTrigger({ type: 'midi', message: 'sysex' }).message, 'note', 'what it does not know is a note');
+  assert.deepEqual(cleanTrigger({ type: 'midi', message: 'noteOff', note: 60, channel: 2 }), { type: 'midi', message: 'noteOff', channel: 2, note: 60 });
 });
 
-test('the messages a trigger hears: a note-on, a controller, a program change; nothing else', () => {
+test('the messages a trigger hears: a note on and off, a controller, a program change; nothing else', () => {
   assert.deepEqual(midiTriggerEvents('90 3C 64'), [{ kind: 'note', channel: 1, note: 60, velocity: 100 }]);
-  assert.deepEqual(midiTriggerEvents('92 3C 00'), [], 'a note-on at velocity 0 is a release');
+  assert.deepEqual(midiTriggerEvents('92 3C 00'), [{ kind: 'noteOff', channel: 3, note: 60 }], 'a note-on at velocity 0 is a release');
   assert.deepEqual(midiTriggerEvents('B0 40 7F C3 05'), [{ kind: 'cc', channel: 1, cc: 64, value: 127 }, { kind: 'program', channel: 4, program: 5 }]);
-  assert.deepEqual(midiTriggerEvents('E0 00 40 80 3C 00'), [], 'a bend, a note-off');
+  assert.deepEqual(midiTriggerEvents('E0 00 40 80 3C 00'), [{ kind: 'noteOff', channel: 1, note: 60 }], 'a bend is not heard; a note-off is');
+});
+
+test('a note let go is heard by its own trigger, not by a note\'s', () => {
+  const down = cleanTrigger({ type: 'midi', message: 'note', note: 60 });
+  const up = cleanTrigger({ type: 'midi', message: 'noteOff', note: 60 });
+  const [off] = midiTriggerEvents('80 3C 40');
+  const [zero] = midiTriggerEvents('90 3C 00');
+  assert.equal(midiTriggerMatches(up, off), true);
+  assert.equal(midiTriggerMatches(up, zero), true, 'a velocity-0 note-on lets the key go as well');
+  assert.equal(midiTriggerMatches(down, off), false, 'letting go does not play the note\'s scene');
+  assert.equal(midiTriggerMatches(up, midiTriggerEvents('90 3C 64')[0]), false);
+  assert.equal(midiTriggerMatches(up, midiTriggerEvents('80 3D 40')[0]), false, 'another note');
+  assert.equal(midiTriggerMatches(cleanTrigger({ type: 'midi', message: 'noteOff' }), off), true, 'any note let go');
+  assert.equal(midiTriggerText(up), 'Note C4 let go');
+  assert.equal(midiTriggerText(cleanTrigger({ type: 'midi', message: 'noteOff', channel: 10 })), 'Any note let go on channel 10');
 });
 
 test('a note trigger hears its note, or any; on its channel, or any', () => {

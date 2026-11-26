@@ -1,5 +1,5 @@
 // Writes the showcase collections (showcaseCollections.js) to their folders under CE/panels/, one
-// `.cepanel` a panel: the Film Festival, the Song Book, Mechanisms and the Gallery.
+// `.cepanel` a panel: the Film Festival, the Song Book, Mechanisms, the Gallery and the Animated Synths.
 //
 //   node --import ./test/support/register-svelte.mjs scripts/export-showcases.mjs                   # write all
 //   node --import ./test/support/register-svelte.mjs scripts/export-showcases.mjs --check           # exit 1 if stale

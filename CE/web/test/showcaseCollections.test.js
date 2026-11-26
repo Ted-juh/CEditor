@@ -1,6 +1,7 @@
-// showcaseCollections.test.js — Mechanisms and the Gallery (scripts/mechanismsPanels.js and
-// galleryPanels.js, written by export-showcases.mjs): the committed files are what the scripts
-// write; each panel opens with every clip of every scene on a control it has; and what each
+// showcaseCollections.test.js — Mechanisms, the Gallery and the Animated Synths (scripts/
+// mechanismsPanels.js, galleryPanels.js and synthPanels.js, written by export-showcases.mjs): the
+// committed files are what the scripts write; each panel opens with every clip of every scene on a
+// control it has (what the synths bind and show is synthPanels.test.js's); and what each
 // mechanism shows is what it says: gears at their teeth ratios on a knob's value, reels on the beat,
 // a domino run whose script answers every marker, and a clock whose script holds each hand at the time.
 
@@ -13,7 +14,7 @@ import { DOMINO_SCRIPT, CLOCK_SCRIPT } from '../scripts/mechanismsPanels.js';
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { cleanScene } from '../src/CE_Application/utils/sceneFormat.js';
 
-const NEW = ['mechanisms', 'gallery'];
+const NEW = ['mechanisms', 'gallery', 'synths'];
 const named = (panel, name) => panel.controls.find((control) => control._children.Core.name === name);
 
 test('the committed panels are what the scripts write: run export-showcases.mjs after changing one', () => {

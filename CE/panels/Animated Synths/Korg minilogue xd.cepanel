@@ -1,0 +1,2344 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "2e077d12-5e17-4a0c-b6d2-2e077d122e07",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Korg minilogue xd",
+  "scriptId": "synth_korg-minilogue-xd",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1200,
+  "height": 520,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF111214",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [
+    {
+      "role": "Korg minilogue xd",
+      "profileId": "korg-minilogue-xd",
+      "version": "*"
+    }
+  ],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Vco1Wave.value",
+      "label": "Vco1Wave",
+      "controlName": "Vco1Wave",
+      "path": "Vco1Wave.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillator1.wave"
+    },
+    {
+      "id": "Vco1Pitch.value",
+      "label": "Vco1Pitch",
+      "controlName": "Vco1Pitch",
+      "path": "Vco1Pitch.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillator1.pitch"
+    },
+    {
+      "id": "Vco1Shape.value",
+      "label": "Vco1Shape",
+      "controlName": "Vco1Shape",
+      "path": "Vco1Shape.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 40,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillator1.shape"
+    },
+    {
+      "id": "Vco2Wave.value",
+      "label": "Vco2Wave",
+      "controlName": "Vco2Wave",
+      "path": "Vco2Wave.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillator2.wave"
+    },
+    {
+      "id": "Vco2Pitch.value",
+      "label": "Vco2Pitch",
+      "controlName": "Vco2Pitch",
+      "path": "Vco2Pitch.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 70,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillator2.pitch"
+    },
+    {
+      "id": "Vco2Shape.value",
+      "label": "Vco2Shape",
+      "controlName": "Vco2Shape",
+      "path": "Vco2Shape.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 20,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillator2.shape"
+    },
+    {
+      "id": "CrossMod.value",
+      "label": "CrossMod",
+      "controlName": "CrossMod",
+      "path": "CrossMod.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillators.crossModDepth"
+    },
+    {
+      "id": "EgInt.value",
+      "label": "EgInt",
+      "controlName": "EgInt",
+      "path": "EgInt.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "envelope.int"
+    },
+    {
+      "id": "MultiShape.value",
+      "label": "MultiShape",
+      "controlName": "MultiShape",
+      "path": "MultiShape.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 30,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "multiEngine.shape"
+    },
+    {
+      "id": "Vco1Level.value",
+      "label": "Vco1Level",
+      "controlName": "Vco1Level",
+      "path": "Vco1Level.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 110,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillator1.level"
+    },
+    {
+      "id": "Vco2Level.value",
+      "label": "Vco2Level",
+      "controlName": "Vco2Level",
+      "path": "Vco2Level.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 84,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "oscillator2.level"
+    },
+    {
+      "id": "MultiLevel.value",
+      "label": "MultiLevel",
+      "controlName": "MultiLevel",
+      "path": "MultiLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 30,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "multiEngine.level"
+    },
+    {
+      "id": "MultiType.value",
+      "label": "MultiType",
+      "controlName": "MultiType",
+      "path": "MultiType.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "multiEngine.type"
+    },
+    {
+      "id": "Cutoff.value",
+      "label": "Cutoff",
+      "controlName": "Cutoff",
+      "path": "Cutoff.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 76,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "filter.cutoff"
+    },
+    {
+      "id": "Resonance.value",
+      "label": "Resonance",
+      "controlName": "Resonance",
+      "path": "Resonance.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 40,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "filter.resonance"
+    },
+    {
+      "id": "Drive.value",
+      "label": "Drive",
+      "controlName": "Drive",
+      "path": "Drive.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "filter.drive"
+    },
+    {
+      "id": "AmpA.value",
+      "label": "AmpA",
+      "controlName": "AmpA",
+      "path": "AmpA.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 4,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "ampEnvelope.attack"
+    },
+    {
+      "id": "AmpD.value",
+      "label": "AmpD",
+      "controlName": "AmpD",
+      "path": "AmpD.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 70,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "ampEnvelope.decay"
+    },
+    {
+      "id": "AmpS.value",
+      "label": "AmpS",
+      "controlName": "AmpS",
+      "path": "AmpS.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 96,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "ampEnvelope.sustain"
+    },
+    {
+      "id": "AmpR.value",
+      "label": "AmpR",
+      "controlName": "AmpR",
+      "path": "AmpR.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "ampEnvelope.release"
+    },
+    {
+      "id": "EgA.value",
+      "label": "EgA",
+      "controlName": "EgA",
+      "path": "EgA.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 10,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "envelope.attack"
+    },
+    {
+      "id": "EgD.value",
+      "label": "EgD",
+      "controlName": "EgD",
+      "path": "EgD.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 60,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "envelope.decay"
+    },
+    {
+      "id": "LfoRate.value",
+      "label": "LfoRate",
+      "controlName": "LfoRate",
+      "path": "LfoRate.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 56,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "lfo.rate"
+    },
+    {
+      "id": "LfoInt.value",
+      "label": "LfoInt",
+      "controlName": "LfoInt",
+      "path": "LfoInt.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 24,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "lfo.int"
+    },
+    {
+      "id": "LfoWave.value",
+      "label": "LfoWave",
+      "controlName": "LfoWave",
+      "path": "LfoWave.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "lfo.wave"
+    },
+    {
+      "id": "ModTime.value",
+      "label": "ModTime",
+      "controlName": "ModTime",
+      "path": "ModTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "effects.time"
+    },
+    {
+      "id": "ModDepth.value",
+      "label": "ModDepth",
+      "controlName": "ModDepth",
+      "path": "ModDepth.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 40,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "effects.depth"
+    },
+    {
+      "id": "DelayTime.value",
+      "label": "DelayTime",
+      "controlName": "DelayTime",
+      "path": "DelayTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 70,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "effects.timeCc105"
+    },
+    {
+      "id": "DelayDepth.value",
+      "label": "DelayDepth",
+      "controlName": "DelayDepth",
+      "path": "DelayDepth.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 44,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "effects.depthCc106"
+    },
+    {
+      "id": "ReverbTime.value",
+      "label": "ReverbTime",
+      "controlName": "ReverbTime",
+      "path": "ReverbTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 80,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Korg minilogue xd",
+      "deviceParameterId": "effects.timeCc108"
+    }
+  ],
+  "scripts": [
+    {
+      "id": "synth_korg-minilogue-xd_1",
+      "name": "Screen and steps",
+      "language": "javascript",
+      "source": "// The screen talks back, as the minilogue xd's does.\nconst NAMES = {\"Vco1Wave\":{\"name\":\"VCO1 WAVE\",\"choices\":[\"SQR\",\"TRI\",\"SAW\"]},\"Vco1Pitch\":\"VCO1 PITCH\",\"Vco1Shape\":\"VCO1 SHAPE\",\"Vco2Wave\":{\"name\":\"VCO2 WAVE\",\"choices\":[\"SQR\",\"TRI\",\"SAW\"]},\"Vco2Pitch\":\"VCO2 PITCH\",\"Vco2Shape\":\"VCO2 SHAPE\",\"CrossMod\":\"CROSS MOD\",\"EgInt\":\"EG INT\",\"MultiShape\":\"MULTI SHAPE\",\"Vco1Level\":\"VCO1 LEVEL\",\"Vco2Level\":\"VCO2 LEVEL\",\"MultiLevel\":\"MULTI LEVEL\",\"MultiType\":{\"name\":\"MULTI TYPE\",\"choices\":[\"NOISE\",\"VPM\",\"USR\"]},\"Cutoff\":\"CUTOFF\",\"Resonance\":\"RESONANCE\",\"Drive\":{\"name\":\"CUTOFF DRIVE\",\"choices\":[\"0%\",\"50%\",\"100%\"]},\"AmpA\":\"AMP ATTACK\",\"AmpD\":\"AMP DECAY\",\"AmpS\":\"AMP SUSTAIN\",\"AmpR\":\"AMP RELEASE\",\"EgA\":\"EG ATTACK\",\"EgD\":\"EG DECAY\",\"LfoRate\":\"LFO RATE\",\"LfoInt\":\"LFO INT\",\"LfoWave\":{\"name\":\"LFO WAVE\",\"choices\":[\"SQR\",\"TRI\",\"SAW\"]},\"ModTime\":\"MOD TIME\",\"ModDepth\":\"MOD DEPTH\",\"DelayTime\":\"DELAY TIME\",\"DelayDepth\":\"DELAY DEPTH\",\"ReverbTime\":\"REVERB TIME\"};\nlet showing = '';\n\n// A knob on a choice turns across its choices, 0 to 1: the one it is nearest is the one it says.\nconst shown = (entry, value) => entry.choices\n  ? entry.choices[Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * (entry.choices.length - 1))]\n  : String(typeof value === 'number' ? Math.round(value) : value);\n\n// A new name is pushed in, and the value comes up once it has arrived: written while the old name was\n// still leaving, it read as that control's.\nlet pushing = false;\nlet latest = '';\non('*', 'onControlChanged', (info) => {\n  const entry = NAMES[info.target];\n  if (!entry) return;\n  const name = entry.name ?? entry;\n  latest = shown(entry, info.value);\n  if (name !== showing) {\n    showing = name;\n    pushing = true;\n    set('ScreenValue.Text.content', '');\n    const started = animateSwap('ScreenName', name, 'push', { done: (arrived) => {\n      if (!arrived) return; // a newer name took over, and brings its own value\n      pushing = false;\n      set('ScreenValue.Text.content', latest);\n    } });\n    if (started === false) { pushing = false; set('ScreenValue.Text.content', latest); }\n    return;\n  }\n  if (!pushing) set('ScreenValue.Text.content', latest);\n});\n\n// Programs 1-100 are bank 0, 101-200 bank 1, and so on (the profile's preset banks).\non('*', 'onProgramIn', (program) => {\n  const number = (program.bankLsb || 0) * 100 + program.program + 1;\n  animateSwap('ScreenProgram', 'PROGRAM ' + String(number).padStart(3, '0'), 'roll');\n});\n\n// Four sixteenths a beat: the first now, the rest a sixteenth apart at the tempo the beat came at.\non('*', 'onBeat', (time) => {\n  const quarter = Math.floor(time.beats) % 4;\n  const sixteenth = 60000 / (time.bpm || 120) / 4;\n  for (let k = 0; k < 4; k += 1) {\n    const scene = 'Step ' + (quarter * 4 + k + 1);\n    if (k === 0) animatePlay(scene);\n    else after(Math.round(k * sixteenth), () => animatePlay(scene));\n  }\n});\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "switchboard"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Alu","id":"ctrl_1752242706000","controlType":"Label"},
+        "Transform": {"y":450,"width":1200,"height":70},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#c9cdd1"},{"position":100,"color":"#8e9398"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Model","id":"ctrl_1752242706001","controlType":"Label"},
+        "Transform": {"x":36,"y":18,"width":300,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"minilogue xd","_children":{"Fill":{"colour":"FFF2F0EA"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":800,"size":19,"letterSpacing":2.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Kind","id":"ctrl_1752242706002","controlType":"Label"},
+        "Transform": {"x":800,"y":23,"width":364,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"POLYPHONIC ANALOGUE SYNTHESIZER","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":11,"letterSpacing":2},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcoFrame","id":"ctrl_1752242706003","controlType":"Label"},
+        "Transform": {"x":28,"y":62,"width":200,"height":340},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22340%22%20viewBox%3D%220%200%20200%20340%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22199%22%20height%3D%22339%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%2334373C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcoTitle","id":"ctrl_1752242706004","controlType":"Label"},
+        "Transform": {"x":38,"y":53,"width":147,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF111214"},"Border":{"enabled":false}}},
+        "Text": {"content":"VCO 1 · VCO 2","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco1Wave","id":"ctrl_1752242706005","description":"VCO 1 WAVE — cc50","controlType":"Knob"},
+        "Transform": {"x":51,"y":103,"width":34,"height":34},
+        "Behavior": {"valueType":"enum","defaultValue":"sqr","defaultCurrentValue":0},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillator1.wave","parameterType":"choice"}]},
+        "Value": {"rows":[{"id":"sqr","displayText":"SQR","internalValue":"sqr","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"tri","displayText":"TRI","internalValue":"tri","sendValue":64,"receiveValue":64},{"id":"saw","displayText":"SAW","internalValue":"saw","sendValue":127,"receiveValue":127}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco1WaveName","id":"ctrl_1752242706006","attachedTo":"ctrl_1752242706005","controlType":"Label"},
+        "Transform": {"x":20,"y":141,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WAVE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco1Pitch","id":"ctrl_1752242706007","description":"VCO 1 PITCH — cc34","controlType":"Knob"},
+        "Transform": {"x":108,"y":100,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillator1.pitch","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco1PitchName","id":"ctrl_1752242706008","attachedTo":"ctrl_1752242706007","controlType":"Label"},
+        "Transform": {"x":80,"y":144,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PITCH","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco1Shape","id":"ctrl_1752242706009","description":"VCO 1 SHAPE — cc36","controlType":"Knob"},
+        "Transform": {"x":168,"y":100,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":40,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillator1.shape","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco1ShapeName","id":"ctrl_1752242706010","attachedTo":"ctrl_1752242706009","controlType":"Label"},
+        "Transform": {"x":140,"y":144,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SHAPE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco2Wave","id":"ctrl_1752242706011","description":"VCO 2 WAVE — cc51","controlType":"Knob"},
+        "Transform": {"x":51,"y":203,"width":34,"height":34},
+        "Behavior": {"valueType":"enum","defaultValue":"sqr","defaultCurrentValue":0},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillator2.wave","parameterType":"choice"}]},
+        "Value": {"rows":[{"id":"sqr","displayText":"SQR","internalValue":"sqr","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"tri","displayText":"TRI","internalValue":"tri","sendValue":64,"receiveValue":64},{"id":"saw","displayText":"SAW","internalValue":"saw","sendValue":127,"receiveValue":127}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco2WaveName","id":"ctrl_1752242706012","attachedTo":"ctrl_1752242706011","controlType":"Label"},
+        "Transform": {"x":20,"y":241,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WAVE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco2Pitch","id":"ctrl_1752242706013","description":"VCO 2 PITCH — cc35","controlType":"Knob"},
+        "Transform": {"x":108,"y":200,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":70,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillator2.pitch","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco2PitchName","id":"ctrl_1752242706014","attachedTo":"ctrl_1752242706013","controlType":"Label"},
+        "Transform": {"x":80,"y":244,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PITCH","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco2Shape","id":"ctrl_1752242706015","description":"VCO 2 SHAPE — cc37","controlType":"Knob"},
+        "Transform": {"x":168,"y":200,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":20,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillator2.shape","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco2ShapeName","id":"ctrl_1752242706016","attachedTo":"ctrl_1752242706015","controlType":"Label"},
+        "Transform": {"x":140,"y":244,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SHAPE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CrossMod","id":"ctrl_1752242706017","description":"CROSS MOD DEPTH — cc41","controlType":"Knob"},
+        "Transform": {"x":82,"y":306,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillators.crossModDepth","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CrossModName","id":"ctrl_1752242706018","attachedTo":"ctrl_1752242706017","controlType":"Label"},
+        "Transform": {"x":50,"y":342,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CROSS MOD","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgInt","id":"ctrl_1752242706019","description":"EG INT — cc22","controlType":"Knob"},
+        "Transform": {"x":142,"y":306,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"envelope.int","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgIntName","id":"ctrl_1752242706020","attachedTo":"ctrl_1752242706019","controlType":"Label"},
+        "Transform": {"x":110,"y":342,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EG INT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MultiFrame","id":"ctrl_1752242706021","controlType":"Label"},
+        "Transform": {"x":242,"y":62,"width":160,"height":340},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22160%22%20height%3D%22340%22%20viewBox%3D%220%200%20160%20340%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22159%22%20height%3D%22339%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%2334373C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MultiTitle","id":"ctrl_1752242706022","controlType":"Label"},
+        "Transform": {"x":252,"y":53,"width":147,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF111214"},"Border":{"enabled":false}}},
+        "Text": {"content":"MULTI · MIXER","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MultiShape","id":"ctrl_1752242706023","description":"MULTI SHAPE — cc54","controlType":"Knob"},
+        "Transform": {"x":302,"y":100,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":30,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"multiEngine.shape","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MultiShapeName","id":"ctrl_1752242706024","attachedTo":"ctrl_1752242706023","controlType":"Label"},
+        "Transform": {"x":274,"y":144,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SHAPE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco1Level","id":"ctrl_1752242706025","description":"VCO 1 LEVEL — cc39","controlType":"Knob"},
+        "Transform": {"x":257,"y":207,"width":30,"height":30},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":110,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillator1.level","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco1LevelName","id":"ctrl_1752242706026","attachedTo":"ctrl_1752242706025","controlType":"Label"},
+        "Transform": {"x":224,"y":241,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"VCO 1","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco2Level","id":"ctrl_1752242706027","description":"VCO 2 LEVEL — cc40","controlType":"Knob"},
+        "Transform": {"x":307,"y":207,"width":30,"height":30},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":84,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"oscillator2.level","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vco2LevelName","id":"ctrl_1752242706028","attachedTo":"ctrl_1752242706027","controlType":"Label"},
+        "Transform": {"x":274,"y":241,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"VCO 2","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MultiLevel","id":"ctrl_1752242706029","description":"MULTI LEVEL — cc33","controlType":"Knob"},
+        "Transform": {"x":357,"y":207,"width":30,"height":30},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":30,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"multiEngine.level","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MultiLevelName","id":"ctrl_1752242706030","attachedTo":"ctrl_1752242706029","controlType":"Label"},
+        "Transform": {"x":324,"y":241,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MULTI","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MultiType","id":"ctrl_1752242706031","description":"MULTI TYPE — cc53","controlType":"Knob"},
+        "Transform": {"x":306,"y":306,"width":32,"height":32},
+        "Behavior": {"valueType":"enum","defaultValue":"noise","defaultCurrentValue":0},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"multiEngine.type","parameterType":"choice"}]},
+        "Value": {"rows":[{"id":"noise","displayText":"NOISE","internalValue":"noise","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"vpm","displayText":"VPM","internalValue":"vpm","sendValue":64,"receiveValue":64},{"id":"usr","displayText":"USR","internalValue":"usr","sendValue":127,"receiveValue":127}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MultiTypeName","id":"ctrl_1752242706032","attachedTo":"ctrl_1752242706031","controlType":"Label"},
+        "Transform": {"x":274,"y":342,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TYPE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Screen","id":"ctrl_1752242706033","controlType":"Label"},
+        "Transform": {"x":420,"y":62,"width":300,"height":200},
+        "Background": {"_children":{"Fill":{"colour":"FF030405"},"Border":{"enabled":false},"Corners":{"radius":8}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScreenEdge","id":"ctrl_1752242706034","controlType":"Label"},
+        "Transform": {"x":420,"y":62,"width":300,"height":200},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22200%22%20viewBox%3D%220%200%20300%20200%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22299%22%20height%3D%22199%22%20rx%3D%228%22%20fill%3D%22none%22%20stroke%3D%22%232A2D33%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScreenProgram","id":"ctrl_1752242706035","controlType":"Label"},
+        "Transform": {"x":436,"y":72,"width":268,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PROGRAM 001","_children":{"Fill":{"colour":"FFE8F4FF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScreenRule","id":"ctrl_1752242706036","controlType":"Label"},
+        "Transform": {"x":436,"y":98,"width":268,"height":1},
+        "Background": {"_children":{"Fill":{"colour":"FF1B2229"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScopeSQR","id":"ctrl_1752242706037","controlType":"Label"},
+        "Transform": {"x":436,"y":106,"width":268,"height":104},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22268%22%20height%3D%22104%22%20viewBox%3D%220%200%20268%20104%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-10%25%22%20y%3D%22-50%25%22%20width%3D%22120%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%221.8%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cline%20x1%3D%220%22%20y1%3D%2252%22%20x2%3D%22268%22%20y2%3D%2252%22%20stroke%3D%22%231b2229%22%2F%3E%3Cpath%20d%3D%22M0.0%2012.5L0.7%2012.5L1.5%2012.5L2.2%2012.5L3.0%2012.5L3.7%2012.5L4.5%2012.5L5.2%2012.5L6.0%2012.5L6.7%2012.5L7.4%2012.5L8.2%2012.5L8.9%2012.5L9.7%2012.5L10.4%2012.5L11.2%2012.5L11.9%2012.5L12.7%2012.5L13.4%2012.5L14.1%2012.5L14.9%2012.5L15.6%2012.5L16.4%2012.5L17.1%2012.5L17.9%2012.5L18.6%2012.5L19.4%2012.5L20.1%2012.5L20.8%2012.5L21.6%2012.5L22.3%2012.5L23.1%2012.5L23.8%2012.5L24.6%2012.5L25.3%2012.5L26.1%2012.5L26.8%2012.5L27.5%2012.5L28.3%2012.5L29.0%2012.5L29.8%2012.5L30.5%2012.5L31.3%2012.5L32.0%2012.5L32.8%2012.5L33.5%2012.5L34.2%2012.5L35.0%2012.5L35.7%2012.5L36.5%2012.5L37.2%2012.5L38.0%2012.5L38.7%2012.5L39.5%2012.5L40.2%2012.5L40.9%2012.5L41.7%2012.5L42.4%2012.5L43.2%2012.5L43.9%2012.5L44.7%2091.5L45.4%2091.5L46.2%2091.5L46.9%2091.5L47.6%2091.5L48.4%2091.5L49.1%2091.5L49.9%2091.5L50.6%2091.5L51.4%2091.5L52.1%2091.5L52.9%2091.5L53.6%2091.5L54.3%2091.5L55.1%2091.5L55.8%2091.5L56.6%2091.5L57.3%2091.5L58.1%2091.5L58.8%2091.5L59.6%2091.5L60.3%2091.5L61.0%2091.5L61.8%2091.5L62.5%2091.5L63.3%2091.5L64.0%2091.5L64.8%2091.5L65.5%2091.5L66.3%2091.5L67.0%2091.5L67.7%2091.5L68.5%2091.5L69.2%2091.5L70.0%2091.5L70.7%2091.5L71.5%2091.5L72.2%2091.5L73.0%2091.5L73.7%2091.5L74.4%2091.5L75.2%2091.5L75.9%2091.5L76.7%2091.5L77.4%2091.5L78.2%2091.5L78.9%2091.5L79.7%2091.5L80.4%2091.5L81.1%2091.5L81.9%2091.5L82.6%2091.5L83.4%2091.5L84.1%2091.5L84.9%2091.5L85.6%2091.5L86.4%2091.5L87.1%2091.5L87.8%2091.5L88.6%2091.5L89.3%2012.5L90.1%2012.5L90.8%2012.5L91.6%2012.5L92.3%2012.5L93.1%2012.5L93.8%2012.5L94.5%2012.5L95.3%2012.5L96.0%2012.5L96.8%2012.5L97.5%2012.5L98.3%2012.5L99.0%2012.5L99.8%2012.5L100.5%2012.5L101.2%2012.5L102.0%2012.5L102.7%2012.5L103.5%2012.5L104.2%2012.5L105.0%2012.5L105.7%2012.5L106.5%2012.5L107.2%2012.5L107.9%2012.5L108.7%2012.5L109.4%2012.5L110.2%2012.5L110.9%2012.5L111.7%2012.5L112.4%2012.5L113.2%2012.5L113.9%2012.5L114.6%2012.5L115.4%2012.5L116.1%2012.5L116.9%2012.5L117.6%2012.5L118.4%2012.5L119.1%2012.5L119.9%2012.5L120.6%2012.5L121.3%2012.5L122.1%2012.5L122.8%2012.5L123.6%2012.5L124.3%2012.5L125.1%2012.5L125.8%2012.5L126.6%2012.5L127.3%2012.5L128.0%2012.5L128.8%2012.5L129.5%2012.5L130.3%2012.5L131.0%2012.5L131.8%2012.5L132.5%2012.5L133.3%2012.5L134.0%2091.5L134.7%2091.5L135.5%2091.5L136.2%2091.5L137.0%2091.5L137.7%2091.5L138.5%2091.5L139.2%2091.5L140.0%2091.5L140.7%2091.5L141.4%2091.5L142.2%2091.5L142.9%2091.5L143.7%2091.5L144.4%2091.5L145.2%2091.5L145.9%2091.5L146.7%2091.5L147.4%2091.5L148.1%2091.5L148.9%2091.5L149.6%2091.5L150.4%2091.5L151.1%2091.5L151.9%2091.5L152.6%2091.5L153.4%2091.5L154.1%2091.5L154.8%2091.5L155.6%2091.5L156.3%2091.5L157.1%2091.5L157.8%2091.5L158.6%2091.5L159.3%2091.5L160.1%2091.5L160.8%2091.5L161.5%2091.5L162.3%2091.5L163.0%2091.5L163.8%2091.5L164.5%2091.5L165.3%2091.5L166.0%2091.5L166.8%2091.5L167.5%2091.5L168.2%2091.5L169.0%2091.5L169.7%2091.5L170.5%2091.5L171.2%2091.5L172.0%2091.5L172.7%2091.5L173.5%2091.5L174.2%2091.5L174.9%2091.5L175.7%2091.5L176.4%2091.5L177.2%2091.5L177.9%2091.5L178.7%2012.5L179.4%2012.5L180.2%2012.5L180.9%2012.5L181.6%2012.5L182.4%2012.5L183.1%2012.5L183.9%2012.5L184.6%2012.5L185.4%2012.5L186.1%2012.5L186.9%2012.5L187.6%2012.5L188.3%2012.5L189.1%2012.5L189.8%2012.5L190.6%2012.5L191.3%2012.5L192.1%2012.5L192.8%2012.5L193.6%2012.5L194.3%2012.5L195.0%2012.5L195.8%2012.5L196.5%2012.5L197.3%2012.5L198.0%2012.5L198.8%2012.5L199.5%2012.5L200.3%2012.5L201.0%2012.5L201.7%2012.5L202.5%2012.5L203.2%2012.5L204.0%2012.5L204.7%2012.5L205.5%2012.5L206.2%2012.5L207.0%2012.5L207.7%2012.5L208.4%2012.5L209.2%2012.5L209.9%2012.5L210.7%2012.5L211.4%2012.5L212.2%2012.5L212.9%2012.5L213.7%2012.5L214.4%2012.5L215.1%2012.5L215.9%2012.5L216.6%2012.5L217.4%2012.5L218.1%2012.5L218.9%2012.5L219.6%2012.5L220.4%2012.5L221.1%2012.5L221.8%2012.5L222.6%2012.5L223.3%2091.5L224.1%2091.5L224.8%2091.5L225.6%2091.5L226.3%2091.5L227.1%2091.5L227.8%2091.5L228.5%2091.5L229.3%2091.5L230.0%2091.5L230.8%2091.5L231.5%2091.5L232.3%2091.5L233.0%2091.5L233.8%2091.5L234.5%2091.5L235.2%2091.5L236.0%2091.5L236.7%2091.5L237.5%2091.5L238.2%2091.5L239.0%2091.5L239.7%2091.5L240.5%2091.5L241.2%2091.5L241.9%2091.5L242.7%2091.5L243.4%2091.5L244.2%2091.5L244.9%2091.5L245.7%2091.5L246.4%2091.5L247.2%2091.5L247.9%2091.5L248.6%2091.5L249.4%2091.5L250.1%2091.5L250.9%2091.5L251.6%2091.5L252.4%2091.5L253.1%2091.5L253.9%2091.5L254.6%2091.5L255.3%2091.5L256.1%2091.5L256.8%2091.5L257.6%2091.5L258.3%2091.5L259.1%2091.5L259.8%2091.5L260.6%2091.5L261.3%2091.5L262.0%2091.5L262.8%2091.5L263.5%2091.5L264.3%2091.5L265.0%2091.5L265.8%2091.5L266.5%2091.5L267.3%2091.5L268.0%2012.5%22%20fill%3D%22none%22%20stroke%3D%22%23e8f4ff%22%20stroke-width%3D%224%22%20stroke-opacity%3D%22.35%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M0.0%2012.5L0.7%2012.5L1.5%2012.5L2.2%2012.5L3.0%2012.5L3.7%2012.5L4.5%2012.5L5.2%2012.5L6.0%2012.5L6.7%2012.5L7.4%2012.5L8.2%2012.5L8.9%2012.5L9.7%2012.5L10.4%2012.5L11.2%2012.5L11.9%2012.5L12.7%2012.5L13.4%2012.5L14.1%2012.5L14.9%2012.5L15.6%2012.5L16.4%2012.5L17.1%2012.5L17.9%2012.5L18.6%2012.5L19.4%2012.5L20.1%2012.5L20.8%2012.5L21.6%2012.5L22.3%2012.5L23.1%2012.5L23.8%2012.5L24.6%2012.5L25.3%2012.5L26.1%2012.5L26.8%2012.5L27.5%2012.5L28.3%2012.5L29.0%2012.5L29.8%2012.5L30.5%2012.5L31.3%2012.5L32.0%2012.5L32.8%2012.5L33.5%2012.5L34.2%2012.5L35.0%2012.5L35.7%2012.5L36.5%2012.5L37.2%2012.5L38.0%2012.5L38.7%2012.5L39.5%2012.5L40.2%2012.5L40.9%2012.5L41.7%2012.5L42.4%2012.5L43.2%2012.5L43.9%2012.5L44.7%2091.5L45.4%2091.5L46.2%2091.5L46.9%2091.5L47.6%2091.5L48.4%2091.5L49.1%2091.5L49.9%2091.5L50.6%2091.5L51.4%2091.5L52.1%2091.5L52.9%2091.5L53.6%2091.5L54.3%2091.5L55.1%2091.5L55.8%2091.5L56.6%2091.5L57.3%2091.5L58.1%2091.5L58.8%2091.5L59.6%2091.5L60.3%2091.5L61.0%2091.5L61.8%2091.5L62.5%2091.5L63.3%2091.5L64.0%2091.5L64.8%2091.5L65.5%2091.5L66.3%2091.5L67.0%2091.5L67.7%2091.5L68.5%2091.5L69.2%2091.5L70.0%2091.5L70.7%2091.5L71.5%2091.5L72.2%2091.5L73.0%2091.5L73.7%2091.5L74.4%2091.5L75.2%2091.5L75.9%2091.5L76.7%2091.5L77.4%2091.5L78.2%2091.5L78.9%2091.5L79.7%2091.5L80.4%2091.5L81.1%2091.5L81.9%2091.5L82.6%2091.5L83.4%2091.5L84.1%2091.5L84.9%2091.5L85.6%2091.5L86.4%2091.5L87.1%2091.5L87.8%2091.5L88.6%2091.5L89.3%2012.5L90.1%2012.5L90.8%2012.5L91.6%2012.5L92.3%2012.5L93.1%2012.5L93.8%2012.5L94.5%2012.5L95.3%2012.5L96.0%2012.5L96.8%2012.5L97.5%2012.5L98.3%2012.5L99.0%2012.5L99.8%2012.5L100.5%2012.5L101.2%2012.5L102.0%2012.5L102.7%2012.5L103.5%2012.5L104.2%2012.5L105.0%2012.5L105.7%2012.5L106.5%2012.5L107.2%2012.5L107.9%2012.5L108.7%2012.5L109.4%2012.5L110.2%2012.5L110.9%2012.5L111.7%2012.5L112.4%2012.5L113.2%2012.5L113.9%2012.5L114.6%2012.5L115.4%2012.5L116.1%2012.5L116.9%2012.5L117.6%2012.5L118.4%2012.5L119.1%2012.5L119.9%2012.5L120.6%2012.5L121.3%2012.5L122.1%2012.5L122.8%2012.5L123.6%2012.5L124.3%2012.5L125.1%2012.5L125.8%2012.5L126.6%2012.5L127.3%2012.5L128.0%2012.5L128.8%2012.5L129.5%2012.5L130.3%2012.5L131.0%2012.5L131.8%2012.5L132.5%2012.5L133.3%2012.5L134.0%2091.5L134.7%2091.5L135.5%2091.5L136.2%2091.5L137.0%2091.5L137.7%2091.5L138.5%2091.5L139.2%2091.5L140.0%2091.5L140.7%2091.5L141.4%2091.5L142.2%2091.5L142.9%2091.5L143.7%2091.5L144.4%2091.5L145.2%2091.5L145.9%2091.5L146.7%2091.5L147.4%2091.5L148.1%2091.5L148.9%2091.5L149.6%2091.5L150.4%2091.5L151.1%2091.5L151.9%2091.5L152.6%2091.5L153.4%2091.5L154.1%2091.5L154.8%2091.5L155.6%2091.5L156.3%2091.5L157.1%2091.5L157.8%2091.5L158.6%2091.5L159.3%2091.5L160.1%2091.5L160.8%2091.5L161.5%2091.5L162.3%2091.5L163.0%2091.5L163.8%2091.5L164.5%2091.5L165.3%2091.5L166.0%2091.5L166.8%2091.5L167.5%2091.5L168.2%2091.5L169.0%2091.5L169.7%2091.5L170.5%2091.5L171.2%2091.5L172.0%2091.5L172.7%2091.5L173.5%2091.5L174.2%2091.5L174.9%2091.5L175.7%2091.5L176.4%2091.5L177.2%2091.5L177.9%2091.5L178.7%2012.5L179.4%2012.5L180.2%2012.5L180.9%2012.5L181.6%2012.5L182.4%2012.5L183.1%2012.5L183.9%2012.5L184.6%2012.5L185.4%2012.5L186.1%2012.5L186.9%2012.5L187.6%2012.5L188.3%2012.5L189.1%2012.5L189.8%2012.5L190.6%2012.5L191.3%2012.5L192.1%2012.5L192.8%2012.5L193.6%2012.5L194.3%2012.5L195.0%2012.5L195.8%2012.5L196.5%2012.5L197.3%2012.5L198.0%2012.5L198.8%2012.5L199.5%2012.5L200.3%2012.5L201.0%2012.5L201.7%2012.5L202.5%2012.5L203.2%2012.5L204.0%2012.5L204.7%2012.5L205.5%2012.5L206.2%2012.5L207.0%2012.5L207.7%2012.5L208.4%2012.5L209.2%2012.5L209.9%2012.5L210.7%2012.5L211.4%2012.5L212.2%2012.5L212.9%2012.5L213.7%2012.5L214.4%2012.5L215.1%2012.5L215.9%2012.5L216.6%2012.5L217.4%2012.5L218.1%2012.5L218.9%2012.5L219.6%2012.5L220.4%2012.5L221.1%2012.5L221.8%2012.5L222.6%2012.5L223.3%2091.5L224.1%2091.5L224.8%2091.5L225.6%2091.5L226.3%2091.5L227.1%2091.5L227.8%2091.5L228.5%2091.5L229.3%2091.5L230.0%2091.5L230.8%2091.5L231.5%2091.5L232.3%2091.5L233.0%2091.5L233.8%2091.5L234.5%2091.5L235.2%2091.5L236.0%2091.5L236.7%2091.5L237.5%2091.5L238.2%2091.5L239.0%2091.5L239.7%2091.5L240.5%2091.5L241.2%2091.5L241.9%2091.5L242.7%2091.5L243.4%2091.5L244.2%2091.5L244.9%2091.5L245.7%2091.5L246.4%2091.5L247.2%2091.5L247.9%2091.5L248.6%2091.5L249.4%2091.5L250.1%2091.5L250.9%2091.5L251.6%2091.5L252.4%2091.5L253.1%2091.5L253.9%2091.5L254.6%2091.5L255.3%2091.5L256.1%2091.5L256.8%2091.5L257.6%2091.5L258.3%2091.5L259.1%2091.5L259.8%2091.5L260.6%2091.5L261.3%2091.5L262.0%2091.5L262.8%2091.5L263.5%2091.5L264.3%2091.5L265.0%2091.5L265.8%2091.5L266.5%2091.5L267.3%2091.5L268.0%2012.5%22%20fill%3D%22none%22%20stroke%3D%22%23e8f4ff%22%20stroke-width%3D%221.8%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScopeTRI","id":"ctrl_1752242706038","controlType":"Label"},
+        "Transform": {"x":436,"y":106,"width":268,"height":104},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22268%22%20height%3D%22104%22%20viewBox%3D%220%200%20268%20104%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-10%25%22%20y%3D%22-50%25%22%20width%3D%22120%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%221.8%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cline%20x1%3D%220%22%20y1%3D%2252%22%20x2%3D%22268%22%20y2%3D%2252%22%20stroke%3D%22%231b2229%22%2F%3E%3Cpath%20d%3D%22M0.0%2091.5L0.7%2090.2L1.5%2088.9L2.2%2087.6L3.0%2086.3L3.7%2084.9L4.5%2083.6L5.2%2082.3L6.0%2081.0L6.7%2079.7L7.4%2078.3L8.2%2077.0L8.9%2075.7L9.7%2074.4L10.4%2073.1L11.2%2071.8L11.9%2070.4L12.7%2069.1L13.4%2067.8L14.1%2066.5L14.9%2065.2L15.6%2063.9L16.4%2062.5L17.1%2061.2L17.9%2059.9L18.6%2058.6L19.4%2057.3L20.1%2056.0L20.8%2054.6L21.6%2053.3L22.3%2052.0L23.1%2050.7L23.8%2049.4L24.6%2048.0L25.3%2046.7L26.1%2045.4L26.8%2044.1L27.5%2042.8L28.3%2041.5L29.0%2040.1L29.8%2038.8L30.5%2037.5L31.3%2036.2L32.0%2034.9L32.8%2033.6L33.5%2032.2L34.2%2030.9L35.0%2029.6L35.7%2028.3L36.5%2027.0L37.2%2025.7L38.0%2024.3L38.7%2023.0L39.5%2021.7L40.2%2020.4L40.9%2019.1L41.7%2017.7L42.4%2016.4L43.2%2015.1L43.9%2013.8L44.7%2012.5L45.4%2013.8L46.2%2015.1L46.9%2016.4L47.6%2017.7L48.4%2019.1L49.1%2020.4L49.9%2021.7L50.6%2023.0L51.4%2024.3L52.1%2025.7L52.9%2027.0L53.6%2028.3L54.3%2029.6L55.1%2030.9L55.8%2032.2L56.6%2033.6L57.3%2034.9L58.1%2036.2L58.8%2037.5L59.6%2038.8L60.3%2040.1L61.0%2041.5L61.8%2042.8L62.5%2044.1L63.3%2045.4L64.0%2046.7L64.8%2048.0L65.5%2049.4L66.3%2050.7L67.0%2052.0L67.7%2053.3L68.5%2054.6L69.2%2056.0L70.0%2057.3L70.7%2058.6L71.5%2059.9L72.2%2061.2L73.0%2062.5L73.7%2063.9L74.4%2065.2L75.2%2066.5L75.9%2067.8L76.7%2069.1L77.4%2070.4L78.2%2071.8L78.9%2073.1L79.7%2074.4L80.4%2075.7L81.1%2077.0L81.9%2078.3L82.6%2079.7L83.4%2081.0L84.1%2082.3L84.9%2083.6L85.6%2084.9L86.4%2086.3L87.1%2087.6L87.8%2088.9L88.6%2090.2L89.3%2091.5L90.1%2090.2L90.8%2088.9L91.6%2087.6L92.3%2086.3L93.1%2084.9L93.8%2083.6L94.5%2082.3L95.3%2081.0L96.0%2079.7L96.8%2078.3L97.5%2077.0L98.3%2075.7L99.0%2074.4L99.8%2073.1L100.5%2071.8L101.2%2070.4L102.0%2069.1L102.7%2067.8L103.5%2066.5L104.2%2065.2L105.0%2063.9L105.7%2062.5L106.5%2061.2L107.2%2059.9L107.9%2058.6L108.7%2057.3L109.4%2056.0L110.2%2054.6L110.9%2053.3L111.7%2052.0L112.4%2050.7L113.2%2049.4L113.9%2048.0L114.6%2046.7L115.4%2045.4L116.1%2044.1L116.9%2042.8L117.6%2041.5L118.4%2040.1L119.1%2038.8L119.9%2037.5L120.6%2036.2L121.3%2034.9L122.1%2033.6L122.8%2032.2L123.6%2030.9L124.3%2029.6L125.1%2028.3L125.8%2027.0L126.6%2025.7L127.3%2024.3L128.0%2023.0L128.8%2021.7L129.5%2020.4L130.3%2019.1L131.0%2017.7L131.8%2016.4L132.5%2015.1L133.3%2013.8L134.0%2012.5L134.7%2013.8L135.5%2015.1L136.2%2016.4L137.0%2017.7L137.7%2019.1L138.5%2020.4L139.2%2021.7L140.0%2023.0L140.7%2024.3L141.4%2025.7L142.2%2027.0L142.9%2028.3L143.7%2029.6L144.4%2030.9L145.2%2032.2L145.9%2033.6L146.7%2034.9L147.4%2036.2L148.1%2037.5L148.9%2038.8L149.6%2040.1L150.4%2041.5L151.1%2042.8L151.9%2044.1L152.6%2045.4L153.4%2046.7L154.1%2048.0L154.8%2049.4L155.6%2050.7L156.3%2052.0L157.1%2053.3L157.8%2054.6L158.6%2056.0L159.3%2057.3L160.1%2058.6L160.8%2059.9L161.5%2061.2L162.3%2062.5L163.0%2063.9L163.8%2065.2L164.5%2066.5L165.3%2067.8L166.0%2069.1L166.8%2070.4L167.5%2071.8L168.2%2073.1L169.0%2074.4L169.7%2075.7L170.5%2077.0L171.2%2078.3L172.0%2079.7L172.7%2081.0L173.5%2082.3L174.2%2083.6L174.9%2084.9L175.7%2086.3L176.4%2087.6L177.2%2088.9L177.9%2090.2L178.7%2091.5L179.4%2090.2L180.2%2088.9L180.9%2087.6L181.6%2086.3L182.4%2084.9L183.1%2083.6L183.9%2082.3L184.6%2081.0L185.4%2079.7L186.1%2078.3L186.9%2077.0L187.6%2075.7L188.3%2074.4L189.1%2073.1L189.8%2071.8L190.6%2070.4L191.3%2069.1L192.1%2067.8L192.8%2066.5L193.6%2065.2L194.3%2063.9L195.0%2062.5L195.8%2061.2L196.5%2059.9L197.3%2058.6L198.0%2057.3L198.8%2056.0L199.5%2054.6L200.3%2053.3L201.0%2052.0L201.7%2050.7L202.5%2049.4L203.2%2048.0L204.0%2046.7L204.7%2045.4L205.5%2044.1L206.2%2042.8L207.0%2041.5L207.7%2040.1L208.4%2038.8L209.2%2037.5L209.9%2036.2L210.7%2034.9L211.4%2033.6L212.2%2032.2L212.9%2030.9L213.7%2029.6L214.4%2028.3L215.1%2027.0L215.9%2025.7L216.6%2024.3L217.4%2023.0L218.1%2021.7L218.9%2020.4L219.6%2019.1L220.4%2017.7L221.1%2016.4L221.8%2015.1L222.6%2013.8L223.3%2012.5L224.1%2013.8L224.8%2015.1L225.6%2016.4L226.3%2017.7L227.1%2019.1L227.8%2020.4L228.5%2021.7L229.3%2023.0L230.0%2024.3L230.8%2025.7L231.5%2027.0L232.3%2028.3L233.0%2029.6L233.8%2030.9L234.5%2032.2L235.2%2033.6L236.0%2034.9L236.7%2036.2L237.5%2037.5L238.2%2038.8L239.0%2040.1L239.7%2041.5L240.5%2042.8L241.2%2044.1L241.9%2045.4L242.7%2046.7L243.4%2048.0L244.2%2049.4L244.9%2050.7L245.7%2052.0L246.4%2053.3L247.2%2054.6L247.9%2056.0L248.6%2057.3L249.4%2058.6L250.1%2059.9L250.9%2061.2L251.6%2062.5L252.4%2063.9L253.1%2065.2L253.9%2066.5L254.6%2067.8L255.3%2069.1L256.1%2070.4L256.8%2071.8L257.6%2073.1L258.3%2074.4L259.1%2075.7L259.8%2077.0L260.6%2078.3L261.3%2079.7L262.0%2081.0L262.8%2082.3L263.5%2083.6L264.3%2084.9L265.0%2086.3L265.8%2087.6L266.5%2088.9L267.3%2090.2L268.0%2091.5%22%20fill%3D%22none%22%20stroke%3D%22%23e8f4ff%22%20stroke-width%3D%224%22%20stroke-opacity%3D%22.35%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M0.0%2091.5L0.7%2090.2L1.5%2088.9L2.2%2087.6L3.0%2086.3L3.7%2084.9L4.5%2083.6L5.2%2082.3L6.0%2081.0L6.7%2079.7L7.4%2078.3L8.2%2077.0L8.9%2075.7L9.7%2074.4L10.4%2073.1L11.2%2071.8L11.9%2070.4L12.7%2069.1L13.4%2067.8L14.1%2066.5L14.9%2065.2L15.6%2063.9L16.4%2062.5L17.1%2061.2L17.9%2059.9L18.6%2058.6L19.4%2057.3L20.1%2056.0L20.8%2054.6L21.6%2053.3L22.3%2052.0L23.1%2050.7L23.8%2049.4L24.6%2048.0L25.3%2046.7L26.1%2045.4L26.8%2044.1L27.5%2042.8L28.3%2041.5L29.0%2040.1L29.8%2038.8L30.5%2037.5L31.3%2036.2L32.0%2034.9L32.8%2033.6L33.5%2032.2L34.2%2030.9L35.0%2029.6L35.7%2028.3L36.5%2027.0L37.2%2025.7L38.0%2024.3L38.7%2023.0L39.5%2021.7L40.2%2020.4L40.9%2019.1L41.7%2017.7L42.4%2016.4L43.2%2015.1L43.9%2013.8L44.7%2012.5L45.4%2013.8L46.2%2015.1L46.9%2016.4L47.6%2017.7L48.4%2019.1L49.1%2020.4L49.9%2021.7L50.6%2023.0L51.4%2024.3L52.1%2025.7L52.9%2027.0L53.6%2028.3L54.3%2029.6L55.1%2030.9L55.8%2032.2L56.6%2033.6L57.3%2034.9L58.1%2036.2L58.8%2037.5L59.6%2038.8L60.3%2040.1L61.0%2041.5L61.8%2042.8L62.5%2044.1L63.3%2045.4L64.0%2046.7L64.8%2048.0L65.5%2049.4L66.3%2050.7L67.0%2052.0L67.7%2053.3L68.5%2054.6L69.2%2056.0L70.0%2057.3L70.7%2058.6L71.5%2059.9L72.2%2061.2L73.0%2062.5L73.7%2063.9L74.4%2065.2L75.2%2066.5L75.9%2067.8L76.7%2069.1L77.4%2070.4L78.2%2071.8L78.9%2073.1L79.7%2074.4L80.4%2075.7L81.1%2077.0L81.9%2078.3L82.6%2079.7L83.4%2081.0L84.1%2082.3L84.9%2083.6L85.6%2084.9L86.4%2086.3L87.1%2087.6L87.8%2088.9L88.6%2090.2L89.3%2091.5L90.1%2090.2L90.8%2088.9L91.6%2087.6L92.3%2086.3L93.1%2084.9L93.8%2083.6L94.5%2082.3L95.3%2081.0L96.0%2079.7L96.8%2078.3L97.5%2077.0L98.3%2075.7L99.0%2074.4L99.8%2073.1L100.5%2071.8L101.2%2070.4L102.0%2069.1L102.7%2067.8L103.5%2066.5L104.2%2065.2L105.0%2063.9L105.7%2062.5L106.5%2061.2L107.2%2059.9L107.9%2058.6L108.7%2057.3L109.4%2056.0L110.2%2054.6L110.9%2053.3L111.7%2052.0L112.4%2050.7L113.2%2049.4L113.9%2048.0L114.6%2046.7L115.4%2045.4L116.1%2044.1L116.9%2042.8L117.6%2041.5L118.4%2040.1L119.1%2038.8L119.9%2037.5L120.6%2036.2L121.3%2034.9L122.1%2033.6L122.8%2032.2L123.6%2030.9L124.3%2029.6L125.1%2028.3L125.8%2027.0L126.6%2025.7L127.3%2024.3L128.0%2023.0L128.8%2021.7L129.5%2020.4L130.3%2019.1L131.0%2017.7L131.8%2016.4L132.5%2015.1L133.3%2013.8L134.0%2012.5L134.7%2013.8L135.5%2015.1L136.2%2016.4L137.0%2017.7L137.7%2019.1L138.5%2020.4L139.2%2021.7L140.0%2023.0L140.7%2024.3L141.4%2025.7L142.2%2027.0L142.9%2028.3L143.7%2029.6L144.4%2030.9L145.2%2032.2L145.9%2033.6L146.7%2034.9L147.4%2036.2L148.1%2037.5L148.9%2038.8L149.6%2040.1L150.4%2041.5L151.1%2042.8L151.9%2044.1L152.6%2045.4L153.4%2046.7L154.1%2048.0L154.8%2049.4L155.6%2050.7L156.3%2052.0L157.1%2053.3L157.8%2054.6L158.6%2056.0L159.3%2057.3L160.1%2058.6L160.8%2059.9L161.5%2061.2L162.3%2062.5L163.0%2063.9L163.8%2065.2L164.5%2066.5L165.3%2067.8L166.0%2069.1L166.8%2070.4L167.5%2071.8L168.2%2073.1L169.0%2074.4L169.7%2075.7L170.5%2077.0L171.2%2078.3L172.0%2079.7L172.7%2081.0L173.5%2082.3L174.2%2083.6L174.9%2084.9L175.7%2086.3L176.4%2087.6L177.2%2088.9L177.9%2090.2L178.7%2091.5L179.4%2090.2L180.2%2088.9L180.9%2087.6L181.6%2086.3L182.4%2084.9L183.1%2083.6L183.9%2082.3L184.6%2081.0L185.4%2079.7L186.1%2078.3L186.9%2077.0L187.6%2075.7L188.3%2074.4L189.1%2073.1L189.8%2071.8L190.6%2070.4L191.3%2069.1L192.1%2067.8L192.8%2066.5L193.6%2065.2L194.3%2063.9L195.0%2062.5L195.8%2061.2L196.5%2059.9L197.3%2058.6L198.0%2057.3L198.8%2056.0L199.5%2054.6L200.3%2053.3L201.0%2052.0L201.7%2050.7L202.5%2049.4L203.2%2048.0L204.0%2046.7L204.7%2045.4L205.5%2044.1L206.2%2042.8L207.0%2041.5L207.7%2040.1L208.4%2038.8L209.2%2037.5L209.9%2036.2L210.7%2034.9L211.4%2033.6L212.2%2032.2L212.9%2030.9L213.7%2029.6L214.4%2028.3L215.1%2027.0L215.9%2025.7L216.6%2024.3L217.4%2023.0L218.1%2021.7L218.9%2020.4L219.6%2019.1L220.4%2017.7L221.1%2016.4L221.8%2015.1L222.6%2013.8L223.3%2012.5L224.1%2013.8L224.8%2015.1L225.6%2016.4L226.3%2017.7L227.1%2019.1L227.8%2020.4L228.5%2021.7L229.3%2023.0L230.0%2024.3L230.8%2025.7L231.5%2027.0L232.3%2028.3L233.0%2029.6L233.8%2030.9L234.5%2032.2L235.2%2033.6L236.0%2034.9L236.7%2036.2L237.5%2037.5L238.2%2038.8L239.0%2040.1L239.7%2041.5L240.5%2042.8L241.2%2044.1L241.9%2045.4L242.7%2046.7L243.4%2048.0L244.2%2049.4L244.9%2050.7L245.7%2052.0L246.4%2053.3L247.2%2054.6L247.9%2056.0L248.6%2057.3L249.4%2058.6L250.1%2059.9L250.9%2061.2L251.6%2062.5L252.4%2063.9L253.1%2065.2L253.9%2066.5L254.6%2067.8L255.3%2069.1L256.1%2070.4L256.8%2071.8L257.6%2073.1L258.3%2074.4L259.1%2075.7L259.8%2077.0L260.6%2078.3L261.3%2079.7L262.0%2081.0L262.8%2082.3L263.5%2083.6L264.3%2084.9L265.0%2086.3L265.8%2087.6L266.5%2088.9L267.3%2090.2L268.0%2091.5%22%20fill%3D%22none%22%20stroke%3D%22%23e8f4ff%22%20stroke-width%3D%221.8%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScopeSAW","id":"ctrl_1752242706039","controlType":"Label"},
+        "Transform": {"x":436,"y":106,"width":268,"height":104},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22268%22%20height%3D%22104%22%20viewBox%3D%220%200%20268%20104%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-10%25%22%20y%3D%22-50%25%22%20width%3D%22120%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%221.8%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cline%20x1%3D%220%22%20y1%3D%2252%22%20x2%3D%22268%22%20y2%3D%2252%22%20stroke%3D%22%231b2229%22%2F%3E%3Cpath%20d%3D%22M0.0%2012.5L0.7%2013.1L1.5%2013.8L2.2%2014.5L3.0%2015.1L3.7%2015.8L4.5%2016.4L5.2%2017.1L6.0%2017.7L6.7%2018.4L7.4%2019.1L8.2%2019.7L8.9%2020.4L9.7%2021.0L10.4%2021.7L11.2%2022.4L11.9%2023.0L12.7%2023.7L13.4%2024.3L14.1%2025.0L14.9%2025.7L15.6%2026.3L16.4%2027.0L17.1%2027.6L17.9%2028.3L18.6%2028.9L19.4%2029.6L20.1%2030.3L20.8%2030.9L21.6%2031.6L22.3%2032.2L23.1%2032.9L23.8%2033.6L24.6%2034.2L25.3%2034.9L26.1%2035.5L26.8%2036.2L27.5%2036.9L28.3%2037.5L29.0%2038.2L29.8%2038.8L30.5%2039.5L31.3%2040.1L32.0%2040.8L32.8%2041.5L33.5%2042.1L34.2%2042.8L35.0%2043.4L35.7%2044.1L36.5%2044.8L37.2%2045.4L38.0%2046.1L38.7%2046.7L39.5%2047.4L40.2%2048.0L40.9%2048.7L41.7%2049.4L42.4%2050.0L43.2%2050.7L43.9%2051.3L44.7%2052.0L45.4%2052.7L46.2%2053.3L46.9%2054.0L47.6%2054.6L48.4%2055.3L49.1%2056.0L49.9%2056.6L50.6%2057.3L51.4%2057.9L52.1%2058.6L52.9%2059.2L53.6%2059.9L54.3%2060.6L55.1%2061.2L55.8%2061.9L56.6%2062.5L57.3%2063.2L58.1%2063.9L58.8%2064.5L59.6%2065.2L60.3%2065.8L61.0%2066.5L61.8%2067.1L62.5%2067.8L63.3%2068.5L64.0%2069.1L64.8%2069.8L65.5%2070.4L66.3%2071.1L67.0%2071.8L67.7%2072.4L68.5%2073.1L69.2%2073.7L70.0%2074.4L70.7%2075.1L71.5%2075.7L72.2%2076.4L73.0%2077.0L73.7%2077.7L74.4%2078.3L75.2%2079.0L75.9%2079.7L76.7%2080.3L77.4%2081.0L78.2%2081.6L78.9%2082.3L79.7%2083.0L80.4%2083.6L81.1%2084.3L81.9%2084.9L82.6%2085.6L83.4%2086.3L84.1%2086.9L84.9%2087.6L85.6%2088.2L86.4%2088.9L87.1%2089.5L87.8%2090.2L88.6%2090.9L89.3%2012.5L90.1%2013.1L90.8%2013.8L91.6%2014.5L92.3%2015.1L93.1%2015.8L93.8%2016.4L94.5%2017.1L95.3%2017.7L96.0%2018.4L96.8%2019.1L97.5%2019.7L98.3%2020.4L99.0%2021.0L99.8%2021.7L100.5%2022.4L101.2%2023.0L102.0%2023.7L102.7%2024.3L103.5%2025.0L104.2%2025.7L105.0%2026.3L105.7%2027.0L106.5%2027.6L107.2%2028.3L107.9%2028.9L108.7%2029.6L109.4%2030.3L110.2%2030.9L110.9%2031.6L111.7%2032.2L112.4%2032.9L113.2%2033.6L113.9%2034.2L114.6%2034.9L115.4%2035.5L116.1%2036.2L116.9%2036.9L117.6%2037.5L118.4%2038.2L119.1%2038.8L119.9%2039.5L120.6%2040.1L121.3%2040.8L122.1%2041.5L122.8%2042.1L123.6%2042.8L124.3%2043.4L125.1%2044.1L125.8%2044.8L126.6%2045.4L127.3%2046.1L128.0%2046.7L128.8%2047.4L129.5%2048.0L130.3%2048.7L131.0%2049.4L131.8%2050.0L132.5%2050.7L133.3%2051.3L134.0%2052.0L134.7%2052.7L135.5%2053.3L136.2%2054.0L137.0%2054.6L137.7%2055.3L138.5%2056.0L139.2%2056.6L140.0%2057.3L140.7%2057.9L141.4%2058.6L142.2%2059.2L142.9%2059.9L143.7%2060.6L144.4%2061.2L145.2%2061.9L145.9%2062.5L146.7%2063.2L147.4%2063.9L148.1%2064.5L148.9%2065.2L149.6%2065.8L150.4%2066.5L151.1%2067.1L151.9%2067.8L152.6%2068.5L153.4%2069.1L154.1%2069.8L154.8%2070.4L155.6%2071.1L156.3%2071.8L157.1%2072.4L157.8%2073.1L158.6%2073.7L159.3%2074.4L160.1%2075.1L160.8%2075.7L161.5%2076.4L162.3%2077.0L163.0%2077.7L163.8%2078.3L164.5%2079.0L165.3%2079.7L166.0%2080.3L166.8%2081.0L167.5%2081.6L168.2%2082.3L169.0%2083.0L169.7%2083.6L170.5%2084.3L171.2%2084.9L172.0%2085.6L172.7%2086.3L173.5%2086.9L174.2%2087.6L174.9%2088.2L175.7%2088.9L176.4%2089.5L177.2%2090.2L177.9%2090.9L178.7%2012.5L179.4%2013.1L180.2%2013.8L180.9%2014.5L181.6%2015.1L182.4%2015.8L183.1%2016.4L183.9%2017.1L184.6%2017.7L185.4%2018.4L186.1%2019.1L186.9%2019.7L187.6%2020.4L188.3%2021.0L189.1%2021.7L189.8%2022.4L190.6%2023.0L191.3%2023.7L192.1%2024.3L192.8%2025.0L193.6%2025.7L194.3%2026.3L195.0%2027.0L195.8%2027.6L196.5%2028.3L197.3%2028.9L198.0%2029.6L198.8%2030.3L199.5%2030.9L200.3%2031.6L201.0%2032.2L201.7%2032.9L202.5%2033.6L203.2%2034.2L204.0%2034.9L204.7%2035.5L205.5%2036.2L206.2%2036.9L207.0%2037.5L207.7%2038.2L208.4%2038.8L209.2%2039.5L209.9%2040.1L210.7%2040.8L211.4%2041.5L212.2%2042.1L212.9%2042.8L213.7%2043.4L214.4%2044.1L215.1%2044.8L215.9%2045.4L216.6%2046.1L217.4%2046.7L218.1%2047.4L218.9%2048.0L219.6%2048.7L220.4%2049.4L221.1%2050.0L221.8%2050.7L222.6%2051.3L223.3%2052.0L224.1%2052.7L224.8%2053.3L225.6%2054.0L226.3%2054.6L227.1%2055.3L227.8%2056.0L228.5%2056.6L229.3%2057.3L230.0%2057.9L230.8%2058.6L231.5%2059.2L232.3%2059.9L233.0%2060.6L233.8%2061.2L234.5%2061.9L235.2%2062.5L236.0%2063.2L236.7%2063.9L237.5%2064.5L238.2%2065.2L239.0%2065.8L239.7%2066.5L240.5%2067.1L241.2%2067.8L241.9%2068.5L242.7%2069.1L243.4%2069.8L244.2%2070.4L244.9%2071.1L245.7%2071.8L246.4%2072.4L247.2%2073.1L247.9%2073.7L248.6%2074.4L249.4%2075.1L250.1%2075.7L250.9%2076.4L251.6%2077.0L252.4%2077.7L253.1%2078.3L253.9%2079.0L254.6%2079.7L255.3%2080.3L256.1%2081.0L256.8%2081.6L257.6%2082.3L258.3%2083.0L259.1%2083.6L259.8%2084.3L260.6%2084.9L261.3%2085.6L262.0%2086.3L262.8%2086.9L263.5%2087.6L264.3%2088.2L265.0%2088.9L265.8%2089.5L266.5%2090.2L267.3%2090.9L268.0%2012.5%22%20fill%3D%22none%22%20stroke%3D%22%23e8f4ff%22%20stroke-width%3D%224%22%20stroke-opacity%3D%22.35%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M0.0%2012.5L0.7%2013.1L1.5%2013.8L2.2%2014.5L3.0%2015.1L3.7%2015.8L4.5%2016.4L5.2%2017.1L6.0%2017.7L6.7%2018.4L7.4%2019.1L8.2%2019.7L8.9%2020.4L9.7%2021.0L10.4%2021.7L11.2%2022.4L11.9%2023.0L12.7%2023.7L13.4%2024.3L14.1%2025.0L14.9%2025.7L15.6%2026.3L16.4%2027.0L17.1%2027.6L17.9%2028.3L18.6%2028.9L19.4%2029.6L20.1%2030.3L20.8%2030.9L21.6%2031.6L22.3%2032.2L23.1%2032.9L23.8%2033.6L24.6%2034.2L25.3%2034.9L26.1%2035.5L26.8%2036.2L27.5%2036.9L28.3%2037.5L29.0%2038.2L29.8%2038.8L30.5%2039.5L31.3%2040.1L32.0%2040.8L32.8%2041.5L33.5%2042.1L34.2%2042.8L35.0%2043.4L35.7%2044.1L36.5%2044.8L37.2%2045.4L38.0%2046.1L38.7%2046.7L39.5%2047.4L40.2%2048.0L40.9%2048.7L41.7%2049.4L42.4%2050.0L43.2%2050.7L43.9%2051.3L44.7%2052.0L45.4%2052.7L46.2%2053.3L46.9%2054.0L47.6%2054.6L48.4%2055.3L49.1%2056.0L49.9%2056.6L50.6%2057.3L51.4%2057.9L52.1%2058.6L52.9%2059.2L53.6%2059.9L54.3%2060.6L55.1%2061.2L55.8%2061.9L56.6%2062.5L57.3%2063.2L58.1%2063.9L58.8%2064.5L59.6%2065.2L60.3%2065.8L61.0%2066.5L61.8%2067.1L62.5%2067.8L63.3%2068.5L64.0%2069.1L64.8%2069.8L65.5%2070.4L66.3%2071.1L67.0%2071.8L67.7%2072.4L68.5%2073.1L69.2%2073.7L70.0%2074.4L70.7%2075.1L71.5%2075.7L72.2%2076.4L73.0%2077.0L73.7%2077.7L74.4%2078.3L75.2%2079.0L75.9%2079.7L76.7%2080.3L77.4%2081.0L78.2%2081.6L78.9%2082.3L79.7%2083.0L80.4%2083.6L81.1%2084.3L81.9%2084.9L82.6%2085.6L83.4%2086.3L84.1%2086.9L84.9%2087.6L85.6%2088.2L86.4%2088.9L87.1%2089.5L87.8%2090.2L88.6%2090.9L89.3%2012.5L90.1%2013.1L90.8%2013.8L91.6%2014.5L92.3%2015.1L93.1%2015.8L93.8%2016.4L94.5%2017.1L95.3%2017.7L96.0%2018.4L96.8%2019.1L97.5%2019.7L98.3%2020.4L99.0%2021.0L99.8%2021.7L100.5%2022.4L101.2%2023.0L102.0%2023.7L102.7%2024.3L103.5%2025.0L104.2%2025.7L105.0%2026.3L105.7%2027.0L106.5%2027.6L107.2%2028.3L107.9%2028.9L108.7%2029.6L109.4%2030.3L110.2%2030.9L110.9%2031.6L111.7%2032.2L112.4%2032.9L113.2%2033.6L113.9%2034.2L114.6%2034.9L115.4%2035.5L116.1%2036.2L116.9%2036.9L117.6%2037.5L118.4%2038.2L119.1%2038.8L119.9%2039.5L120.6%2040.1L121.3%2040.8L122.1%2041.5L122.8%2042.1L123.6%2042.8L124.3%2043.4L125.1%2044.1L125.8%2044.8L126.6%2045.4L127.3%2046.1L128.0%2046.7L128.8%2047.4L129.5%2048.0L130.3%2048.7L131.0%2049.4L131.8%2050.0L132.5%2050.7L133.3%2051.3L134.0%2052.0L134.7%2052.7L135.5%2053.3L136.2%2054.0L137.0%2054.6L137.7%2055.3L138.5%2056.0L139.2%2056.6L140.0%2057.3L140.7%2057.9L141.4%2058.6L142.2%2059.2L142.9%2059.9L143.7%2060.6L144.4%2061.2L145.2%2061.9L145.9%2062.5L146.7%2063.2L147.4%2063.9L148.1%2064.5L148.9%2065.2L149.6%2065.8L150.4%2066.5L151.1%2067.1L151.9%2067.8L152.6%2068.5L153.4%2069.1L154.1%2069.8L154.8%2070.4L155.6%2071.1L156.3%2071.8L157.1%2072.4L157.8%2073.1L158.6%2073.7L159.3%2074.4L160.1%2075.1L160.8%2075.7L161.5%2076.4L162.3%2077.0L163.0%2077.7L163.8%2078.3L164.5%2079.0L165.3%2079.7L166.0%2080.3L166.8%2081.0L167.5%2081.6L168.2%2082.3L169.0%2083.0L169.7%2083.6L170.5%2084.3L171.2%2084.9L172.0%2085.6L172.7%2086.3L173.5%2086.9L174.2%2087.6L174.9%2088.2L175.7%2088.9L176.4%2089.5L177.2%2090.2L177.9%2090.9L178.7%2012.5L179.4%2013.1L180.2%2013.8L180.9%2014.5L181.6%2015.1L182.4%2015.8L183.1%2016.4L183.9%2017.1L184.6%2017.7L185.4%2018.4L186.1%2019.1L186.9%2019.7L187.6%2020.4L188.3%2021.0L189.1%2021.7L189.8%2022.4L190.6%2023.0L191.3%2023.7L192.1%2024.3L192.8%2025.0L193.6%2025.7L194.3%2026.3L195.0%2027.0L195.8%2027.6L196.5%2028.3L197.3%2028.9L198.0%2029.6L198.8%2030.3L199.5%2030.9L200.3%2031.6L201.0%2032.2L201.7%2032.9L202.5%2033.6L203.2%2034.2L204.0%2034.9L204.7%2035.5L205.5%2036.2L206.2%2036.9L207.0%2037.5L207.7%2038.2L208.4%2038.8L209.2%2039.5L209.9%2040.1L210.7%2040.8L211.4%2041.5L212.2%2042.1L212.9%2042.8L213.7%2043.4L214.4%2044.1L215.1%2044.8L215.9%2045.4L216.6%2046.1L217.4%2046.7L218.1%2047.4L218.9%2048.0L219.6%2048.7L220.4%2049.4L221.1%2050.0L221.8%2050.7L222.6%2051.3L223.3%2052.0L224.1%2052.7L224.8%2053.3L225.6%2054.0L226.3%2054.6L227.1%2055.3L227.8%2056.0L228.5%2056.6L229.3%2057.3L230.0%2057.9L230.8%2058.6L231.5%2059.2L232.3%2059.9L233.0%2060.6L233.8%2061.2L234.5%2061.9L235.2%2062.5L236.0%2063.2L236.7%2063.9L237.5%2064.5L238.2%2065.2L239.0%2065.8L239.7%2066.5L240.5%2067.1L241.2%2067.8L241.9%2068.5L242.7%2069.1L243.4%2069.8L244.2%2070.4L244.9%2071.1L245.7%2071.8L246.4%2072.4L247.2%2073.1L247.9%2073.7L248.6%2074.4L249.4%2075.1L250.1%2075.7L250.9%2076.4L251.6%2077.0L252.4%2077.7L253.1%2078.3L253.9%2079.0L254.6%2079.7L255.3%2080.3L256.1%2081.0L256.8%2081.6L257.6%2082.3L258.3%2083.0L259.1%2083.6L259.8%2084.3L260.6%2084.9L261.3%2085.6L262.0%2086.3L262.8%2086.9L263.5%2087.6L264.3%2088.2L265.0%2088.9L265.8%2089.5L266.5%2090.2L267.3%2090.9L268.0%2012.5%22%20fill%3D%22none%22%20stroke%3D%22%23e8f4ff%22%20stroke-width%3D%221.8%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScreenBar","id":"ctrl_1752242706040","controlType":"Label"},
+        "Transform": {"x":436,"y":222,"width":268,"height":28},
+        "Background": {"_children":{"Fill":{"colour":"FF0D1116"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScreenName","id":"ctrl_1752242706041","controlType":"Label"},
+        "Transform": {"x":446,"y":225,"width":160,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TOUCH A KNOB","_children":{"Fill":{"colour":"73E8F4FF"},"Font":{"family":"JetBrains Mono"},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ScreenValue","id":"ctrl_1752242706042","controlType":"Label"},
+        "Transform": {"x":610,"y":224,"width":86,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFE8F4FF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":15},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterFrame","id":"ctrl_1752242706043","controlType":"Label"},
+        "Transform": {"x":736,"y":62,"width":200,"height":200},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22200%22%20viewBox%3D%220%200%20200%20200%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22199%22%20height%3D%22199%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%2334373C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterTitle","id":"ctrl_1752242706044","controlType":"Label"},
+        "Transform": {"x":746,"y":53,"width":78,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF111214"},"Border":{"enabled":false}}},
+        "Text": {"content":"FILTER","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Cutoff","id":"ctrl_1752242706045","description":"CUTOFF — cc43","controlType":"Knob"},
+        "Transform": {"x":768,"y":114,"width":64,"height":64},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":76,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"filter.cutoff","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CutoffName","id":"ctrl_1752242706046","attachedTo":"ctrl_1752242706045","controlType":"Label"},
+        "Transform": {"x":752,"y":182,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Resonance","id":"ctrl_1752242706047","description":"RESONANCE — cc44","controlType":"Knob"},
+        "Transform": {"x":874,"y":96,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":40,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"filter.resonance","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResonanceName","id":"ctrl_1752242706048","attachedTo":"ctrl_1752242706047","controlType":"Label"},
+        "Transform": {"x":842,"y":132,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"RESONANCE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drive","id":"ctrl_1752242706049","description":"CUTOFF DRIVE — cc84","controlType":"Knob"},
+        "Transform": {"x":874,"y":180,"width":32,"height":32},
+        "Behavior": {"valueType":"enum","defaultValue":"0","defaultCurrentValue":0},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"filter.drive","parameterType":"choice"}]},
+        "Value": {"rows":[{"id":"0","displayText":"0%","internalValue":"0","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"50","displayText":"50%","internalValue":"50","sendValue":64,"receiveValue":64},{"id":"100","displayText":"100%","internalValue":"100","sendValue":127,"receiveValue":127}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DriveName","id":"ctrl_1752242706050","attachedTo":"ctrl_1752242706049","controlType":"Label"},
+        "Transform": {"x":842,"y":216,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DRIVE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgFrame","id":"ctrl_1752242706051","controlType":"Label"},
+        "Transform": {"x":950,"y":62,"width":222,"height":200},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22222%22%20height%3D%22200%22%20viewBox%3D%220%200%20222%20200%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22221%22%20height%3D%22199%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%2334373C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgTitle","id":"ctrl_1752242706052","controlType":"Label"},
+        "Transform": {"x":960,"y":53,"width":127,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF111214"},"Border":{"enabled":false}}},
+        "Text": {"content":"AMP EG · EG","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpA","id":"ctrl_1752242706053","description":"AMP EG ATTACK — cc16","controlType":"Slider"},
+        "Transform": {"x":975,"y":80,"width":22,"height":66},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":4,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"ampEnvelope.attack","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpAName","id":"ctrl_1752242706054","attachedTo":"ctrl_1752242706053","controlType":"Label"},
+        "Transform": {"x":966,"y":148,"width":40,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpD","id":"ctrl_1752242706055","description":"AMP EG DECAY — cc17","controlType":"Slider"},
+        "Transform": {"x":1025,"y":80,"width":22,"height":66},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":70,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"ampEnvelope.decay","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpDName","id":"ctrl_1752242706056","attachedTo":"ctrl_1752242706055","controlType":"Label"},
+        "Transform": {"x":1016,"y":148,"width":40,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpS","id":"ctrl_1752242706057","description":"AMP EG SUSTAIN — cc18","controlType":"Slider"},
+        "Transform": {"x":1075,"y":80,"width":22,"height":66},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":96,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"ampEnvelope.sustain","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpSName","id":"ctrl_1752242706058","attachedTo":"ctrl_1752242706057","controlType":"Label"},
+        "Transform": {"x":1066,"y":148,"width":40,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"S","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpR","id":"ctrl_1752242706059","description":"AMP EG RELEASE — cc19","controlType":"Slider"},
+        "Transform": {"x":1125,"y":80,"width":22,"height":66},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":50,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"ampEnvelope.release","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpRName","id":"ctrl_1752242706060","attachedTo":"ctrl_1752242706059","controlType":"Label"},
+        "Transform": {"x":1116,"y":148,"width":40,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"R","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgA","id":"ctrl_1752242706061","description":"EG ATTACK — cc20","controlType":"Slider"},
+        "Transform": {"x":975,"y":172,"width":22,"height":50},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":10,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"envelope.attack","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgAName","id":"ctrl_1752242706062","attachedTo":"ctrl_1752242706061","controlType":"Label"},
+        "Transform": {"x":966,"y":224,"width":40,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgD","id":"ctrl_1752242706063","description":"EG DECAY — cc21","controlType":"Slider"},
+        "Transform": {"x":1025,"y":172,"width":22,"height":50},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":60,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"envelope.decay","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgDName","id":"ctrl_1752242706064","attachedTo":"ctrl_1752242706063","controlType":"Label"},
+        "Transform": {"x":1016,"y":224,"width":40,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoFrame","id":"ctrl_1752242706065","controlType":"Label"},
+        "Transform": {"x":420,"y":280,"width":300,"height":122},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22122%22%20viewBox%3D%220%200%20300%20122%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22299%22%20height%3D%22121%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%2334373C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoTitle","id":"ctrl_1752242706066","controlType":"Label"},
+        "Transform": {"x":430,"y":271,"width":48,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF111214"},"Border":{"enabled":false}}},
+        "Text": {"content":"LFO","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoRate","id":"ctrl_1752242706067","description":"LFO RATE — cc24","controlType":"Knob"},
+        "Transform": {"x":462,"y":316,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":56,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"lfo.rate","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoRateName","id":"ctrl_1752242706068","attachedTo":"ctrl_1752242706067","controlType":"Label"},
+        "Transform": {"x":432,"y":356,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"RATE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoInt","id":"ctrl_1752242706069","description":"LFO INT — cc26","controlType":"Knob"},
+        "Transform": {"x":552,"y":316,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":24,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"lfo.int","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoIntName","id":"ctrl_1752242706070","attachedTo":"ctrl_1752242706069","controlType":"Label"},
+        "Transform": {"x":522,"y":356,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"INT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoWave","id":"ctrl_1752242706071","description":"LFO WAVE — cc57","controlType":"Knob"},
+        "Transform": {"x":642,"y":316,"width":36,"height":36},
+        "Behavior": {"valueType":"enum","defaultValue":"sqr","defaultCurrentValue":0},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"lfo.wave","parameterType":"choice"}]},
+        "Value": {"rows":[{"id":"sqr","displayText":"SQR","internalValue":"sqr","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"tri","displayText":"TRI","internalValue":"tri","sendValue":64,"receiveValue":64},{"id":"saw","displayText":"SAW","internalValue":"saw","sendValue":127,"receiveValue":127}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoWaveName","id":"ctrl_1752242706072","attachedTo":"ctrl_1752242706071","controlType":"Label"},
+        "Transform": {"x":612,"y":356,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WAVE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FxFrame","id":"ctrl_1752242706073","controlType":"Label"},
+        "Transform": {"x":736,"y":280,"width":436,"height":122},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22436%22%20height%3D%22122%22%20viewBox%3D%220%200%20436%20122%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22435%22%20height%3D%22121%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%2334373C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FxTitle","id":"ctrl_1752242706074","controlType":"Label"},
+        "Transform": {"x":746,"y":271,"width":87,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF111214"},"Border":{"enabled":false}}},
+        "Text": {"content":"EFFECTS","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModTime","id":"ctrl_1752242706075","description":"MOD FX TIME — cc28","controlType":"Knob"},
+        "Transform": {"x":772,"y":316,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":50,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"effects.time","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModTimeName","id":"ctrl_1752242706076","attachedTo":"ctrl_1752242706075","controlType":"Label"},
+        "Transform": {"x":742,"y":356,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MOD TIME","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModDepth","id":"ctrl_1752242706077","description":"MOD FX DEPTH — cc29","controlType":"Knob"},
+        "Transform": {"x":858,"y":316,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":40,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"effects.depth","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModDepthName","id":"ctrl_1752242706078","attachedTo":"ctrl_1752242706077","controlType":"Label"},
+        "Transform": {"x":828,"y":356,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MOD DEPTH","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayTime","id":"ctrl_1752242706079","description":"DELAY TIME — cc105","controlType":"Knob"},
+        "Transform": {"x":944,"y":316,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":70,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"effects.timeCc105","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayTimeName","id":"ctrl_1752242706080","attachedTo":"ctrl_1752242706079","controlType":"Label"},
+        "Transform": {"x":914,"y":356,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DELAY TIME","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayDepth","id":"ctrl_1752242706081","description":"DELAY DEPTH — cc106","controlType":"Knob"},
+        "Transform": {"x":1030,"y":316,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":44,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"effects.depthCc106","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayDepthName","id":"ctrl_1752242706082","attachedTo":"ctrl_1752242706081","controlType":"Label"},
+        "Transform": {"x":1000,"y":356,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DELAY DEPTH","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReverbTime","id":"ctrl_1752242706083","description":"REVERB TIME — cc108","controlType":"Knob"},
+        "Transform": {"x":1116,"y":316,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":80,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Korg minilogue xd","parameterId":"effects.timeCc108","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReverbTimeName","id":"ctrl_1752242706084","attachedTo":"ctrl_1752242706083","controlType":"Label"},
+        "Transform": {"x":1086,"y":356,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"REVERB TIME","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey1","id":"ctrl_1752242706085","controlType":"Label"},
+        "Transform": {"x":40,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"1","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step1","id":"ctrl_1752242706086","controlType":"Label"},
+        "Transform": {"x":63,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey2","id":"ctrl_1752242706087","controlType":"Label"},
+        "Transform": {"x":110,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"2","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step2","id":"ctrl_1752242706088","controlType":"Label"},
+        "Transform": {"x":133,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey3","id":"ctrl_1752242706089","controlType":"Label"},
+        "Transform": {"x":180,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"3","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step3","id":"ctrl_1752242706090","controlType":"Label"},
+        "Transform": {"x":203,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey4","id":"ctrl_1752242706091","controlType":"Label"},
+        "Transform": {"x":250,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"4","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step4","id":"ctrl_1752242706092","controlType":"Label"},
+        "Transform": {"x":273,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey5","id":"ctrl_1752242706093","controlType":"Label"},
+        "Transform": {"x":320,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"5","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step5","id":"ctrl_1752242706094","controlType":"Label"},
+        "Transform": {"x":343,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey6","id":"ctrl_1752242706095","controlType":"Label"},
+        "Transform": {"x":390,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"6","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step6","id":"ctrl_1752242706096","controlType":"Label"},
+        "Transform": {"x":413,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey7","id":"ctrl_1752242706097","controlType":"Label"},
+        "Transform": {"x":460,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"7","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step7","id":"ctrl_1752242706098","controlType":"Label"},
+        "Transform": {"x":483,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey8","id":"ctrl_1752242706099","controlType":"Label"},
+        "Transform": {"x":530,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"8","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step8","id":"ctrl_1752242706100","controlType":"Label"},
+        "Transform": {"x":553,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey9","id":"ctrl_1752242706101","controlType":"Label"},
+        "Transform": {"x":600,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"9","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step9","id":"ctrl_1752242706102","controlType":"Label"},
+        "Transform": {"x":623,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey10","id":"ctrl_1752242706103","controlType":"Label"},
+        "Transform": {"x":670,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"10","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step10","id":"ctrl_1752242706104","controlType":"Label"},
+        "Transform": {"x":693,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey11","id":"ctrl_1752242706105","controlType":"Label"},
+        "Transform": {"x":740,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"11","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step11","id":"ctrl_1752242706106","controlType":"Label"},
+        "Transform": {"x":763,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey12","id":"ctrl_1752242706107","controlType":"Label"},
+        "Transform": {"x":810,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"12","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step12","id":"ctrl_1752242706108","controlType":"Label"},
+        "Transform": {"x":833,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey13","id":"ctrl_1752242706109","controlType":"Label"},
+        "Transform": {"x":880,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"13","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step13","id":"ctrl_1752242706110","controlType":"Label"},
+        "Transform": {"x":903,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey14","id":"ctrl_1752242706111","controlType":"Label"},
+        "Transform": {"x":950,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"14","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step14","id":"ctrl_1752242706112","controlType":"Label"},
+        "Transform": {"x":973,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey15","id":"ctrl_1752242706113","controlType":"Label"},
+        "Transform": {"x":1020,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"15","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step15","id":"ctrl_1752242706114","controlType":"Label"},
+        "Transform": {"x":1043,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StepKey16","id":"ctrl_1752242706115","controlType":"Label"},
+        "Transform": {"x":1090,"y":470,"width":54,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2D31"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"16","_children":{"Fill":{"colour":"FFC9CDD1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Step16","id":"ctrl_1752242706116","controlType":"Label"},
+        "Transform": {"x":1113,"y":456,"width":8,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF4A2222"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_korg-minilogue-xd",
+      "name": "Scope wave",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_1",
+          "controlId": "ctrl_1752242706037",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.22,
+                "opacity": 1
+              },
+              {
+                "at": 0.3,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_korg-minilogue-xd_2",
+          "controlId": "ctrl_1752242706038",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.21999999999999997,
+                "opacity": 0
+              },
+              {
+                "at": 0.3,
+                "opacity": 1
+              },
+              {
+                "at": 0.7,
+                "opacity": 1
+              },
+              {
+                "at": 0.7799999999999999,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_korg-minilogue-xd_3",
+          "controlId": "ctrl_1752242706039",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.7000000000000001,
+                "opacity": 0
+              },
+              {
+                "at": 0.78,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1752242706005",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_korg-minilogue-xd_2",
+      "name": "Program change",
+      "trigger": {
+        "type": "midi",
+        "message": "program",
+        "channel": 0,
+        "program": -1
+      },
+      "length": 500,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_4",
+          "controlId": "ctrl_1752242706033",
+          "target": "Transform",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FF1A2A3A"
+              },
+              {
+                "at": 1,
+                "fill": "FF030405"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_3",
+      "name": "Step 1",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_5",
+          "controlId": "ctrl_1752242706086",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_4",
+      "name": "Step 2",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_6",
+          "controlId": "ctrl_1752242706088",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_5",
+      "name": "Step 3",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_7",
+          "controlId": "ctrl_1752242706090",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_6",
+      "name": "Step 4",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_8",
+          "controlId": "ctrl_1752242706092",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_7",
+      "name": "Step 5",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_9",
+          "controlId": "ctrl_1752242706094",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_8",
+      "name": "Step 6",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_10",
+          "controlId": "ctrl_1752242706096",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_9",
+      "name": "Step 7",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_11",
+          "controlId": "ctrl_1752242706098",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_10",
+      "name": "Step 8",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_12",
+          "controlId": "ctrl_1752242706100",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_11",
+      "name": "Step 9",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_13",
+          "controlId": "ctrl_1752242706102",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_12",
+      "name": "Step 10",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_14",
+          "controlId": "ctrl_1752242706104",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_13",
+      "name": "Step 11",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_15",
+          "controlId": "ctrl_1752242706106",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_14",
+      "name": "Step 12",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_16",
+          "controlId": "ctrl_1752242706108",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_15",
+      "name": "Step 13",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_17",
+          "controlId": "ctrl_1752242706110",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_16",
+      "name": "Step 14",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_18",
+          "controlId": "ctrl_1752242706112",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_17",
+      "name": "Step 15",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_19",
+          "controlId": "ctrl_1752242706114",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_korg-minilogue-xd_18",
+      "name": "Step 16",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_korg-minilogue-xd_20",
+          "controlId": "ctrl_1752242706116",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF3B30"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A2222"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -328,6 +328,9 @@ export function textSwitchTimes(scene, controlId) {
  * keyframe player gives the first four (patterns by name; a part's, by part and then name), or null
  * when the scene has nothing on it. `at` (ms) poses every clip at that moment, paused;
  * without it the clips play from the moment this is applied. `phase` restarts a played scene.
+ * `moved` says, element by element ('moves:<part>', '<channel>:<part>', 'pattern:<part>:<name>'),
+ * what each of its animation values moves, in their order: what mergeKeyframeOutputs needs to let a
+ * later scene take a property over.
  */
 export function sceneControlOutput(scene, controlId, { at = null, phase = 'a', elapsed = null } = {}) {
   // In the order they start: on one element, the later clip is laid over the earlier.
@@ -343,6 +346,8 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a', e
   const texts = new Map();
   const patterns = new Map();         // pattern name -> animation values, for PatternLayers
   const partPatterns = new Map();     // part -> pattern name -> animation values: a part's patterns
+  const moved = new Map();            // element key -> what each of its animation values moves, in order
+  const noteMoved = (key, set) => moved.set(key, [...(moved.get(key) ?? []), set]);
   const rules = [];
   const options = { at: Number.isFinite(at) ? at : null, fill: 'both' };
   for (const clip of clips) {
@@ -356,8 +361,10 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a', e
       if (pattern.part && !partPatterns.has(pattern.part)) partPatterns.set(pattern.part, new Map());
       const byName = pattern.part ? partPatterns.get(pattern.part) : patterns;
       const list = byName.get(pattern.name) ?? [];
-      const fill = fillAfter(seen, `pattern:${pattern.part ?? ''}:${pattern.name}`, movedBy(entry.frames, MOVED));
+      const key = `pattern:${pattern.part ?? ''}:${pattern.name}`;
+      const fill = fillAfter(seen, key, movedBy(entry.frames, MOVED));
       list.push(animationValue(entry, phase, { ...options, fill }));
+      noteMoved(key, movedBy(entry.frames, MOVED));
       byName.set(pattern.name, list);
       rules.push(keyframesRule(entry, phase));
       continue;
@@ -379,6 +386,7 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a', e
       const list = parts.get(part) ?? [];
       const fill = fillAfter(seen, `moves:${part}`, movedBy(entry.frames, MOVED));
       list.push(animationValue(entry, phase, { ...options, fill }));
+      noteMoved(`moves:${part}`, movedBy(entry.frames, MOVED));
       parts.set(part, list);
       rules.push(keyframesRule(entry, phase));
     }
@@ -387,6 +395,7 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a', e
       const lists = colours.get(part) ?? { paint: [], shape: [], stroke: [], text: [], gradient: [], image: [] };
       const fill = fillAfter(seen, `${channel}:${part}`, channelMoves(entry, channel));
       lists[channel].push(colourAnimationValue(entry, channel, phase, { ...options, fill }));
+      noteMoved(`${channel}:${part}`, channelMoves(entry, channel));
       colours.set(part, lists);
       rules.push(colourKeyframesRule(entry, channel, phase));
     }
@@ -401,34 +410,63 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a', e
     if (current !== list[0] && !Number.isFinite(at)) current = { ...current, effect: { ...current.effect, delay: current.effect.delay - moment } };
     texts.set(part, [current]);
   }
-  return { parts, colours, texts, patterns, partPatterns, rules: [...new Set(rules)].join('\n') };
+  return { parts, colours, texts, patterns, partPatterns, moved, rules: [...new Set(rules)].join('\n') };
 }
 
 /**
- * The keyframe player's output and a scene's for one control, together: CanvasControl draws both.
- * Either may be null; neither is changed.
+ * The keyframe player's output and a scene's for one control, together: CanvasControl draws both,
+ * the scenes in the order they started (sceneRuntime.js), each over the ones before. Either may be
+ * null; neither is changed.
+ *
+ * A LATER SCENE TAKES A PROPERTY OVER. Where the scene moves a property of an element, an earlier
+ * scene's animation of nothing but properties the scene moves there is left out, not stacked under
+ * it. A scene's clips hold their frames before they start and after they end (fill both), so the
+ * later one decides those properties at every moment anyway; left in, the two would rely on the
+ * engine putting the later animation of a list on top, and Chromium stopped doing that for two
+ * held animations of a key's colour once a third key, sharing their keyframes, started its own:
+ * a key lit by a note and darkened when it was let go lit up again when another note came.
+ * Animations with nothing said of what they move (the control's own, from its keyframe player)
+ * are kept as they were.
  */
 export function mergeKeyframeOutputs(own, scene) {
   if (!scene) return own;
   if (!own) return { fired: [], key: '', ...scene };
-  const mergeLists = (a, b) => {
-    const out = new Map(a ?? []);
-    for (const [part, list] of b ?? []) out.set(part, [...(out.get(part) ?? []), ...list]);
-    return out;
+  const covers = new Map();
+  for (const [key, sets] of scene.moved ?? []) covers.set(key, new Set(sets.flatMap((set) => [...set])));
+  const moved = new Map(own.moved ?? []);
+  /** The earlier list at one element, less what the scene takes over; the scene's after it. */
+  const join = (key, before = [], after = []) => {
+    const over = covers.get(key);
+    const sets = own.moved?.get(key);
+    const keep = before.map((_, i) => !(over && sets?.[i]?.size && [...sets[i]].every((property) => over.has(property))));
+    if (sets) moved.set(key, [...sets.filter((_, i) => keep[i]), ...(scene.moved?.get(key) ?? [])]);
+    else if (scene.moved?.has(key)) moved.set(key, [...before.map(() => null), ...scene.moved.get(key)]);
+    return [...before.filter((_, i) => keep[i]), ...after];
   };
+  const parts = new Map(own.parts ?? []);
+  for (const [part, list] of scene.parts ?? []) parts.set(part, join(`moves:${part}`, parts.get(part), list));
   const colours = new Map(own.colours ?? []);
   for (const [part, lists] of scene.colours ?? []) {
     const current = colours.get(part) ?? { paint: [], shape: [], stroke: [], text: [], gradient: [], image: [] };
-    colours.set(part, Object.fromEntries(CHANNELS.map((channel) => [channel, [...(current[channel] ?? []), ...(lists[channel] ?? [])]])));
+    colours.set(part, Object.fromEntries(CHANNELS.map((channel) => [channel, (lists[channel] ?? []).length
+      ? join(`${channel}:${part}`, current[channel] ?? [], lists[channel]) : (current[channel] ?? [])])));
   }
+  const patternsAt = (byName, onto, part) => {
+    const out = new Map(onto ?? []);
+    for (const [name, list] of byName ?? []) out.set(name, join(`pattern:${part}:${name}`, out.get(name), list));
+    return out;
+  };
+  const texts = new Map(own.texts ?? []);
+  for (const [part, list] of scene.texts ?? []) texts.set(part, [...(texts.get(part) ?? []), ...list]);
   return {
     ...own,
-    parts: mergeLists(own.parts, scene.parts),
+    parts,
     colours,
-    texts: mergeLists(own.texts, scene.texts),
-    patterns: mergeLists(own.patterns, scene.patterns),
+    texts,
+    patterns: patternsAt(scene.patterns, own.patterns, ''),
     partPatterns: new Map([...new Set([...(own.partPatterns?.keys() ?? []), ...(scene.partPatterns?.keys() ?? [])])]
-      .map((part) => [part, mergeLists(own.partPatterns?.get(part), scene.partPatterns?.get(part))])),
+      .map((part) => [part, patternsAt(scene.partPatterns?.get(part), own.partPatterns?.get(part), part)])),
+    moved,
     rules: [own.rules, scene.rules].filter(Boolean).join('\n'),
   };
 }

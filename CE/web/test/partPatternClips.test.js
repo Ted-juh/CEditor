@@ -72,7 +72,7 @@ test('a scene draws a part\'s pattern clip on that part\'s pattern, and nothing 
   const merged = mergeKeyframeOutputs({ parts: new Map(), colours: new Map(), texts: new Map(), patterns: new Map(), rules: '', fired: [], key: '' }, out);
   assert.equal(merged.partPatterns.get('key').get(name).length, 1, 'carried through the merge with the player\'s output');
   const twice = mergeKeyframeOutputs(merged, out);
-  assert.equal(twice.partPatterns.get('key').get(name).length, 2, 'two scenes on it, both');
+  assert.equal(twice.partPatterns.get('key').get(name).length, 1, 'a second scene moving all the first moves there takes it over');
 });
 
 test('a script names a part\'s pattern by its path, and a preset asks for the part and its pattern', () => {

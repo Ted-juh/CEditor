@@ -25,6 +25,13 @@
  * `plays()` is `[{ scene, phase, at }]`, `at` null while it runs. The timers are injected, so it is
  * tested without a clock.
  *
+ * WHICH DRAWS ON TOP. Every scene that has played stays drawn, held at its end, and where two of
+ * them move the same thing of the same control the one later in `plays()` wins. That order is the
+ * order the scenes last started in: a trigger, a script's play or seek, an effect; a scene a hand
+ * drives starts each time the hand moves it, and until then lies under the rest. A looping scene
+ * going round again keeps its place. So a key lit by "a note" and darkened by "a note let go" shows
+ * whichever of the two came last, however the two are ordered in the panel's list.
+ *
  * MARKERS (sceneFormat.js `markers`) call `onMarker(action, { scene, marker })` as a play passes
  * them: a timed play at each one's moment, a clock as it moves forward past one (the hand, the ease
  * after it, a script's seek), all at once under reduced motion, as the scene jumps to its end. A
@@ -103,6 +110,9 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
   const markerTimers = new Map(); // sceneId -> handles: the markers of the play under way
   const beatSlots = new Map();  // sceneId -> floor(beats / every), or null while stopped
   const dones = new Map();      // sceneId -> done(completed), from a script
+  const started = new Map();    // sceneId -> when it last started, as a count: what draws on top
+  let starts = 0;
+  const markStarted = (id) => { starts += 1; started.set(id, starts); };
 
   const all = () => [...scenes, ...extras.values()];
   const sceneById = (id) => all().find((scene) => scene.id === id) ?? null;
@@ -180,11 +190,12 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
   function run(scene, done = null) {
     finish(scene.id, false);
     if (typeof done === 'function') dones.set(scene.id, done);
+    markStarted(scene.id);
     begin(scene);
   }
 
   function drop(id) {
-    plays.delete(id); stopTimer(id); beatSlots.delete(id); finish(id, false); clocks.delete(id);
+    plays.delete(id); stopTimer(id); beatSlots.delete(id); finish(id, false); clocks.delete(id); started.delete(id);
   }
 
   const clockOf = (scene) => {
@@ -262,11 +273,13 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
         state.target = state.shown = Math.max(0, Math.min(1, where));
         crossMarkers(scene, before, state.shown);
         state.velocity = 0; state.carry = 0;
+        markStarted(scene.id);
         onChange();
         return true;
       }
       stopTimer(scene.id);
       finish(scene.id, false);
+      markStarted(scene.id);
       // A CSS animation paused by its play state keeps the time it has already run, and a new delay
       // counts from there: a seek into a run, or after one, would land late by that much. So it
       // makes the animation afresh (the other phase), paused from its first moment at the point
@@ -306,7 +319,7 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
         if (!scene.clock || scene.clock.controlId !== controlId || (scene.clock.part ?? '') !== part) continue;
         const state = clockOf(scene);
         const before = state.shown;
-        if (clockInput(state, scene.clock, kind, payload, { reducedMotion })) moved.push(scene.id);
+        if (clockInput(state, scene.clock, kind, payload, { reducedMotion })) { moved.push(scene.id); markStarted(scene.id); }
         crossMarkers(scene, before, state.shown);
       }
       if (moved.length) { onChange(); wake(); }
@@ -340,7 +353,8 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
         const play = plays.get(scene.id);
         if (play) out.push({ scene, phase: play.phase, at: play.at });
       }
-      return out;
+      // The order they last started in; a sort keeps the panel's order between equals.
+      return out.sort((a, b) => (started.get(a.scene.id) ?? 0) - (started.get(b.scene.id) ?? 0));
     },
     destroy() {
       if (frameHandle !== null) { frames.cancel(frameHandle); frameHandle = null; }
@@ -350,6 +364,7 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
       beatSlots.clear();
       dones.clear();
       extras.clear();
+      started.clear();
     },
   };
 }

@@ -1377,9 +1377,11 @@ There is one Designer per panel, and it closes with its panel.
     over it), **Pressed**, a state of its own, or **Back to Base** (when no state holds any more);
   - **A gesture on a control**: a click, double-click, long press, flick or wheel turn;
   - **The beat**: every so many beats while the transport runs;
-  - **MIDI in**: a note (one, or any), a controller going past a point (a sustain pedal pressed:
-    once as it goes down, not again while it is held), or a program change, on one channel or
-    any. It hears what the panel's MIDI input brings, in Preview and in the plugin;
+  - **MIDI in**: a note (one, or any), a note let go, a controller going past a point (a sustain
+    pedal pressed: once as it goes down, not again while it is held), or a program change, on one
+    channel or any. A note and its letting go make a pair: one scene lights a key, the other puts
+    it out, so it stays lit as long as the key is held. It hears what the panel's MIDI input
+    brings, in Preview and in the plugin;
   - **A script asks**: `ce.anim.play("Intro")` from a script.
 
   **Driven by** can hand the scene's playhead to a control instead of time. The scene then sits
@@ -1462,7 +1464,7 @@ The scripting manual has the details.
 
 #### Showcases
 
-CEditor installs four folders of example panels next to the **Control set starters**, in
+CEditor installs five folders of example panels next to the **Control set starters**, in
 `CE/panels/`. Each panel shows off something the Designer can do. Open one with **File › Open**,
 then choose **Preview** to play it, or open the **Animation Designer** to see how it is made.
 
@@ -1470,15 +1472,21 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
 - **Song Book:** panels named after songs, acting out what each is about.
 - **Mechanisms:** gears, a tape machine, a music box, a domino run and a clock.
 - **Gallery:** art movements set moving.
+- **Animated Synths:** working panels for a Moog Subsequent 37, a Roland JU-06A and a Korg
+  minilogue xd, every control bound to the synth's profile. They move with what you play and turn:
+  the Moog's signal path glows with its mix and sends each note down it, the JU-06A lights its keys
+  and steps out each note's echoes, and the minilogue's screen names what you touched.
 
 Most of them play by themselves. A few wait for you:
 
 - **Blue Monday** and **Tape Machine** follow the transport: press Play.
 - **Every Breath You Take** follows the pointer, and **Gear Train** turns with its knob.
-- **Domino Run** and **Clockwork** run scripts of their own. A panel opened from a file runs no
-  script until you trust it, so choose **Enable scripts for this session** in the bar at the foot
-  of the window. Until then, a marker that calls one of the scripts' actions says so in the script
-  console.
+- **Domino Run**, **Clockwork** and the **minilogue xd** run scripts of their own. A panel opened
+  from a file runs no script until you trust it, so choose **Enable scripts for this session** in
+  the bar at the foot of the window. Until then, a marker that calls one of the scripts' actions
+  says so in the script console.
+- The **Animated Synths** answer MIDI from the synth or a keyboard, and the minilogue's step lamps
+  and the JU-06A's beat lamp follow the transport.
 
 ## 9. Scripts
 

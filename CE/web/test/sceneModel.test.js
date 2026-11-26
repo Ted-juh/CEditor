@@ -128,6 +128,24 @@ test('a clip plays as an animation the players read, its start its delay; posed,
   assert.match(styles[0], /-100ms 1 normal backwards paused;$/, 'each letter posed at the playhead');
 });
 
+test('a later scene takes over what it moves of an element, and leaves the rest to the earlier one', () => {
+  const clip = (id, frames) => ({ id: `s_${id}`, clips: [{ id, controlId: 'key', target: 'Transform', start: 0, length: 200, effect: { kind: 'keyframes', easing: 'linear', iterations: 1, direction: 'normal', frames } }] });
+  const lit = sceneControlOutput(clip('lit', [{ at: 0, fill: 'FFFFC98A' }, { at: 1, fill: 'FFFFC98A' }]), 'key', { at: 200 });
+  const dark = sceneControlOutput(clip('dark', [{ at: 0, fill: 'FFFFC98A' }, { at: 1, fill: 'FFE9E7E2' }]), 'key', { at: 200 });
+  const moving = sceneControlOutput(clip('move', [{ at: 0, x: 0, opacity: 1 }, { at: 1, x: 40, opacity: 0.5 }]), 'key', { at: 200 });
+  const fading = sceneControlOutput(clip('fade', [{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }]), 'key', { at: 200 });
+  const own = { parts: new Map([['', ['own 1s']]]), colours: new Map([['', { paint: ['own paint'], shape: [], stroke: [], text: [], gradient: [], image: [] }]]), texts: new Map(), rules: '', fired: [], key: '' };
+  const drawn = [lit, dark, moving, fading].reduce((acc, out) => mergeKeyframeOutputs(acc, out), own);
+  const paint = drawn.colours.get('').paint;
+  assert.equal(paint.length, 2, 'the control\'s own paint kept; of the two scenes on it, the later alone');
+  assert.equal(paint[0], 'own paint');
+  assert.equal(paint[1], dark.colours.get('').paint[0], 'let go after the note: the dark one');
+  assert.equal(mergeKeyframeOutputs(mergeKeyframeOutputs(own, dark), lit).colours.get('').paint[1], lit.colours.get('').paint[0], 'and the other way round');
+  // The fade moves opacity only; the move before it, opacity and place: the move stays for its place.
+  assert.deepEqual(drawn.parts.get(''), ['own 1s', moving.parts.get('')[0], fading.parts.get('')[0]]);
+  assert.equal(mergeKeyframeOutputs(fading, moving).parts.get('').length, 1, 'a move that also fades takes the fade over');
+});
+
 test('a scene\'s output joins what the control plays of its own, changing neither', () => {
   const own = { parts: new Map([['', ['own 1s']]]), colours: new Map(), texts: new Map(), rules: '@own', fired: ['x'], key: 'k' };
   const scene = sceneControlOutput(intro(), 'cutoff', { at: 0 });

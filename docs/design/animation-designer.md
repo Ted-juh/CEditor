@@ -1852,6 +1852,89 @@ Verified locally:
   - Clockwork's hands are held at the time of day once its script is enabled.
 - `test/showcaseCollections.test.js`: the domino script starts a run as it starts.
 
+## As built: the Animated Synths, and a note let go (2026-11-26)
+
+The owner asked for panels for real synths that use animation where it suits the instrument, one
+from each of Moog, Roland, Yamaha and Korg, with a mockup first. The mockups were approved with the
+additions they proposed. Three panels are built (`scripts/synthPanels.js`, written to
+`CE/panels/Animated Synths/` by `export-showcases.mjs`); the Yamaha reface DX waits for its manual's
+chart of the twelve algorithms, which this environment cannot reach and which is not drawn from
+memory.
+
+Every knob and slider is bound to a parameter of the instrument's profile as the editor binds a
+dropped one: the binding, then the parameter's range and choices adopted (`parameterAdoptionPatches`),
+and the panel names the profile in `requiredProfiles`. A knob on a choice starts on the profile's
+own choice; the rest start on a patch worth looking at, sent nowhere until touched. What is drawn is
+what the profile knows, and where the mockups went further than that they were cut back:
+
+- **Moog Subsequent 37: the signal path.** Each mixer line glows with its channel's level (a scene
+  on each level's value); the filter's picture, three widths wide and shown a width at a time,
+  slides with CUTOFF while its resonant peak fades with RESONANCE (two scenes on one picture: the
+  image inside its clip, and the control's opacity); each note sends a pulse from the bus through
+  the ladder and the VCA to the output; a lamp is lit while a note is held. The mockup's envelopes
+  redrawing as their stages turn is not built: the Envelope control redraws from stage values only
+  when linked to a custom component's channels, not to knobs, and a scene cannot bend a line.
+- **Roland JU-06A: time.** The keys from C3 to C5 light while their notes are held. Each note's
+  echoes step out one after another, as many as FEEDBACK leaves, as far apart as TIME sets and as
+  loud as LEVEL (three scenes on each echo, moving its place, its opacity and its flash). The
+  chorus shimmers behind its knob as far as CHORUS is turned, and a lamp marks the transport's
+  beat. The mockup had the chorus showing positions I, II and I+II and the LFO lamp blinking while
+  TEMPO SYNC was on: the profile says a JU-06A switch "is a number until the instrument shows where
+  its positions fall", so the panel shows the number's size, and the lamp is labelled as the beat.
+  The echoes keep their own step: the delay's real time is not something a scene can follow.
+- **Korg minilogue xd: the screen.** The scope shows VCO 1's wave, square, triangle or saw, as
+  its WAVE knob says. A touched control's name is pushed onto the screen and its value written
+  under it (a choice by its label); a program change rolls its number in, counted as the profile's
+  banks count (bank select LSB times 100, plus one); the step lamps walk a bar of sixteen, four a
+  beat, a sixteenth apart at the tempo the beat came at. The mockup's scope bent the wave with
+  SHAPE; the profile says nothing of what SHAPE does to each wave, so the scope does not guess.
+  The screen is a panel script: a script answers one event (its Runs on setting), so the three it
+  needs are `on('*', …)` listeners set up as it loads. The first version defined `onControlChanged`
+  and the rest as functions, and nothing called them.
+
+**A note let go.** A MIDI trigger's message can now be `noteOff`: a note's release, or a note-on at
+velocity 0, as MIDI says. The Designer offers it as "A note let go", and the scene list says "Note
+C4 let go". A key lit by one scene and darkened by another needs two more things of the runtime,
+and both are general:
+
+- **Scenes draw in the order they last started** (`sceneRuntime.js`). Every scene that has played
+  stays drawn, held at its end, and where two move the same thing the later in `plays()` wins. That
+  order was the panel's scene list, so a "let go" scene listed after its "note" won for good and a
+  key lit once never lit again. It is now the order they last started: a trigger, a script's play
+  or seek, an effect; a scene a hand drives starts each time the hand moves it, and until then lies
+  under the rest. A looping scene going round keeps its place.
+- **A later scene takes a property over** (`mergeKeyframeOutputs`). With the order right, a key
+  still lit up again when another key was struck: Chromium stopped putting the later of two held
+  animations of the key's colour on top once a third key, sharing their keyframes, started its own,
+  with the two animations, their order and their times all unchanged. So where a scene moves a
+  property of an element, an earlier scene's animation of nothing but properties it moves there is
+  left out rather than stacked under it. A scene's clips hold their frames before they start and
+  after they end, so the later one decides those properties at every moment anyway: nothing drawn
+  changes, and nothing rests on the engine's stacking. `sceneControlOutput` now says what each
+  animation moves, element by element. The control's own animations are kept as they were.
+
+The panels' section frames are drawn: a control set dresses a Label's own border its way, and in
+the sets these panels use it drew none.
+
+Verified locally:
+- `test/synthPanels.test.js` (new): every bound control binds a parameter its profile has, by the
+  profile's role, on the port its control prefers, with the range or choices adopted and a choice
+  starting on the profile's own; every value clock is driven by a bound control; the Moog's lines
+  follow their own levels and its filter picture takes two scenes on two properties; each of the
+  JU-06A's 25 keys is lit by its note and let go by its release, back to its rest colour; each echo
+  takes three scenes on three properties; the minilogue's script pushes a new name in once, writes
+  each value, names a choice by its label, counts programs by bank and walks four steps a beat at
+  the beat's tempo.
+- `test/sceneRuntime.test.js`: scenes in the order they last started, a looping one keeping its
+  place, a seek starting one too; a hand-driven scene under the rest until moved.
+- `test/sceneModel.test.js`: a later scene takes over a colour from an earlier one in either order,
+  keeps the control's own, and leaves an earlier move its place when only its fade is taken.
+- `test/sceneMidi.test.js`: a release heard by its own trigger and not by a note's.
+- The browser check `showcases`: a JU-06A key lit while held, back when let go and still back when
+  another note comes; a Moog note sends its pulse and its lamp; the minilogue's screen, once its
+  scripts are enabled, names VCO 1's WAVE and its choice, its scope showing that wave, and rolls a
+  program's number in.
+
 ## Open
 
 Nothing for the owner at present.

@@ -52,8 +52,9 @@ export function patternPlace(target) {
 }
 
 export const SCENE_TRIGGER_TYPES = Object.freeze(['panelOpen', 'state', 'event', 'beat', 'midi', 'script']);
-/** What a MIDI trigger hears: a note played, a controller pushed past a point, a program change. */
-export const MIDI_TRIGGER_MESSAGES = Object.freeze(['note', 'cc', 'program']);
+/** What a MIDI trigger hears: a note played, a note let go, a controller pushed past a point, a
+ *  program change. */
+export const MIDI_TRIGGER_MESSAGES = Object.freeze(['note', 'noteOff', 'cc', 'program']);
 export const CLIP_KINDS = Object.freeze(['keyframes', 'text', 'value']);
 /** The clip target that is what a control's value draws (step 6). */
 export const VALUE_TARGET = 'Value';
@@ -79,8 +80,9 @@ export function newSceneId(prefix = 'sc', random = Math.random) {
 }
 
 /**
- * A MIDI trigger read: `channel` 1 to 16, or 0 for any; a note-on of `note` (0 to 127, or -1 for any);
- * a controller `cc` going past `above` on its way up; or a program change to `program` (or -1, any).
+ * A MIDI trigger read: `channel` 1 to 16, or 0 for any; a note-on of `note` (0 to 127, or -1 for any),
+ * or with message 'noteOff' that note let go; a controller `cc` going past `above` on its way up; or
+ * a program change to `program` (or -1, any).
  */
 function cleanMidiTrigger(raw) {
   const whole = (value, lo, hi, fallback) => {
@@ -92,7 +94,7 @@ function cleanMidiTrigger(raw) {
   const channel = channelRead > 16 ? 0 : channelRead;
   if (message === 'cc') return { type: 'midi', message, channel, cc: whole(raw?.cc, 0, 119, 64), above: whole(raw?.above, 0, 126, 63) };
   if (message === 'program') return { type: 'midi', message, channel, program: whole(raw?.program, -1, 127, -1) };
-  return { type: 'midi', message, channel, note: whole(raw?.note, -1, 127, -1) };
+  return { type: 'midi', message: message === 'noteOff' ? 'noteOff' : 'note', channel, note: whole(raw?.note, -1, 127, -1) };
 }
 
 /** A trigger read with what it needs, or the script trigger when it makes no sense. */
