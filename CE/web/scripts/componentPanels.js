@@ -48,11 +48,13 @@ const TILE_H = 262;
 const KNOB = 136;
 const TOP = 96;
 const READOUT_ROOM = 30;
+const THROW_ROOM = 46;      // a word thrown from the tip: 14 px out, its flight, and half its height
 
-/** A panel of one group: its knobs in rows of `columns`, each with its caption. */
-function groupPanel(group, { columns = 3 } = {}) {
+/** A panel of one group: its knobs in rows of three, or four when there are more than nine, each with its caption. */
+function groupPanel(group) {
   const look = LOOKS[group.id];
   const entries = KNOB_PRESETS.filter((entry) => entry.group === group.id);
+  const columns = entries.length > 9 ? 4 : 3;
   const rows = Math.ceil(entries.length / columns);
   const width = columns * TILE_W + 60;
   const height = TOP + rows * TILE_H + 24;
@@ -65,19 +67,22 @@ function groupPanel(group, { columns = 3 } = {}) {
     const x = 30 + (i % columns) * TILE_W;
     const y = TOP + Math.floor(i / columns) * TILE_H;
     const name = { 'name-value': 'Cutoff', decode: 'Resonance' }[entry.slug] ?? pascal(entry.slug);
-    // A preset that shows the readout hangs it past the dial, where the knob's own box would cut it
-    // off: such a knob gets a box with room round the dial, the dial kept the size the others are.
+    // A preset that shows the readout hangs it past the dial, and one that throws words from the
+    // pointer's tip throws them past it, where the knob's own box would cut them off: such a knob
+    // gets a box with room round the dial, the dial kept the size the others are.
     const readout = entry.preset.fields['Behavior.showHandleLabels'] === true;
-    const box = readout ? KNOB + 2 * READOUT_ROOM : KNOB;
+    const throws = Object.values(entry.preset.animations).some((node) => node.kind === 'emit' && node.from !== 'centre');
+    const room = throws ? THROW_ROOM : readout ? READOUT_ROOM : 0;
+    const box = KNOB + 2 * room;
     const knob = f.add('Knob', name, Math.round(x + (TILE_W - box) / 2), y - (box - KNOB) / 2, box, box);
     const behavior = knob._children.Behavior;
-    behavior.defaultCurrentValue = STARTS[entry.slug] ?? 0.5;
     Object.assign(behavior, entry.knob);
-    if (readout) {
-      behavior.circularDiameter = Math.round(2 * knobTrackOf(resolveControlForSet(knob, getControlSet(look.set)), KNOB, KNOB).radius);
-      // Large enough to read from across the panel; a knob's own readout is set for a cramped one.
-      knob._children.Parts._children.labelCurrent._children.Text._children.Font.size = 14;
-    }
+    // Where it starts, as a share of its range: a knob of 0 to 100 starts at 50, not at 0.5.
+    const [low, high] = [Number(behavior.min ?? 0), Number(behavior.max ?? 1)];
+    behavior.defaultCurrentValue = low + (high - low) * (STARTS[entry.slug] ?? 0.5);
+    if (room) behavior.circularDiameter = Math.round(2 * knobTrackOf(resolveControlForSet(knob, getControlSet(look.set)), KNOB, KNOB).radius);
+    // Large enough to read from across the panel; a knob's own readout is set for a cramped one.
+    if (readout) knob._children.Parts._children.labelCurrent._children.Text._children.Font.size = 14;
     knob._children.Core.description = `${entry.name}: ${entry.what}.`;
     let captionTop = y + KNOB + 10;
     if (entry.on === 'label') {

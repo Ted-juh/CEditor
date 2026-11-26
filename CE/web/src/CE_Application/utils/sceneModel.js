@@ -55,7 +55,7 @@ export const SCENE_EFFECTS = Object.freeze([
   ...TEXT_EFFECT_NAMES.flatMap((name) => ['in', 'out'].map((way) => ({
     id: `text:${name}:${way}`,
     label: `${TEXT_EFFECTS[name].label} ${way}`,
-    category: ['push', 'roll', 'wipe', 'crossfade', 'reel'].includes(name) ? 'Swap' : 'Text',
+    category: ['push', 'roll', 'wipe', 'crossfade', 'reel', 'odometer'].includes(name) ? 'Swap' : 'Text',
     target: 'Text',
     length: 900,
     effect: { kind: 'text', effect: name, way, iterations: 1 },

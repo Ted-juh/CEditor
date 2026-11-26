@@ -294,7 +294,9 @@ tree lists them under it. Selected with the knob for **Create Component from Sel
 in too, the value as a layer that follows the knob's value.
 
 The labels that ride a knob's or slider's handles as they move are still its own: **Handle Labels**
-on its Labels tab.
+on its Labels tab. On a knob, **Sits** puts the value's label **At the tip** of its pointer, riding
+it round, or **In the cap**, still, in the middle of the dial; there a line or bar pointer becomes a
+tick at the rim, so the number is not struck through.
 
 A meter works the same way. It draws no reading and no caption of its own; the **Labels** section
 at the top of its **Meter** tab adds **+ Value** (the reading, printed with the meter's precision,
@@ -1243,7 +1245,7 @@ you hover over it, a light that pulses with the beat. Animations are edited in t
 **Animation** tool. Select a control and press **Edit the selected control's animations**; the tool
 stays on that control until you choose another.
 
-There are four kinds, and a fifth on a knob or a slider:
+There are four kinds, and two more for what a value draws:
 
 - **Transition** — eases from one state to another, for example from normal to hover. Choose
   **From** and **To**, the **Duration**, and what it eases: scale, rotation, position, size,
@@ -1251,7 +1253,10 @@ There are four kinds, and a fifth on a knob or a slider:
   centre and stops glide from one state's gradient to the next, as long as it keeps its type and has
   no more than twelve stops.
 - **Keyframes** — a little loop of poses, played all the time, in a state, when the value changes,
-  on the beat, on a gesture, or when a script asks for it. Besides the poses, a frame can **turn**
+  on each step of the value, on the beat, on a gesture, or when a script asks for it. **On each step
+  of the value** plays once each time the value comes to another step, while it is turned too: as
+  many steps as the control has (a knob of five choices, four), one every 5% on a knob with none,
+  or the number under **Steps**. A detent felt as you turn. Besides the poses, a frame can **turn**
   the fill's gradient (degrees) and **shift** its stops (percent), so a sheen sweeps across or a
   conic gradient spins while the control stays put. Where the fill has an image, a frame can also
   **pan** it across or down (percent of the box), **zoom** it and **spin** it, inside its clip: a
@@ -1259,7 +1264,14 @@ There are four kinds, and a fifth on a knob or a slider:
   spin** in the Animation Designer's **Paint** effects are ready-made ones.
 - **Sequence** — a timeline of keyframes on several tracks, which you can scrub with a playhead.
 - **Text** — an effect on the control's words themselves: **Typewriter**, **Explode**, **Roll**,
-  **Push**, **Wipe**, **Crossfade**, **Shimmer**, **Part** and **Reel**, each **In** or **Out**. **Part**
+  **Push**, **Wipe**, **Crossfade**, **Shimmer**, **Part**, **Reel**, **Odometer**, **Fly** and
+  **Fan**, each **In** or **Out**. An **Odometer** rolls only the letters that changed since the
+  words before, as a counter's digits do (0.44 to 0.45 rolls the last one). **Fly** brings each piece
+  in from where it starts: on a knob's scale, from the dial's centre out along its own line, and out
+  along it, away; on a Label, up from just below. **Fan** turns a knob's ticks into place round the
+  dial from the first one, as a fan opens. On a step trigger, **Direction** can be **The way it
+  turned**: a push or a wipe brings the next word in from the right as the value rises and from the
+  left as it falls, a roll or an odometer rolls up or down. **Part**
   opens the words down their middle like a pair of doors, each half into the edge of the box (in,
   they close). **Reel** rolls each letter up through a column of other glyphs to the letter, like a
   slot machine or a code breaking; its **Spins** say how many glyphs it passes, and **Through**
@@ -1276,6 +1288,8 @@ There are four kinds, and a fifth on a knob or a slider:
   converted to parts) prints no numbers: there a text effect plays on its readout, whole, and on
   the ring of ticks the pointer, halo, skirt, vernier and scalloped forms have, a tick at a time.
   A knob carried in a component's part takes an effect on that part on its own words, as above.
+  Two effects on the same marks at once (the ticks flying away, and back) take turns, each in its
+  own time.
 - **Value** (knobs, sliders, the Macro and meters) — moves what the value draws, its arc, ring, pointer, needle or bar, then hands
   back to the value: a new one is a ring sweep, round to full and back. It plays on the same
   triggers as **Keyframes** except **all the time**, and with **Loop** it repeats while its state
@@ -1283,6 +1297,12 @@ There are four kinds, and a fifth on a knob or a slider:
   the range, or so far from the value. Only the drawing moves: the value, its readout and what it
   sends stay as they are, and while you turn the knob it shows where you turned it to. A looping
   one counts two against the panel's ten loops.
+- **Words** (knobs and sliders) — throws words out of the dial each time it plays, which fly and
+  fade, several in the air at once: **The value**, as the readout prints it, or **How far it moved**
+  since the last word, signed ("+2.4"). From **The pointer's tip** or **The centre**, **Along the
+  pointer** or **Up**, so many px, at a **Size**. On each step of the value it is a stream of numbers
+  as the knob turns; when the knob is let go, how far it was turned. The words fly within the knob's
+  own box, as its readout does: give it room round the dial.
 
 What an animation changes is picked as a path — **Knob01 › Body › Cap › Scale** — by stepping through
 the levels, typing (`text col`), or **Browse**, which shows them side by side.

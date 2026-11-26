@@ -26,8 +26,12 @@ import {
   colourAnimationValue,
   colourVariables,
   COLOUR_CHANNELS,
+  readEmit,
+  turnDirection,
 } from '../src/CE_Application/utils/keyframeAnimation.js';
-import { readTrigger } from '../src/CE_Application/utils/interactionRuntime.js';
+import { readTrigger, stepsOfControl } from '../src/CE_Application/utils/interactionRuntime.js';
+import { readTextEffect } from '../src/CE_Application/utils/textEffects.js';
+import { createControl } from '../src/CE_Application/models/componentTypes.js';
 
 const node = (trigger, extra = {}) => ({
   _type: 'Animation', name: 'pulse', enabled: true, kind: 'keyframes',
@@ -39,11 +43,13 @@ const node = (trigger, extra = {}) => ({
 
 test('the trigger types a keyframe animation answers', () => {
   // `event` joined on 2026-11-24: a gesture (click, long press, flick…), the States tab's Events
-  // row, played on request as `script` is (stateMotion.js).
-  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'beat', 'script', 'event']);
+  // row, played on request as `script` is (stateMotion.js). `valueStep` on 2026-11-26: once each
+  // time a knob's value crosses into another of its steps (the Components showcase's Detent).
+  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event']);
   assert.equal(defaultIterations('always'), 'infinite');
   assert.equal(defaultIterations('stateChange'), 'infinite', 'a state animation loops while the state holds');
   assert.equal(defaultIterations('valueChange'), 1);
+  assert.equal(defaultIterations('valueStep'), 1, 'once a step');
   assert.equal(defaultIterations('beat'), 1);
   assert.equal(defaultIterations('event'), 1, 'a gesture plays it once');
 });
@@ -286,4 +292,106 @@ test('colour variables are all five, always, so a part never paints with its con
   assert.equal(animationDeclaration(['m 1ms'], { extra: ['p 1ms'] }), 'animation:m 1ms, p 1ms;');
   assert.equal(animationDeclaration(null, { extra: ['p 1ms'], svg: true }), 'animation:p 1ms;',
     'a colour alone needs no transform origin');
+});
+
+// --- A step of the value, and words thrown (2026-11-26, the Components showcase's knob) -----------
+
+test('a step animation fires each time the value comes to another step, during a drag too', () => {
+  const { step, clock } = rig(node({ type: 'valueStep', steps: 4 }));
+  assert.equal(phaseOf(step([], { valueNormalized: 0.5 })), null, 'where the value starts is no step');
+  clock.t = 100;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.55 })), null, 'within the same step: nothing');
+  clock.t = 200;
+  const up = step(['Dragging'], { valueNormalized: 0.7, dragging: true });
+  assert.equal(phaseOf(up), 'a', 'into the next step, while dragged');
+  assert.deepEqual(up.fired, ['pulse']);
+  clock.t = 220;
+  assert.equal(phaseOf(step(['Dragging'], { valueNormalized: 1, dragging: true })), 'b', 'the next step restarts it at once, as a detent does');
+  clock.t = 240;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.99 })), 'b', 'rounded: 0.99 is still the top step');
+});
+
+test('a step trigger reads its count, kept in range, and a control steps as its own steps say', () => {
+  assert.equal(readTrigger({ trigger: { type: 'valueStep', steps: 7.4 } }).steps, 7);
+  assert.equal(readTrigger({ trigger: { type: 'valueStep', steps: 9999 } }).steps, 400);
+  assert.equal(readTrigger({ trigger: { type: 'valueStep' } }).steps, 0, 'none named: the control\'s own');
+  const knob = createControl('Knob');
+  Object.assign(knob._children.Behavior, { min: 0, max: 4, step: 1 });
+  assert.equal(stepsOfControl(knob), 4, 'a knob of five choices has four steps between them');
+  Object.assign(knob._children.Behavior, { min: 0, max: 1, step: 0 });
+  assert.equal(stepsOfControl(knob), 20, 'a knob with no step: twenty, one every 5%');
+  Object.assign(knob._children.Behavior, { min: 0, max: 127, step: 0.01 });
+  assert.equal(stepsOfControl(knob), 20, 'more than 400 is no detent anyone feels');
+});
+
+const emitNode = (fields = {}) => ({
+  _type: 'Animation', name: 'stream', enabled: true, kind: 'emit', duration: 700, delay: 0, easing: 'outQuad',
+  trigger: { type: 'valueStep', steps: 10 }, targets: [], ...fields,
+});
+
+test('an emit animation reads what it throws, from where and how far, kept in range', () => {
+  const entry = readEmit(emitNode({ shows: 'delta', from: 'centre', direction: 'up', travel: 9999, size: 1 }));
+  assert.deepEqual(
+    { ...entry.emit, easing: undefined },
+    { shows: 'delta', from: 'centre', direction: 'up', travel: 400, size: 6, colour: null, duration: 700, delay: 0, easing: undefined },
+  );
+  assert.equal(entry.moves, false);
+  assert.deepEqual(entry.frames, []);
+  const plain = readEmit(emitNode({ shows: 'x', from: 'y', direction: 'z' })).emit;
+  assert.deepEqual([plain.shows, plain.from, plain.direction, plain.travel, plain.size], ['value', 'tip', 'pointer', 36, 12]);
+  assert.equal(readEmit(emitNode({ enabled: false })), null);
+  assert.equal(readEmit({ kind: 'keyframes' }), null);
+  assert.equal(readEmit(emitNode(), '', { timeScale: 2 }).emit.duration, 1400, 'slow motion stretches its flight');
+});
+
+test('each step throws a word with the value and the one before it; a word lasts its flight', () => {
+  const clock = { t: 0 };
+  const player = createKeyframePlayer({ now: () => clock.t });
+  const catalog = { enabled: true, reducedMotion: false, entries: [readEmit(emitNode())] };
+  const step = (v) => player.next({ activeStates: [], signals: { valueNormalized: v }, keyframes: catalog });
+  assert.deepEqual(step(0.2).emits, [], 'the value as it opens throws nothing');
+  clock.t = 50;
+  const one = step(0.3);
+  assert.deepEqual(one.emits.map((w) => [w.value, w.from, w.turn]), [[0.3, 0.2, 1]]);
+  clock.t = 100;
+  const two = step(0.1);
+  assert.deepEqual(two.emits.map((w) => [w.value, w.from, w.turn]), [[0.3, 0.2, 1], [0.1, 0.3, -1]], 'down: the turn says so');
+  assert.notEqual(two.key, one.key, 'a new word restyles');
+  clock.t = 50 + 700 + 201;
+  assert.deepEqual(step(0.1).emits.map((w) => w.value), [0.1], 'the first has faded; the second is still in the air');
+  clock.t = 100 + 700 + 201;
+  assert.deepEqual(step(0.1).emits, []);
+  player.reset();
+  assert.deepEqual(step(0.9).emits, [], 'reset forgets where the value was');
+});
+
+test('a word thrown on another trigger carries the value as it is', () => {
+  const clock = { t: 0 };
+  const player = createKeyframePlayer({ now: () => clock.t });
+  const catalog = { enabled: true, reducedMotion: false, entries: [readEmit(emitNode({ trigger: { type: 'script' } }))] };
+  const step = (v, plays = {}) => player.next({ activeStates: [], signals: { valueNormalized: v }, keyframes: catalog }, { plays });
+  assert.deepEqual(step(0.4).emits, []);
+  assert.deepEqual(step(0.6, { stream: 1 }).emits.map((w) => [w.value, w.from]), [[0.6, 0.4]]);
+});
+
+test('a text effect whose direction is the turn goes the way the value went', () => {
+  assert.deepEqual(['odometer', 'roll', 'reel'].map((effect) => [turnDirection({ effect }, 1), turnDirection({ effect }, -1)]),
+    [['up', 'down'], ['up', 'down'], ['up', 'down']], 'a counter\'s digits');
+  assert.deepEqual(['push', 'wipe'].map((effect) => [turnDirection({ effect }, 1), turnDirection({ effect }, -1)]),
+    [['left', 'right'], ['left', 'right']], 'a carousel: up, the next word comes in from the right');
+  const text = readTextEffect({ kind: 'text', enabled: true, name: 'names', effect: 'push', direction: 'turn',
+    trigger: { type: 'valueStep', steps: 4 }, targets: [{ path: 'Parts.labelCurrent' }] });
+  assert.equal(text.direction, 'turn');
+  const clock = { t: 0 };
+  const player = createKeyframePlayer({ now: () => clock.t });
+  const entry = { name: 'names', text, moves: false, part: 'labelCurrent', trigger: text.trigger, iterations: 1, frames: [], span: 600 };
+  const catalog = { enabled: true, reducedMotion: false, entries: [entry] };
+  const step = (v) => player.next({ activeStates: [], signals: { valueNormalized: v }, keyframes: catalog });
+  step(0.5);
+  clock.t = 10;
+  assert.equal(step(0.75).texts.get('labelCurrent')[0].effect.direction, 'left');
+  clock.t = 20;
+  const down = step(0.25);
+  assert.equal(down.texts.get('labelCurrent')[0].effect.direction, 'right');
+  assert.match(down.rules, /@keyframes/, 'its rules are the turned effect\'s');
 });

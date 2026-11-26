@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { PRESET_KINDS, cleanPresetAnimationName, cleanPreset, PRESET_FORMAT } from '../src/CE_Application/utils/animationPresetFormat.js';
-import { ANIMATION_KINDS, VALUE_KIND, cleanAnimationName } from '../src/CE_Application/utils/animationModel.js';
+import { ANIMATION_KINDS, VALUE_KIND, EMIT_KIND, cleanAnimationName } from '../src/CE_Application/utils/animationModel.js';
 
 test('the format module imports nothing, so plain Node can read a panel\'s presets', () => {
   const source = readFileSync(new URL('../src/CE_Application/utils/animationPresetFormat.js', import.meta.url), 'utf8');
@@ -20,7 +20,7 @@ test('the format module imports nothing, so plain Node can read a panel\'s prese
 });
 
 test('its copies are the model\'s: the kinds, and the rule for an animation\'s name', () => {
-  assert.deepEqual([...PRESET_KINDS], [...ANIMATION_KINDS, VALUE_KIND], 'every kind a control may have, the value kind included');
+  assert.deepEqual([...PRESET_KINDS], [...ANIMATION_KINDS, VALUE_KIND, EMIT_KIND], 'every kind a control may have, the value and emit kinds included');
   for (const name of ['lift', ' hover lift ', 'fade.slower', 'x-y_z9', '', null, 'É', 'a/b']) {
     assert.equal(cleanPresetAnimationName(name), cleanAnimationName(name), String(name));
   }

@@ -21,7 +21,7 @@
 
   let effect = $derived(readTextEffect({ ...(row?.animation ?? {}), enabled: true, kind: 'text' }));
   let has = $derived({
-    direction: ['roll', 'push', 'wipe'].includes(effect?.effect),
+    direction: ['roll', 'push', 'wipe', 'odometer'].includes(effect?.effect),
     burst: effect?.effect === 'explode',
     reel: effect?.effect === 'reel',
     colour: effect?.effect === 'typewriter' || effect?.effect === 'shimmer',
@@ -89,7 +89,8 @@
     {#if has.direction}
       <div class="r">
         <span class="lab">Moves</span>
-        <Segmented options={[{ value: 'left', label: '←' }, { value: 'right', label: '→' }, { value: 'up', label: '↑' }, { value: 'down', label: '↓' }]}
+        <!-- "The way it turned": up as the value rises, down as it falls, on a step trigger. -->
+        <Segmented options={[{ value: 'left', label: '←' }, { value: 'right', label: '→' }, { value: 'up', label: '↑' }, { value: 'down', label: '↓' }, { value: 'turn', label: 'Turn', title: 'The way the value turned: up (or left) as it rises, down (or right) as it falls' }]}
                    value={effect.direction} ariaLabel="Moves" onchange={(value) => onpatch({ direction: value })} />
       </div>
     {/if}

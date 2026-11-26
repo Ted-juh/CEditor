@@ -2028,6 +2028,17 @@ centre; a preset's transition named as one of the control's own, easing the same
 change, takes its place; a name ↔ value swap plays when the words become the value, not on each new
 value; and a third built-in scene preset, Knobs wave.
 
+## As built: Components, the Knob's second half (2026-11-26)
+
+Ten more knob presets, and what the engine learned for them, recorded in full in
+[component-presets.md](component-presets.md). For this record: a keyframe trigger **on each step of
+the value** (`valueStep`), which knows which way the value turned, and a text effect's direction can
+be that way (`turn`); a sixth kind, **Words** (`emit`), that throws the value or the change out of a
+knob's dial; three text effects, **Odometer**, **Fly** and **Fan**, the last two moving a scale's
+marks about the dial's centre; a readout that sits in the cap; two effects on the same marks taking
+turns rather than hiding each other (the first half's Countdown never showed its ticks leaving); and
+a value effect's clock that always moves (one could stop on its first frame).
+
 ## Open
 
 Nothing for the owner at present.

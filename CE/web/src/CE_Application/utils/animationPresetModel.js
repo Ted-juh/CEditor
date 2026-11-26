@@ -46,7 +46,7 @@ export {
 } from './animationPresetFormat.js';
 import { readTrigger } from './interactionRuntime.js';
 import { labelShows } from './labelShows.js';
-import { sliderWordsRefusal } from './anatomyWords.js';
+import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
 
 /** The fields of an animation that are its identity in a control, not a setting. */
 const IDENTITY = new Set(['_type', 'name', LINK_KEY]);
@@ -226,6 +226,9 @@ export function presetDoesNotFit(preset, control) {
   if (needs.states.length && !control._children.States) return `It plays on ${needs.states.join(', ')}, and this control has no states.`;
   if (Object.values(preset.animations ?? {}).some((node) => node?.kind === 'value') && !controlDrawsValue(control)) {
     return 'It moves what a value draws, and this control draws none: it goes on a knob, a slider, a Macro or a meter.';
+  }
+  if (Object.values(preset.animations ?? {}).some((node) => node?.kind === 'emit') && !isSliderFamily(control)) {
+    return 'It throws words from a pointer, and this control has none: it goes on a knob or a slider.';
   }
   return wordsNotShown(preset, control);
 }

@@ -62,11 +62,69 @@ import { cleanValueFrames } from './sceneFormat.js';
 // `event`: a gesture on the control — click, double-click, long press, flick, a wheel turn — played
 // on request from where the gesture is recognised, as `script` is from ce.anim.play. Its id is in
 // `trigger.event` (stateMotion.js MOTION_EVENTS); the player needs no branch for it. 2026-11-24.
-export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'beat', 'script', 'event'];
+//
+// `valueStep`: each time the value comes to a new step, the range cut into `trigger.steps` (or the
+// control's own steps). Unlike valueChange it plays during a drag, once a step however fast the hand
+// goes, and it knows which way the value turned: a text effect whose direction is `turn` goes that
+// way, and an emitted word (EMIT, below) knows where it came from. A detent, a stream of numbers.
+// The Components showcase's Knob, phase 2 (docs/design/component-presets.md). 2026-11-26.
+export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event'];
 
 /** What a frame can set, and the value each has when a frame leaves it out. */
 export const FRAME_PROPERTIES = ['scale', 'rotate', 'x', 'y', 'opacity'];
 export const FRAME_DEFAULTS = Object.freeze({ scale: 1, rotate: 0, x: 0, y: 0, opacity: 1 });
+
+/**
+ * EMIT. The kind of animation that makes words rather than moving them: each time it plays (on a
+ * step, usually), the control's value, or how far it moved, is thrown out from the pointer's tip
+ * (or the dial's centre), along the pointer or straight up, and fades as it goes. Several can be in
+ * the air at once. The player keeps each word while it flies; the slider renderer draws them.
+ *
+ *   { kind: 'emit', shows: 'value' | 'delta', from: 'tip' | 'centre', direction: 'pointer' | 'up',
+ *     travel (px), size (px), colour (AARRGGBB or none: the readout's), duration, delay, easing,
+ *     trigger }
+ */
+export const EMIT_KIND = 'emit';
+export const EMIT_SHOWS = Object.freeze(['value', 'delta']);
+export const EMIT_FROM = Object.freeze(['tip', 'centre']);
+export const EMIT_DIRECTIONS = Object.freeze(['pointer', 'up']);
+const EMIT_LIMITS = { travel: [0, 400], size: [6, 72], duration: [80, 5000] };
+const clampTo = (value, [low, high], fallback) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(high, Math.max(low, n)) : fallback;
+};
+
+/** An emit animation read with every field defaulted and in range; null when it is not one or is off. */
+export function readEmit(animation, key = '', { timeScale = 1 } = {}) {
+  if (!animation || typeof animation !== 'object' || animation.enabled === false) return null;
+  if (String(animation.kind ?? '') !== EMIT_KIND) return null;
+  const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
+  const duration = clampTo(animation.duration, EMIT_LIMITS.duration, 700) * scale;
+  const delay = Math.max(0, Number(animation.delay) || 0) * scale;
+  const emit = {
+    shows: EMIT_SHOWS.includes(animation.shows) ? animation.shows : 'value',
+    from: EMIT_FROM.includes(animation.from) ? animation.from : 'tip',
+    direction: EMIT_DIRECTIONS.includes(animation.direction) ? animation.direction : 'pointer',
+    travel: clampTo(animation.travel, EMIT_LIMITS.travel, 36),
+    size: clampTo(animation.size, EMIT_LIMITS.size, 12),
+    colour: cleanFrameColour(animation.colour),
+    duration,
+    delay,
+    easing: easingToCss(animation),
+  };
+  return {
+    name: String(animation.name ?? key),
+    emit,
+    moves: false,
+    part: '',
+    duration,
+    delay,
+    iterations: 1,
+    trigger: readTrigger(animation),
+    frames: [],
+    span: delay + duration,
+  };
+}
 
 /** The limits a frame value is kept to — past them a typo, not a design. */
 const FRAME_LIMITS = { scale: [0, 10], rotate: [-3600, 3600], x: [-2000, 2000], y: [-2000, 2000], opacity: [0, 1] };
@@ -385,14 +443,26 @@ function stateHolds(trigger, activeStates) {
 export function createKeyframePlayer({ now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) } = {}) {
   let previousFrame = null;
   let previousBeatSlot = new Map();     // name -> floor(beats / every)
+  let previousStepSlot = new Map();     // name -> the step the value was on (valueStep)
+  let emitted = [];                     // words in the air: [{ id, name, emit, at, value, from, turn }]
+  let emitSeq = 0;
+  const previousEmitValue = new Map();  // name -> the value when its last word was thrown
   let previousPlays = {};
   const heldBefore = new Map();         // name -> whether a looping state animation's state held
   const runs = new Map();               // name -> { phase, startedAt } for anything that has played
-  let last = { parts: new Map(), colours: new Map(), texts: new Map(), values: [], rules: '', fired: [], key: '' };
+  let last = { parts: new Map(), colours: new Map(), texts: new Map(), values: [], emits: [], rules: '', fired: [], key: '' };
 
-  const flip = (name, t) => {
+  // A word thrown: the value now and the value at the last word, for a delta.
+  const throwWord = (entry, t, value, turn) => {
+    if (!Number.isFinite(value)) return;
+    const from = previousEmitValue.get(entry.name) ?? value;
+    previousEmitValue.set(entry.name, value);
+    emitted.push({ id: (emitSeq += 1), name: entry.name, emit: entry.emit, at: t, value, from, turn });
+  };
+
+  const flip = (name, t, turn = null) => {
     const run = runs.get(name);
-    runs.set(name, { phase: run?.phase === 'a' ? 'b' : 'a', startedAt: t });
+    runs.set(name, { phase: run?.phase === 'a' ? 'b' : 'a', startedAt: t, turn: turn ?? run?.turn ?? 1 });
   };
 
   return {
@@ -440,6 +510,21 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
           const busy = run && t < run.startedAt + entry.span;
           fire = !change.first && frame.signals?.dragging !== true && !busy
             && matchStrength({ trigger }, change, frame.signals) > 0;
+        } else if (trigger.type === 'valueStep') {
+          // Once a step, during a drag too: the step the value is on, rounded, so a knob of four
+          // choices (0, 1/3, 2/3, 1) cut into three steps lands on each exactly.
+          const v = Number(frame.signals?.valueNormalized);
+          const slot = Number.isFinite(v) ? Math.round(v * Math.max(1, trigger.steps || 20)) : null;
+          const before = previousStepSlot.get(entry.name);
+          previousStepSlot.set(entry.name, slot);
+          if (Number.isFinite(v) && !previousEmitValue.has(entry.name)) previousEmitValue.set(entry.name, v);
+          if (slot !== null && before !== undefined && before !== null && slot !== before && !requested) {
+            flip(entry.name, t, slot > before ? 1 : -1);
+            fired.push(entry.name);
+            if (entry.emit) throwWord(entry, t, v, slot > before ? 1 : -1);
+          }
+          if (runs.has(entry.name)) playing.set(entry.name, runs.get(entry.name).phase);
+          continue;
         } else if (trigger.type === 'beat') {
           const every = Math.max(1, trigger.every || 1);
           const slot = Number.isFinite(beats) ? Math.floor(beats / every) : null;
@@ -448,6 +533,12 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
           previousBeatSlot.set(entry.name, slot);
         }
         if (fire && !requested) { flip(entry.name, t); fired.push(entry.name); }
+        // A word thrown on any other trigger (a click, a script): the value as it is now.
+        if (entry.emit) {
+          const v = Number(frame.signals?.valueNormalized);
+          if (Number.isFinite(v) && !previousEmitValue.has(entry.name)) previousEmitValue.set(entry.name, v);
+          if ((fire && !requested) || requested) throwWord(entry, t, v, 1);
+        }
         // A one-shot stays applied after it ends (fill mode none leaves the element as it was), so a
         // re-render never restarts it; only a flip of its name does.
         if (runs.has(entry.name)) playing.set(entry.name, runs.get(entry.name).phase);
@@ -473,11 +564,15 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
         if (entry.text) {
           // A text effect (utils/textEffects.js): the renderer cuts the text and gives each piece its
           // animation; here, which effect plays on which text, in which phase, and its rules.
+          // A direction of `turn` goes the way the value last turned (valueStep).
+          const effect = entry.text.direction === 'turn' ? { ...entry.text, direction: turnDirection(entry.text, runs.get(entry.name)?.turn ?? 1) } : entry.text;
           const list = texts.get(entry.part) ?? [];
-          list.push({ name: entry.name, effect: entry.text, phase, trigger: entry.trigger });
+          // When it started: a part with several effects plays them one at a time (an out, then the
+          // in that brings the words back), and the renderer needs to know whose turn it is.
+          list.push({ name: entry.name, effect, phase, trigger: entry.trigger, startedAt: runs.get(entry.name)?.startedAt ?? t });
           texts.set(entry.part, list);
-          rules.push(textEffectRules(entry.text, { phase }));
-          keyParts.push(`${entry.part}:tx:${entry.name}:${phase}`);
+          rules.push(textEffectRules(effect, { phase }));
+          keyParts.push(`${entry.part}:tx:${entry.name}:${phase}:${effect.direction}`);
           continue;
         }
         if (entry.moves) {
@@ -496,6 +591,9 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
           keyParts.push(`${entry.part}:${colourAnimationValue(entry, channel, phase)}`);
         }
       }
+      // The words still in the air; the rest have faded.
+      emitted = entries.length ? emitted.filter((word) => t < word.at + word.emit.delay + word.emit.duration + 200) : [];
+      for (const word of emitted) keyParts.push(`w:${word.id}`);
       const key = keyParts.join('|');
       if (key === last.key) {
         // Nothing to restyle: hand back the same objects, so a beat tick or a re-render of a control
@@ -503,18 +601,33 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
         last = { ...last, fired };
         return last;
       }
-      last = { parts, colours, texts, values, rules: [...new Set(rules)].join('\n'), fired, key };
+      last = { parts, colours, texts, values, emits: emitted, rules: [...new Set(rules)].join('\n'), fired, key };
       return last;
     },
     reset() {
       previousFrame = null;
       previousBeatSlot = new Map();
+      previousStepSlot = new Map();
+      previousEmitValue.clear();
+      emitted = [];
       previousPlays = {};
       heldBefore.clear();
       runs.clear();
-      last = { parts: new Map(), colours: new Map(), texts: new Map(), values: [], rules: '', fired: [], key: '' };
+      last = { parts: new Map(), colours: new Map(), texts: new Map(), values: [], emits: [], rules: '', fired: [], key: '' };
     },
   };
+}
+
+/**
+ * Where a text effect whose direction is `turn` goes when the value turned up (1) or down (-1): a
+ * roll, a reel or an odometer rolls up when the value rose and down when it fell, as a counter's
+ * digits do; a push or a wipe carries the text left as the value rises, the next word coming in
+ * from the right, as a carousel does, and right as it falls.
+ */
+export function turnDirection(effect, turn) {
+  const up = turn >= 0;
+  if (['push', 'wipe'].includes(effect?.effect)) return up ? 'left' : 'right';
+  return up ? 'up' : 'down';
 }
 
 const emptyChannels = () => ({ paint: [], shape: [], stroke: [], text: [], gradient: [], image: [] });

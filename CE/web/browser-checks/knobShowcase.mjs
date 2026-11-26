@@ -13,6 +13,16 @@
  *   - Gestures: a flick on Spin turns its whole cap, outline and all.
  *   - Together: the followers' drawings follow the first knob's value.
  *
+ * And the presets that needed the engine to learn something first (phase 2):
+ *
+ *   - Ticks: Fly away's ticks fly off on a double-click and fly back, one effect after the other;
+ *     Fan in turns each tick about the dial's centre as the panel opens.
+ *   - Numbers: Number stream throws values while turning, and they fade; the Odometer rolls only the
+ *     digit that changed; Choice names pushes the next name in the way the value turned; Big number
+ *     fills the dial while held; Units shows the unit only under the pointer; Delta throws how far
+ *     the knob was turned as it is let go.
+ *   - Turning: Detent pulses the pointer on a new step and not within one.
+ *
  *   node browser-checks/knobShowcase.mjs
  */
 import assert from 'node:assert/strict';
@@ -73,6 +83,42 @@ try {
     assert.ok(arriving > 20, `every big and small tick and number has its piece (${arriving})`);
     assert.equal(after.running, 0, 'nothing still playing');
     assert.equal(after.marks, 6, 'the six numbers are there');
+  });
+
+  // Fan in played as the panel opened: about the dial's centre, not each tick's own.
+  const fanned = await page.evaluate((sel) => {
+    const tick = document.querySelector(`${sel} [data-tick]`).closest('[data-word-piece]');
+    const r = document.querySelector(`${sel} svg[data-drawn]`).viewBox.baseVal;
+    return { box: tick.style.transformBox, origin: tick.style.transformOrigin, centre: `${r.width / 2}px ${r.height / 2}px` };
+  }, inPreview(ids.FanIn));
+  check('Ticks: Fan in turns each tick about the dial\'s centre', () => {
+    assert.equal(fanned.box, 'view-box');
+    assert.equal(fanned.origin, fanned.centre);
+  });
+
+  // Fly away: the away flight first, then the flight back, never both at once.
+  const flight = () => page.evaluate((sel) => {
+    const tick = document.querySelector(`${sel} [data-tick]`).closest('[data-word-piece]');
+    const [animation] = tick?.getAnimations() ?? [];
+    const [first] = animation?.effect.getKeyframes() ?? [];
+    return { count: tick?.getAnimations().length ?? 0, way: !animation ? 'none' : first?.opacity === '0' ? 'back' : 'away' };
+  }, inPreview(ids.FlyAway));
+  const [fx, fy] = await centre(ids.FlyAway);
+  await page.mouse.dblclick(fx, fy);
+  await page.waitForTimeout(150);
+  const leaving = await flight();
+  await page.waitForTimeout(800);
+  const returning = await flight();
+  await kit.settle(1400);
+  const home = await page.evaluate((sel) => ({
+    running: document.querySelector(sel).getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length,
+    ticks: document.querySelectorAll(`${sel} [data-tick]`).length,
+  }), inPreview(ids.FlyAway));
+  check('Ticks: Fly away flies the ticks off on a double-click, then back, one flight at a time', () => {
+    assert.deepEqual(leaving, { count: 1, way: 'away' });
+    assert.deepEqual(returning, { count: 1, way: 'back' });
+    assert.equal(home.running, 0);
+    assert.ok(home.ticks > 20, `${home.ticks}`);
   });
 
   // --- Touch ------------------------------------------------------------------------------------
@@ -151,6 +197,100 @@ try {
     assert.equal(named, 'Cutoff');
   });
 
+  // Number stream: words thrown while it turns, each a value, gone once they have flown.
+  const words = () => page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-emitted-word]`)].map((n) => n.textContent.trim()), inPreview(ids.NumberStream));
+  const [nx, ny] = await centre(ids.NumberStream);
+  await page.mouse.move(nx, ny - 10);
+  await page.mouse.down();
+  await page.mouse.move(nx + 50, ny - 30, { steps: 10 });
+  const streaming = await words();
+  await page.mouse.up();
+  await kit.settle(1200);
+  const flown = await words();
+  check('Numbers: Number stream throws values while it turns, and they fade', () => {
+    assert.ok(streaming.length >= 2, `${streaming}`);
+    for (const word of streaming) assert.match(word, /^\d+\.\d$/);
+    assert.deepEqual(flown, []);
+  });
+
+  // Delta: how far it was turned, as it is let go.
+  const [dx, dy] = await centre(ids.Delta);
+  await page.mouse.move(dx, dy - 10);
+  await page.mouse.down();
+  await page.mouse.move(dx + 50, dy - 30, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(120);
+  const delta = await page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-emitted-word]`)].map((n) => n.textContent.trim()), inPreview(ids.Delta));
+  check('Numbers: Delta throws how far it was turned as it is let go', () => {
+    assert.equal(delta.length, 1);
+    assert.match(delta[0], /^\+\d+\.\d$/);
+  });
+
+  // The odometer: only the digit that changed rolls.
+  const digits = () => page.evaluate((sel) => [...document.querySelectorAll(`${sel} .slider-label span`)].map((n) => [n.textContent, n.getAnimations().length]), inPreview(ids.Odometer));
+  await setValue(ids.Odometer, 67);
+  await kit.settle(500);
+  await setValue(ids.Odometer, 68);
+  await page.waitForTimeout(60);
+  const rolled = await digits();
+  check('Numbers: the Odometer rolls only the digit that changed', () => {
+    assert.deepEqual(rolled, [['6', 0], ['8', 1]]);
+  });
+
+  // Choice names: the next name in from the right going up, from the left going down.
+  const pushedFrom = () => page.evaluate((sel) => {
+    const span = document.querySelector(`${sel} .slider-label span`);
+    const [animation] = span?.getAnimations() ?? [];
+    return [span?.textContent, String(animation?.effect.getKeyframes()[0]?.transform ?? '')];
+  }, inPreview(ids.ChoiceNames));
+  await setValue(ids.ChoiceNames, 3);
+  await page.waitForTimeout(60);
+  const up = await pushedFrom();
+  await kit.settle(500);
+  await setValue(ids.ChoiceNames, 1);
+  await page.waitForTimeout(60);
+  const down = await pushedFrom();
+  check('Numbers: Choice names pushes the next name in the way the value turned', () => {
+    assert.deepEqual(up, ['Triangle', 'translateX(110%)']);
+    assert.deepEqual(down, ['Square', 'translateX(-110%)']);
+  });
+
+  // Big number: in the middle of the dial, large, while held; gone after.
+  const big = () => page.evaluate((sel) => {
+    const label = document.querySelector(`${sel} .slider-label`);
+    const box = document.querySelector(sel).getBoundingClientRect();
+    const r = label.getBoundingClientRect();
+    return { opacity: Number(getComputedStyle(label).opacity), size: getComputedStyle(label).fontSize, off: Math.round(Math.hypot(r.x + r.width / 2 - (box.x + box.width / 2), r.y + r.height / 2 - (box.y + box.height / 2))) };
+  }, inPreview(ids.BigNumber));
+  const [bx, by] = await centre(ids.BigNumber);
+  await page.mouse.move(bx, by);
+  await page.mouse.down();
+  await kit.settle(400);
+  const held = await big();
+  await page.mouse.up();
+  await kit.settle(500);
+  const released = await big();
+  check('Numbers: Big number fills the dial while it is held', () => {
+    assert.equal(held.opacity, 1);
+    assert.equal(held.size, '34px');
+    assert.ok(held.off <= 2, `in the middle: ${held.off} px off`);
+    assert.equal(released.opacity, 0);
+  });
+
+  // Units: the unit only while the pointer is over the knob.
+  const unitsText = () => page.evaluate((sel) => document.querySelector(`${sel} .slider-label`)?.textContent.replace(/\s+/g, ' ').trim(), inPreview(ids.Units));
+  const resting = await unitsText();
+  const [ux, uy] = await centre(ids.Units);
+  await page.mouse.move(ux, uy);
+  await kit.settle(500);
+  const hovered = await unitsText();
+  await page.mouse.move(5, 1390);
+  await kit.settle(400);
+  check('Numbers: Units shows the unit only under the pointer', () => {
+    assert.equal(resting, '50');
+    assert.equal(hovered, '50 ms');
+  });
+
   // --- Turning ----------------------------------------------------------------------------------
   ids = await open('Turning');
   await kit.preview(true);
@@ -168,6 +308,20 @@ try {
     assert.equal(glided, 0.9);
   });
 
+  // Detent: a pulse on the pointer for a new step, none within one.
+  const pulses = () => page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-pointer]`)].reduce((n, el) => n + el.getAnimations().filter((a) => a.playState === 'running').length, 0), inPreview(ids.Detent));
+  await setValue(ids.Detent, 7);
+  await page.waitForTimeout(40);
+  const stepped = await pulses();
+  await kit.settle(400);
+  await setValue(ids.Detent, 7.3);
+  await page.waitForTimeout(40);
+  const within = await pulses();
+  check('Turning: Detent pulses the pointer on a new step, and not within one', () => {
+    assert.ok(stepped >= 1, `${stepped}`);
+    assert.equal(within, 0);
+  });
+
   // --- Attention --------------------------------------------------------------------------------
   ids = await open('Attention');
   await kit.preview(true);
@@ -175,7 +329,7 @@ try {
   await kit.settle(400);
   const handedBack = await drawn(ids.RingSweep);
   check('Attention: Ring sweep draws to full as the panel opens, and hands back to the value', () => {
-    assert.ok(Math.max(...sweep) > 0.97, `it reaches full: ${Math.max(...sweep)}`);
+    assert.ok(Math.max(...sweep) > 0.97, `it reaches full: ${sweep.join(" ")}`);
     assert.equal(handedBack, 0.4);
   });
 
@@ -186,7 +340,9 @@ try {
   const [sx, sy] = await centre(ids.Spin);
   await page.mouse.move(sx - 30, sy - 14);
   await page.mouse.down();
-  for (let k = 1; k <= 4; k += 1) await page.mouse.move(sx - 30 + 17.5 * k, sy - 14 - 4 * k);
+  // A flick is 600 px/s over the last 100 ms (gestureEvents.js). Each move takes 15 to 40 ms to
+  // arrive here, and 17.5 px a step came to about that speed: one run in three was no flick at all.
+  for (let k = 1; k <= 4; k += 1) await page.mouse.move(sx - 30 + 32 * k, sy - 14 - 6 * k);
   await page.mouse.up();
   await page.waitForTimeout(120);
   const spinning = await page.evaluate((sel) => {

@@ -20,7 +20,7 @@ import {
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { resolveControlForSet } from '../src/CE_Application/models/controlSetFamilies.js';
-import { stateMatches } from '../src/CE_Application/utils/interactionRuntime.js';
+import { stateMatches, resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
 import { setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 
 import { initHistory, flushHistory } from '../src/CE_Application/stores/history.js';
@@ -155,6 +155,47 @@ test('a value effect hands back to the value, and nothing loops that does not sa
       if (node.trigger?.type === 'always' && !loops.has(entry.slug)) assert.equal(node.iterations, 1, entry.slug);
     }
   }
+});
+
+test('phase 2: a step plays them, a word is thrown, the readout sits in the cap, and the ticks fly and fan', () => {
+  const nodeOf = (slug, name) => byId(slug).preset.animations[name];
+  // A step of the value, as many as the knob has: Detent on a knob of 0 to 12 in ones is twelve.
+  const detent = applied(knobFor(byId('detent')), byId('detent').preset);
+  const entry = resolveInteractiveControl(detent, {}).runtime.keyframes.entries.find((e) => e.name === 'detent');
+  assert.deepEqual([entry.trigger.type, entry.trigger.steps, entry.part], ['valueStep', 12, 'pointerCurrent']);
+  // Words thrown: the value along the pointer at each step; the change, out of the middle, on letting go.
+  assert.deepEqual(['kind', 'shows', 'from', 'direction'].map((k) => nodeOf('number-stream', 'stream')[k]), ['emit', 'value', 'tip', 'pointer']);
+  assert.equal(nodeOf('number-stream', 'stream').trigger.type, 'valueStep');
+  assert.deepEqual(['shows', 'from', 'direction'].map((k) => nodeOf('delta', 'delta')[k]), ['delta', 'centre', 'up']);
+  assert.equal(nodeOf('delta', 'delta').trigger.leaving, true);
+  const thrown = resolveInteractiveControl(applied(createControl('Knob'), byId('number-stream').preset), {}).runtime.keyframes.entries[0];
+  assert.equal(thrown.emit.travel, 24, 'the catalog reads it as words to throw');
+  assert.match(presetDoesNotFit(byId('delta').preset, createControl('Label')), /throws words from a pointer/);
+  // The readout in the cap: the odometer and the choice names roll and push the way the value turned.
+  for (const slug of ['odometer', 'choice-names', 'units', 'big-number']) {
+    const knob = applied(knobFor(byId(slug)), byId(slug).preset);
+    assert.equal(knob._children.Parts._children.labelCurrent.anchor, 'centre', slug);
+    assert.equal(knob._children.Behavior.showHandleLabels, true, slug);
+  }
+  assert.deepEqual([nodeOf('odometer', 'odometer').effect, nodeOf('odometer', 'odometer').direction], ['odometer', 'turn']);
+  assert.deepEqual([nodeOf('choice-names', 'choice').effect, nodeOf('choice-names', 'choice').direction], ['push', 'turn']);
+  assert.deepEqual(byId('choice-names').knob.displayTable, ['Saw', 'Square', 'Pulse', 'Triangle', 'Sine']);
+  // Units: the knob's own unit, taken away while the pointer is not over it.
+  const units = applied(knobFor(byId('units')), byId('units').preset)._children.States._children.Resting;
+  assert.equal(stateMatches(units, { hover: false }), true);
+  assert.equal(stateMatches(units, { hover: true }), false);
+  assert.deepEqual(units.patches.component, { 'Behavior.unit': '' });
+  // Big number: hidden at rest, and while held, large in the cap with the pointer stepped aside.
+  const big = applied(knobFor(byId('big-number')), byId('big-number').preset);
+  assert.equal(big._children.Parts._children.labelCurrent.opacity, 0);
+  assert.equal(big._children.States._children.Pressed.patches.parts.pointerCurrent.opacity, 0, 'added to the knob\'s own Pressed, which squeezes the pointer');
+  // The ticks: fly in from the centre, fly away and back, fan in.
+  assert.deepEqual(Object.values(byId('burst').preset.animations).map((n) => [n.effect, n.way]), [['fly', 'in'], ['fly', 'in']]);
+  assert.deepEqual(Object.values(byId('fly-away').preset.animations).map((n) => `${n.effect} ${n.way}`), ['fly out', 'fly out', 'fly in', 'fly in']);
+  assert.deepEqual(Object.values(byId('fan-in').preset.animations).map((n) => n.effect), ['fan', 'fan']);
+  // An older CEditor reads where the readout sits and ignores it, as any field it does not know; a
+  // value it does not know is not kept.
+  assert.deepEqual(cleanPreset({ ...byId('odometer').preset, fields: { 'Parts.labelCurrent.anchor': 'middle' } }).fields, {});
 });
 
 test('in the library: a built-in applies linked, the panel carries it, and nobody is offered to adopt it', () => {

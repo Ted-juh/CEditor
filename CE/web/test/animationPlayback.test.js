@@ -275,3 +275,18 @@ test('the preview sets the value a state asks for', () => {
   withState(knob, 'Out', { rule: 'value > 100000' });
   assert.equal(statePatch(knob, 'out').exact, false);
 });
+
+test('Play on a step: three steps up and two back down, each on a step of its own (2026-11-26)', () => {
+  const knob = createControl('Knob');
+  Object.assign(knob._children.Behavior, { min: 0, max: 4, step: 1 });
+  withKeyframes(knob, { type: 'valueStep' }, { duration: 160 });
+  const plan = playbackPlan(knob, row(knob, 'pulse'));
+  assert.equal(plan.ok, true, plan.reason);
+  assert.deepEqual(plan.steps.map((step) => step.label), ['start', 'a step up', 'a step up', 'a step up', 'a step down', 'a step down']);
+  assert.deepEqual(plan.steps.map((step) => step.session.valueOverride), [1, 2, 3, 4, 3, 2], 'the knob of five choices, one choice at a time');
+  assert.equal(plan.steps[0].hold, LEAD_MS);
+  assert.ok(plan.steps.slice(1).every((step) => step.hold >= 320), 'each step held long enough to see');
+  const button = createControl('Button');
+  withKeyframes(button, { type: 'valueStep', steps: 4 });
+  assert.match(playbackPlan(button, row(button, 'pulse')).reason, /cannot set this control's value/);
+});

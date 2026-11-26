@@ -20,8 +20,8 @@
   "enabled": true,
   "locked": false,
   "filePath": null,
-  "width": 870,
-  "height": 644,
+  "width": 1140,
+  "height": 906,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -209,6 +209,90 @@
       "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
+    },
+    {
+      "id": "NumberStream.value",
+      "label": "NumberStream",
+      "controlName": "NumberStream",
+      "path": "NumberStream.value",
+      "min": 0,
+      "max": 10,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Odometer.value",
+      "label": "Odometer",
+      "controlName": "Odometer",
+      "path": "Odometer.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Delta.value",
+      "label": "Delta",
+      "controlName": "Delta",
+      "path": "Delta.value",
+      "min": 0,
+      "max": 10,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Units.value",
+      "label": "Units",
+      "controlName": "Units",
+      "path": "Units.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "ms",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "BigNumber.value",
+      "label": "BigNumber",
+      "controlName": "BigNumber",
+      "path": "BigNumber.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ChoiceNames.value",
+      "label": "ChoiceNames",
+      "controlName": "ChoiceNames",
+      "path": "ChoiceNames.value",
+      "min": 0,
+      "max": 4,
+      "defaultValue": 2,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
     }
   ],
   "scripts": [
@@ -240,7 +324,7 @@
     {
       "_children": {
         "Core": {"name":"Note","id":"ctrl_1740715562001","controlType":"Label"},
-        "Transform": {"x":30,"y":58,"width":810,"height":22},
+        "Transform": {"x":30,"y":58,"width":1080,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"the value and the name as text in motion. Each knob wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
       },
@@ -378,7 +462,7 @@
     {
       "_children": {
         "Core": {"name":"TipLabel","id":"ctrl_1740715562016","description":"Tip label: the value rides at the pointer's tip.","controlType":"Knob"},
-        "Transform": {"x":67,"y":328,"width":196,"height":196},
+        "Transform": {"x":877,"y":66,"width":196,"height":196},
         "Behavior": {"circularDiameter":117,"showHandleLabels":true},
         "Parts": {
           "_children": {
@@ -393,7 +477,7 @@
     {
       "_children": {
         "Core": {"name":"TipLabelCaption","id":"ctrl_1740715562017","controlType":"Label"},
-        "Transform": {"x":40,"y":504,"width":250,"height":22},
+        "Transform": {"x":850,"y":242,"width":250,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Tip label","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
@@ -402,7 +486,7 @@
     {
       "_children": {
         "Core": {"name":"TipLabelHow","id":"ctrl_1740715562018","controlType":"Label"},
-        "Transform": {"x":40,"y":526,"width":250,"height":16},
+        "Transform": {"x":850,"y":264,"width":250,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"WHILE TURNING","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
@@ -411,7 +495,7 @@
     {
       "_children": {
         "Core": {"name":"TipLabelWhat","id":"ctrl_1740715562019","controlType":"Label"},
-        "Transform": {"x":44,"y":544,"width":242,"height":36},
+        "Transform": {"x":854,"y":282,"width":242,"height":36},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"the value rides at the pointer's tip","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
@@ -420,7 +504,7 @@
     {
       "_children": {
         "Core": {"name":"MaxStamp","id":"ctrl_1740715562020","description":"MAX stamp: MAX or MIN stamps on in red.","controlType":"Knob"},
-        "Transform": {"x":337,"y":328,"width":196,"height":196},
+        "Transform": {"x":67,"y":328,"width":196,"height":196},
         "Behavior": {"defaultCurrentValue":0.9,"circularDiameter":117,"showHandleLabels":true},
         "Parts": {
           "_children": {
@@ -435,7 +519,7 @@
     {
       "_children": {
         "Core": {"name":"MaxStampCaption","id":"ctrl_1740715562021","controlType":"Label"},
-        "Transform": {"x":310,"y":504,"width":250,"height":22},
+        "Transform": {"x":40,"y":504,"width":250,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MAX stamp","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
@@ -444,7 +528,7 @@
     {
       "_children": {
         "Core": {"name":"MaxStampHow","id":"ctrl_1740715562022","controlType":"Label"},
-        "Transform": {"x":310,"y":526,"width":250,"height":16},
+        "Transform": {"x":40,"y":526,"width":250,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"AT AN END","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
@@ -453,7 +537,7 @@
     {
       "_children": {
         "Core": {"name":"MaxStampWhat","id":"ctrl_1740715562023","controlType":"Label"},
-        "Transform": {"x":314,"y":544,"width":242,"height":36},
+        "Transform": {"x":44,"y":544,"width":242,"height":36},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MAX or MIN stamps on in red","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
@@ -462,7 +546,7 @@
     {
       "_children": {
         "Core": {"name":"FromTheSynth","id":"ctrl_1740715562024","description":"From the synth: a value the synth sends flashes the arc; your own turns do not.","controlType":"Knob"},
-        "Transform": {"x":637,"y":358,"width":136,"height":136},
+        "Transform": {"x":367,"y":358,"width":136,"height":136},
         "Behavior": {"defaultCurrentValue":0.4},
         "Animations": {"_children":{"fromSynth":{"_type":"Animation","name":"fromSynth","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized","origin":"external"},"targets":[{"path":"Parts.bodyTrackFill"}],"frames":[{"at":0,"fill":"FFFFD23F","opacity":1},{"at":0.35,"fill":"FFFFD23F","opacity":1},{"at":1,"opacity":1}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:from-the-synth","revision":1,"from":"fromSynth"}}}}
       },
@@ -471,7 +555,7 @@
     {
       "_children": {
         "Core": {"name":"FromTheSynthCaption","id":"ctrl_1740715562025","controlType":"Label"},
-        "Transform": {"x":580,"y":504,"width":250,"height":22},
+        "Transform": {"x":310,"y":504,"width":250,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"From the synth","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
@@ -480,7 +564,7 @@
     {
       "_children": {
         "Core": {"name":"FromTheSynthHow","id":"ctrl_1740715562026","controlType":"Label"},
-        "Transform": {"x":580,"y":526,"width":250,"height":16},
+        "Transform": {"x":310,"y":526,"width":250,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MIDI IN","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
@@ -489,9 +573,247 @@
     {
       "_children": {
         "Core": {"name":"FromTheSynthWhat","id":"ctrl_1740715562027","controlType":"Label"},
-        "Transform": {"x":584,"y":544,"width":242,"height":36},
+        "Transform": {"x":314,"y":544,"width":242,"height":36},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"a value the synth sends flashes the arc; your own turns do not","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStream","id":"ctrl_1740715562028","description":"Number stream: every step throws its value out along the pointer.","controlType":"Knob"},
+        "Transform": {"x":591,"y":312,"width":228,"height":228},
+        "Behavior": {"max":10,"defaultCurrentValue":5,"circularDiameter":117,"precision":1},
+        "Animations": {"_children":{"stream":{"_type":"Animation","name":"stream","enabled":true,"kind":"emit","trigger":{"type":"valueStep"},"targets":[],"shows":"value","from":"tip","direction":"pointer","travel":24,"size":12,"duration":650,"delay":0,"easing":"outCubic","iterations":1,"preset":{"id":"ce:knob:number-stream","revision":1,"from":"stream"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamCaption","id":"ctrl_1740715562029","controlType":"Label"},
+        "Transform": {"x":580,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Number stream","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamHow","id":"ctrl_1740715562030","controlType":"Label"},
+        "Transform": {"x":580,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamWhat","id":"ctrl_1740715562031","controlType":"Label"},
+        "Transform": {"x":584,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"every step throws its value out along the pointer","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Odometer","id":"ctrl_1740715562032","description":"Odometer: only the digits that changed roll, the way you turned.","controlType":"Knob"},
+        "Transform": {"x":877,"y":328,"width":196,"height":196},
+        "Behavior": {"max":100,"step":1,"defaultCurrentValue":50,"circularDiameter":117,"showHandleLabels":true,"precision":0},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}},"anchor":"centre"}
+          }
+        },
+        "Animations": {"_children":{"odometer":{"_type":"Animation","name":"odometer","enabled":true,"kind":"text","effect":"odometer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":240,"direction":"turn","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:knob:odometer","revision":1,"from":"odometer"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerCaption","id":"ctrl_1740715562033","controlType":"Label"},
+        "Transform": {"x":850,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Odometer","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerHow","id":"ctrl_1740715562034","controlType":"Label"},
+        "Transform": {"x":850,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerWhat","id":"ctrl_1740715562035","controlType":"Label"},
+        "Transform": {"x":854,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"only the digits that changed roll, the way you turned","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Delta","id":"ctrl_1740715562036","description":"Delta: how far you turned it rises out of the dial, \"+2.4\", and fades.","controlType":"Knob"},
+        "Transform": {"x":97,"y":620,"width":136,"height":136},
+        "Behavior": {"max":10,"defaultCurrentValue":5,"precision":1},
+        "Animations": {"_children":{"delta":{"_type":"Animation","name":"delta","enabled":true,"kind":"emit","trigger":{"type":"stateChange","from":["dragging"],"to":["*"],"leaving":true},"targets":[],"shows":"delta","from":"centre","direction":"up","travel":34,"size":18,"duration":1200,"delay":0,"easing":"outCubic","iterations":1,"preset":{"id":"ce:knob:delta","revision":1,"from":"delta"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaCaption","id":"ctrl_1740715562037","controlType":"Label"},
+        "Transform": {"x":40,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Delta","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaHow","id":"ctrl_1740715562038","controlType":"Label"},
+        "Transform": {"x":40,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaWhat","id":"ctrl_1740715562039","controlType":"Label"},
+        "Transform": {"x":44,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how far you turned it rises out of the dial, \"+2.4\", and fades","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Units","id":"ctrl_1740715562040","description":"Units: the unit rolls in after the value.","controlType":"Knob"},
+        "Transform": {"x":337,"y":590,"width":196,"height":196},
+        "Behavior": {"max":100,"step":1,"defaultCurrentValue":50,"circularDiameter":117,"showHandleLabels":true,"precision":0,"unit":"ms"},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}},"anchor":"centre"}
+          }
+        },
+        "States": {"_children":{"Resting":{"_type":"State","name":"Resting","group":"interaction","description":"Units (animation preset).","enabled":true,"when":{"hover":false},"patches":{"component":{"Behavior.unit":""},"parts":{}}}}},
+        "Animations": {"_children":{"unitIn":{"_type":"Animation","name":"unitIn","enabled":true,"kind":"text","effect":"odometer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":300,"direction":"up","trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:knob:units","revision":1,"from":"unitIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsCaption","id":"ctrl_1740715562041","controlType":"Label"},
+        "Transform": {"x":310,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Units","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsHow","id":"ctrl_1740715562042","controlType":"Label"},
+        "Transform": {"x":310,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsWhat","id":"ctrl_1740715562043","controlType":"Label"},
+        "Transform": {"x":314,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the unit rolls in after the value","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumber","id":"ctrl_1740715562044","description":"Big number: the value fills the dial while you hold it.","controlType":"Knob"},
+        "Transform": {"x":607,"y":590,"width":196,"height":196},
+        "Behavior": {"max":100,"step":1,"defaultCurrentValue":50,"circularDiameter":117,"showHandleLabels":true,"precision":0},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}},"anchor":"centre"}
+          }
+        },
+        "States": {"_children":{"Pressed":{"patches":{"parts":{"pointerCurrent":{"opacity":0},"labelCurrent":{"opacity":1,"Text.Font.size":34,"Text.Font.weightValue":700}}}}}},
+        "Animations": {"_children":{"bigNumber":{"_type":"Animation","name":"bigNumber","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["pressed"],"reverse":true},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]},{"path":"Parts.pointerCurrent.opacity","properties":["opacity"]}],"duration":160,"delay":0,"easing":"outQuad","preset":{"id":"ce:knob:big-number","revision":1,"from":"bigNumber"}},"bigPop":{"_type":"Animation","name":"bigPop","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["pressed"]},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"scale":0.55},{"at":1,"scale":1}],"duration":240,"delay":0,"easing":"outBack","iterations":1,"direction":"normal","preset":{"id":"ce:knob:big-number","revision":1,"from":"bigPop"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberCaption","id":"ctrl_1740715562045","controlType":"Label"},
+        "Transform": {"x":580,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Big number","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberHow","id":"ctrl_1740715562046","controlType":"Label"},
+        "Transform": {"x":580,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberWhat","id":"ctrl_1740715562047","controlType":"Label"},
+        "Transform": {"x":584,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value fills the dial while you hold it","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNames","id":"ctrl_1740715562048","description":"Choice names: a stepped knob: the next name pushes in the way you turned.","controlType":"Knob"},
+        "Transform": {"x":877,"y":590,"width":196,"height":196},
+        "Behavior": {"max":4,"step":1,"defaultCurrentValue":2,"circularDiameter":117,"showHandleLabels":true,"displayTable":["Saw","Square","Pulse","Triangle","Sine"]},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}},"anchor":"centre"}
+          }
+        },
+        "Animations": {"_children":{"choice":{"_type":"Animation","name":"choice","enabled":true,"kind":"text","effect":"push","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":280,"direction":"turn","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:knob:choice-names","revision":1,"from":"choice"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesCaption","id":"ctrl_1740715562049","controlType":"Label"},
+        "Transform": {"x":850,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Choice names","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesHow","id":"ctrl_1740715562050","controlType":"Label"},
+        "Transform": {"x":850,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesWhat","id":"ctrl_1740715562051","controlType":"Label"},
+        "Transform": {"x":854,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a stepped knob: the next name pushes in the way you turned","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     }
@@ -1046,6 +1368,349 @@
       },
       "states": {},
       "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:number-stream",
+      "name": "Number stream",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "stream": {
+          "_type": "Animation",
+          "name": "stream",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [],
+          "shows": "value",
+          "from": "tip",
+          "direction": "pointer",
+          "travel": 24,
+          "size": 12,
+          "duration": 650,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:odometer",
+      "name": "Odometer",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "odometer": {
+          "_type": "Animation",
+          "name": "odometer",
+          "enabled": true,
+          "kind": "text",
+          "effect": "odometer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 240,
+          "direction": "turn",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.anchor": "centre"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:delta",
+      "name": "Delta",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "let go"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "delta": {
+          "_type": "Animation",
+          "name": "delta",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "dragging"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [],
+          "shows": "delta",
+          "from": "centre",
+          "direction": "up",
+          "travel": 34,
+          "size": 18,
+          "duration": 1200,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:units",
+      "name": "Units",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "unitIn": {
+          "_type": "Animation",
+          "name": "unitIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "odometer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 300,
+          "direction": "up",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {
+        "Resting": {
+          "when": {
+            "hover": false
+          },
+          "patches": {
+            "component": {
+              "Behavior.unit": ""
+            },
+            "parts": {}
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.anchor": "centre"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:big-number",
+      "name": "Big number",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "press"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "bigNumber": {
+          "_type": "Animation",
+          "name": "bigNumber",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            },
+            {
+              "path": "Parts.pointerCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outQuad"
+        },
+        "bigPop": {
+          "_type": "Animation",
+          "name": "bigPop",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 0.55
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 240,
+          "delay": 0,
+          "easing": "outBack",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {
+        "Pressed": {
+          "when": {
+            "pressed": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1,
+                "Text.Font.size": 34,
+                "Text.Font.weightValue": 700
+              },
+              "pointerCurrent": {
+                "opacity": 0
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0,
+        "Parts.labelCurrent.anchor": "centre"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:choice-names",
+      "name": "Choice names",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "choice": {
+          "_type": "Animation",
+          "name": "choice",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 280,
+          "direction": "turn",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.anchor": "centre"
+      }
     }
   ]
 }

@@ -21,7 +21,7 @@
   "locked": false,
   "filePath": null,
   "width": 870,
-  "height": 644,
+  "height": 906,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -187,6 +187,48 @@
       "label": "Ripple",
       "controlName": "Ripple",
       "path": "Ripple.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Burst.value",
+      "label": "Burst",
+      "controlName": "Burst",
+      "path": "Burst.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FlyAway.value",
+      "label": "FlyAway",
+      "controlName": "FlyAway",
+      "path": "FlyAway.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FanIn.value",
+      "label": "FanIn",
+      "controlName": "FanIn",
+      "path": "FanIn.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -398,6 +440,111 @@
         "Transform": {"x":314,"y":544,"width":242,"height":36},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"a wave of light runs round the ticks","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Burst","id":"ctrl_1748777692022","description":"Burst: each tick flies out from the centre along its own line, the big ones first.","controlType":"Knob"},
+        "Transform": {"x":637,"y":358,"width":136,"height":136},
+        "Animations": {"_children":{"burstBig":{"_type":"Animation","name":"burstBig","enabled":true,"kind":"text","effect":"fly","way":"in","delay":300,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":45,"duration":560,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:knob:burst","revision":1,"from":"burstBig"}},"burstSmall":{"_type":"Animation","name":"burstSmall","enabled":true,"kind":"text","effect":"fly","way":"in","delay":850,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":12,"duration":500,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:knob:burst","revision":1,"from":"burstSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BurstCaption","id":"ctrl_1748777692023","controlType":"Label"},
+        "Transform": {"x":580,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Burst","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BurstHow","id":"ctrl_1748777692024","controlType":"Label"},
+        "Transform": {"x":580,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BurstWhat","id":"ctrl_1748777692025","controlType":"Label"},
+        "Transform": {"x":584,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each tick flies out from the centre along its own line, the big ones first","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyAway","id":"ctrl_1748777692026","description":"Fly away: the ticks fly off along their lines as it resets, and fly back.","controlType":"Knob"},
+        "Transform": {"x":97,"y":620,"width":136,"height":136},
+        "Animations": {"_children":{"awayBig":{"_type":"Animation","name":"awayBig","enabled":true,"kind":"text","effect":"fly","way":"out","delay":0,"easing":"inQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":360,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:knob:fly-away","revision":1,"from":"awayBig"}},"awaySmall":{"_type":"Animation","name":"awaySmall","enabled":true,"kind":"text","effect":"fly","way":"out","delay":0,"easing":"inQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":320,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:knob:fly-away","revision":1,"from":"awaySmall"}},"backBig":{"_type":"Animation","name":"backBig","enabled":true,"kind":"text","effect":"fly","way":"in","delay":650,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":30,"duration":420,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:knob:fly-away","revision":1,"from":"backBig"}},"backSmall":{"_type":"Animation","name":"backSmall","enabled":true,"kind":"text","effect":"fly","way":"in","delay":800,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":8,"duration":380,"trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:knob:fly-away","revision":1,"from":"backSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyAwayCaption","id":"ctrl_1748777692027","controlType":"Label"},
+        "Transform": {"x":40,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Fly away","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyAwayHow","id":"ctrl_1748777692028","controlType":"Label"},
+        "Transform": {"x":40,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyAwayWhat","id":"ctrl_1748777692029","controlType":"Label"},
+        "Transform": {"x":44,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the ticks fly off along their lines as it resets, and fly back","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanIn","id":"ctrl_1748777692030","description":"Fan in: the ticks turn into place round the dial, as a fan opens.","controlType":"Knob"},
+        "Transform": {"x":367,"y":620,"width":136,"height":136},
+        "Animations": {"_children":{"fanBig":{"_type":"Animation","name":"fanBig","enabled":true,"kind":"text","effect":"fan","way":"in","delay":300,"easing":"inOutCubic","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":1100,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMajor"}],"preset":{"id":"ce:knob:fan-in","revision":1,"from":"fanBig"}},"fanSmall":{"_type":"Animation","name":"fanSmall","enabled":true,"kind":"text","effect":"fan","way":"in","delay":450,"easing":"inOutCubic","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":1100,"trigger":{"type":"always"},"targets":[{"path":"Parts.tickMinor"}],"preset":{"id":"ce:knob:fan-in","revision":1,"from":"fanSmall"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanInCaption","id":"ctrl_1748777692031","controlType":"Label"},
+        "Transform": {"x":310,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Fan in","_children":{"Fill":{"colour":"FFEDEDE8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanInHow","id":"ctrl_1748777692032","controlType":"Label"},
+        "Transform": {"x":310,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFFFC857"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanInWhat","id":"ctrl_1748777692033","controlType":"Label"},
+        "Transform": {"x":314,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the ticks turn into place round the dial, as a fan opens","_children":{"Fill":{"colour":"FFA2A7AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     }
@@ -811,6 +958,248 @@
             "to": [
               "hover"
             ]
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:burst",
+      "name": "Burst",
+      "category": "Knob",
+      "tags": [
+        "Ticks",
+        "panel opens"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "burstBig": {
+          "_type": "Animation",
+          "name": "burstBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "in",
+          "delay": 300,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 45,
+          "duration": 560,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "burstSmall": {
+          "_type": "Animation",
+          "name": "burstSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "in",
+          "delay": 850,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 12,
+          "duration": 500,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:fly-away",
+      "name": "Fly away",
+      "category": "Knob",
+      "tags": [
+        "Ticks",
+        "double-click"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "awayBig": {
+          "_type": "Animation",
+          "name": "awayBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "out",
+          "delay": 0,
+          "easing": "inQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 360,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "awaySmall": {
+          "_type": "Animation",
+          "name": "awaySmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "out",
+          "delay": 0,
+          "easing": "inQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 320,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        },
+        "backBig": {
+          "_type": "Animation",
+          "name": "backBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "in",
+          "delay": 650,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 30,
+          "duration": 420,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "backSmall": {
+          "_type": "Animation",
+          "name": "backSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fly",
+          "way": "in",
+          "delay": 800,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 8,
+          "duration": 380,
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMinor"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:fan-in",
+      "name": "Fan in",
+      "category": "Knob",
+      "tags": [
+        "Ticks",
+        "panel opens"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "fanBig": {
+          "_type": "Animation",
+          "name": "fanBig",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fan",
+          "way": "in",
+          "delay": 300,
+          "easing": "inOutCubic",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 1100,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.tickMajor"
+            }
+          ]
+        },
+        "fanSmall": {
+          "_type": "Animation",
+          "name": "fanSmall",
+          "enabled": true,
+          "kind": "text",
+          "effect": "fan",
+          "way": "in",
+          "delay": 450,
+          "easing": "inOutCubic",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 1100,
+          "trigger": {
+            "type": "always"
           },
           "targets": [
             {

@@ -7825,7 +7825,9 @@ const DEFINE_SPECS = {
     // writes for the Text kind; and the preset an animation follows (utils/animationPresetModel.js
     // LINK_KEY), which Apply writes. The Components showcase's knobs carry all of them.
     extra: ['iterations', 'direction', 'loop', 'hold', 'bezier', 'spring',
-      'effect', 'way', 'split', 'order', 'stagger', 'scatter', 'scale', 'spins', 'glyphs', 'colour', 'preset'],
+      'effect', 'way', 'split', 'order', 'stagger', 'scatter', 'scale', 'spins', 'glyphs', 'colour', 'preset',
+      // Words thrown from a knob's pointer (utils/keyframeAnimation.js readEmit).
+      'shows', 'from', 'travel', 'size'],
   },
   Bindings: {
     templates: [ENTRY_BASELINES.Bindings],
@@ -7847,6 +7849,8 @@ const DEFINE_SPECS = {
       'shadowOffset', 'shadowColour', 'shadowBlur', 'taper', 'aspect', 'shiftY',
       // A plate's grooves and a bar pointer's second bar (models/directionKnobParts.js).
       'grooves', 'grooveLength', 'grooveWidth', 'markFrom', 'markTo', 'markWidth', 'markColour',
+      // Where a knob's readout sits: at the pointer's tip, or in the cap (`centre`).
+      'anchor',
       // A plate's, a fader cap's or a button part's rendered look (utils/renderedLookCore.js).
       'look', 'renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop',
       'renderMaterial', 'renderTopMaterial', 'renderTopColour', 'renderCorner',

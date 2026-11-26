@@ -47,7 +47,7 @@ test('a swap\'s effect is a text effect, by name, its "in" what the preview play
   const roll = readSwapEffect('Roll in');
   assert.equal(roll.meaning.found, true);
   assert.equal(roll.meaning.entry.effect.effect, 'roll');
-  assert.deepEqual(roll.meaning.choices, ['typewriter', 'explode', 'roll', 'push', 'wipe', 'crossfade', 'shimmer', 'part', 'reel']);
+  assert.deepEqual(roll.meaning.choices, ['typewriter', 'explode', 'roll', 'push', 'wipe', 'crossfade', 'shimmer', 'part', 'reel', 'odometer', 'fly', 'fan']);
   assert.equal(roll.meaning.choiceNames.roll, 'Roll');
   assert.match(readSwapEffect('zoom').problem.message, /is not a text effect; try typewriter/);
 });
@@ -97,8 +97,8 @@ test('in a script, the calls\' values are read as these kinds and written back a
 
 test('Ctrl+Space in the code offers the same: effects by category, scenes, a control\'s places by name', () => {
   const p = panel();
-  const effects = 'ce.anim.effect("Cutoff", "Fa")';
-  const offered = valueCompletions(effects, 'lua', effects.indexOf('Fa') + 2, { panel: p }, { force: true });
+  const effects = 'ce.anim.effect("Cutoff", "Fad")';
+  const offered = valueCompletions(effects, 'lua', effects.indexOf('Fad') + 3, { panel: p }, { force: true });
   assert.deepEqual(offered.options.slice(0, 2).map((row) => [row.label, row.detail]), [['Fade in', 'Move'], ['Fade out', 'Move']]);
   const scenes = 'ce.anim.play("In")';
   assert.deepEqual(valueCompletions(scenes, 'lua', scenes.indexOf('In') + 2, { panel: p }, { force: true }).options.map((row) => [row.label, row.detail]), [['Intro', 'scene']]);

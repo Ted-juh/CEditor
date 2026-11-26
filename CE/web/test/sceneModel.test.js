@@ -58,8 +58,10 @@ test('a scene and its clips are read and checked; what does not read is dropped,
 });
 
 test('the library: every text effect in and out, moves and paint, each going where it plays', () => {
-  assert.equal(SCENE_EFFECTS.filter((entry) => entry.effect.kind === 'text').length, 18);
+  assert.equal(SCENE_EFFECTS.filter((entry) => entry.effect.kind === 'text').length, 24, 'twelve effects, in and out');
   assert.equal(sceneEffect('text:reel:in').category, 'Swap', 'a reel reads as a change of words');
+  assert.equal(sceneEffect('text:odometer:in').category, 'Swap', 'and an odometer, the letters that changed');
+  assert.equal(sceneEffect('text:fan:in').category, 'Text');
   assert.equal(sceneEffect('text:push:out').category, 'Swap');
   assert.equal(sceneEffect('text:explode:in').category, 'Text');
   assert.equal(sceneEffect('paint:sheen').effect.frames[1].shift, 100);

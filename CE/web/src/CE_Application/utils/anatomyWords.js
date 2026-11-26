@@ -154,11 +154,45 @@ const OWN_BOX = 'transform-box:fill-box;transform-origin:center;';
  * ''): one piece a mark, round the scale; `whole` plays them together. For SVG: no inline display,
  * and a move about the mark's own box.
  */
-export function markPieceStyles(effect, labels, { phase = 'a', seedText = '', at = null } = {}) {
+export function markPieceStyles(effect, labels, { phase = 'a', seedText = '', at = null, geometry = null } = {}) {
   if (!effect || !labels?.length) return [];
   const pieces = labels.map((text) => ({ text: String(text ?? ''), animated: true }));
   const run = effect.split === 'whole' ? { ...effect, stagger: 0 } : effect;
-  return textPieceStyles(run, pieces, { phase, seedText, at }).map((style) => `${style.replace(INLINE_PIECE, '')}${OWN_BOX}`);
+  const about = markGeometry(effect, geometry);
+  return textPieceStyles(run, pieces, { phase, seedText, at }).map((style, i) => `${style.replace(INLINE_PIECE, '')}${OWN_BOX}${about[i] ?? ''}`);
+}
+
+/**
+ * What a fly or a fan needs of each mark, from where the marks are round the dial (`geometry`:
+ * `{ centre: { x, y }, points: [{ x, y }] }`, one point a mark): a fly's way to or from the centre
+ * (going in, `--ce-fly-x`/`-y`, from the centre to the mark, so it starts there; going out,
+ * `--ce-fly-out-x`/`-y`, on outward by most of its distance: a pair each way, so a fly away and the
+ * fly back can play on the same marks); a fan's turn back to the first mark's angle
+ * (`--ce-fan-turn`) about the dial's centre. Nothing for any other effect, or without geometry: the
+ * effect's own fallback plays about the mark.
+ */
+export function markGeometry(effect, geometry) {
+  const kind = effect?.effect;
+  const centre = geometry?.centre;
+  const points = geometry?.points ?? [];
+  if (!['fly', 'fan'].includes(kind) || !centre || !points.length) return [];
+  if (kind === 'fly') {
+    const outward = effect.way === 'out';
+    return points.map((point) => {
+      const dx = point.x - centre.x;
+      const dy = point.y - centre.y;
+      return outward
+        ? `--ce-fly-out-x:${round(dx * 0.9)}px;--ce-fly-out-y:${round(dy * 0.9)}px;`
+        : `--ce-fly-x:${round(-dx)}px;--ce-fly-y:${round(-dy)}px;`;
+    });
+  }
+  const angleOf = (point) => (Math.atan2(point.y - centre.y, point.x - centre.x) * 180) / Math.PI;
+  const first = angleOf(points[0]);
+  const origin = `transform-box:view-box;transform-origin:${round(centre.x)}px ${round(centre.y)}px;`;
+  return points.map((point) => {
+    const back = ((angleOf(point) - first) % 360 + 360) % 360;
+    return `--ce-fan-turn:${round(-back)}deg;${origin}`;
+  });
 }
 
 const round = (value) => Math.round(value * 100) / 100;

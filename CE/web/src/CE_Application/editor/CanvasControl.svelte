@@ -98,7 +98,7 @@
   import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { noteAnimationsFired, animationPlays, requestAnimationPlay } from '../stores/animationActivity.js';
-  import { splitText, textEffectSpan, textPieceStyles, reelColumns, REEL_WINDOW } from '../utils/textEffects.js';
+  import { splitText, textEffectSpan, textPieceStyles, reelColumns, REEL_WINDOW, odometerChanged, wordsHistory } from '../utils/textEffects.js';
   import { createKeyframePlayer, animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { transport } from '../stores/transport.js';
   import {
@@ -1930,9 +1930,15 @@
       if (seen.size || fresh) valueNow = now;
     });
   });
+  // A frame at a time while an effect runs: each step moves the clock on, and the clock moving is
+  // what asks for the next. So it must always move. It reads performance.now(), the clock the runs'
+  // starts are on, not the frame's timestamp, which can be behind a start set this frame; and
+  // Chromium has been seen to hand two callbacks the same frame time, which left the clock where it
+  // was, asked for nothing more, and held a knob on the first frame of its effect (2026-11-26: Ring
+  // sweep drawn at 0 instead of its value, one panel open in three).
   $effect(() => {
     if (!drawnValueState.running || valueFrame || typeof requestAnimationFrame !== 'function') return;
-    const step = (now) => { valueFrame = 0; valueNow = now; };
+    const step = () => { valueFrame = 0; valueNow = Math.max(nowMs(), valueNow + 0.001); };
     valueFrame = requestAnimationFrame(step);
   });
   onDestroy(() => { if (valueFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(valueFrame); valueFrame = 0; });
@@ -1982,11 +1988,20 @@
   let liveTextEffect = $derived(ownTextEffects.filter((item) => !isSwapOut(item)).at(-1) ?? null);
   let ghostTextEffect = $derived(ownTextEffects.filter(isSwapOut).at(-1) ?? null);
 
+  // What the words said before they last changed, line by line, for an odometer: only the letters
+  // that differ roll (textEffects.js odometerChanged, wordsHistory).
+  const linesBefore = wordsHistory((lines) => lines.join('\n'));
+
   /** Lines of text cut into pieces for one effect, each piece with its inline style; per line. */
   function textPiecesFor(lines, item) {
     const all = [];
+    const odometer = item.effect.effect === 'odometer' && item.effect.split === 'letter';
+    const before = odometer ? linesBefore(lines) : null;
     lines.forEach((line, index) => {
-      for (const piece of splitText(line === '' ? '\u200B' : line, item.effect.split)) all.push({ ...piece, line: index });
+      const changed = odometer ? odometerChanged(line, before?.[index] ?? null) : null;
+      splitText(line === '' ? '\u200B' : line, item.effect.split).forEach((piece, k) => {
+        all.push({ ...piece, animated: piece.animated && changed?.[k] !== false, line: index });
+      });
     });
     const seedText = `${core?.id ?? ''}:${item.name}`;
     // A reel's letters are windows on their columns (textEffects.js reelColumns).
@@ -3727,6 +3742,7 @@
         partAnimations={activeKeyframes?.parts ?? null}
         partColours={keyframeColours}
         partTexts={activeKeyframes?.texts ?? null}
+        emits={activeKeyframes?.emits?.length ? activeKeyframes.emits : null}
         debug={interactionDebugEnabled}
       />
     {/if}

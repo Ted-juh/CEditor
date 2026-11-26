@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import {
-  SLIDER_WORD_PARTS, sliderWordParts, sliderWordsPlace, sliderWordsRefusal, markPieceStyles, markClipBox, knobFormOf, sliderMarkCount,
+  SLIDER_WORD_PARTS, sliderWordParts, sliderWordsPlace, sliderWordsRefusal, markPieceStyles, markClipBox, markGeometry, knobFormOf, sliderMarkCount,
 } from '../src/CE_Application/utils/anatomyWords.js';
 import ControlAnatomy from '../src/CE_Application/editor/ControlAnatomy.svelte';
 import InteractivePartRenderer from '../src/CE_Application/editor/InteractivePartRenderer.svelte';
@@ -128,6 +128,60 @@ test('a roll clips each tick to a box about itself; a handle label is cut into l
   assert.ok(clips.length >= 2, html);
   for (const id of clips) assert.ok(html.includes(`clip-path="url(#${id})"`), id);
   assert.match(html, /<div class="slider-label[^"]*" data-label-words="" style="[^"]*"><!--\[--><span style="display:inline-block;white-space:pre;animation:ce-tx-/);
+});
+
+test('a fly or a fan moves each mark about the dial\'s centre; any other effect, about itself', () => {
+  const around = { centre: { x: 50, y: 50 }, points: [{ x: 20, y: 80 }, { x: 50, y: 10 }, { x: 80, y: 80 }] };
+  const fly = effect({ effect: 'fly', way: 'in' });
+  assert.deepEqual(markGeometry(fly, around), [
+    '--ce-fly-x:30px;--ce-fly-y:-30px;', '--ce-fly-x:0px;--ce-fly-y:40px;', '--ce-fly-x:-30px;--ce-fly-y:-30px;',
+  ], 'going in, each starts at the centre');
+  assert.deepEqual(markGeometry(effect({ effect: 'fly', way: 'out' }), around)[1], '--ce-fly-out-x:0px;--ce-fly-out-y:-36px;', 'going out, on along its own line, by a pair of its own');
+  const fan = markGeometry(effect({ effect: 'fan', way: 'in' }), around);
+  assert.deepEqual(fan.map((style) => /--ce-fan-turn:(-?\d+)deg/.exec(style)[1]), ['0', '-135', '-270'], 'each turned back to the first mark');
+  for (const style of fan) assert.match(style, /transform-box:view-box;transform-origin:50px 50px;$/);
+  assert.deepEqual(markGeometry(effect({ effect: 'roll' }), around), []);
+  assert.deepEqual(markGeometry(fly, null), [], 'off a dial, the effect\'s own fallback');
+  const styles = markPieceStyles(fly, ['0', '5', '10'], { phase: 'a', geometry: around });
+  assert.match(styles[0], /transform-origin:center;--ce-fly-x:30px;--ce-fly-y:-30px;$/, 'after the piece\'s own, so the dial\'s wins');
+});
+
+test('a knob\'s marks fly in from its centre, and fan about it', () => {
+  const html = drawn({ scaleNumberCount: 3, showTicks: false }, { tickNumber: { effect: 'fan', way: 'in' } });
+  const turns = [...html.matchAll(/--ce-fan-turn:(-?[\d.]+)deg;transform-box:view-box;transform-origin:([\d.]+)px ([\d.]+)px;/g)];
+  assert.equal(turns.length, 3);
+  assert.deepEqual(turns.map((m) => [m[2], m[3]]), [['60', '60'], ['60', '60'], ['60', '60']], 'about the dial of a 120 box');
+  assert.deepEqual(turns.map((m) => Math.round(Number(m[1]))), [0, -135, -270], 'the scale is 270°, from its first number');
+});
+
+test('a knob throws the words its emit animation made, from the tip or the centre, and its readout sits in the cap', () => {
+  const control = knob({ min: 0, max: 10, precision: 1, showHandleLabels: false });
+  const word = (fields) => ({ id: 1, name: 'stream', at: performance.now(), value: 0.75, from: 0.5, turn: 1,
+    emit: { shows: 'value', from: 'tip', direction: 'pointer', travel: 36, size: 12, colour: null, duration: 700, delay: 0, easing: 'ease-out', ...fields } });
+  const thrown = render(SliderFamilyRenderer, { props: { control, width: 120, height: 120, emits: [word({})] } }).body;
+  const one = /<div class="slider-label emit-word[^"]*" data-emitted-word="" style="([^"]*)">([^<]*)<\/div>/.exec(thrown);
+  assert.ok(one, thrown);
+  assert.equal(one[2], '7.5');
+  assert.match(one[1], /font-size:12px;--ce-emit-x:[-\d.]+px;--ce-emit-y:[-\d.]+px;animation-duration:700ms;animation-delay:0ms;animation-timing-function:ease-out, /);
+  const [x, y] = [Number(/left:([-\d.]+)px/.exec(one[1])[1]), Number(/top:([-\d.]+)px/.exec(one[1])[1])];
+  assert.ok(Math.hypot(x - 60, y - 60) > 40, `past the pointer's tip: ${x}, ${y}`);
+  const delta = render(SliderFamilyRenderer, { props: { control, width: 120, height: 120, emits: [word({ shows: 'delta', from: 'centre', direction: 'up' })] } }).body;
+  const two = /data-emitted-word="" style="([^"]*)">([^<]*)</.exec(delta);
+  assert.equal(two[2], '+2.5', 'the change since the last word, signed');
+  assert.match(two[1], /^left:60\.0px;top:60\.0px;.*--ce-emit-x:0\.0px;--ce-emit-y:-36\.0px;/, 'from the centre, straight up');
+  const down = render(SliderFamilyRenderer, { props: { control, width: 120, height: 120, emits: [{ ...word({ shows: 'delta' }), value: 0.25 }] } }).body;
+  assert.match(down, /data-emitted-word=""[^>]*>\u22122\.5</, 'a fall is a minus sign, not a hyphen');
+  const none = render(SliderFamilyRenderer, { props: { control, width: 120, height: 120 } }).body;
+  assert.doesNotMatch(none, /data-emitted-word/);
+  const landed = render(SliderFamilyRenderer, { props: { control, width: 120, height: 120, emits: [{ ...word({}), at: performance.now() - 900 }] } }).body;
+  assert.doesNotMatch(landed, /data-emitted-word/, 'a word that has flown is not drawn, whenever the player is next asked');
+
+  const capped = knob({ showHandleLabels: true });
+  capped._children.Parts = { ...(capped._children.Parts ?? {}) };
+  const tipped = render(SliderFamilyRenderer, { props: { control: capped, width: 120, height: 120 } }).body;
+  const at = (html) => /class="slider-label[^"]*"[^>]*style="[^"]*left:\s*([-\d.]+)px;\s*top:\s*([-\d.]+)px/.exec(html)?.slice(1).map(Number);
+  assert.ok(at(tipped), tipped);
+  assert.notDeepEqual(at(tipped), [60, 60], 'by default, at the tip');
 });
 
 // --- A knob drawn as a form (ControlAnatomy), and one carried by a component's part -----------------

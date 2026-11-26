@@ -19,7 +19,7 @@
  * it. A condition the session cannot hold at all is reported (`exact: false`) and played as near as
  * it can be, because a near miss shown honestly beats a Play button that does nothing.
  */
-import { readTrigger, STATE_RULE_VALUE_NAMES } from './interactionRuntime.js';
+import { readTrigger, stepsOfControl, STATE_RULE_VALUE_NAMES } from './interactionRuntime.js';
 import { getCustomValueChannels, customChannelDefaultValue, customConditionMatches } from './customComponentInteraction.js';
 import { controlStateNames, ANY_STATE, DEFAULT_STATE } from './animationModel.js';
 import { isSliderBehavior, getSliderMin, getSliderMax } from './sliderBehavior.js';
@@ -311,6 +311,26 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
         { label: 'high', session: { ...REST_SESSION, ...on, ...high }, hold: span + TAIL_MS },
         { label: 'low again', session: { ...REST_SESSION, ...on, ...low }, hold: span + TAIL_MS },
       ],
+    };
+  }
+
+  if (trigger.type === 'valueStep') {
+    // Three steps up and two back down, each on a step of its own and held long enough to see what
+    // a step plays, and which way it turned (a push or an odometer goes the way the value went).
+    const steps = trigger.steps || stepsOfControl(control);
+    const first = Math.max(0, Math.min(steps - 3, Math.round(steps * 0.25)));
+    const slots = [first, first + 1, first + 2, first + 3, first + 2, first + 1];
+    const patches = slots.map((slot) => valuePatch(control, slot / steps));
+    if (patches.some((patch) => !patch)) return { ok: false, reason: 'Play cannot set this control\'s value. Turn it on the stage instead.' };
+    return {
+      ok: true,
+      exact: true,
+      note: '',
+      steps: slots.map((slot, i) => ({
+        label: i === 0 ? 'start' : slot > slots[i - 1] ? 'a step up' : 'a step down',
+        session: { ...REST_SESSION, ...patches[i] },
+        hold: i === 0 ? LEAD_MS : Math.max(320, Math.min(span, 900)),
+      })),
     };
   }
 

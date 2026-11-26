@@ -13,10 +13,11 @@
  */
 
 /**
- * The animation kinds a preset may hold: animationModel.js ANIMATION_KINDS, and VALUE_KIND (what a
- * knob's value draws, step 6). A CEditor from before step 6 refuses a value preset, as it should.
+ * The animation kinds a preset may hold: animationModel.js ANIMATION_KINDS, VALUE_KIND (what a
+ * knob's value draws, step 6) and EMIT_KIND (words thrown from its pointer, the Components' Knob).
+ * A CEditor from before either refuses such a preset, as it should.
  */
-export const PRESET_KINDS = Object.freeze(['transition', 'keyframes', 'sequence', 'text', 'value']);
+export const PRESET_KINDS = Object.freeze(['transition', 'keyframes', 'sequence', 'text', 'value', 'emit']);
 
 /** An animation's name as a path segment: animationModel.js cleanAnimationName. */
 export function cleanPresetAnimationName(wanted) {
@@ -75,10 +76,12 @@ export function cleanPreset(raw) {
   const fields = {};
   for (const [path, value] of Object.entries(raw.fields ?? {})) {
     // Only what a recipe is known to need: what a Label shows, set to a word; a knob's readout shown;
-    // a part's resting opacity (a readout hidden until a state shows it).
+    // a part's resting opacity (a readout hidden until a state shows it); where the readout sits, at
+    // the pointer's tip or in the cap (a stepped knob's choice, an odometer).
     if (path === 'Text.shows' && /^[a-zA-Z]{1,24}$/.test(String(value))) fields[path] = String(value);
     else if (path === 'Behavior.showHandleLabels' && typeof value === 'boolean') fields[path] = value;
     else if (/^Parts\.[A-Za-z][A-Za-z0-9_]{0,39}\.opacity$/.test(path) && Number.isFinite(Number(value))) fields[path] = Math.min(1, Math.max(0, Number(value)));
+    else if (path === 'Parts.labelCurrent.anchor' && ['tip', 'centre'].includes(value)) fields[path] = value;
   }
   return {
     format: PRESET_FORMAT,

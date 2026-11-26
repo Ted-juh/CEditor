@@ -10,7 +10,7 @@
   import { activeControlSet } from '../stores/controlSets.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { resolveSliderSemanticParts } from '../utils/sliderEntityFactory.js';
-  import { splitText, textEffectClips, textPieceStyles } from '../utils/textEffects.js';
+  import { splitText, textEffectClips, textPieceStyles, odometerChanged, effectInTurn, wordsHistory } from '../utils/textEffects.js';
   import { markClipBox, markPieceStyles } from '../utils/anatomyWords.js';
   import { numberOr, clamp } from '../utils/primitives.js';
   import {
@@ -45,6 +45,9 @@
     // Text effects playing on the knob's own words, by part (utils/anatomyWords.js): its scale's
     // numbers and ticks, and the labels on its handles. The keyframe player's `texts`, or null.
     partTexts = null,
+    // Words an `emit` animation threw (utils/keyframeAnimation.js EMIT): each flies out from the
+    // pointer's tip, or the dial's centre, and fades. The keyframe player keeps them while they fly.
+    emits = null,
     debug = false,
   } = $props();
 
@@ -509,6 +512,16 @@
       ? { kind: 'rect', x: x1 - thickness / 2, y: Math.min(y1, y2), width: thickness, height: Math.abs(y2 - y1), rx: trackRadius }
       : { kind: 'rect', x: Math.min(x1, x2), y: y1 - thickness / 2, width: Math.abs(x2 - x1), height: thickness, rx: trackRadius };
   }
+  // A readout in the cap (Parts.labelCurrent.anchor `centre`, shown) has the middle of the dial: a
+  // line or bar pointer starts no nearer than two thirds of the way out, a tick at the rim, so the
+  // number or the choice is not struck through. A readout hidden at rest gives the room back.
+  let capReadout = $derived(geometry === 'circular' && showHandleLabels && String(labelParts.current?.anchor ?? '') === 'centre'
+    && numberOr(labelParts.current?.opacity, 1) > 0 && labelParts.current?.visible !== false);
+  const pointerInner = (share) => {
+    const r0 = pointerReach * (share / 100);
+    return capReadout ? Math.max(r0, pointerReach * 0.66) : r0;
+  };
+
   function radialPointerShape(kind) {
     const angle = (sliderNormalizedToAngle(behavior, normalizedValues.current) * Math.PI) / 180;
     const ux = Math.cos(angle);
@@ -524,7 +537,7 @@
     }
     if (kind === 'line') {
       // Layout.offsetX is where the line starts, as a % of the cap radius (30 unless the set says).
-      const r0 = pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.offsetX, 30) / 100);
+      const r0 = pointerInner(numberOr(pointerCurrentPart?._children?.Layout?.offsetX, 30));
       return { line: { x1: cx + ux * r0, y1: cy + uy * r0, x2: cx + ux * tip, y2: cy + uy * tip, width: thick } };
     }
     const px = -uy;
@@ -534,7 +547,7 @@
       // the cap radius as theirs are, so it keeps its proportions at any size. `taper` narrows the
       // tip by that % of the width (a wedge), a negative one widens it. A border is an edge round
       // it, outside the fill: two fine lines with no fill between them, or a dark rim round a bar.
-      const r0 = pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.offsetX, 30) / 100);
+      const r0 = pointerInner(numberOr(pointerCurrentPart?._children?.Layout?.offsetX, 30));
       const halfBase = Math.max(0.5, pointerReach * numberOr(pointerCurrentPart?._children?.Layout?.width, 12) / 200);
       const halfTip = halfBase * (1 - Math.max(-300, Math.min(100, numberOr(pointerCurrentPart?.taper, 0))) / 100);
       const quad = (grow) => [[r0 - grow, -halfBase - grow], [tip + grow, -halfTip - grow], [tip + grow, halfTip + grow], [r0 - grow, halfBase + grow]]
@@ -743,7 +756,32 @@
   // A scale's numbers and ticks are drawn here, not as parts, so a text effect on Parts.tickNumber,
   // tickMajor or tickMinor plays here: one piece a mark, round the scale in order. The labels on the
   // handles are HTML and are cut as a Label's words are.
-  const wordsEffect = (partName) => partTexts?.get?.(partName)?.at(-1) ?? null;
+  // Several effects on one part play one at a time (textEffects.js effectInTurn): an out, then the
+  // in that brings the words back. `turnClock` moves when the next one is due, to draw it.
+  let turnClock = $state(0);
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const effectTurn = (partName) => {
+    void turnClock;
+    return effectInTurn(partTexts?.get?.(partName) ?? [], now());
+  };
+  const wordsEffect = (partName) => effectTurn(partName).item;
+  let nextTurn = $derived(Math.min(...['tickNumber', 'tickMajor', 'tickMinor', 'labelStart', 'labelCurrent', 'labelEnd']
+    .map((partName) => effectTurn(partName).next ?? Infinity)));
+  // A thrown word is gone once it has flown (keyframeAnimation.js EMIT): the player forgets it the
+  // next time it is asked, which after the last turn of the knob may be a while.
+  const wordEnd = (word) => word.at + word.emit.delay + word.emit.duration + 100;
+  let wordsInFlight = $derived.by(() => {
+    void turnClock;
+    const t = now();
+    return (emits ?? []).filter((word) => t < wordEnd(word));
+  });
+  let nextLanding = $derived(Math.min(...wordsInFlight.map(wordEnd)));
+  $effect(() => {
+    const due = Math.min(nextTurn, nextLanding);
+    if (!Number.isFinite(due)) return undefined;
+    const timer = setTimeout(() => { turnClock += 1; }, Math.max(0, due - now()) + 4);
+    return () => clearTimeout(timer);
+  });
 
   /**
    * One effect over a scale's marks ({ label, box }, in order round it): each mark's style and, for a
@@ -751,10 +789,17 @@
    */
   function marksFx(partName, item, marks) {
     if (!item || !marks.length) return null;
-    const styles = markPieceStyles(item.effect, marks.map((mark) => mark.label), { phase: item.phase, seedText: `${partName}:${item.name}`, at: item.at ?? null });
+    // Where each mark is round the dial, for an effect that moves it about the centre (fly, fan).
+    const around = geometry === 'circular'
+      ? { centre: circularCenter, points: marks.map((mark) => markCentre(mark.box)) }
+      : null;
+    const styles = markPieceStyles(item.effect, marks.map((mark) => mark.label), { phase: item.phase, seedText: `${partName}:${item.name}`, at: item.at ?? null, geometry: around });
     const clips = textEffectClips(item.effect);
     return marks.map((mark, i) => ({ style: styles[i], clip: clips ? { id: maskIdFor(`${partName}Word${i}`), ...markClipBox(mark.box) } : null }));
   }
+
+  /** The middle of what a mark covers: a number's or a dot's centre, a tick line's midpoint. */
+  const markCentre = (box) => (box?.x1 != null ? { x: (box.x1 + box.x2) / 2, y: (box.y1 + box.y2) / 2 } : { x: box?.x ?? 0, y: box?.y ?? 0 });
 
   /** What a tick of this kind covers, for its clip: a numeral's text, a dot, or the line itself. */
   function tickBox(kind, line, length, strokeWidth, label) {
@@ -797,14 +842,63 @@
   });
   let wordClips = $derived([...(numbersFx ?? []), ...(majorFx ?? []), ...(minorFx ?? [])].map((fx) => fx.clip).filter(Boolean));
 
+  // What each handle label said before it last changed, for an odometer: the letters that differ
+  // roll and the rest stand still. Not reactive state: it is read where the words are cut, and a
+  // change of words is what re-renders them.
+  const labelHistory = new Map();
+  function previousWords(partName, text) {
+    if (!labelHistory.has(partName)) labelHistory.set(partName, wordsHistory());
+    return labelHistory.get(partName)(text);
+  }
+
   /** A handle label's words cut for an effect, each with its style; null when none plays on it. */
   function labelWords(partName, text) {
+    const words = String(text ?? '');
+    const before = previousWords(partName, words);
     const item = wordsEffect(partName);
     if (!item) return null;
-    const pieces = splitText(String(text ?? ''), item.effect.split);
+    let pieces = splitText(words, item.effect.split);
+    // An odometer rolls only what changed since the words before (utils/textEffects.js).
+    if (item.effect.effect === 'odometer' && item.effect.split === 'letter') {
+      const changed = odometerChanged(words, before);
+      pieces = pieces.map((piece, i) => ({ ...piece, animated: piece.animated && changed[i] !== false }));
+    }
     const styles = textPieceStyles(item.effect, pieces, { phase: item.phase, seedText: `${partName}:${item.name}`, at: item.at ?? null });
     return { pieces: pieces.map((piece, i) => ({ ...piece, style: styles[i] })), clips: textEffectClips(item.effect) };
   }
+
+  // --- Emitted words (utils/keyframeAnimation.js EMIT) -------------------------------------------
+  const valueAt = (normalized) => numberOr(behavior?.min, 0) + (numberOr(behavior?.max, 1) - numberOr(behavior?.min, 0)) * clamp(numberOr(normalized, 0), 0, 1);
+  /** What a word says: the value as the readout prints it, or the change since the last word, signed. */
+  function emittedText(word) {
+    if (word.emit.shows !== 'delta') return formatSliderNumericValue(behavior, valueAt(word.value));
+    const span = numberOr(behavior?.max, 1) - numberOr(behavior?.min, 0);
+    const change = (numberOr(word.value, 0) - numberOr(word.from, 0)) * span;
+    const precision = Math.max(0, Math.min(6, Math.round(numberOr(behavior?.precision, 2))));
+    return `${change >= 0 ? '+' : '\u2212'}${Math.abs(change).toFixed(precision)}`;
+  }
+  let emittedWords = $derived.by(() => {
+    if (!wordsInFlight.length || geometry !== 'circular') return [];
+    return wordsInFlight.map((word) => {
+      const angle = (sliderNormalizedToAngle(behavior, numberOr(word.value, 0)) * Math.PI) / 180;
+      const start = word.emit.from === 'centre'
+        ? circularCenter
+        : resolveCircularPoint(width, height, sliderNormalizedToAngle(behavior, numberOr(word.value, 0)), circularMetrics.radius + 14, circularCenter);
+      const [dx, dy] = word.emit.direction === 'up' ? [0, -word.emit.travel] : [Math.cos(angle) * word.emit.travel, Math.sin(angle) * word.emit.travel];
+      const colour = word.emit.colour ? argbToCss(word.emit.colour) : argbToCss(labelParts.current?._children?.Text?._children?.Fill?.colour, '#FFFFFF');
+      return {
+        id: word.id,
+        text: emittedText(word),
+        style: [
+          `left:${start.x.toFixed(1)}px`, `top:${start.y.toFixed(1)}px`, `color:${colour}`, `font-size:${word.emit.size}px`,
+          `--ce-emit-x:${dx.toFixed(1)}px`, `--ce-emit-y:${dy.toFixed(1)}px`,
+          `animation-duration:${Math.round(word.emit.duration)}ms`, `animation-delay:${Math.round(word.emit.delay)}ms`,
+          // The move eases as the animation says; the fade holds, then drops in the last part.
+          `animation-timing-function:${word.emit.easing}, cubic-bezier(0.7, 0, 0.9, 0.45)`,
+        ].join(';'),
+      };
+    });
+  });
   const sliderInstanceId = $props.id();
   let sliderMaskSeed = $derived(safeSvgId(`${control?._children?.Core?.id ?? 'slider'}-${sliderInstanceId}`));
   let singleFillOrigin = $derived(String(behavior?.fillOrigin ?? 'min').trim().toLowerCase() === 'center' ? centerMarkerNormalized : 0);
@@ -1643,8 +1737,11 @@
     {/if}
   </svg>
 
-  {#snippet handleLabel(partName, part, anchor, text)}
+  {#snippet handleLabel(partName, part, tip, text)}
     {@const words = labelWords(partName, text)}
+    <!-- A handle label rides its pointer's tip, or sits in the cap (`anchor: centre`): the value in
+         the middle of the knob while it is pressed, a stepped knob's choice. -->
+    {@const anchor = String(part?.anchor ?? '') === 'centre' && geometry === 'circular' ? circularCenter : tip}
     {#if words}
       <!-- In a text effect: cut as a Label's words are, and clipped to itself for a roll or a push. -->
       <div class="slider-label" data-label-words style={`${labelStyle(part, anchor, partName)}${words.clips ? ';overflow:hidden' : ''}`}>{#each words.pieces as piece, i (i)}<span style={piece.style}>{piece.text}</span>{/each}</div>
@@ -1654,6 +1751,10 @@
       </div>
     {/if}
   {/snippet}
+
+  {#each emittedWords as word (word.id)}
+    <div class="slider-label emit-word" data-emitted-word style={word.style}>{word.text}</div>
+  {/each}
 
   {#if showHandleLabels && valueMode !== 'single'}
     {@render handleLabel('labelStart', labelParts.start, labelAnchors.start, labelContent(labelParts.start, formatSliderNumericValue(behavior, rawValues.start)))}
@@ -1694,6 +1795,25 @@
     letter-spacing: 0.08px;
     pointer-events: none;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  }
+
+  /* A word an emit animation threw: out from where it was thrown by --ce-emit-x/-y, growing a
+     little, and fading after it has been read. Two animations, each from/to: a percentage stop in
+     a component's keyframes puts its class on every element it draws (Svelte 5). */
+  .emit-word {
+    animation-name: ce-emit-word-move, ce-emit-word-fade;
+    animation-fill-mode: both;
+    font-weight: 700;
+  }
+
+  @keyframes ce-emit-word-move {
+    from { translate: 0 0; scale: 0.85; }
+    to { translate: var(--ce-emit-x, 0px) var(--ce-emit-y, -24px); scale: 1.12; }
+  }
+
+  @keyframes ce-emit-word-fade {
+    from { opacity: 1; }
+    to { opacity: 0; }
   }
 
   .slider-debug-chip {

@@ -11,9 +11,10 @@
  * belong to the set are its tokens (`{control.fill.hot}`), which each set resolves its own way.
  * Colours that are the effect's own (a red overload, an amber flash) are written out.
  *
- * Every preset here plays on what a knob already has. The ones the design lists and this does not
- * hold yet (a number stream, an odometer, a delta, ticks flying along their line) wait for the
- * engine work they need; the design record says which.
+ * The first 39 played on what a knob already had; the rest needed the engine to learn something
+ * first (the design record's phase 2): a step of the value as a trigger and the way it turned, words
+ * thrown from the pointer, an odometer, a readout in the cap, and marks that fly along their own
+ * line or fan in about the dial.
  *
  * IMPORTS ONLY THE FORMAT, which imports nothing: the export tools and the showcase script read this
  * under plain Node.
@@ -54,6 +55,13 @@ const words = (name, trigger, part, effect, way, settings, extra = {}) => ({
   targets: [{ path: `Parts.${part}` }], ...extra,
 });
 
+/** Words thrown from the pointer each time it plays (keyframeAnimation.js EMIT): the value, or the change. */
+const emit = (name, trigger, settings, extra = {}) => ({
+  _type: 'Animation', name, enabled: true, kind: 'emit', trigger, targets: [],
+  shows: 'value', from: 'tip', direction: 'pointer', travel: 36, size: 12,
+  duration: 700, delay: 0, easing: 'outCubic', iterations: 1, ...settings, ...extra,
+});
+
 const value = (name, trigger, frames, duration, extra = {}) => ({
   _type: 'Animation', name, enabled: true, kind: 'value', trigger,
   targets: [{ path: 'Value' }], frames, duration, delay: 0, easing: 'inOutCubic', iterations: 1, ...extra,
@@ -69,10 +77,14 @@ const WHILE_HOVER = { type: 'stateChange', to: ['hover'] };   // with a loop: fo
 // The light a shimmer runs: warm, so it shows on white ticks and on dark numbers alike.
 const LIGHT = 'FFFFC24D';
 const VALUE_CHANGE = { type: 'valueChange', source: 'value.normalized' };
+// Each step of the value, as many as the knob has (a knob with none: one every 5%), while dragged too.
+const EACH_STEP = { type: 'valueStep' };
 
 // What the knob's readout needs to play: the readout shown, and hidden until the preset shows it.
 const READOUT_HIDDEN = Object.freeze({ 'Behavior.showHandleLabels': true, 'Parts.labelCurrent.opacity': 0 });
 const READOUT_SHOWN = Object.freeze({ 'Behavior.showHandleLabels': true });
+// The readout in the middle of the dial rather than at the pointer's tip.
+const IN_THE_CAP = Object.freeze({ 'Parts.labelCurrent.anchor': 'centre' });
 const part = (name, patch) => ({ [name]: patch });
 const state = (when, parts = {}, { component = {}, rule = '' } = {}) => ({ when, ...(rule ? { rule } : {}), patches: { component, parts } });
 
@@ -109,8 +121,6 @@ const NUMBERS = [
     },
   },
   {
-    // On the name Label: a reel scrambles real text, letter by letter through other glyphs. The
-    // knob's own numbers are SVG, where a reel can only roll each number up into place.
     // On the name Label: a reel scrambles real text, letter by letter through other glyphs. The
     // knob's own numbers are SVG, where a reel can only roll each number up into place; and a Label
     // has no hover of its own, so it decodes when the words come back to the name.
@@ -152,6 +162,51 @@ const NUMBERS = [
       ], 700, { easing: 'outQuad' }),
     },
   },
+  {
+    id: 'number-stream', name: 'Number stream', how: 'each step', what: 'every step throws its value out along the pointer',
+    knob: { min: 0, max: 10, precision: 1 },
+    // The words fly within the knob's own box, as its readout does: a knob wearing it wants room
+    // round its dial (the showcase gives it 46 px).
+    animations: { stream: emit('stream', EACH_STEP, { shows: 'value', from: 'tip', direction: 'pointer', travel: 24, size: 12, duration: 650 }) },
+  },
+  {
+    id: 'odometer', name: 'Odometer', how: 'each step', what: 'only the digits that changed roll, the way you turned',
+    knob: { min: 0, max: 100, step: 1, precision: 0 },
+    fields: { ...READOUT_SHOWN, ...IN_THE_CAP },
+    animations: { odometer: words('odometer', EACH_STEP, 'labelCurrent', 'odometer', 'in', { split: 'letter', order: 'forward', stagger: 0, duration: 240, direction: 'turn' }) },
+  },
+  {
+    // The change since the last word it threw, which is the last time it was let go: how far you
+    // turned it, not the size of a step.
+    id: 'delta', name: 'Delta', how: 'let go', what: 'how far you turned it rises out of the dial, "+2.4", and fades',
+    knob: { min: 0, max: 10, precision: 1 },
+    animations: { delta: emit('delta', leaving('dragging'), { shows: 'delta', from: 'centre', direction: 'up', travel: 34, size: 18, duration: 1200 }) },
+  },
+  {
+    // The knob's own unit, shown only while the pointer is over it: at rest a state takes it away.
+    id: 'units', name: 'Units', how: 'hover', what: 'the unit rolls in after the value',
+    knob: { min: 0, max: 100, step: 1, precision: 0, unit: 'ms' },
+    fields: { ...READOUT_SHOWN, ...IN_THE_CAP },
+    states: { Resting: state({ hover: false }, {}, { component: { 'Behavior.unit': '' } }) },
+    animations: { unitIn: words('unitIn', enteringOnce('hover'), 'labelCurrent', 'odometer', 'in', { split: 'letter', order: 'forward', stagger: 0, duration: 300, direction: 'up' }) },
+  },
+  {
+    id: 'big-number', name: 'Big number', how: 'press', what: 'the value fills the dial while you hold it',
+    knob: { min: 0, max: 100, step: 1, precision: 0 },
+    fields: { ...READOUT_HIDDEN, ...IN_THE_CAP },
+    // The pointer steps aside while the number has the dial: the arc still shows where it is.
+    states: { Pressed: state({ pressed: true }, { ...part('labelCurrent', { opacity: 1, 'Text.Font.size': 34, 'Text.Font.weightValue': 700 }), ...part('pointerCurrent', { opacity: 0 }) }) },
+    animations: {
+      bigNumber: transition('bigNumber', entering('pressed'), [['Parts.labelCurrent.opacity', 'opacity'], ['Parts.pointerCurrent.opacity', 'opacity']], 160, 'outQuad'),
+      bigPop: keyframes('bigPop', enteringOnce('pressed'), 'labelCurrent', [{ at: 0, scale: 0.55 }, { at: 1, scale: 1 }], 240, { easing: 'outBack' }),
+    },
+  },
+  {
+    id: 'choice-names', name: 'Choice names', how: 'each step', what: 'a stepped knob: the next name pushes in the way you turned',
+    knob: { min: 0, max: 4, step: 1, displayTable: ['Saw', 'Square', 'Pulse', 'Triangle', 'Sine'] },
+    fields: { ...READOUT_SHOWN, ...IN_THE_CAP },
+    animations: { choice: words('choice', EACH_STEP, 'labelCurrent', 'push', 'in', { split: 'whole', order: 'forward', stagger: 0, duration: 280, direction: 'turn' }) },
+  },
 ];
 
 const TICKS = [
@@ -192,6 +247,29 @@ const TICKS = [
     animations: {
       ripple: words('ripple', WHILE_HOVER, 'tickMajor', 'shimmer', 'in', { split: 'letter', order: 'forward', stagger: 60, duration: 500, colour: LIGHT }, { iterations: 'infinite' }),
       rippleSmall: words('rippleSmall', WHILE_HOVER, 'tickMinor', 'shimmer', 'in', { split: 'letter', order: 'forward', stagger: 20, duration: 500, colour: LIGHT }, { iterations: 'infinite' }),
+    },
+  },
+  {
+    id: 'burst', name: 'Burst', how: 'panel opens', what: 'each tick flies out from the centre along its own line, the big ones first',
+    animations: {
+      burstBig: words('burstBig', ONCE_OPEN, 'tickMajor', 'fly', 'in', { split: 'letter', order: 'forward', stagger: 45, duration: 560 }, { delay: 300 }),
+      burstSmall: words('burstSmall', ONCE_OPEN, 'tickMinor', 'fly', 'in', { split: 'letter', order: 'forward', stagger: 12, duration: 500 }, { delay: 850 }),
+    },
+  },
+  {
+    id: 'fly-away', name: 'Fly away', how: 'double-click', what: 'the ticks fly off along their lines as it resets, and fly back',
+    animations: {
+      awayBig: words('awayBig', gesture('doubleClick'), 'tickMajor', 'fly', 'out', { split: 'letter', order: 'forward', stagger: 0, duration: 360 }, { easing: 'inQuad' }),
+      awaySmall: words('awaySmall', gesture('doubleClick'), 'tickMinor', 'fly', 'out', { split: 'letter', order: 'forward', stagger: 0, duration: 320 }, { easing: 'inQuad' }),
+      backBig: words('backBig', gesture('doubleClick'), 'tickMajor', 'fly', 'in', { split: 'letter', order: 'forward', stagger: 30, duration: 420 }, { delay: 650 }),
+      backSmall: words('backSmall', gesture('doubleClick'), 'tickMinor', 'fly', 'in', { split: 'letter', order: 'forward', stagger: 8, duration: 380 }, { delay: 800 }),
+    },
+  },
+  {
+    id: 'fan-in', name: 'Fan in', how: 'panel opens', what: 'the ticks turn into place round the dial, as a fan opens',
+    animations: {
+      fanBig: words('fanBig', ONCE_OPEN, 'tickMajor', 'fan', 'in', { split: 'letter', order: 'forward', stagger: 0, duration: 1100 }, { delay: 300, easing: 'inOutCubic' }),
+      fanSmall: words('fanSmall', ONCE_OPEN, 'tickMinor', 'fan', 'in', { split: 'letter', order: 'forward', stagger: 0, duration: 1100 }, { delay: 450, easing: 'inOutCubic' }),
     },
   },
 ];
@@ -266,6 +344,11 @@ const TURNING = [
     animations: {
       modulated: value('modulated', { type: 'always' }, [{ at: 0, by: 0 }, { at: 0.25, by: 0.06 }, { at: 0.75, by: -0.06 }, { at: 1, by: 0 }], 1800, { easing: 'inOutSine', iterations: 'infinite' }),
     },
+  },
+  {
+    id: 'detent', name: 'Detent', how: 'each step', what: 'the pointer pulses once a step, as a notch is felt',
+    knob: { min: 0, max: 12, step: 1, precision: 0 },
+    animations: { detent: keyframes('detent', EACH_STEP, 'pointerCurrent', [{ at: 0, scale: 1 }, { at: 0.3, scale: 1.45, fill: 'FFFFFFFF' }, { at: 1, scale: 1 }], 160, { easing: 'outQuad' }) },
   },
 ];
 

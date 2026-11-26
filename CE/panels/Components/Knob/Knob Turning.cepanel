@@ -195,6 +195,20 @@
       "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
+    },
+    {
+      "id": "Detent.value",
+      "label": "Detent",
+      "controlName": "Detent",
+      "path": "Detent.value",
+      "min": 0,
+      "max": 12,
+      "defaultValue": 6,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
     }
   ],
   "scripts": [],
@@ -399,6 +413,42 @@
         "Transform": {"x":314,"y":544,"width":242,"height":36},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"the drawing wobbles round the value, as if an LFO were on it","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Detent","id":"ctrl_1746747303022","description":"Detent: the pointer pulses once a step, as a notch is felt.","controlType":"Knob"},
+        "Transform": {"x":637,"y":358,"width":136,"height":136},
+        "Behavior": {"max":12,"step":1,"defaultCurrentValue":6,"precision":0},
+        "Animations": {"_children":{"detent":{"_type":"Animation","name":"detent","enabled":true,"kind":"keyframes","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.pointerCurrent"}],"frames":[{"at":0,"scale":1},{"at":0.3,"scale":1.45,"fill":"FFFFFFFF"},{"at":1,"scale":1}],"duration":160,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:detent","revision":1,"from":"detent"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentCaption","id":"ctrl_1746747303023","controlType":"Label"},
+        "Transform": {"x":580,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Detent","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentHow","id":"ctrl_1746747303024","controlType":"Label"},
+        "Transform": {"x":580,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentWhat","id":"ctrl_1746747303025","controlType":"Label"},
+        "Transform": {"x":584,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the pointer pulses once a step, as a notch is felt","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     }
@@ -808,6 +858,58 @@
           "delay": 0,
           "easing": "inOutSine",
           "iterations": "infinite"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:detent",
+      "name": "Detent",
+      "category": "Knob",
+      "tags": [
+        "Turning",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "detent": {
+          "_type": "Animation",
+          "name": "detent",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.3,
+              "scale": 1.45,
+              "fill": "FFFFFFFF"
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
         }
       },
       "states": {},

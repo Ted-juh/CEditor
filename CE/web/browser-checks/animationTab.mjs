@@ -836,7 +836,7 @@ assert.match(await ev(() => window.__anim.presetReport()), /on 1 control, linked
 
 check('the Knob\'s built-in presets are listed under it, by group; one applies linked, one that needs a cap is refused', async () => {});
 assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
-  component: 'Knob', groups: ['Numbers', 'Ticks', 'Touch', 'Turning', 'Attention', 'Gestures', 'Words'], count: 39, first: 'Fly-out let go',
+  component: 'Knob', groups: ['Numbers', 'Ticks', 'Touch', 'Turning', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
 }]);
 await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
 await settle();
@@ -922,6 +922,39 @@ check('a knob is offered the Value kind, and picking it makes a ring sweep on wh
   assert.deepEqual(sweepNode.frames, [{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]);
   assert.equal(sweepNode.trigger.type, 'stateChange');
   assert.equal(sweepRows, 3, 'its frames, in the value editor');
+});
+
+// --- The Words kind and the step trigger (2026-11-26) --------------------------------------------
+
+await ev(() => window.__anim.addAnimationNamed('stream'));
+await settle();
+await ev(() => window.__anim.pickKind('words'));
+await settle();
+const streamKept = await ev(() => window.__anim.knobAnimation('stream'));
+const streamPane = await ev(() => window.__anim.emitPane());
+const streamTriggers = await ev(() => window.__anim.triggerOptions());
+await ev(() => window.__anim.chooseTrigger('valueStep'));
+await settle();
+const streamNode = await ev(() => window.__anim.knobAnimation('stream'));
+const streamSteps = await ev(() => window.__anim.stepsCell());
+await ev(() => window.__anim.clickSegment('Shows', 'How far it moved'));
+await settle();
+const deltaNode = await ev(() => window.__anim.knobAnimation('stream'));
+await ev(() => window.__anim.chooseTrigger('event'));
+await settle();
+const noSteps = await ev(() => window.__anim.stepsCell());
+check('a knob is offered the Words kind: words thrown on each step, the value or how far it moved', () => {
+  assert.ok(knobKinds.includes('Words'), knobKinds.join(', '));
+  assert.ok(!customKinds.includes('Words'), 'not on a custom component: it has no pointer to throw them from');
+  assert.equal(streamKept.kind, 'emit');
+  assert.equal(streamKept.trigger.type, 'stateChange', 'the trigger it had is kept, as the Value kind keeps it');
+  assert.equal(streamNode.trigger.type, 'valueStep');
+  assert.deepEqual([streamNode.shows, streamNode.from, streamNode.direction], ['value', 'tip', 'pointer']);
+  assert.ok(streamPane, 'its own pane');
+  assert.ok(streamTriggers.includes('valueStep') && !streamTriggers.includes('always'), streamTriggers.join(', '));
+  assert.ok(streamSteps, 'a step trigger says how many steps');
+  assert.equal(deltaNode.shows, 'delta');
+  assert.ok(!noSteps, 'and only a step trigger');
 });
 
 // --- The rules --------------------------------------------------------------------------------

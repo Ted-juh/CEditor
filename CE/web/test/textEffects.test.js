@@ -17,10 +17,13 @@ import {
   textEffectRules,
   textEffectSpan,
   textPieceStyles,
+  odometerChanged,
+  effectInTurn,
+  wordsHistory,
 } from '../src/CE_Application/utils/textEffects.js';
 
-test('the seven effects the owner approved, and Part and Reel since, each reads with its own defaults, in and out', () => {
-  assert.deepEqual(TEXT_EFFECT_NAMES, ['typewriter', 'explode', 'roll', 'push', 'wipe', 'crossfade', 'shimmer', 'part', 'reel']);
+test('the seven effects the owner approved, Part and Reel since, and the knob\'s three, each reads with its own defaults, in and out', () => {
+  assert.deepEqual(TEXT_EFFECT_NAMES, ['typewriter', 'explode', 'roll', 'push', 'wipe', 'crossfade', 'shimmer', 'part', 'reel', 'odometer', 'fly', 'fan']);
   for (const name of TEXT_EFFECT_NAMES) {
     for (const way of ['in', 'out']) {
       const effect = readTextEffect(newTextEffectShape('a', name, way));
@@ -170,4 +173,64 @@ test('a text effect is played by the keyframe player: on request, and on the wor
   assert.deepEqual(frame.fired, ['type'], 'the script-triggered typewriter on request');
   assert.equal(frame.texts.get('')[0].name, 'type');
   assert.match(frame.rules, /@keyframes ce-tx-[0-9a-z]+-0-[ab]\{0%\{opacity:0;\}1%\{opacity:1;\}100%\{opacity:1\}\}/);
+});
+
+// --- The knob's three (2026-11-26, the Components showcase) -------------------------------------
+
+test('an odometer rolls only the digits that changed, lined up as a counter\'s are', () => {
+  assert.deepEqual(odometerChanged('0.45', '0.44'), [false, false, false, true], 'the last digit');
+  assert.deepEqual(odometerChanged('12.0', '9.0'), [true, true, false, false], 'from the right: a value grows on the left');
+  assert.deepEqual(odometerChanged('0.45 Hz', '0.45'), [false, false, false, false, true, true, true], 'a unit arriving after the value: from the left');
+  assert.deepEqual(odometerChanged('0.45', '0.45 Hz'), [false, false, false, false], 'and going');
+  assert.deepEqual(odometerChanged('5', null), [true], 'the first words roll whole');
+  const odometer = readTextEffect(newTextEffectShape('o', 'odometer'));
+  assert.deepEqual([odometer.split, odometer.stagger, odometer.direction], ['letter', 0, 'up'], 'every digit at once, rolling up');
+  assert.equal(textEffectClips(odometer), true, 'each digit through its own window');
+  assert.match(textEffectRules(odometer, { phase: 'a' }), /0%\{transform:translateY\(110%\)\}/);
+});
+
+test('a fly comes from where its marks say, and a fan turns about the dial; on a Label, about itself', () => {
+  const fly = readTextEffect(newTextEffectShape('f', 'fly'));
+  assert.match(textEffectRules(fly, { phase: 'a' }), /0%\{opacity:0;transform:translate\(var\(--ce-fly-x, 0px\), var\(--ce-fly-y, 0\.8em\)\)\}100%\{\}/,
+    'a mark sets the way; a Label\'s letters rise from just below');
+  const away = readTextEffect(newTextEffectShape('f', 'fly', 'out'));
+  assert.match(textEffectRules(away, { phase: 'a' }), /0%\{\}100%\{opacity:0;transform:translate\(var\(--ce-fly-out-x, 0px\), var\(--ce-fly-out-y, -0\.8em\)\)\}/,
+    'away by a pair of its own, so the fly back on the same marks keeps its own');
+  const fan = readTextEffect(newTextEffectShape('n', 'fan'));
+  assert.equal(fan.stagger, 0, 'every mark turns at once, the far ones further');
+  assert.match(textEffectRules(fan, { phase: 'a' }), /0%\{opacity:0;transform:rotate\(var\(--ce-fan-turn, -30deg\)\)\}/);
+  assert.equal(textEffectClips(fly), false, 'a mark flying is not cut off at its own box');
+  assert.equal(textEffectClips(fan), false);
+});
+
+test('several effects on the same words take turns: the last to have started, a later one from its own start', () => {
+  const away = { name: 'away', startedAt: 1000, effect: { effect: 'fly', way: 'out', delay: 0 } };
+  const back = { name: 'back', startedAt: 1000, effect: { effect: 'fly', way: 'in', delay: 650 } };
+  const before = effectInTurn([back, away], 900);
+  assert.equal(before.item, away, 'before either starts: the first to start, in its own time');
+  assert.equal(before.next, 1650, 'and the in takes over at its start');
+  assert.equal(effectInTurn([back, away], 1200).item, away);
+  const turned = effectInTurn([back, away], 1660);
+  assert.equal(turned.item.name, 'back');
+  assert.equal(turned.item.effect.delay, 0, 'its wait was spent on the out');
+  assert.equal(back.effect.delay, 650, 'the item handed over is not changed');
+  assert.equal(turned.next, null);
+  const hover = { name: 'shimmer', startedAt: 5000, effect: { effect: 'shimmer', delay: 0 } };
+  assert.equal(effectInTurn([back, away, hover], 5001).item.name, 'shimmer', 'one fired later plays over one done long ago');
+  assert.equal(effectInTurn([away], 0).item, away, 'one alone is left as it is');
+  const posed = { name: 'p', effect: { effect: 'typewriter', delay: 0 } };
+  assert.equal(effectInTurn([posed, { ...posed, name: 'q' }], 0).item.name, 'q', 'posed by a playhead: the last');
+  assert.deepEqual(effectInTurn([], 0), { item: null, next: null });
+});
+
+test('an odometer compares with the words before they last changed, however often it asks', () => {
+  const before = wordsHistory();
+  assert.equal(before('0.44'), null, 'nothing came before');
+  assert.equal(before('0.44'), null);
+  assert.equal(before('0.45'), '0.44');
+  assert.equal(before('0.45'), '0.44', 'asked again mid-roll: the same, so the roll is left be');
+  assert.equal(before('0.46'), '0.45');
+  const lines = wordsHistory((words) => words.join('\n'));
+  assert.equal(lines(['12', 'Hz']), null);
+  assert.deepEqual(lines(['13', 'Hz']), ['12', 'Hz'], 'a Label\'s lines, compared whole');
 });

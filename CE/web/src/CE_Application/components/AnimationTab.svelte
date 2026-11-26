@@ -107,6 +107,7 @@
     cleanSpring,
     animationKindsFor,
     VALUE_KIND,
+    EMIT_KIND,
     SEQUENCE_KIND,
     EASING_NAMES,
     offeredTargetsFor,
@@ -178,6 +179,8 @@
   let textKind = $derived(selected?.kind === 'text');
   // What a knob's or slider's value draws (step 6): offered on a control that draws one.
   let valueKind = $derived(selected?.kind === VALUE_KIND);
+  // Words thrown from the pointer (phase 2 of the Components' Knob): a knob or slider only.
+  let emitKind = $derived(selected?.kind === EMIT_KIND);
   let kinds = $derived.by(() => {
     const list = animationKindsFor(control);
     return valueKind && !list.includes(VALUE_KIND) ? [...list, VALUE_KIND] : list;
@@ -201,13 +204,14 @@
     const fill = owner?._children?.Background?._children?.Fill;
     return fill?.imageEnabled === true && !!fill?.imageSrc;
   });
-  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence', text: 'Text', value: 'Value' };
+  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence', text: 'Text', value: 'Value', emit: 'Words' };
   const KIND_TITLES = {
     transition: 'Eases between two styles when something changes',
     keyframes: 'Plays a shape of its own on one part — a pulse, a blink — looping, on the beat, or from a script',
     sequence: 'Tracks along a time axis, one per change, each with its own keyframes; a value trigger scrubs it',
     text: 'Real words, whole or a piece at a time: typewriter, explode, roll, push, wipe, crossfade, shimmer',
     value: 'What the value draws — its arc, its pointer — moved for a moment, then handed back to the value: a ring sweep',
+    emit: 'Words thrown out from the pointer as the value steps: the value, or how far it moved, flying off and fading',
   };
 
   const ORIGIN_LABELS = { any: 'Any', user: 'Mine', external: 'Outside' };
@@ -845,11 +849,12 @@ onMount(() => {
 
             <div class="grpcol">
               <div class="grp">Runs when</div>
-              {#if keyframes || textKind || valueKind}
+              {#if keyframes || textKind || valueKind || emitKind}
                 <div class="r">
                   <span class="lab">Trigger</span>
-                  <!-- A value animation "all the time" would never let the value be seen: not offered. -->
-                  <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES.filter((type) => !valueKind || type !== 'always')).map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] }))}
+                  <!-- A value animation "all the time" would never let the value be seen, and words
+                       "all the time" would never be thrown: not offered. -->
+                  <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES.filter((type) => !(valueKind || emitKind) || type !== 'always')).map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] }))}
                                   value={selected.triggerType} ariaLabel="Keyframe trigger"
                                   onchange={(value) => setProps({ trigger: {
                                     ...(selected.animation.trigger ?? {}),
@@ -857,6 +862,14 @@ onMount(() => {
                                     ...(value === 'event' && !selected.animation.trigger?.event ? { event: 'click' } : {}),
                                   } })} />
                 </div>
+                {#if selected.triggerType === 'valueStep'}
+                  <!-- How many steps the range is cut into: 0, the control's own (its step size). -->
+                  <div class="r">
+                    <span class="lab">Steps</span>
+                    <div class="cell"><NumberCell label="0: its own" value={selected.animation.trigger?.steps ?? 0} min={0} max={400} step={1}
+                      onchange={(value) => setProp('trigger.steps', Math.max(0, Math.min(400, Math.round(value))))} /></div>
+                  </div>
+                {/if}
                 {#if selected.triggerType === 'stateChange'}
                   <div class="r top">
                     <span class="lab">In</span>
@@ -1045,6 +1058,37 @@ onMount(() => {
                   <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
                 {/if}
                 <TextEffectEditor row={selected} {control} onpatch={(patch) => setProps(patch)} />
+              </div>
+            </div>
+          {:else if emitKind}
+            <div class="pane">
+              <div class="panehead">
+                <b>Words thrown</b>
+              </div>
+              <div class="panebody" data-emit-animation>
+                <div class="r">
+                  <span class="lab">Shows</span>
+                  <Segmented options={[{ value: 'value', label: 'The value' }, { value: 'delta', label: 'How far it moved' }]}
+                             value={selected.animation.shows ?? 'value'} ariaLabel="Shows" onchange={(value) => setProp('shows', value)} />
+                </div>
+                <div class="r">
+                  <span class="lab">From</span>
+                  <Segmented options={[{ value: 'tip', label: 'The pointer’s tip' }, { value: 'centre', label: 'The centre' }]}
+                             value={selected.animation.from ?? 'tip'} ariaLabel="From" onchange={(value) => setProp('from', value)} />
+                </div>
+                <div class="r">
+                  <span class="lab">Flies</span>
+                  <Segmented options={[{ value: 'pointer', label: 'Along the pointer' }, { value: 'up', label: 'Up' }]}
+                             value={selected.animation.direction ?? 'pointer'} ariaLabel="Flies" onchange={(value) => setProp('direction', value)} />
+                  <div class="cell"><NumberCell label="px" value={selected.animation.travel ?? 36} min={0} max={400} step={2}
+                    onchange={(value) => setProp('travel', Math.max(0, Math.min(400, Math.round(value))))} /></div>
+                </div>
+                <div class="r">
+                  <span class="lab">Size</span>
+                  <div class="cell"><NumberCell label="px" value={selected.animation.size ?? 12} min={6} max={72} step={1}
+                    onchange={(value) => setProp('size', Math.max(6, Math.min(72, Math.round(value))))} /></div>
+                </div>
+                <p class="hint">Each time it plays, {controlName}'s value — or how far it moved since the last word — flies out and fades. Several can be in the air at once. On a step trigger, one word a step, while it is turned too.</p>
               </div>
             </div>
           {:else if valueKind}

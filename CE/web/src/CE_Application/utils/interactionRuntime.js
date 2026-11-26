@@ -41,7 +41,7 @@ import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
 import { easingToCss } from './easing.js';
 // A cycle, and a safe one: keyframeAnimation.js reads readTrigger from here, and this file reads
 // readKeyframes from there, each only when called — never while either module is loading.
-import { readKeyframes, readValueAnimation } from './keyframeAnimation.js';
+import { readKeyframes, readValueAnimation, readEmit } from './keyframeAnimation.js';
 import { readTextEffect } from './textEffects.js';
 
 function getNodeChild(node, key) {
@@ -559,7 +559,21 @@ export function readTrigger(animation) {
     // Leaving slot writes it: "to default" cannot say "leaving hover" on a knob, which is never in
     // the default state — ActiveHandleCurrent is active at rest. 2026-11-24.
     leaving: trigger.leaving === true,
+    // valueStep: how many steps the range is cut into; 0, the control's own (stepsOfControl).
+    steps: Math.max(0, Math.min(400, Math.round(Number(trigger.steps) || 0))),
   };
+}
+
+/**
+ * How many steps a control's range is cut into, for a step trigger that names none: its own step
+ * (Behavior.step over min..max) when that gives 2 to 400 of them, else 20.
+ */
+export function stepsOfControl(control) {
+  const behavior = getNodeChild(control, 'Behavior') ?? {};
+  const span = Number(behavior.max ?? 1) - Number(behavior.min ?? 0);
+  const step = Number(behavior.step);
+  const steps = Number.isFinite(span) && step > 0 ? Math.round(span / step) : NaN;
+  return steps >= 2 && steps <= 400 ? steps : 20;
 }
 
 /**
@@ -668,8 +682,12 @@ function buildKeyframeCatalog(control, previewSession) {
   for (const [key, animation] of Object.entries(animations?._children ?? {})) {
     const entry = readKeyframes(animation, key, { timeScale: previewSession?.animationTimeScale })
       ?? textEffectEntry(animation, key, previewSession?.animationTimeScale)
-      ?? readValueAnimation(animation, key, { timeScale: previewSession?.animationTimeScale });
-    if (entry) entries.push(entry);
+      ?? readValueAnimation(animation, key, { timeScale: previewSession?.animationTimeScale })
+      ?? readEmit(animation, key, { timeScale: previewSession?.animationTimeScale });
+    if (!entry) continue;
+    // A step trigger that names no count steps as the control does.
+    if (entry.trigger?.type === 'valueStep' && !entry.trigger.steps) entry.trigger = { ...entry.trigger, steps: stepsOfControl(control) };
+    entries.push(entry);
   }
   return { enabled: true, reducedMotion, entries };
 }

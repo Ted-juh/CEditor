@@ -293,7 +293,7 @@ test('every section refuses a key its entries do not have, and defines nothing',
     assert.deepEqual(errorsOf(), [
       'ce.panel.define("k", "Animations", "glow"): "durration" is not one of its options, so nothing was done. Its '
         + 'options are: name, enabled, kind, trigger, targets, duration, delay, easing, frames, iterations, direction, '
-        + 'loop, hold, bezier, spring, effect, way, split, order, stagger, scatter, scale, spins, glyphs, colour, preset.',
+        + 'loop, hold, bezier, spring, effect, way, split, order, stagger, scatter, scale, spins, glyphs, colour, preset, shows, from, travel, size.',
     ]);
     // A key that is a number is a Lua list's entry, not a key, as in every options table.
     assert.equal(api.panelDefine('k', 'Variants', 'compact', { 1: 'x', label: 'Compact' }), true);

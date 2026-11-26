@@ -33,14 +33,15 @@ export const TEXT_KIND = 'text';
 export const TEXT_WAYS = Object.freeze(['in', 'out']);
 export const TEXT_SPLITS = Object.freeze(['letter', 'word', 'line', 'whole']);
 export const TEXT_ORDERS = Object.freeze(['forward', 'reverse', 'centre', 'random']);
-export const TEXT_DIRECTIONS = Object.freeze(['left', 'right', 'up', 'down']);
+// `turn`: the way the value last turned (keyframeAnimation.js turnDirection), for a step trigger.
+export const TEXT_DIRECTIONS = Object.freeze(['left', 'right', 'up', 'down', 'turn']);
 
 /**
  * What starts a text effect: a keyframe animation's triggers, and `textChange` — the words changed
  * (a Label that shows a knob's value, or its name and its value by turns). A textChange trigger's
  * `to` waits for one of a "name, value while touched" Label's two texts: ['value'], ['name'], or any.
  */
-export const TEXT_TRIGGER_TYPES = Object.freeze(['always', 'stateChange', 'valueChange', 'beat', 'script', 'event', 'textChange']);
+export const TEXT_TRIGGER_TYPES = Object.freeze(['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'textChange']);
 export const TEXT_TRIGGER_LABELS = Object.freeze({
   always: 'All the time',
   stateChange: 'In a state',
@@ -48,6 +49,7 @@ export const TEXT_TRIGGER_LABELS = Object.freeze({
   beat: 'On the beat',
   script: 'When a script plays it',
   event: 'On a click or gesture',
+  valueStep: 'On each step of the value',
   textChange: 'When its words change',
 });
 
@@ -72,6 +74,18 @@ export const TEXT_EFFECTS = Object.freeze({
   shimmer: { label: 'Shimmer', split: 'letter', order: { in: 'forward', out: 'reverse' }, stagger: 40, duration: 600, colour: 'FFFFFFFF' },
   part: { label: 'Part', split: 'letter', order: { in: 'forward', out: 'forward' }, stagger: 0, duration: 900 },
   reel: { label: 'Reel', split: 'letter', order: { in: 'forward', out: 'reverse' }, stagger: 70, duration: 900, spins: 6 },
+  // The Components showcase's Knob, phase 2 (2026-11-26):
+  //   - odometer: only the letters that changed roll, as a counter's digits do; with a direction of
+  //     `turn`, up as the value rises and down as it falls. Where nothing says what changed, a roll.
+  //   - fly: each piece travels along its own line from a centre (in) or away from it (out): a knob's
+  //     ticks fly out of the cap to their places. The renderer that knows where the centre is says
+  //     how far (`--ce-fly-x`, `--ce-fly-y` on each piece); elsewhere a piece rises into place.
+  //   - fan: each piece turns into place about a centre, from the first piece's angle: the ticks
+  //     open like a fan. Turned about the dial's centre where the renderer gives it
+  //     (`--ce-fan-turn` and the piece's origin), about the piece's own centre elsewhere.
+  odometer: { label: 'Odometer', split: 'letter', order: { in: 'forward', out: 'forward' }, stagger: 0, duration: 320, direction: 'up' },
+  fly: { label: 'Fly', split: 'letter', order: { in: 'forward', out: 'forward' }, stagger: 40, duration: 520 },
+  fan: { label: 'Fan', split: 'letter', order: { in: 'forward', out: 'reverse' }, stagger: 0, duration: 800 },
 });
 export const TEXT_EFFECT_NAMES = Object.freeze(Object.keys(TEXT_EFFECTS));
 
@@ -244,7 +258,16 @@ function poseDeclarations(effect, variant) {
       return `opacity:0;transform:translate(${num(x)}px,${num(y)}px) scale(${num(effect.scale)})`;
     }
     case 'roll':
+    case 'odometer':
       return `transform:translateY(${num(sign * (away[1] || -1) * 110)}%)`;
+    case 'fly':
+      // A mark's way is set by its dial (anatomyWords.js markGeometry), each way its own pair, so a
+      // fly away and the fly back on the same marks do not share one; a Label's letters rise.
+      return effect.way === 'in'
+        ? 'opacity:0;transform:translate(var(--ce-fly-x, 0px), var(--ce-fly-y, 0.8em))'
+        : 'opacity:0;transform:translate(var(--ce-fly-out-x, 0px), var(--ce-fly-out-y, -0.8em))';
+    case 'fan':
+      return 'opacity:0;transform:rotate(var(--ce-fan-turn, -30deg))';
     case 'push':
       return `transform:translateX(${num(sign * (away[0] || 1) * 110)}%)`;
     case 'part': {
@@ -324,7 +347,7 @@ export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 
   const ranks = pieceRanks(pieces, effect.order, seedText);
   const count = effect.iterations === 'infinite' ? 'infinite' : String(effect.iterations);
   const fill = effect.way === 'out' ? 'both' : 'backwards';
-  const moves = ['explode', 'roll', 'push', 'part', 'reel'].includes(effect.effect);
+  const moves = ['explode', 'roll', 'push', 'part', 'reel', 'odometer', 'fly', 'fan'].includes(effect.effect);
   // Part: the first half of the animated pieces is one door, the rest the other.
   const animated = pieces.map((piece, index) => (piece.animated ? index : -1)).filter((index) => index >= 0);
   const firstHalf = new Set(animated.slice(0, Math.ceil(animated.length / 2)));
@@ -344,9 +367,69 @@ export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 
   });
 }
 
+/**
+ * Of several effects on the same words (`items`: `{ effect, startedAt }`, as the keyframe player
+ * hands them over), the one playing at `now`: the last to have started, or, before any has, the
+ * first to start; and when the next takes over (`next`, or null). One at a time, because two CSS
+ * animations on one piece cannot take turns: an out fills both ways and an in fills backwards, so
+ * whichever is on top hides the other from the start, and an in's empty last frame is filled from
+ * the one underneath — it would bring the words back to the out's empty pose. A later effect takes
+ * over from its own start (`delay` 0): the wait was spent on the one before.
+ *
+ * Items with no `startedAt` (posed by a playhead, from a scene) are not timed: the last plays.
+ */
+export function effectInTurn(items, now) {
+  if (!items?.length) return { item: null, next: null };
+  if (items.length === 1 || items.some((item) => !Number.isFinite(item?.startedAt))) return { item: items.at(-1), next: null };
+  const startOf = (item) => item.startedAt + (Number(item.effect?.delay) || 0);
+  const first = items.reduce((a, b) => (startOf(b) < startOf(a) ? b : a));
+  const started = items.filter((item) => startOf(item) <= now);
+  // The last to have started; before any has, the first, which waits out its own delay.
+  const item = started.length ? started.reduce((a, b) => (startOf(b) >= startOf(a) ? b : a)) : first;
+  const later = items.map(startOf).filter((start) => start > Math.max(now, startOf(item)));
+  return {
+    item: item === first ? item : { ...item, effect: { ...item.effect, delay: 0 } },
+    next: later.length ? Math.min(...later) : null,
+  };
+}
+
 /** Whether an effect slides the text across its own box, which then has to clip it. */
 export function textEffectClips(effect) {
-  return ['roll', 'push', 'part', 'reel'].includes(effect?.effect);
+  return ['roll', 'push', 'part', 'reel', 'odometer'].includes(effect?.effect);
+}
+
+/**
+ * Which pieces of `next` an odometer rolls: the ones that differ from `previous`, the two texts
+ * lined up from the right, as a counter's digits are (a value grows on the left), or from the left
+ * when one begins with the other (a unit arrived after the value, or went). Pieces with no
+ * counterpart roll too. Every piece when nothing came before.
+ */
+export function odometerChanged(next, previous) {
+  const now = splitText(String(next ?? ''), 'letter');
+  if (previous == null) return now.map(() => true);
+  const before = splitText(String(previous), 'letter');
+  const extends_ = String(next ?? '').startsWith(String(previous)) || String(previous).startsWith(String(next ?? ''));
+  const offset = extends_ ? 0 : before.length - now.length;
+  return now.map((piece, index) => {
+    const other = before[index + offset];
+    return !other || other.text !== piece.text;
+  });
+}
+
+/**
+ * The words an odometer compares with: a memory that, given the words now, says what they were
+ * before they last changed (null until they have). It moves on only when the words do, so asking
+ * again while a roll plays gives the same answer and leaves the roll be. `keyOf` says when two are
+ * the same words (lines of a Label are compared whole).
+ */
+export function wordsHistory(keyOf = String) {
+  let seen = null;
+  return (words) => {
+    const key = keyOf(words);
+    if (!seen) { seen = { key, words, previous: null }; return null; }
+    if (seen.key !== key) seen = { key, words, previous: seen.words };
+    return seen.previous;
+  };
 }
 
 /** The window a reel's letter rolls in: one line high, the column inside it cut off above and below. */

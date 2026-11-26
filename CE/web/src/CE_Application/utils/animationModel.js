@@ -32,7 +32,7 @@ import { TEXT_TRIGGER_TYPES, newTextEffectShape } from './textEffects.js';
 import { patternEntries, patternLabel } from './patternLayers.js';
 import { cleanValueFrames, VALUE_TARGET } from './sceneFormat.js';
 import { controlDrawsValue } from './valueDrawn.js';
-import { sliderWordsRefusal } from './anatomyWords.js';
+import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import {
   KEYFRAME_TRIGGER_TYPES,
@@ -73,9 +73,16 @@ export const ANIMATION_KINDS = ['transition', 'keyframes', 'sequence', 'text'];
  * control that draws a value, so it is not in the list every control gets.
  */
 export const VALUE_KIND = 'value';
+/**
+ * `emit`: words thrown out from a knob's or a slider's pointer as its value steps — the value, or
+ * how far it moved (utils/keyframeAnimation.js EMIT). Drawn by the slider renderer, so offered on
+ * the knob and slider family only. The Components showcase's Knob, phase 2, 2026-11-26.
+ */
+export const EMIT_KIND = 'emit';
 /** The kinds an animation on this control may be: a knob or a slider has the value kind too. */
 export function animationKindsFor(control) {
-  return controlDrawsValue(control) ? [...ANIMATION_KINDS, VALUE_KIND] : ANIMATION_KINDS;
+  if (!controlDrawsValue(control)) return ANIMATION_KINDS;
+  return isSliderFamily(control) ? [...ANIMATION_KINDS, VALUE_KIND, EMIT_KIND] : [...ANIMATION_KINDS, VALUE_KIND];
 }
 /** A new value animation's frames: the ring sweep — nothing, round to full, back to the value. */
 export const VALUE_SWEEP_FRAMES = Object.freeze([{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]);
@@ -628,6 +635,7 @@ export const KEYFRAME_TRIGGER_LABELS = {
   always: 'All the time',
   stateChange: 'In a state',
   valueChange: 'When the value changes',
+  valueStep: 'On each step of the value',
   beat: 'On the beat',
   script: 'When a script plays it',
   event: 'On a click or gesture',
@@ -701,6 +709,24 @@ export function kindPatch(row, kind, control = null) {
     };
     if (!(Number(animation.duration) >= 200)) patch.duration = 1200;
     if (!animation.easing || animation.kind !== VALUE_KIND) patch.easing = 'inOutCubic';
+    return patch;
+  }
+  if (kind === EMIT_KIND) {
+    // Words thrown from the pointer: the value, from its tip, along it, on each step — or on a
+    // trigger a keyframe animation answers, except "all the time", which would throw nothing.
+    const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) && trigger.type !== 'always' ? trigger.type : null;
+    const patch = {
+      kind: EMIT_KIND,
+      shows: ['value', 'delta'].includes(animation.shows) ? animation.shows : 'value',
+      from: ['tip', 'centre'].includes(animation.from) ? animation.from : 'tip',
+      direction: ['pointer', 'up'].includes(animation.direction) ? animation.direction : 'pointer',
+      travel: Number(animation.travel) > 0 ? Number(animation.travel) : 36,
+      size: Number(animation.size) > 0 ? Number(animation.size) : 12,
+      trigger: type ? { ...trigger, type } : { type: 'valueStep' },
+      targets: [],
+      iterations: 1,
+    };
+    if (!(Number(animation.duration) >= 200)) patch.duration = 700;
     return patch;
   }
   if (kind === 'keyframes') {
@@ -819,7 +845,8 @@ export function triggerSummary(row) {
     const to = (t.to ?? []).filter((state) => state !== '*');
     return to.length ? `when the ${to.join(' or ')} arrives` : 'when its words change';
   }
-  if (row?.kind === 'keyframes' || row?.kind === 'text' || row?.kind === VALUE_KIND) {
+  if (t.type === 'valueStep') return t.steps ? `on each of ${t.steps} steps` : 'on each step';
+  if (row?.kind === 'keyframes' || row?.kind === 'text' || row?.kind === VALUE_KIND || row?.kind === EMIT_KIND) {
     if (t.type === 'always') return 'all the time';
     if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
     if (t.type === 'script') return 'from a script';

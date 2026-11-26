@@ -124,6 +124,15 @@ window.__anim = {
   },
   knobAnimation: (name) => JSON.parse(JSON.stringify(get(panels)[0].controls.find((c) => c._children.Core.id === 'ctrl_knob')._children.Animations?._children?.[name] ?? null)),
   valueFrameRows: () => document.querySelectorAll('[data-value-animation] [data-value-frame]').length,
+  // The Words kind (keyframeAnimation.js EMIT) and the step trigger.
+  emitPane: () => !!document.querySelector('[data-emit-animation]'),
+  triggerOptions: () => [...document.querySelectorAll('select[aria-label="Keyframe trigger"] option')].map((option) => option.value),
+  chooseTrigger: (type) => {
+    const select = document.querySelector('select[aria-label="Keyframe trigger"]');
+    select.value = type;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  },
+  stepsCell: () => [...document.querySelectorAll('.r')].some((row) => textOf(row.querySelector('.lab')) === 'Steps'),
   head: () => textOf(document.querySelector('.who')),
   alarm: () => textOf(document.querySelector('.alarm')),
 
