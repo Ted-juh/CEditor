@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5aa4ef78",
+  "fingerprint": "6a26585a",
   "set": {
     "id": "bellows",
     "name": "Bellows",
@@ -71,6 +71,7 @@
       "display.screen": "FF0A0A0B",
       "display.backlight": "FF272728",
       "panel.surface": "FF27252B",
+      "control.readout": "{control.cap}",
       "section.surface": "FF1E1D22"
     },
     "lamp": {

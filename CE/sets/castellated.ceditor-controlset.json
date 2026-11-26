@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6697406a",
+  "fingerprint": "363bb166",
   "set": {
     "id": "castellated",
     "name": "Castellated",
@@ -71,6 +71,7 @@
       "display.screen": "FF0A0A0B",
       "display.backlight": "FF272728",
       "panel.surface": "FF24292B",
+      "control.readout": "{text.label}",
       "section.surface": "FF1C2022"
     },
     "lamp": {

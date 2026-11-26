@@ -487,7 +487,7 @@
         "Transform": {"x":356,"y":120,"width":44,"height":155},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"minorTickCount":1,"majorTickLength":5},
         "Parts": {
-          "_drawing": "5f7ae147"
+          "_drawing": "5f2fcc2b"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFAAAFB5"},"pointerCurrent":{"Background.Fill.colour":"FFFFFFFF"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFD99963"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -509,7 +509,7 @@
         "Transform": {"x":406,"y":120,"width":44,"height":155},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"minorTickCount":1,"majorTickLength":5},
         "Parts": {
-          "_drawing": "5f7ae147"
+          "_drawing": "5f2fcc2b"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFAAAFB5"},"pointerCurrent":{"Background.Fill.colour":"FFFFFFFF"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFD99963"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -531,7 +531,7 @@
         "Transform": {"x":456,"y":120,"width":44,"height":155},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"minorTickCount":1,"majorTickLength":5},
         "Parts": {
-          "_drawing": "5f7ae147"
+          "_drawing": "5f2fcc2b"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFAAAFB5"},"pointerCurrent":{"Background.Fill.colour":"FFFFFFFF"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFD99963"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -553,7 +553,7 @@
         "Transform": {"x":506,"y":120,"width":44,"height":155},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":5},
         "Parts": {
-          "_drawing": "5f7ae147"
+          "_drawing": "5f2fcc2b"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFAAAFB5"},"pointerCurrent":{"Background.Fill.colour":"FFFFFFFF"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFD99963"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -852,7 +852,7 @@
         "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}}
       }
     },
-    "5f7ae147": {
+    "5f2fcc2b": {
       "_children": {
         "bodyHousing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF24262A"}}}}},
         "bodySkirt": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF5B5E63"}}}}},
@@ -871,7 +871,7 @@
         "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE0A43A"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
-        "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF4A4D51"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
+        "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF5CC492"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},

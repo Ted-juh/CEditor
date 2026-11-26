@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "a13079c6",
+  "fingerprint": "6add755a",
   "set": {
     "id": "cassette-deck",
     "name": "Workstation",
@@ -71,6 +71,7 @@
       "display.screen": "FF141A12",
       "display.backlight": "FF30352E",
       "panel.surface": "FF34383E",
+      "control.readout": "{text.label}",
       "section.surface": "FF292C30"
     },
     "lamp": {

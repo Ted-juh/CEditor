@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "30323dec",
+  "fingerprint": "2cd2adfe",
   "set": {
     "id": "hi-fi",
     "name": "Studio Console",
@@ -71,6 +71,7 @@
       "display.screen": "FF141A12",
       "display.backlight": "FF30352E",
       "panel.surface": "FF32383B",
+      "control.readout": "{control.cap}",
       "section.surface": "FF272C2E"
     },
     "lamp": {

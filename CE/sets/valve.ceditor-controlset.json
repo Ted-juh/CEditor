@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "a1085cd9",
+  "fingerprint": "456d3abb",
   "set": {
     "id": "valve",
     "name": "Valve",
@@ -71,6 +71,7 @@
       "display.screen": "FF120B06",
       "display.backlight": "FF2E2824",
       "panel.surface": "FF6B4A2E",
+      "control.readout": "{control.cap}",
       "section.surface": "FF533A24"
     },
     "lamp": {

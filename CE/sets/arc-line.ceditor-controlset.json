@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5c5f8983",
+  "fingerprint": "eef89657",
   "set": {
     "id": "arc-line",
     "name": "Arc Line",
@@ -71,6 +71,7 @@
       "border.surface": "66FFFFFF",
       "border.field": "665B5B5B",
       "border.mixed": "FFFFD166",
+      "control.readout": "{text.label}",
       "section.surface": "FF151D21"
     },
     "lamp": {

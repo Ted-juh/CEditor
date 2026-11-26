@@ -9,7 +9,7 @@ import { familySize } from './setFromControl.js';
 import { deepClone } from '../utils/deepClone.js';
 
 /**
- * The 45 colour roles a set holds and an author sets, grouped as the controls use them. The other
+ * The 46 colour roles a set holds and an author sets, grouped as the controls use them. The other
  * ten (DERIVED_ROLES: the section surface, the instruments' face and inks, the series) are worked
  * out from these on every read, so they are shown and not edited.
  */
@@ -21,6 +21,7 @@ export const ROLE_GROUPS = [
     ['control.track', 'Track'], ['control.track.edge', 'Track edge'], ['control.fill', 'Value fill'], ['control.fill.hot', 'Value fill, hot'],
     ['control.range', 'Range'], ['control.range.hot', 'Range, hot'], ['control.body', 'Body'], ['control.cap', 'Knob / fader cap'],
     ['control.cap.hot', 'Cap, hot'], ['control.cap.edge', 'Cap edge'], ['control.cap.start', 'Cap, start'], ['control.cap.end', 'Cap, end'],
+    ['control.readout', 'Fader readout'],
     ['control.marker', 'Marker'], ['control.tick', 'Tick'], ['control.tick.minor', 'Minor tick'],
   ] },
   { id: 'buttons', label: 'Buttons', roles: [

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "cd4c7465",
+  "fingerprint": "71ff4c2f",
   "set": {
     "id": "broadcast",
     "name": "Broadcast",
@@ -71,6 +71,7 @@
       "display.screen": "FF141A12",
       "display.backlight": "FF30352E",
       "panel.surface": "FF444D50",
+      "control.readout": "{control.cap}",
       "section.surface": "FF353C3E"
     },
     "lamp": {

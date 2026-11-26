@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "63c1120e",
+  "fingerprint": "7b39bec4",
   "set": {
     "id": "flightdeck",
     "name": "Modular Metal",
@@ -71,6 +71,7 @@
       "border.field": "66303338",
       "border.mixed": "FFC9A227",
       "panel.surface": "FFA9ACA9",
+      "control.readout": "{control.cap}",
       "section.surface": "FFC7C9C7"
     },
     "lamp": {

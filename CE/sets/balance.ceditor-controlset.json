@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "cecbca6e",
+  "fingerprint": "92ac678c",
   "set": {
     "id": "balance",
     "name": "Balance",
@@ -71,6 +71,7 @@
       "border.field": "66807A6E",
       "border.mixed": "FFB98A00",
       "panel.surface": "FFEEECE4",
+      "control.readout": "{control.cap}",
       "section.surface": "FFF4F3ED"
     },
     "lamp": {

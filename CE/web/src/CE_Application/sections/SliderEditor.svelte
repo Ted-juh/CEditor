@@ -86,7 +86,7 @@
 
   function regenerateSliderParts() {
     setPatch({
-      Parts: createSliderSemanticParts(),
+      Parts: createSliderSemanticParts(isKnob ? 'Knob' : 'Slider'),
     });
   }
 
@@ -176,7 +176,7 @@
       'Behavior.defaultStartValue': min + ((max - min) * 0.25),
       'Behavior.defaultCurrentValue': preset.bipolar === true ? center : midpoint(min, max),
       'Behavior.defaultEndValue': min + ((max - min) * 0.75),
-      Parts: createSliderSemanticParts(),
+      Parts: createSliderSemanticParts(isKnob ? 'Knob' : 'Slider'),
     };
     if (preset.geometry !== geometry) {
       basePatch['Transform.width'] = preset.width;

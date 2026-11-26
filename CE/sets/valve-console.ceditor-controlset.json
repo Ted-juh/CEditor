@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c307a67c",
+  "fingerprint": "0ca62aa2",
   "set": {
     "id": "valve-console",
     "name": "Valve Console",
@@ -71,6 +71,7 @@
       "border.field": "CCB8892E",
       "border.mixed": "FFC98A2A",
       "panel.surface": "FF28231F",
+      "control.readout": "{text.label}",
       "section.surface": "FF1F1B18"
     },
     "lamp": {

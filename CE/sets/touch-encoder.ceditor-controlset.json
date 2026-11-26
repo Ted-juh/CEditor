@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "cc7c2d9a",
+  "fingerprint": "5267685c",
   "set": {
     "id": "touch-encoder",
     "name": "Touch Encoder",
@@ -71,6 +71,7 @@
       "border.surface": "66FFFFFF",
       "border.field": "665B5B5B",
       "border.mixed": "FFFFD166",
+      "control.readout": "{text.label}",
       "section.surface": "FF1B2025"
     },
     "lamp": {

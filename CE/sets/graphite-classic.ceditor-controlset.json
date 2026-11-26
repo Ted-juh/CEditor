@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7cc77424",
+  "fingerprint": "8a50a7ca",
   "set": {
     "id": "graphite",
     "name": "Graphite Classic",
@@ -71,6 +71,7 @@
       "border.surface": "66FFFFFF",
       "border.field": "665B5B5B",
       "border.mixed": "FFFFD166",
+      "control.readout": "{control.cap}",
       "section.surface": "{surface}"
     },
     "lamp": {

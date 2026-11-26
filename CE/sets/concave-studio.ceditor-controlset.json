@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "20675b79",
+  "fingerprint": "b4a473db",
   "set": {
     "id": "concave-studio",
     "name": "Concave Studio",
@@ -71,6 +71,7 @@
       "display.screen": "FF141A12",
       "display.backlight": "FF30352E",
       "panel.surface": "FF363D40",
+      "control.readout": "{control.cap}",
       "section.surface": "FF2A3032"
     },
     "lamp": {

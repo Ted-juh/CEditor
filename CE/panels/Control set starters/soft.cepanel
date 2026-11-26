@@ -417,7 +417,7 @@
             "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF262A33"},"Font":{"family":"Nunito Sans","letterSpacing":0.9}}}}},
             "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF262A33"},"Font":{"family":"Nunito Sans","letterSpacing":0.9}}}}},
             "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE39A2E"},"Font":{"family":"Nunito Sans","letterSpacing":0.9}}}}},
-            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF5B5BD6"},"Font":{"family":"Nunito Sans","letterSpacing":0.9}}}}},
+            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF262A33"},"Font":{"family":"Nunito Sans","letterSpacing":0.9}}}}},
             "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF3BAF7E"},"Font":{"family":"Nunito Sans","letterSpacing":0.9}}}}},
             "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF262A33"},"Font":{"family":"Nunito Sans","letterSpacing":0.9}}}}},
             "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF6E7482"},"Font":{"family":"Nunito Sans","letterSpacing":0.9}}}}},

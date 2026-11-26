@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "eaa72ff4",
+  "fingerprint": "66db1eda",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -71,6 +71,7 @@
       "border.field": "66303338",
       "border.mixed": "FFC9A227",
       "panel.surface": "FF9A9FA6",
+      "control.readout": "{text.label}",
       "section.surface": "FFBDC1C5"
     },
     "lamp": {

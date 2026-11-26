@@ -487,7 +487,7 @@
         "Transform": {"x":356,"y":120,"width":44,"height":155},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":8,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
-          "_drawing": "ca180e25"
+          "_drawing": "69224e83"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFB8FFD2"},"bodySelectedRange":{"Background.Fill.colour":"FF41B173"},"pointerCurrent":{"Background.Fill.colour":"FFB8FFD2"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFAFC7A8"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -509,7 +509,7 @@
         "Transform": {"x":406,"y":120,"width":44,"height":155},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":8,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
-          "_drawing": "ca180e25"
+          "_drawing": "69224e83"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFB8FFD2"},"bodySelectedRange":{"Background.Fill.colour":"FF41B173"},"pointerCurrent":{"Background.Fill.colour":"FFB8FFD2"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFAFC7A8"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -531,7 +531,7 @@
         "Transform": {"x":456,"y":120,"width":44,"height":155},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":8,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
-          "_drawing": "ca180e25"
+          "_drawing": "69224e83"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFB8FFD2"},"bodySelectedRange":{"Background.Fill.colour":"FF41B173"},"pointerCurrent":{"Background.Fill.colour":"FFB8FFD2"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFAFC7A8"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -553,7 +553,7 @@
         "Transform": {"x":506,"y":120,"width":44,"height":155},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":8,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
-          "_drawing": "ca180e25"
+          "_drawing": "69224e83"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFB8FFD2"},"bodySelectedRange":{"Background.Fill.colour":"FF41B173"},"pointerCurrent":{"Background.Fill.colour":"FFB8FFD2"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFAFC7A8"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -830,7 +830,7 @@
         "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono","letterSpacing":0.9}}}}}
       }
     },
-    "ca180e25": {
+    "69224e83": {
       "_children": {
         "bodyHousing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF242B36"}}}}},
         "bodySkirt": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
@@ -849,7 +849,7 @@
         "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono","letterSpacing":0.9}}}}},
         "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono","letterSpacing":0.9}}}}},
         "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFB020"},"Font":{"family":"JetBrains Mono","letterSpacing":0.9}}}}},
-        "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF556171"},"Font":{"family":"JetBrains Mono","letterSpacing":0.9}}}}},
+        "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono","letterSpacing":0.9}}}}},
         "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF39FF7A"},"Font":{"family":"JetBrains Mono","letterSpacing":0.9}}}}},
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono","letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"letterSpacing":0.9}}}}},

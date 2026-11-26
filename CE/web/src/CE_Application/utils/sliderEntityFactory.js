@@ -81,7 +81,12 @@ function textSection({
   return text;
 }
 
-export function createSliderSemanticParts() {
+/** The colour a control of this type draws its current value's readout in. */
+export function readoutColour(type) {
+  return type === 'Knob' ? '{control.cap}' : '{control.readout}';
+}
+
+export function createSliderSemanticParts(type = 'Slider') {
   return {
     _type: 'Parts',
     _children: {
@@ -275,7 +280,9 @@ export function createSliderSemanticParts() {
       labelCurrent: createPartNode('labelCurrent', {
         role: 'labelCurrent',
         zIndex: 5,
-        sections: { Text: textSection({ colour: '{control.cap}' }) },
+        // A fader's readout stands beside its cap, on the panel, in the colour its set reads there
+        // (controlSets.js withReadout). A knob's is in the cap's: in the cap, it is on the knob.
+        sections: { Text: textSection({ colour: readoutColour(type) }) },
       }),
       labelEnd: createPartNode('labelEnd', {
         role: 'labelEnd',
@@ -301,8 +308,8 @@ export function createSliderSemanticParts() {
   };
 }
 
-export function resolveSliderSemanticParts(existingParts = null) {
-  const defaults = createSliderSemanticParts();
+export function resolveSliderSemanticParts(existingParts = null, type = 'Slider') {
+  const defaults = createSliderSemanticParts(type);
   const existing = existingParts?._children ?? {};
   for (const [partName, defaultPart] of Object.entries(defaults._children)) {
     if (!existing[partName]) {

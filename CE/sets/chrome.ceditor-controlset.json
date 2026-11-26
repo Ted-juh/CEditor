@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d17fbabf",
+  "fingerprint": "8012c8a3",
   "set": {
     "id": "chrome",
     "name": "Chrome",
@@ -71,6 +71,7 @@
       "display.screen": "FF061018",
       "display.backlight": "FF242D34",
       "panel.surface": "FF10151F",
+      "control.readout": "{text.label}",
       "section.surface": "FF0C1018"
     },
     "lamp": {

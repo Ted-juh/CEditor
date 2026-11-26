@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "40e54588",
+  "fingerprint": "50e8e07a",
   "set": {
     "id": "ivory",
     "name": "Ivory",
@@ -71,6 +71,7 @@
       "border.field": "66807A6E",
       "border.mixed": "FFB98A00",
       "panel.surface": "FFEFEAE0",
+      "control.readout": "{text.label}",
       "section.surface": "FFF5F1EB"
     },
     "lamp": {

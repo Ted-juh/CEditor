@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0b99a4f0",
+  "fingerprint": "3068a4ba",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -71,6 +71,7 @@
       "display.screen": "FF101214",
       "display.backlight": "FF2D2E30",
       "panel.surface": "FFC4C8CC",
+      "control.readout": "{control.cap}",
       "section.surface": "FFD9DBDE"
     },
     "lamp": {

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "89094b3c",
+  "fingerprint": "640fec70",
   "set": {
     "id": "ceramic",
     "name": "Ceramic & Oak",
@@ -71,6 +71,7 @@
       "display.screen": "FFE9E6DC",
       "display.backlight": "FFECE9E0",
       "panel.surface": "FFF2EFE7",
+      "control.readout": "{text.label}",
       "section.surface": "FFF7F5EF"
     },
     "lamp": {

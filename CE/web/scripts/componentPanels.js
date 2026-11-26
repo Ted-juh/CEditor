@@ -190,7 +190,9 @@ export const KNOB_PANELS = [
 // console cap, a billet, a lens) and its fill colours differ from set to set as much as a knob's.
 
 const SLIDER_LOOKS = {
-  numbers: { set: 'soft', bg: 'FF16171D', ink: 'FFE8E9F2', how: 'FF9C93FF', what: 'FF9EA0B3' },
+  // Soft is a set for a light panel, and its readout is its label ink (control.readout): on a dark
+  // ground the readouts this panel is about would not show, so it is on Soft's own panel colour.
+  numbers: { set: 'soft', bg: 'FFE8EAEE', ink: 'FF1C1E26', how: 'FF4A44C2', what: 'FF4A4F5C' },
   // Small ticks between the big ones, so "big, then small" has both.
   ticks: { set: 'dual-scale', bg: 'FF121416', ink: 'FFEDEDE8', how: 'FFFFC857', what: 'FFA2A7AD', settings: { showTicks: true, majorTickCount: 6, minorTickCount: 4 } },
   touch: { set: 'broadcast', bg: 'FF1B1D20', ink: 'FFEDEFF2', how: 'FF7FD1C7', what: 'FFA0A8B0' },

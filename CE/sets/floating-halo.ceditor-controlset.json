@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "1807471f",
+  "fingerprint": "bcdf39a9",
   "set": {
     "id": "floating-halo",
     "name": "Floating Halo",
@@ -71,6 +71,7 @@
       "display.screen": "FF03040A",
       "display.backlight": "FF212227",
       "panel.surface": "FF151D25",
+      "control.readout": "{text.label}",
       "section.surface": "FF10171D"
     },
     "lamp": {

@@ -417,7 +417,7 @@
             "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Rubik","letterSpacing":0.9}}}}},
             "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Rubik","letterSpacing":0.9}}}}},
             "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFB020"},"Font":{"family":"Rubik","letterSpacing":0.9}}}}},
-            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFF6B5B"},"Font":{"family":"Rubik","letterSpacing":0.9}}}}},
+            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Rubik","letterSpacing":0.9}}}}},
             "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF3BC46E"},"Font":{"family":"Rubik","letterSpacing":0.9}}}}},
             "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Rubik","letterSpacing":0.9}}}}},
             "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Rubik","letterSpacing":0.9}}}}},

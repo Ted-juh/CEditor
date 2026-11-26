@@ -417,7 +417,7 @@
             "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
             "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
             "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE0A43A"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
-            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFA2A7AE"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
+            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
             "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF5CC492"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
             "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
             "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF3E4247"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},

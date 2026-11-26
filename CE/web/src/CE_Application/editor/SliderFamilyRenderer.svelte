@@ -230,7 +230,7 @@
   }
 
   let behavior = $derived(control?._children?.Behavior ?? null);
-  let parts = $derived(resolveSliderSemanticParts(control?._children?.Parts ?? null));
+  let parts = $derived(resolveSliderSemanticParts(control?._children?.Parts ?? null, control?._children?.Core?.controlType));
   // The sizes it is drawn with and, for a knob, the circle it is drawn round: worked out in one
   // place (utils/knobTrack.js), which Preview's and the Test Bench's hit tests and Create Component
   // from Selection's layers ask too, so all four agree.

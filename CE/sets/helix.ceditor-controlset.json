@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d7b0c5da",
+  "fingerprint": "0efbc8f4",
   "set": {
     "id": "helix",
     "name": "Helix",
@@ -71,6 +71,7 @@
       "border.field": "66303338",
       "border.mixed": "FFC9A227",
       "panel.surface": "FFD4D9D8",
+      "control.readout": "{control.cap}",
       "section.surface": "FFE3E6E6"
     },
     "lamp": {

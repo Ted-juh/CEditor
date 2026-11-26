@@ -64,7 +64,7 @@ test('roles go by the names the Settings page gives them', () => {
   assert.equal(roleLabel('control.cap'), 'Knob / fader cap');
   assert.equal(roleLabel('{accent}'), 'Accent');
   assert.equal(roleLabel('series.one'), 'Series 1');
-  assert.equal(ROLE_GROUPS.flatMap((group) => group.roles).length, 45);
+  assert.equal(ROLE_GROUPS.flatMap((group) => group.roles).length, 46);
 });
 
 test('the dock shows the set colours and the link; the look bar marks a linked swatch', () => {

@@ -36,7 +36,7 @@
     "texture"
   ],
   "bgSolid": true,
-  "bgColour": "FF16171D",
+  "bgColour": "FFE8EAEE",
   "bgGradientEnabled": false,
   "bgGradientOpacity": 100,
   "bgGradientName": "",
@@ -317,7 +317,7 @@
         "Core": {"name":"Title","id":"ctrl_1772560903000","controlType":"Label"},
         "Transform": {"x":30,"y":22,"width":520,"height":34},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Slider · Numbers","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+        "Text": {"content":"Slider · Numbers","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
       },
       "_type": "Control"
     },
@@ -326,7 +326,7 @@
         "Core": {"name":"Note","id":"ctrl_1772560903001","controlType":"Label"},
         "Transform": {"x":30,"y":58,"width":1380,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"the value and the name as text in motion. Each slider wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+        "Text": {"content":"the value and the name as text in motion. Each slider wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
       },
       "_type": "Control"
     },
@@ -349,7 +349,7 @@
         "Core": {"name":"FlyOutCaption","id":"ctrl_1772560903003","controlType":"Label"},
         "Transform": {"x":38,"y":328,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Fly-out","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Fly-out","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -358,7 +358,7 @@
         "Core": {"name":"FlyOutHow","id":"ctrl_1772560903004","controlType":"Label"},
         "Transform": {"x":38,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -367,7 +367,7 @@
         "Core": {"name":"FlyOutWhat","id":"ctrl_1772560903005","controlType":"Label"},
         "Transform": {"x":40,"y":368,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"the value floats up off the cap and fades","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"the value floats up off the cap and fades","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -384,7 +384,7 @@
         "Core": {"name":"LevelName","id":"ctrl_1772560903007","attachedTo":"ctrl_1772560903006","controlType":"Label"},
         "Transform": {"x":275,"y":322,"width":200,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":14}},"shows":"nameValue","showsControl":"ctrl_1772560903006"},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":14}},"shows":"nameValue","showsControl":"ctrl_1772560903006"},
         "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"valueIn":{"_type":"Animation","name":"valueIn","enabled":true,"kind":"text","effect":"push","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":320,"direction":"right","trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:name-value","revision":1,"from":"valueIn"}},"nameOut":{"_type":"Animation","name":"nameOut","enabled":true,"kind":"text","effect":"push","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":320,"direction":"right","trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:name-value","revision":1,"from":"nameOut"}},"valueOut":{"_type":"Animation","name":"valueOut","enabled":true,"kind":"text","effect":"crossfade","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":220,"trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:name-value","revision":1,"from":"valueOut"}},"nameIn":{"_type":"Animation","name":"nameIn","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":150,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":45,"duration":300,"colour":"FFFFE3E3","trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:name-value","revision":1,"from":"nameIn"}}}}
       },
       "_type": "Control"
@@ -394,7 +394,7 @@
         "Core": {"name":"LevelCaption","id":"ctrl_1772560903008","controlType":"Label"},
         "Transform": {"x":268,"y":350,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Name ↔ value","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Name ↔ value","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -403,7 +403,7 @@
         "Core": {"name":"LevelHow","id":"ctrl_1772560903009","controlType":"Label"},
         "Transform": {"x":268,"y":372,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"WHILE MOVING","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"WHILE MOVING","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -412,7 +412,7 @@
         "Core": {"name":"LevelWhat","id":"ctrl_1772560903010","controlType":"Label"},
         "Transform": {"x":270,"y":390,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"its name pushes over to the value, and types itself back","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"its name pushes over to the value, and types itself back","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -429,7 +429,7 @@
         "Core": {"name":"PanName","id":"ctrl_1772560903012","attachedTo":"ctrl_1772560903011","controlType":"Label"},
         "Transform": {"x":505,"y":322,"width":200,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":14}},"shows":"nameValue","showsControl":"ctrl_1772560903011"},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":14}},"shows":"nameValue","showsControl":"ctrl_1772560903011"},
         "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"valueIn":{"_type":"Animation","name":"valueIn","enabled":true,"kind":"text","effect":"crossfade","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":160,"trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:decode","revision":1,"from":"valueIn"}},"decode":{"_type":"Animation","name":"decode","enabled":true,"kind":"text","effect":"reel","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":70,"duration":800,"spins":7,"glyphs":"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=?","trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:slider:decode","revision":1,"from":"decode"}}}}
       },
       "_type": "Control"
@@ -439,7 +439,7 @@
         "Core": {"name":"PanCaption","id":"ctrl_1772560903013","controlType":"Label"},
         "Transform": {"x":498,"y":350,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Decode","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Decode","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -448,7 +448,7 @@
         "Core": {"name":"PanHow","id":"ctrl_1772560903014","controlType":"Label"},
         "Transform": {"x":498,"y":372,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -457,7 +457,7 @@
         "Core": {"name":"PanWhat","id":"ctrl_1772560903015","controlType":"Label"},
         "Transform": {"x":500,"y":390,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"the value while moving; let go, the name decodes back through glyphs","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"the value while moving; let go, the name decodes back through glyphs","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -481,7 +481,7 @@
         "Core": {"name":"CapLabelCaption","id":"ctrl_1772560903017","controlType":"Label"},
         "Transform": {"x":728,"y":328,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Cap label","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Cap label","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -490,7 +490,7 @@
         "Core": {"name":"CapLabelHow","id":"ctrl_1772560903018","controlType":"Label"},
         "Transform": {"x":728,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"WHILE MOVING","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"WHILE MOVING","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -499,7 +499,7 @@
         "Core": {"name":"CapLabelWhat","id":"ctrl_1772560903019","controlType":"Label"},
         "Transform": {"x":730,"y":368,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"the value rides beside the cap","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"the value rides beside the cap","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -523,7 +523,7 @@
         "Core": {"name":"MaxStampCaption","id":"ctrl_1772560903021","controlType":"Label"},
         "Transform": {"x":958,"y":328,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"MAX stamp","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"MAX stamp","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -532,7 +532,7 @@
         "Core": {"name":"MaxStampHow","id":"ctrl_1772560903022","controlType":"Label"},
         "Transform": {"x":958,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"AT AN END","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"AT AN END","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -541,7 +541,7 @@
         "Core": {"name":"MaxStampWhat","id":"ctrl_1772560903023","controlType":"Label"},
         "Transform": {"x":960,"y":368,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"MAX or MIN stamps on in red","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"MAX or MIN stamps on in red","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -559,7 +559,7 @@
         "Core": {"name":"FromTheSynthCaption","id":"ctrl_1772560903025","controlType":"Label"},
         "Transform": {"x":1188,"y":328,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"From the synth","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"From the synth","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -568,7 +568,7 @@
         "Core": {"name":"FromTheSynthHow","id":"ctrl_1772560903026","controlType":"Label"},
         "Transform": {"x":1188,"y":350,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"MIDI IN","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"MIDI IN","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -577,7 +577,7 @@
         "Core": {"name":"FromTheSynthWhat","id":"ctrl_1772560903027","controlType":"Label"},
         "Transform": {"x":1190,"y":368,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"a value the synth sends flashes the fill; your own moves do not","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"a value the synth sends flashes the fill; your own moves do not","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -595,7 +595,7 @@
         "Core": {"name":"NumberStreamCaption","id":"ctrl_1772560903029","controlType":"Label"},
         "Transform": {"x":38,"y":668,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Number stream","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Number stream","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -604,7 +604,7 @@
         "Core": {"name":"NumberStreamHow","id":"ctrl_1772560903030","controlType":"Label"},
         "Transform": {"x":38,"y":690,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -613,7 +613,7 @@
         "Core": {"name":"NumberStreamWhat","id":"ctrl_1772560903031","controlType":"Label"},
         "Transform": {"x":40,"y":708,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"every step throws its value out from the cap","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"every step throws its value out from the cap","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -636,7 +636,7 @@
         "Core": {"name":"OdometerCaption","id":"ctrl_1772560903033","controlType":"Label"},
         "Transform": {"x":268,"y":668,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Odometer","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Odometer","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -645,7 +645,7 @@
         "Core": {"name":"OdometerHow","id":"ctrl_1772560903034","controlType":"Label"},
         "Transform": {"x":268,"y":690,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -654,7 +654,7 @@
         "Core": {"name":"OdometerWhat","id":"ctrl_1772560903035","controlType":"Label"},
         "Transform": {"x":270,"y":708,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"only the digits that changed roll, the way you moved","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"only the digits that changed roll, the way you moved","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -672,7 +672,7 @@
         "Core": {"name":"DeltaCaption","id":"ctrl_1772560903037","controlType":"Label"},
         "Transform": {"x":498,"y":668,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Delta","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Delta","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -681,7 +681,7 @@
         "Core": {"name":"DeltaHow","id":"ctrl_1772560903038","controlType":"Label"},
         "Transform": {"x":498,"y":690,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -690,7 +690,7 @@
         "Core": {"name":"DeltaWhat","id":"ctrl_1772560903039","controlType":"Label"},
         "Transform": {"x":500,"y":708,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"how far you moved it rises off the cap, \"+2.4\", and fades","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"how far you moved it rises off the cap, \"+2.4\", and fades","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -714,7 +714,7 @@
         "Core": {"name":"UnitsCaption","id":"ctrl_1772560903041","controlType":"Label"},
         "Transform": {"x":728,"y":668,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Units","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Units","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -723,7 +723,7 @@
         "Core": {"name":"UnitsHow","id":"ctrl_1772560903042","controlType":"Label"},
         "Transform": {"x":728,"y":690,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -732,7 +732,7 @@
         "Core": {"name":"UnitsWhat","id":"ctrl_1772560903043","controlType":"Label"},
         "Transform": {"x":730,"y":708,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"the unit rolls in after the value","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"the unit rolls in after the value","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -756,7 +756,7 @@
         "Core": {"name":"BigNumberCaption","id":"ctrl_1772560903045","controlType":"Label"},
         "Transform": {"x":958,"y":668,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Big number","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Big number","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -765,7 +765,7 @@
         "Core": {"name":"BigNumberHow","id":"ctrl_1772560903046","controlType":"Label"},
         "Transform": {"x":958,"y":690,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -774,7 +774,7 @@
         "Core": {"name":"BigNumberWhat","id":"ctrl_1772560903047","controlType":"Label"},
         "Transform": {"x":960,"y":708,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"the value, large, beside the cap while you hold it","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"the value, large, beside the cap while you hold it","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -797,7 +797,7 @@
         "Core": {"name":"ChoiceNamesCaption","id":"ctrl_1772560903049","controlType":"Label"},
         "Transform": {"x":1188,"y":668,"width":214,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"Choice names","_children":{"Fill":{"colour":"FFE8E9F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+        "Text": {"content":"Choice names","_children":{"Fill":{"colour":"FF1C1E26"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
       },
       "_type": "Control"
     },
@@ -806,7 +806,7 @@
         "Core": {"name":"ChoiceNamesHow","id":"ctrl_1772560903050","controlType":"Label"},
         "Transform": {"x":1188,"y":690,"width":214,"height":16},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF9C93FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF4A44C2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
       },
       "_type": "Control"
     },
@@ -815,7 +815,7 @@
         "Core": {"name":"ChoiceNamesWhat","id":"ctrl_1772560903051","controlType":"Label"},
         "Transform": {"x":1190,"y":708,"width":210,"height":52},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"a stepped fader: the next name rolls in the way you moved","_children":{"Fill":{"colour":"FF9EA0B3"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"a stepped fader: the next name rolls in the way you moved","_children":{"Fill":{"colour":"FF4A4F5C"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     }

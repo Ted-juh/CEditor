@@ -269,7 +269,7 @@ before. The library lists **Slider** after **Knob**.
 
 | Panel | Set | Why that set |
 |---|---|---|
-| Numbers | Soft | a round cap and a fill the readout reads against |
+| Numbers | Soft, on its own light panel | a round cap and a fill the readout reads against; its readout is its label ink, which reads on its panel and not on a dark one |
 | Ticks | Dual Scale (small ticks turned on) | a long scale of ticks, a billet cap |
 | Touch | Broadcast | a console cap big enough to see it lift |
 | Moving | Frost | a bold fill, so the way it moves is all there is, and yellow, so Overload's red reads (on Pop's coral it barely did) |
@@ -316,14 +316,19 @@ What a line needed, each found by watching a preset not play, or play wrong, in 
   played. Throw found it (`gestureEvents.js` `GESTURE_KINDS`).
 - **Two panels' sets, changed after watching them.** Overload turns the fill red, and the Moving
   panel's Pop draws a coral fill, against which it barely showed; Frost's is yellow. A fader's
-  readout is drawn in its cap's colour (`{control.cap}`), beside the cap on the panel's ground, and
-  Anodised's is near-black: on the Gestures panel's dark ground Default stamp played and nobody could
-  see it (the Knob's sits in the cap, where the cap's colour reads). Carbon's is orange, and its dark
-  cap shows Reset flash's white, which Anodised's pale one hid. A test now holds every readout a
-  showcase fader shows to 3:1 against its panel's ground. Across the sets it is wider than these two
-  panels: 28 of the 69 draw a slider's readout under 3:1 against a dark panel (FF17181A), and nine,
-  Anodised among them, at about 1:1. On such a panel a fader's readout does not read, with or without
-  a preset. That is the sets' (a fader's readout taking its cap's colour), and not changed here.
+  readout is drawn beside the cap, on the panel, and was in the cap's colour (`{control.cap}`):
+  Anodised's is near-black, a colour for its own light grey panel, and on the Gestures panel's dark
+  ground Default stamp played and nobody could see it (the Knob's sits in the cap, where the cap's
+  colour reads). Carbon's is orange, and its dark cap shows Reset flash's white, which Anodised's
+  pale one hid. A test holds every readout a showcase fader shows to 3:1 against its panel's ground.
+- **A fader readout colour in every set** (the owner's decision 9 in changeable-control-sets.md).
+  Measured against each set's own panel, which is the ground a set is made for, 35 of the 79
+  built-ins put the cap-coloured readout under 3:1 (an earlier count here, 28 of 69, measured every
+  set against one dark ground, which is not the question). A set now holds `control.readout`, its
+  cap's colour where that reads on its panel at 4.5:1 and its label text's where it does not, and a
+  fader draws its readout in it. Soft is a set for a light panel, so its readout is its dark label
+  ink, and the Numbers panel, whose readouts are the point, is on Soft's own panel colour with dark
+  captions; the other panels' sets read on their dark grounds as before.
 - **The showcase's set check compared objects.** A panel stores its set as `{ id }`, and both
   components' tests put those in a `Set`, so two panels in one set always passed; the Slider's
   Numbers panel was in the Knob's Numbers set. Compared by id, and moved.

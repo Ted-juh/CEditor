@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bfd73f1e",
+  "fingerprint": "2f324d1a",
   "set": {
     "id": "laboratory",
     "name": "Laboratory",
@@ -71,6 +71,7 @@
       "display.screen": "FF1A1208",
       "display.backlight": "FF352E26",
       "panel.surface": "FF5F6B5E",
+      "control.readout": "{text.label}",
       "section.surface": "FF4A5349"
     },
     "lamp": {

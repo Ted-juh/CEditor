@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "565dd6e7",
+  "fingerprint": "21d8e713",
   "set": {
     "id": "fan",
     "name": "Fan",
@@ -71,6 +71,7 @@
       "display.screen": "FF1B1B1B",
       "display.backlight": "FF363636",
       "panel.surface": "FFF1E6D8",
+      "control.readout": "{text.label}",
       "section.surface": "FFF6EFE6"
     },
     "lamp": {

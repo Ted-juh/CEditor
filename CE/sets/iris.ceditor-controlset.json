@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d5f06f97",
+  "fingerprint": "5c8cc815",
   "set": {
     "id": "iris",
     "name": "Iris",
@@ -71,6 +71,7 @@
       "display.screen": "FF03040A",
       "display.backlight": "FF212227",
       "panel.surface": "FF171C26",
+      "control.readout": "{text.label}",
       "section.surface": "FF12161E"
     },
     "lamp": {

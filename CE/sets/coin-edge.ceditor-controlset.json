@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f6d96763",
+  "fingerprint": "4e608e89",
   "set": {
     "id": "coin-edge",
     "name": "Coin Edge",
@@ -71,6 +71,7 @@
       "display.screen": "FF141A12",
       "display.backlight": "FF30352E",
       "panel.surface": "FF292D30",
+      "control.readout": "{control.cap}",
       "section.surface": "FF202325"
     },
     "lamp": {

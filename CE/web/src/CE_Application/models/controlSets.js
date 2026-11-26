@@ -31,7 +31,7 @@ import { extendControlSet } from './controlSetCoverage.js';
 import { typeFamilies } from './controlSetRecipes.js';
 import { withLabelDesign } from './labelDesigns.js';
 import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
-import { withInstrumentDesign, withInstrumentTokens } from './instrumentDesigns.js';
+import { withInstrumentDesign, withInstrumentTokens, contrast } from './instrumentDesigns.js';
 import { withDisplayDesign } from './displayDesigns.js';
 import { withPersonalDesigns } from './personalSetDesigns.js';
 import { deepClone } from '../utils/deepClone.js';
@@ -97,6 +97,7 @@ export const CONTROL_SET_TOKEN_ROLES = [
   { name: 'control.cap.edge', group: 'control', description: 'Hairline around a handle.' },
   { name: 'control.cap.start', group: 'control', description: 'Start handle of a range, and its label.' },
   { name: 'control.cap.end', group: 'control', description: 'End handle of a range, and its label.' },
+  { name: 'control.readout', group: 'control', description: 'A fader\'s value readout, beside its cap on the panel: the cap\'s colour where that reads there, the label text\'s where it does not.' },
   { name: 'control.marker', group: 'control', description: 'Centre / detent marker.' },
   { name: 'control.tick', group: 'control', description: 'Major tick marks.' },
   { name: 'control.tick.minor', group: 'control', description: 'Minor tick marks.' },
@@ -307,6 +308,30 @@ const BASE_BUILT_IN_SETS = [
  * the additional sets copy their base's tokens wholesale, Graphite's alias among them, and with a
  * panel colour present that alias is exactly the cream-on-cream this role exists to prevent.
  */
+/**
+ * A fader's value readout stands beside its cap, on the panel, and it was drawn in the cap's colour:
+ * in 35 of the 79 built-in sets under 3:1 against the set's own panel (a white cap on a white
+ * panel, a dark one on a dark one), so on a panel in that set it could not be read. A set names its
+ * readout colour (`control.readout`); one that does not is given the cap's where the cap reads on
+ * its panel at 4.5:1, the contrast text asks for, and its label text's where it does not, which
+ * every set's reads on its panel. As a reference, not a copy, so it follows the role it names when
+ * that is edited. The roles are read within the set: the base set may not exist yet.
+ */
+export const READOUT_CONTRAST = 4.5;
+export function withReadout(set) {
+  if (!set?.tokens || set.tokens['control.readout'] !== undefined) return set;
+  const own = (name) => {
+    let value = set.tokens[name];
+    for (let i = 0; i < 8 && tokenNameOf(value); i += 1) value = set.tokens[tokenNameOf(value)];
+    return COLOUR_LITERAL_PATTERN.test(String(value ?? '')) ? String(value) : null;
+  };
+  const cap = own('control.cap');
+  const panel = own('panel.surface');
+  if (!cap || !panel || !own('text.label')) return set;
+  const readout = contrast(cap, panel) >= READOUT_CONTRAST ? '{control.cap}' : '{text.label}';
+  return { ...set, tokens: { ...set.tokens, 'control.readout': readout } };
+}
+
 export function withPanelSurface(set, { fallback = null } = {}) {
   const current = set?.tokens?.['panel.surface'];
   const panelColour = String(set?.panel?.colour ?? '').trim().toUpperCase();
@@ -370,6 +395,8 @@ export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditiona
   .map((set) => withPanelSurface(set, { fallback: '{surface}' }))
   // After panel.surface, which the label designs read to light their lettering.
   .map(withLabelDesign)
+  // And the readout a fader shows beside its cap, which must read on that panel.
+  .map(withReadout)
   // Then the sections, whose surface is the panel's moved a step from the lettering.
   .map((set) => withSectionSurface(set, { fallback: '{surface}' }))
   .map(withSectionDesign)
@@ -546,7 +573,8 @@ export function normalizeControlSetDefinition(value) {
   }
   // A set written before `panel.surface` existed still names its panel colour; that is the role.
   // Then its designs, derived again from its own colours, the same way the built-ins' are.
-  return withPersonalDesigns(withPanelSurface(out), { builtInId: builtInControlSetId, isBuiltIn: (key) => SETS_BY_ID.has(key) });
+  // A set written before `control.readout` existed is given one by the same rule as the built-ins.
+  return withReadout(withPersonalDesigns(withPanelSurface(out), { builtInId: builtInControlSetId, isBuiltIn: (key) => SETS_BY_ID.has(key) }));
 }
 
 /**

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0a7ef9f1",
+  "fingerprint": "654ba8f7",
   "set": {
     "id": "heritage",
     "name": "Heritage",
@@ -71,6 +71,7 @@
       "border.field": "CCB8892E",
       "border.mixed": "FFC98A2A",
       "panel.surface": "FF2C2925",
+      "control.readout": "{control.cap}",
       "section.surface": "FF22201D"
     },
     "lamp": {

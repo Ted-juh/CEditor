@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f7116140",
+  "fingerprint": "06d9856a",
   "set": {
     "id": "aerospace",
     "name": "Aerospace",
@@ -71,6 +71,7 @@
       "display.screen": "FF03040A",
       "display.backlight": "FF212227",
       "panel.surface": "FF1A1C20",
+      "control.readout": "{text.label}",
       "section.surface": "FF141619"
     },
     "lamp": {

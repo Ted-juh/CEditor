@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "62c4415b",
+  "fingerprint": "a47175c5",
   "set": {
     "id": "kiln",
     "name": "Kiln",
@@ -71,6 +71,7 @@
       "display.screen": "FF262A33",
       "display.backlight": "FF40444B",
       "panel.surface": "FFEEE7DC",
+      "control.readout": "{text.label}",
       "section.surface": "FFF4EFE8"
     },
     "lamp": {

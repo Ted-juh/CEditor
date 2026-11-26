@@ -255,7 +255,7 @@ components):
   library and in the copy the panel carries (the panel's copy wins a lookup, so both must change).
   A built-in set is copied under a name the window offers, and the panel moves to the copy, or the
   control does where it was assigned a set of its own. One panel write, one undo step.
-- **Settings › Control Sets** (`models/setEditing.js`): the 45 colour roles in six groups, the ten
+- **Settings › Control Sets** (`models/setEditing.js`): the 46 colour roles in six groups, the ten
   derived ones shown read-only; the swatch opens the Colors dock on the role (colours go through
   the dock, never a popup). Lettering: typeface, weight and spacing written to every family's text,
   a knob's readout part included. Lamp: direction and height. Families grouped as the Insert menu
@@ -1099,3 +1099,29 @@ Taken by the owner, 2026-11-05 (after the mock-up of meters and keys):
 7. **A meter's reading and caption are Labels too, as the knobs'.**
 8. **A key's caption is a Label where the key is drawn as a device; a flat button keeps the text on
    its face.** It lights up and moves with the key there, and already takes every text setting.
+
+Taken by the owner, 2026-11-26:
+
+9. **A fader readout colour in every set.** A fader's value readout stands beside its cap, on the
+   panel, and was drawn in the cap's colour: measured against each set's own panel surface, 35 of
+   the 79 built-ins put it under 3:1 there (a white cap on a white panel, as Ceramic, Kiln and
+   Studio White; a dark one on a dark one, as Chrome, Obsidian and Brassworks).
+
+   As built: a 56th role, `control.readout` (Settings › Control Sets, among the controls' colours,
+   **Fader readout**). A set that does not name one is given it as it is read (`withReadout`, for
+   the built-ins and for a set from a file or a document alike): the cap's colour where the cap
+   reads on the set's panel at 4.5:1, the contrast text asks for, and the label text's where it
+   does not, which every set's reads on its panel (the least, 4.7:1). As a reference, so it follows
+   the role it names when an author edits that. 40 sets keep the cap's colour, 39 take their label
+   text's; the least readout now reads at 4.53:1 on its own panel. A slider's readout part is drawn
+   in it (`sliderEntityFactory.readoutColour`); a knob's stays in the cap's, as its readout can sit
+   in its cap, on the knob, and Change to Knob / Change to Slider swaps the one for the other unless
+   the author chose a colour. A fader saved before opens with it: a file keeps a default as nothing.
+   The base set's is `{control.cap}`, so a set with nothing to judge by follows its own cap as
+   before; the C++ table of the base set's roles (`ScriptColours.generated.h`) carries it. The set
+   files in `CE/sets` carry it, and the shipped starters (`CE/panels/Control set starters`), which
+   bake their colours, draw 28 of their faders' readouts in it now; nothing else in them changed.
+   Of the other shipped panels, ten faders show a readout, and none reads worse on its panel.
+
+   A knob's readout at the tip of its pointer also stands on the panel, 22 px past the dial, in the
+   cap's colour, and in those sets reads as poorly. Not changed: the owner asked for the fader's.

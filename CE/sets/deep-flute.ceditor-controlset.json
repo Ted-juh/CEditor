@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3d513bf7",
+  "fingerprint": "d490d1dd",
   "set": {
     "id": "deep-flute",
     "name": "Deep Flute",
@@ -71,6 +71,7 @@
       "display.screen": "FF0A0A0B",
       "display.backlight": "FF272728",
       "panel.surface": "FF202629",
+      "control.readout": "{text.label}",
       "section.surface": "FF191E20"
     },
     "lamp": {

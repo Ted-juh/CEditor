@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c0db35e5",
+  "fingerprint": "e86fbb5f",
   "set": {
     "id": "ladder",
     "name": "Ladder",
@@ -71,6 +71,7 @@
       "display.screen": "FFF3E9C8",
       "display.backlight": "FFF4ECCF",
       "panel.surface": "FF1B1B1D",
+      "control.readout": "{control.cap}",
       "section.surface": "FF151517"
     },
     "lamp": {

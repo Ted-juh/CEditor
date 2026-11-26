@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d78580c1",
+  "fingerprint": "c4b76a83",
   "set": {
     "id": "porcelain",
     "name": "Compact Analog",
@@ -71,6 +71,7 @@
       "display.screen": "FF262A33",
       "display.backlight": "FF40444B",
       "panel.surface": "FFD8D9D4",
+      "control.readout": "{text.label}",
       "section.surface": "FFE6E6E3"
     },
     "lamp": {

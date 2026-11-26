@@ -417,7 +417,7 @@
             "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE6F0FA"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE6F0FA"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE0A43A"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
-            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF161A21"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE6F0FA"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF5CC492"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE6F0FA"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF7FDCF2"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},

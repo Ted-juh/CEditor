@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "af00bc31",
+  "fingerprint": "7f260b0b",
   "set": {
     "id": "ember",
     "name": "Ember",
@@ -71,6 +71,7 @@
       "border.field": "666A5A4C",
       "border.mixed": "FFE6C15A",
       "panel.surface": "FF2A2320",
+      "control.readout": "{control.cap}",
       "section.surface": "FF211B19"
     },
     "lamp": {
