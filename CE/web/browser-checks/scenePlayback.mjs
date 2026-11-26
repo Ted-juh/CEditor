@@ -5,7 +5,8 @@
  *     type in, the knob fades, running, from the start
  *   - a scene that ends holds its last frame: posed there and paused, nothing left running
  *   - a click on a button starts the scene waiting on it; a second click starts it again
- *   - the pointer over the knob — the knob entering Hover — starts the scene waiting on that
+ *   - the pointer over the knob — the knob entering Hover — starts the scene waiting on that; once it
+ *     ends, the loop on the same lamp, still going round, draws over it again
  *   - a looping scene starts again each time its length has passed
  *   - a script plays a scene, holds it at a point, plays a library effect and swaps words (step 5c)
  *   - a drag on a control moves the scene it drives, and stays where it was let go (step 5c)
@@ -102,16 +103,27 @@ try {
     assert.notEqual(again[0].name, clicked[0].name, 'the phase flipped, so the animation restarted');
   });
 
-  // The pointer over the knob: the lamp's Glow (its Blink loops on the lamp too).
-  const lampBefore = kf(await s('box', 'lamp')).length;
+  // The pointer over the knob: the lamp's Glow (its Blink loops on the lamp too). The Glow pops the
+  // lamp's scale and opacity; while it runs it is on top, and the Blink's fade (opacity alone) is left
+  // out under it. Once it has ended and holds, the Blink, still going round, is on top again.
+  const before = kf(await s('box', 'lamp'));
+  const blink = (name) => before.some((a) => a.name.replace(/-[ab]$/, '') === name.replace(/-[ab]$/, ''));
   const knob = await s('rect', 'cutoff');
   await page.mouse.move(knob.x + knob.w / 2, knob.y + knob.h / 2, { steps: 3 });
   await page.waitForTimeout(150);
   const lampHover = kf(await s('box', 'lamp'));
+  await page.waitForTimeout(800);
+  const lampAfter = kf(await s('box', 'lamp'));
   check('the knob entering Hover starts the scene waiting on it', () => {
-    assert.equal(lampBefore, 1, 'the loop only, before');
-    assert.equal(lampHover.length, 2, JSON.stringify(lampHover));
-    assert.ok(lampHover.every((a) => a.state === 'running'));
+    assert.equal(before.length, 1, 'the loop only, before');
+    const glow = lampHover.filter((a) => !blink(a.name));
+    assert.equal(glow.length, 1, `the Glow is playing: ${JSON.stringify(lampHover)}`);
+    assert.equal(glow[0].state, 'running');
+  });
+  check('a scene that has played out draws under one still going: the Blink is back on top once the Glow ends', () => {
+    assert.equal(lampAfter.length, 2, JSON.stringify(lampAfter));
+    assert.ok(blink(lampAfter[1].name) && lampAfter[1].state === 'running', `the Blink last, running: ${JSON.stringify(lampAfter)}`);
+    assert.ok(!blink(lampAfter[0].name) && lampAfter[0].state === 'paused', 'the Glow under it, held at its end');
   });
   await page.mouse.move(680, 5);
 

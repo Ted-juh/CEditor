@@ -41,10 +41,10 @@ import {
 } from '../src/CE_Application/stores/scriptTouchedControls.js';
 
 /** A one-label panel, installed as the runtime's active panel in EDITOR mode (no host). */
-function withPanel(controls, fn) {
+function withPanel(controls, fn, modules = ['ce.core', 'ce.panel', 'ce.anim']) {
   const panel = {
     id: 'p', name: 'P', width: 400, height: 200,
-    scripting: { modules: ['ce.core', 'ce.panel', 'ce.anim'] }, controls,
+    scripting: { modules }, controls,
   };
   clearScriptTouchedControls();
   panels.set([panel]);
@@ -135,6 +135,20 @@ test('a script write reports the control, so it leaves the ground and stays out'
       'an animated label would otherwise re-bake the whole ground on every frame');
     assert.equal(planSceneryFold(live().controls, get(scriptTouchedControlIds)).ground.length, 0);
   });
+});
+
+test('a script that draws on a folded label takes it out of the ground: a drawing is not in the document', () => {
+  // The ground is baked from the document; a drawing (ce.draw) lives only in the script's own store.
+  // Left in the ground, a label or Background drawn on showed nothing in Preview at all.
+  withPanel([label('scope'), label('other')], (api, live) => {
+    const drawer = scriptApiForTesting('scope', 'drawer');   // a script attached to the label
+    drawer.drawStroke('#ffffff', 2);
+    assert.equal(get(scriptTouchedControlIds).has('scope'), false, 'setting a style draws nothing');
+    assert.equal(drawer.drawLine(0, 0, 10, 10), true);
+    assert.ok(get(scriptTouchedControlIds).has('scope'), 'the drawn-on label left the ground');
+    const { ground } = planSceneryFold(live().controls, get(scriptTouchedControlIds));
+    assert.deepEqual(ground.map((c) => c._children.Core.id), ['other'], 'and only it');
+  }, ['ce.core', 'ce.panel', 'ce.draw']);
 });
 
 test('repeating the write does not churn the set', () => {

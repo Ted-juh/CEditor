@@ -1,13 +1,13 @@
 // synthPanels.test.js — the Animated Synths (scripts/synthPanels.js): every control bound to a
 // parameter its instrument's profile has, the way the editor binds a dropped one; every clock driven
 // by a bound control; scenes that share an element moving different things of it, so they compose;
-// a key lit by its note and darkened by that note let go; and the minilogue's screen script saying
-// what it is said to.
+// a key lit by its note and darkened by that note let go; the minilogue's screen script saying what
+// it is said to; and the YC61's rotors turning at the speeds and ramps its manual prints.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SYNTHS, loadProfile } from '../scripts/synthPanels.js';
+import { SYNTHS, loadProfile, YC61_SPEEDS, yc61Rpm, yc61Factor, yc61Step } from '../scripts/synthPanels.js';
 import { getPreferredPort } from '../src/CE_Application/models/componentPorts.js';
 import { cleanScene } from '../src/CE_Application/utils/sceneFormat.js';
 
@@ -182,4 +182,104 @@ test('minilogue xd: each beat lights four of the sixteen steps, a sixteenth apar
   assert.deepEqual(calls, [['play', 'Step 5'], ['after', 150], ['play', 'Step 6'], ['after', 300], ['play', 'Step 7'], ['after', 450], ['play', 'Step 8']]);
   for (let s = 1; s <= 16; s += 1) assert.equal(sceneNamed(panel, `Step ${s}`)?.trigger.type, 'script', `Step ${s} is played by the script alone`);
   assert.equal(sceneNamed(panel, 'Scope wave').clock.controlId, idOf(panel, 'Vco1Wave'));
+});
+
+test('YC61: speeds, ramps and drawbar steps read as the manual prints them', () => {
+  // Each speed's printed range and default (Owner's Manual): the default, 64, lands on the default.
+  const printed = { hornFast: 413.8, drumFast: 373.5, hornSlow: 45.4, drumSlow: 44.8 };
+  for (const [key, [low, high]] of Object.entries(YC61_SPEEDS)) {
+    assert.ok(Math.abs(yc61Rpm(1, [low, high]) - low) < 1e-9, `${key}: 1 is the low end`);
+    assert.ok(Math.abs(yc61Rpm(127, [low, high]) - high) < 1e-9, `${key}: 127 the high end`);
+    assert.ok(Math.abs(yc61Rpm(64, [low, high]) - printed[key]) < 0.06, `${key}: 64 is ${printed[key]} rpm, not ${yc61Rpm(64, [low, high])}`);
+  }
+  // The ramps: 0.21 - 1.00 - 2.00, with the printed defaults 1.30 (horn, 83) and 1.00 (rotor, 64).
+  for (const [value, factor] of [[14, 0.21], [64, 1], [83, 1.3], [127, 2]]) assert.equal(Math.round(yc61Factor(value) * 100) / 100, factor, String(value));
+  // The drawbar table: 0: 0, 1: 1 - 18, 2: 19 - 36 ... 7: 109 - 126, 8: 127.
+  const table = [[0, 0], [1, 1], [18, 1], [19, 2], [36, 2], [37, 3], [54, 3], [55, 4], [72, 4], [73, 5], [90, 5], [91, 6], [108, 6], [109, 7], [126, 7], [127, 8]];
+  for (const [value, step] of table) assert.equal(yc61Step(value), step, `value ${value}`);
+  // And the profile carries the same ranges the panel reads.
+  const profile = loadProfile('yamaha-yc61');
+  const said = (id) => profile.parameters.find((q) => q.id === `liveSetSoundCommon.${id}`).description;
+  assert.match(said('rotarySpeakerHornSpeedFast'), /209\.4 – 817\.6/);
+  assert.match(said('rotarySpeakerRotorSpeedSlow'), /22\.7 – 88\.3/);
+});
+
+/** One of the YC61's scripts against a stand-in API, with a clock of its own. */
+function runYc61(source, values) {
+  let now = 0;
+  const timers = [];
+  const calls = [];
+  const listeners = {};
+  class Clock { static now() { return now; } }
+  const api = {
+    Date: Clock,
+    get: (name) => values[name],
+    set: (path, value) => calls.push(['set', path, value]),
+    on: (target, event, fn) => { listeners[event] = fn; },
+    after: (ms, fn) => { timers.push([now + ms, fn]); },
+    animateSeek: (scene, at) => calls.push(['seek', scene, at]),
+    drawClear: () => calls.push(['clear']), drawOpacity: () => {}, drawStroke: () => {}, drawFill: () => {},
+    drawPath: (points) => calls.push(['path', points.length]), drawText: (x, y, text) => calls.push(['text', text]),
+    drawRedraw: () => calls.push(['redraw']),
+  };
+  const hooks = new Function(...Object.keys(api), `${source}\nreturn typeof onDraw === 'function' ? { onDraw } : {};`)(...Object.values(api));
+  const run = (ms) => {
+    const until = now + ms;
+    for (;;) {
+      timers.sort((a, b) => a[0] - b[0]);
+      if (!timers.length || timers[0][0] > until) break;
+      const [at, fn] = timers.shift();
+      now = at;
+      fn();
+    }
+    now = until;
+  };
+  return { calls, listeners, hooks, run };
+}
+const lastSet = (calls, path) => calls.filter(([kind, p]) => kind === 'set' && p === path).at(-1)?.[2];
+
+test('YC61: the rotors start at their slow speeds, ramp to fast at their own rates, and brake to a stop', () => {
+  const panel = panels['yamaha-yc61'];
+  const rotary = panel.scripts.find((s) => s.name === 'Rotary speaker').source;
+  const values = { HornFast: 64, HornSlow: 64, DrumFast: 64, DrumSlow: 64, HornAcc: 83, HornDec: 83, DrumAcc: 64, DrumDec: 64, SlowFast: 'slow', Rotation: 'on' };
+  const { calls, listeners, run } = runYc61(rotary, values);
+  run(100);
+  assert.equal(lastSet(calls, 'HornRpm.Text.content'), '45 rpm', 'already turning at its slow speed as the panel opens');
+  assert.equal(lastSet(calls, 'DrumRpm.Text.content'), '45 rpm');
+  for (const scene of ['Horn turn', 'Horn blur', 'Drum turn', 'Drum blur']) assert.ok(panel.animationScenes.some((s) => s.name === scene), scene);
+  assert.ok(calls.some(([kind, scene]) => kind === 'seek' && scene === 'Horn turn'), 'the horn\'s scene is held where it has turned to');
+  listeners.onControlChanged({ target: 'SlowFast', value: 'fast' });
+  run(1000);
+  const horn = parseInt(lastSet(calls, 'HornRpm.Text.content'), 10);
+  const drum = parseInt(lastSet(calls, 'DrumRpm.Text.content'), 10);
+  assert.ok(horn > drum + 20 && horn < 413, `a second in, the horn (factor 1.30) is further on than the drum (1.00): ${horn} and ${drum}`);
+  run(10000);
+  // And settles at its fast speed: 413.8 and 373.5 rpm as printed, to the nearest whole rpm shown.
+  assert.ok(Math.abs(parseInt(lastSet(calls, 'HornRpm.Text.content'), 10) - 413.8) <= 1, lastSet(calls, 'HornRpm.Text.content'));
+  assert.ok(Math.abs(parseInt(lastSet(calls, 'DrumRpm.Text.content'), 10) - 373.5) <= 1, lastSet(calls, 'DrumRpm.Text.content'));
+  const blur = calls.filter(([kind, scene]) => kind === 'seek' && scene === 'Horn blur').at(-1)[2];
+  assert.equal(blur, 1, 'too fast to see: drawn as its blur');
+  listeners.onControlChanged({ target: 'Rotation', value: 'off' });
+  run(15000);
+  assert.equal(lastSet(calls, 'HornRpm.Text.content'), '0 rpm', 'ROTATION off brakes it to a stop');
+});
+
+test('YC61: the wave screen draws each sounding footage and their sum, and the registration', () => {
+  const panel = panels['yamaha-yc61'];
+  const script = panel.scripts.find((s) => s.event === 'onDraw');
+  assert.deepEqual([script.target, script.enabled], ['Wave', true], 'attached to the screen it paints');
+  const bars = ['Drawbar16', 'Drawbar513', 'Drawbar8', 'Drawbar4', 'Drawbar223', 'Drawbar2', 'Drawbar135', 'Drawbar113', 'Drawbar1'];
+  const values = Object.fromEntries(bars.map((name) => [name, named(panel, name)._children.Behavior.defaultCurrentValue]));
+  const { calls, listeners, hooks, run } = runYc61(script.source, values);
+  run(100);
+  assert.deepEqual(calls.splice(0), [['redraw']], 'it asks to be painted as it starts');
+  hooks.onDraw({ target: 'Wave', width: 330, height: 230 });
+  const sounding = bars.filter((name) => yc61Step(values[name]) > 0).length;
+  assert.equal(calls.filter(([kind]) => kind === 'path').length, sounding + 1, 'one line a sounding footage, and their sum');
+  assert.deepEqual(calls.find(([kind]) => kind === 'text'), ['text', '88 7040 002']);
+  calls.splice(0);
+  listeners.onControlChanged({ target: 'Drawbar4', value: 64 });
+  listeners.onControlChanged({ target: 'HornFast', value: 64 });
+  assert.deepEqual(calls, [['redraw']], 'redrawn when a drawbar moves, and only then');
+  for (const name of bars) assert.ok(named(panel, name)._children.DeviceBindings.bindings[0].parameterId.startsWith('organUpper.drawbar'), `${name} is an upper drawbar`);
 });

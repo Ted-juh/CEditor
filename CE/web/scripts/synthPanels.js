@@ -11,11 +11,14 @@
 //   Korg minilogue xd    the screen talks back: the scope shows VCO 1's wave, a touched knob's name
 //                        and value come up on the screen, a program change rolls its number in, and
 //                        the step lamps walk the bar in sixteenths at the transport's tempo (scripts)
+//   Yamaha YC61          the organ's own physics: the wave the drawbars make, drawn by a script, and
+//                        the rotary speaker's horn and drum turning at the speeds the YC61 is set to,
+//                        ramping between SLOW and FAST at its acceleration (a script holds the scenes)
 //
 // What is drawn is what the profile knows. Where it does not know something (the JU-06A's switches
 // are numbers until the instrument shows where their positions fall; the profiles say nothing of
-// what SHAPE does to each wave) the panel shows the value, not a guess at what it means. The fourth
-// panel of the set, the Yamaha reface DX, waits for its manual's algorithm chart.
+// what SHAPE does to each wave) the panel shows the value, not a guess at what it means. The Yamaha
+// was to be a reface DX, but Yamaha's manuals chart only one of its twelve algorithms.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -557,9 +560,215 @@ function korgMinilogueXd() {
   ]);
 }
 
+// --- Yamaha YC61 ---------------------------------------------------------------------------------
+
+// The YC61's manual prints each rotary speed's range and default: horn fast 209.4 - 817.6 rpm, 413.8
+// at its default of 64, and so on. Each default is the range's geometric middle, so a value v (1 - 127)
+// is low * (high / low) ^ ((v - 1) / 126) rpm. The ramps are printed as factors, 0.21 - 1.00 - 2.00 for
+// 14 - 64 - 127, which is (v - 1) / 63; the time they are factors of is not printed.
+export const YC61_SPEEDS = Object.freeze({
+  hornFast: [209.4, 817.6], drumFast: [189.3, 736.8], hornSlow: [23.0, 89.6], drumSlow: [22.7, 88.3],
+});
+/** The rotor's speed in rpm for a parameter value, by the printed range. */
+export const yc61Rpm = (value, [low, high]) => low * (high / low) ** ((Math.min(127, Math.max(1, value)) - 1) / 126);
+/** An acceleration or deceleration factor for a parameter value. */
+export const yc61Factor = (value) => (Math.min(127, Math.max(14, value)) - 1) / 63;
+/** A drawbar's step, 0 - 8, for a parameter value: the manual's table (0; 1 - 18; 19 - 36; ... 127). */
+export const yc61Step = (value) => (value <= 0 ? 0 : value >= 127 ? 8 : Math.floor((value - 1) / 18) + 1);
+
+// The rotary speaker's script. Each rotor's speed eases toward the one SLOW/FAST and ROTATION ask for,
+// at its own acceleration or deceleration factor, and its angle is the speed run on; the turning scene
+// is held at that angle, and the blur scene at how fast it goes. RAMP is this panel's own: the time at
+// a factor of 1.00, which the manual does not give.
+export const yc61RotaryScript = (speeds) => `// The rotary speaker, turned as the YC61 turns it.
+const SPEEDS = ${JSON.stringify(speeds)};
+const RAMP = 1.2;   // seconds at a factor of 1.00: this panel's own figure; the manual gives only factors
+const rpm = (v, r) => r[0] * Math.pow(r[1] / r[0], (Math.min(127, Math.max(1, Number(v) || 1)) - 1) / 126);
+const factor = (v) => (Math.min(127, Math.max(14, Number(v) || 64)) - 1) / 63;
+const is = (v, word) => v === 1 || v === true || String(v).toLowerCase() === word;
+
+const values = {};
+for (const name of ['HornFast', 'HornSlow', 'DrumFast', 'DrumSlow', 'HornAcc', 'HornDec', 'DrumAcc', 'DrumDec', 'SlowFast', 'Rotation']) values[name] = get(name);
+on('*', 'onControlChanged', (info) => { if (info.target in values) values[info.target] = info.value; });
+
+const rotors = [
+  { name: 'Horn', fast: 'HornFast', slow: 'HornSlow', acc: 'HornAcc', dec: 'HornDec', speeds: [SPEEDS.hornFast, SPEEDS.hornSlow], speed: 0, angle: 0 },
+  { name: 'Drum', fast: 'DrumFast', slow: 'DrumSlow', acc: 'DrumAcc', dec: 'DrumDec', speeds: [SPEEDS.drumFast, SPEEDS.drumSlow], speed: 0, angle: 0 },
+];
+const wanted = (r) => !is(values.Rotation, 'on') ? 0
+  : is(values.SlowFast, 'fast') ? rpm(values[r.fast], r.speeds[0]) : rpm(values[r.slow], r.speeds[1]);
+for (const r of rotors) r.speed = wanted(r);   // already turning when the panel opens
+
+let last = Date.now();
+let ticks = 0;
+function turn() {
+  const now = Date.now();
+  const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
+  last = now;
+  for (const r of rotors) {
+    const target = wanted(r);
+    const f = factor(target > r.speed ? values[r.acc] : values[r.dec]);
+    r.speed += (target - r.speed) * (1 - Math.exp(-dt * f / RAMP));
+    r.angle = (r.angle + (r.speed / 60) * 360 * dt) % 360;
+    animateSeek(r.name + ' turn', r.angle / 360);
+    animateSeek(r.name + ' blur', Math.min(1, Math.max(0, (r.speed - 100) / 200)));
+    if (ticks % 5 === 0) set(r.name + 'Rpm.Text.content', Math.round(r.speed) + ' rpm');
+  }
+  ticks += 1;
+  after(40, turn);
+}
+turn();
+`;
+
+// The wave's script, attached to the screen it paints: the nine footages' sines, each as loud as its
+// drawbar's step, and their sum. A control is painted only when asked to be, so the script asks as it
+// starts and again whenever a drawbar moves.
+export const yc61WaveScript = (bars) => `// The wave the drawbars make: each footage a sine at its pitch, as loud as its drawbar's step.
+const BARS = ${JSON.stringify(bars)};
+const step = (v) => (v <= 0 ? 0 : v >= 127 ? 8 : Math.floor((v - 1) / 18) + 1);
+
+on('*', 'onControlChanged', (info) => { if (String(info.target).startsWith('Drawbar')) drawRedraw(); });
+after(50, () => drawRedraw());
+
+function onDraw(info) {
+  drawClear();
+  const steps = BARS.map((b) => step(Number(get(b.name)) || 0));
+  const w = info.width;
+  const mid = info.height * 0.52;
+  const amp = info.height * 0.17;
+  const wave = (partials) => {
+    const pts = [];
+    for (let i = 0; i <= 180; i += 1) {
+      const t = (i / 180) * Math.PI * 4;   // two periods of the 8' pitch
+      let y = 0;
+      for (const [k, gain] of partials) y += gain * Math.sin(BARS[k].ratio * t);
+      pts.push(12 + (i / 180) * (w - 24), mid - y * amp);
+    }
+    return pts;
+  };
+  drawOpacity(0.28);
+  drawStroke('#8FD0FF', 1);
+  steps.forEach((s, k) => { if (s) drawPath(wave([[k, s / 8]])); });
+  const total = steps.reduce((a, s) => a + s, 0);
+  drawOpacity(1);
+  drawStroke('#E8F4FF', 2, { join: 'round' });
+  if (total) drawPath(wave(steps.map((s, k) => [k, (s / 8) * Math.min(1, 2.2 / (total / 8))])));
+  // The registration as organists write it: 88 8000 000.
+  drawStroke();
+  drawFill('#8FD0FF');
+  drawText(12, info.height - 10, steps.slice(0, 2).join('') + ' ' + steps.slice(2, 6).join('') + ' ' + steps.slice(6).join(''), { size: 11, family: 'JetBrains Mono' });
+}
+`;
+
+/** A rotor seen from above: the horn's two bells, or the drum and its scoop. */
+const HORN = svg('<defs><linearGradient id="b" x1="0" x2="1"><stop offset="0" stop-color="#f0f2f4"/><stop offset="1" stop-color="#9aa0a8"/></linearGradient></defs>'
+  + '<path d="M4 34 L72 46 L72 54 L4 66 Z" fill="url(#b)" stroke="#4a4d52"/><path d="M196 34 L128 46 L128 54 L196 66 Z" fill="#3a3d42" stroke="#4a4d52"/>'
+  + '<rect x="70" y="44" width="60" height="12" rx="3" fill="#6c7076"/><circle cx="100" cy="50" r="13" fill="#7a7f86" stroke="#2a2d31"/><circle cx="100" cy="50" r="4" fill="#2a2d31"/>', 200, 100);
+const HORN_BLUR = svg('<defs><radialGradient id="g"><stop offset=".12" stop-color="#7a7f86" stop-opacity=".9"/><stop offset=".2" stop-color="#c9cdd1" stop-opacity=".35"/><stop offset=".98" stop-color="#c9cdd1" stop-opacity=".18"/><stop offset="1" stop-color="#c9cdd1" stop-opacity="0"/></radialGradient></defs>'
+  + '<circle cx="100" cy="100" r="98" fill="url(#g)"/><circle cx="100" cy="100" r="98" fill="none" stroke="#c9cdd1" stroke-opacity=".25" stroke-dasharray="3 9"/><circle cx="100" cy="100" r="13" fill="#7a7f86"/>', 200, 200);
+const DRUM = svg('<circle cx="70" cy="70" r="66" fill="#2a2d31" stroke="#5a5e64" stroke-width="2"/>'
+  + '<path d="M70 70 L134 46 A66 66 0 0 1 134 94 Z" fill="#c9cdd1" fill-opacity=".85"/><path d="M70 70 L6 46 A66 66 0 0 0 6 94 Z" fill="#3a3d42"/>'
+  + '<circle cx="70" cy="70" r="10" fill="#7a7f86"/><circle cx="70" cy="70" r="3.5" fill="#2a2d31"/>', 140, 140);
+const DRUM_BLUR = svg('<defs><radialGradient id="g"><stop offset=".14" stop-color="#7a7f86"/><stop offset=".16" stop-color="#5a5e64" stop-opacity=".9"/><stop offset=".97" stop-color="#8a8f96" stop-opacity=".55"/><stop offset="1" stop-color="#5a5e64" stop-opacity=".2"/></radialGradient></defs>'
+  + '<circle cx="70" cy="70" r="66" fill="url(#g)" stroke="#5a5e64" stroke-width="2"/><circle cx="70" cy="70" r="10" fill="#7a7f86"/>', 140, 140);
+
+function yamahaYc61() {
+  const f = synth('yamaha-yc61', 'Yamaha YC61', { set: 'graphite', bg: 'FF18191B', width: 1200, height: 620 });
+  const bg = 'FF18191B';
+  f.label('Stripe', '', 0, 0, 1200, 6, { fill: 'FFB3262B' });
+  f.label('Model', 'YC61', 36, 20, 200, 30, { size: 20, colour: 'FFF2F0EA', weight: 800, spacing: 3, align: 'left' });
+  f.label('Kind', 'STAGE KEYBOARD', 880, 25, 284, 22, { size: 11, colour: 'FF8E9298', weight: 600, spacing: 2, align: 'right' });
+  const line = { bg };
+  // A switch: its choices side by side, reporting each change (a group says nothing unless asked to).
+  const group = (cname, parameterId, x, y, w, h, words) => {
+    const control = f.bind('RadioButtonGroup', cname, parameterId, x, y, w, h);
+    Object.assign(control._children.Behavior, { emitValueChange: true, visualStyle: 'segmented' });
+    control._children.Text._children.Font = { ...control._children.Text._children.Font, size: 10 };
+    if (words) f.caption(control, words, { size: 9, width: Math.max(w, 60) });
+    return control;
+  };
+
+  // Organ: the upper manual's nine drawbars, pulled down for more, then vibrato/chorus and percussion.
+  f.section('Organ', 'ORGAN · UPPER', 28, 66, 392, 420, line);
+  const BARS = [["16'", 'drawbar16', 0.5, 'FF7A4A26', 127], ["5⅓'", 'drawbar513', 1.5, 'FF7A4A26', 127], ["8'", 'drawbar8', 1, 'FFE9E7E2', 109],
+    ["4'", 'drawbar4', 2, 'FFE9E7E2', 0], ["2⅔'", 'drawbar223', 3, 'FF1B1C1E', 55], ["2'", 'drawbar2', 4, 'FFE9E7E2', 0],
+    ["1⅗'", 'drawbar135', 5, 'FF1B1C1E', 0], ["1⅓'", 'drawbar113', 6, 'FF1B1C1E', 0], ["1'", 'drawbar1', 8, 'FFE9E7E2', 19]];
+  const barNames = [];
+  BARS.forEach(([words, id, ratio, tab, start], i) => {
+    const cx = 62 + i * 40;
+    const name = `Drawbar${id.slice('drawbar'.length)}`;
+    barNames.push({ name, ratio });
+    f.label(`${name}Tab`, '', cx - 11, 86, 22, 8, { fill: tab, radius: 2 });
+    const control = f.bind('Slider', name, `organUpper.${id}`, cx - 13, 98, 26, 176, { start });
+    // Pulled down for more, as a drawbar is.
+    Object.assign(control._children.Behavior, { orientation: 'vertical', direction: 'ttb', showTicks: true, majorTickCount: 9, minorTickCount: 0 });
+    f.caption(control, words, { size: 10, width: 40 });
+  });
+  group('VibChoType', 'organ.vibratoChorusType', 44, 310, 360, 26, 'VIBRATO / CHORUS');
+  group('VibChoOn', 'organUpper.vibratoChorusSwitch', 44, 364, 100, 26, 'VIB/CHO');
+  group('Perc', 'organ.percussionSwitch', 156, 364, 108, 26, 'PERCUSSION');
+  group('PercHarmonic', 'organ.percussionType', 276, 364, 128, 26, 'HARMONIC');
+  group('PercDecay', 'organ.percussionDecay', 44, 418, 170, 26, 'DECAY');
+  group('PercVolume', 'organ.percussionVolume', 234, 418, 170, 26, 'VOLUME');
+
+  // The wave the drawbars make, drawn by a script on this screen.
+  f.label('Wave', '', 436, 66, 330, 230, { fill: 'FF050607', radius: 8 });
+  picture(f.label('WaveEdge', '', 436, 66, 330, 230), outline(330, 230, 'FF2A2D33', { radius: 8 }), 'fill');
+  f.label('WaveName', 'ORGAN WAVE', 452, 74, 200, 18, { size: 11, colour: 'FF8FD0FF', family: 'JetBrains Mono', weight: 700, align: 'left' });
+  f.label('WaveNote', 'each footage a sine at its pitch, as loud as its drawbar\'s step in eighths (this panel\'s law, not a measurement); the faint lines are the nine on their own', 436, 304, 330, 44,
+    { size: 9, colour: 'FF6C7076', weight: 500, lineHeight: 1.3 });
+
+  // The rotary speaker from above: horn on top, drum below, each with its blur for when it is fast.
+  f.section('Rotary', 'ROTARY SPEAKER', 782, 66, 390, 420, line);
+  picture(f.label('HornBlur', '', 798, 84, 164, 164), HORN_BLUR, 'contain')._children.Transform.opacity = 0;
+  picture(f.label('Horn', '', 798, 125, 164, 82), HORN, 'contain');
+  f.label('HornName', 'HORN', 840, 250, 80, 14, { size: 9, colour: 'FF9AA0A8', weight: 700, spacing: 1 });
+  picture(f.label('DrumBlur', '', 815, 290, 130, 130), DRUM_BLUR, 'contain')._children.Transform.opacity = 0;
+  picture(f.label('Drum', '', 815, 290, 130, 130), DRUM, 'contain');
+  f.label('DrumName', 'DRUM', 840, 426, 80, 14, { size: 9, colour: 'FF9AA0A8', weight: 700, spacing: 1 });
+  f.label('RpmScreen', '', 976, 86, 182, 58, { fill: 'FF050607', radius: 5 });
+  f.label('HornRpm', '', 988, 92, 160, 22, { size: 14, colour: 'FFE8F4FF', family: 'JetBrains Mono', weight: 700, align: 'right' });
+  f.label('DrumRpm', '', 988, 116, 160, 22, { size: 14, colour: 'B3E8F4FF', family: 'JetBrains Mono', weight: 700, align: 'right' });
+  f.label('HornRpmName', 'HORN', 988, 94, 60, 18, { size: 10, colour: 'FF8E9298', family: 'JetBrains Mono', weight: 700, align: 'left' });
+  f.label('DrumRpmName', 'DRUM', 988, 118, 60, 18, { size: 10, colour: 'FF8E9298', family: 'JetBrains Mono', weight: 700, align: 'left' });
+  group('SlowFast', 'liveSetSoundCommon.rotarySpeakerSlowFast', 976, 160, 182, 28, 'SPEED');
+  group('Rotation', 'liveSetSoundCommon.rotarySpeakerRotationSwitch', 976, 216, 182, 28, 'ROTATION');
+  [['HornFast', 'rotarySpeakerHornSpeedFast', 'H FAST'], ['HornSlow', 'rotarySpeakerHornSpeedSlow', 'H SLOW'], ['HornAcc', 'rotarySpeakerHornAcceleration', 'H ACC'], ['HornDec', 'rotarySpeakerHornDeceleration', 'H DEC'],
+    ['DrumFast', 'rotarySpeakerRotorSpeedFast', 'D FAST'], ['DrumSlow', 'rotarySpeakerRotorSpeedSlow', 'D SLOW'], ['DrumAcc', 'rotarySpeakerRotorAcceleration', 'D ACC'], ['DrumDec', 'rotarySpeakerRotorDeceleration', 'D DEC']]
+    .forEach(([cname, id, words], i) => f.knob(cname, `liveSetSoundCommon.${id}`, 996 + (i % 4) * 46, 304 + Math.floor(i / 4) * 86, 30, words, { size: 8 }));
+  f.label('RotaryNote', 'speeds and ramps as the YC61 manual prints them; a ramp at 1.00 here takes 1.2 s, the manual gives no time', 970, 438, 194, 40,
+    { size: 8, colour: 'FF6C7076', weight: 500, lineHeight: 1.3 });
+
+  // The keys, as the YC61's 61.
+  const keys = keyboard(36, 96, 28, 1144);
+  for (const key of keys.filter((k) => !k.black)) f.label(`Key${key.name}`, '', Math.round(key.x + 1), 504, Math.max(1, Math.round(key.w - 2)), 100, { fill: 'FFE9E7E2', radius: 3 });
+  for (const key of keys.filter((k) => k.black)) f.label(`Key${key.name}`, '', Math.round(key.x), 504, Math.round(key.w), 62, { fill: 'FF1B1C1E', radius: 2 });
+
+  // Scenes the script holds: each rotor turned to its angle, and blurred by its speed.
+  f.clip('Horn', 'Transform', 0, frames([{ at: 0, rotate: 0 }, { at: 1, rotate: 360 }]), 1000, 0);
+  f.clip('HornBlur', 'Transform', 0, frames([{ at: 0, rotate: 0 }, { at: 1, rotate: 360 }]), 1000, 0);
+  f.clip('Horn', 'Transform', 0, frames([{ at: 0, opacity: 1 }, { at: 1, opacity: 0.12 }]), 1000, 1);
+  f.clip('HornBlur', 'Transform', 0, frames([{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }]), 1000, 1);
+  f.clip('Drum', 'Transform', 0, frames([{ at: 0, rotate: 0 }, { at: 1, rotate: 360 }]), 1000, 2);
+  f.clip('DrumBlur', 'Transform', 0, frames([{ at: 0, rotate: 0 }, { at: 1, rotate: 360 }]), 1000, 2);
+  f.clip('Drum', 'Transform', 0, frames([{ at: 0, opacity: 1 }, { at: 1, opacity: 0.15 }]), 1000, 3);
+  f.clip('DrumBlur', 'Transform', 0, frames([{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }]), 1000, 3);
+
+  f.script('Rotary speaker', yc61RotaryScript(YC61_SPEEDS));
+  f.script('Organ wave', yc61WaveScript(barNames), { event: 'onDraw', target: 'Wave' });
+
+  return f.scenes([
+    { name: 'Horn turn', length: 1000, trigger: { type: 'script' }, loop: false },
+    { name: 'Horn blur', length: 1000, trigger: { type: 'script' }, loop: false },
+    { name: 'Drum turn', length: 1000, trigger: { type: 'script' }, loop: false },
+    { name: 'Drum blur', length: 1000, trigger: { type: 'script' }, loop: false },
+  ]);
+}
+
 /** [id, make] for each panel, in the order the collection lists them. */
 export const SYNTHS = [
   ['moog-subsequent-37', moogSubsequent37],
   ['roland-ju-06a', rolandJu06a],
   ['korg-minilogue-xd', korgMinilogueXd],
+  ['yamaha-yc61', yamahaYc61],
 ];

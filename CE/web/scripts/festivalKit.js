@@ -85,8 +85,10 @@ export function panelMaker(id, name, { set = 'carbon-pro', bg = 'FF000000', kind
     });
     return panel;
   };
-  const script = (scriptName, source) => {
-    scripts.push({ id: `${kind.script}_${id}_${scripts.length + 1}`, name: scriptName, language: 'javascript', source });
+  /** A script; with `event` it answers that event (on `target`, a control's name, or every one). */
+  const script = (scriptName, source, { event = null, target = '*' } = {}) => {
+    scripts.push({ id: `${kind.script}_${id}_${scripts.length + 1}`, name: scriptName, language: 'javascript', source,
+      ...(event ? { scope: 'panel', target, event, enabled: true } : {}) });
   };
   const done = (sceneName, length) => make([{ id: `sc_${id}`, name: sceneName, trigger: { type: 'panelOpen' }, length, loop: true, clips: clipsByScene[0] }]);
   const scenes = (list) => make(list.map(({ name: sceneName, length, trigger = { type: 'panelOpen' }, loop = true, clock = null, markers = null }, i) => ({

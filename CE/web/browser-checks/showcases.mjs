@@ -15,6 +15,8 @@
  *   - Subsequent 37: a note sends the pulse down the path; the note lamp is lit only while held
  *   - minilogue xd: once its script is enabled, the screen names a touched control and its choice,
  *     the scope shows that wave, and a program change rolls its number in
+ *   - YC61: its rotors turn at the speeds it is set to and FAST ramps them up, and the organ wave a
+ *     script draws on its screen shows (a control drawn on leaves the still ground)
  *
  *   node browser-checks/showcases.mjs
  */
@@ -242,6 +244,30 @@ try {
     check('minilogue xd: a program change rolls its number in', () => {
       assert.equal(program, 'PROGRAM 042');
       assert.deepEqual(errors, []);
+    });
+  }
+  {
+    const ids = await open('Animated Synths', 'Yamaha YC61');
+    await page.getByRole('button', { name: 'Enable scripts for this session' }).click();
+    await kit.settle(1500);
+    const slow = await words(ids.HornRpm);
+    const wave = await page.evaluate((id) => document.querySelectorAll(`.panel-surface .canvas-control[data-control-id="${id}"] polyline`).length, ids.Wave);
+    // FAST, as a press on the speed switch writes it (the panel is wider than this window, so the
+    // switch can be under the dock).
+    await page.evaluate(async (id) => {
+      const { updatePanelPreviewSession } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
+      updatePanelPreviewSession(id, { valueOverrideEnabled: true, valueOverride: 'fast' });
+    }, ids.SlowFast);
+    await kit.settle(4000);
+    const ramped = parseInt(await words(ids.HornRpm), 10);
+    const errors = await errorsInConsole();
+    check('YC61: the rotary speaker turns at the speeds the YC61 is set to, and FAST ramps the horn up to its own', () => {
+      assert.equal(slow, '45 rpm', `slow, the horn's default: ${slow}`);
+      assert.ok(ramped > 380 && ramped <= 414, `fast, ramping to its 413.8 rpm: ${ramped}`);
+      assert.deepEqual(errors, []);
+    });
+    check('YC61: the organ wave is drawn on its screen, which leaves the still ground for it', () => {
+      assert.ok(wave >= 2, `the sum and its parts are drawn: ${wave} lines`);
     });
   }
   if (kit.failures.length) throw new Error(`page errors: ${kit.failures.join('; ')}`);

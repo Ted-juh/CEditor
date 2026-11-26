@@ -190,18 +190,51 @@ test('scenes draw in the order they last started: a key darkened by a note let g
   const on = { type: 'midi', message: 'note', channel: 0, note: 60 };
   const off = { type: 'midi', message: 'noteOff', channel: 0, note: 60 };
   // Listed with the dark one last, which under the panel's order alone would win for good.
-  runtime.setScenes([scene('lit', on, { length: 100 }), scene('dark', off, { length: 100 }), scene('loop', { type: 'panelOpen' }, { length: 100, loop: true })]);
-  runtime.open();
+  runtime.setScenes([scene('lit', on, { length: 100 }), scene('dark', off, { length: 100 })]);
   const order = () => runtime.plays().map((p) => p.scene.id);
   runtime.fire({ type: 'midi', event: { kind: 'note', channel: 1, note: 60, velocity: 100 } });
-  assert.deepEqual(order(), ['loop', 'lit']);
   runtime.fire({ type: 'midi', event: { kind: 'noteOff', channel: 1, note: 60 } });
   timers.advance(250);
-  assert.deepEqual(order(), ['loop', 'lit', 'dark'], 'let go: the dark one on top, the loop going round keeping its place');
+  assert.deepEqual(order(), ['lit', 'dark'], 'let go: the dark one on top');
   runtime.fire({ type: 'midi', event: { kind: 'note', channel: 1, note: 60, velocity: 90 } });
-  assert.deepEqual(order(), ['loop', 'dark', 'lit'], 'struck again: lit');
+  assert.deepEqual(order(), ['dark', 'lit'], 'struck again: lit');
+  timers.advance(250);
+  assert.deepEqual(order(), ['dark', 'lit'], 'and still lit once both have stopped');
   runtime.seek('dark', 1);
-  assert.deepEqual(order(), ['loop', 'lit', 'dark'], 'a seek starts it too');
+  assert.deepEqual(order(), ['lit', 'dark'], 'a seek starts it too');
+});
+
+test('a scene that has played to its end draws under one still going: a loop shows again once a pop on it ends', () => {
+  const timers = fakeTimers();
+  const runtime = createSceneRuntime({ timers });
+  runtime.setScenes([scene('pop', { type: 'event', controlId: 'lamp', event: 'click' }, { length: 300 }), scene('loop', { type: 'panelOpen' }, { length: 500, loop: true })]);
+  runtime.open();
+  const order = () => runtime.plays().map((p) => p.scene.id);
+  timers.advance(100);
+  runtime.fire({ type: 'event', controlId: 'lamp', event: 'click' });
+  assert.deepEqual(order(), ['loop', 'pop'], 'both running: the one started last on top');
+  timers.advance(300);
+  assert.deepEqual(order(), ['pop', 'loop'], 'the pop held at its end: the loop, still going round, back on top');
+  timers.advance(1000);
+  assert.deepEqual(order(), ['pop', 'loop'], 'going round keeps it there');
+});
+
+test('a scene a script holds at a point is not one that has played out: it draws over a scene still going', () => {
+  const timers = fakeTimers();
+  const runtime = createSceneRuntime({ timers });
+  runtime.setScenes([scene('roll', { type: 'script' }, { length: 600 }), scene('type', { type: 'script' }, { length: 600 })]);
+  const order = () => runtime.plays().map((p) => p.scene.id);
+  runtime.start('type');
+  timers.advance(60);
+  runtime.seek('roll', 0.2);
+  assert.deepEqual(order(), ['type', 'roll'], 'held by the script after the other started: on top while that one plays');
+  timers.advance(1000);
+  assert.deepEqual(order(), ['type', 'roll'], 'and once it has played out, beneath');
+  runtime.start('roll');
+  timers.advance(1000);
+  runtime.start('type');
+  timers.advance(1000);
+  assert.deepEqual(order(), ['roll', 'type'], 'both played out: the one started last on top');
 });
 
 test('a scene a hand drives lies under the rest until the hand moves it', () => {
@@ -210,9 +243,15 @@ test('a scene a hand drives lies under the rest until the hand moves it', () => 
   const runtime = createSceneRuntime({ timers, frames });
   runtime.setScenes([scene('timed', { type: 'panelOpen' }), scene('hand', { type: 'script' }, { clock: { source: 'value', controlId: 'k', follow: 'exact' } })]);
   runtime.open();
-  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['hand', 'timed'], 'never moved: beneath');
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['hand', 'timed'], 'never moved, and the other running: beneath');
+  timers.advance(1000);
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['hand', 'timed'], 'the other played out: still beneath it, never having moved');
   runtime.input('k', 'value', { normalized: 0.5 });
   assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['timed', 'hand'], 'moved: on top');
+  runtime.start('timed');
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['hand', 'timed'], 'the other started again: on top while it plays');
+  timers.advance(1000);
+  assert.deepEqual(runtime.plays().map((p) => p.scene.id), ['timed', 'hand'], 'and beneath the hand once it has played out');
 });
 
 test('with reduced motion a script still hears done(true), once the call has returned', () => {

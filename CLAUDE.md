@@ -150,6 +150,12 @@ first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Wi
 their own beside the web tests and the C++ build; run them locally when you touch rendering, the
 docks, the player inbound path or the learn chips.
 
+**`runAll.mjs` alone does not rebuild the bundle.** Most checks load `dist-scenery/`, which only
+`npm run test:browser` builds. Changed the source and running one check? Build first —
+`npx vite build --config browser-checks/vite.config.mjs`, about 45 s — or the check runs the code
+as it was. On 2026-11-26, a single `scenePlayback` run here tested the scene runtime from before a
+change, while CI failed the same check on the change itself.
+
 **Both browser runs go side by side** (`browser-checks/parallelSlots.mjs` says how): half the logical
 processors as workers, at most eight, each with a dev-server port and a Vite cache of its own, so
 eight here and two on CI's four cores. On 2026-11-23, on a 32-thread machine: the 46 browser checks

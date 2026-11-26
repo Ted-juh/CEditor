@@ -6190,6 +6190,11 @@ function pushCommand(explicit, ownerName, command, memberId = null) {
     const outside = outsideWords(memberId, commandBounds(command), { w: Number(t.width), h: Number(t.height) }, drawState.strokeWidth);
     drawSaid(`${id}\u0000${memberId}`, outside);
   }
+  // Out of the scenery ground, as a control a script writes to is (stores/scriptTouchedControls.js).
+  // The ground is a picture baked from the document, and a drawing is not in the document: drawn on
+  // a folded Label or Background, the drawing was recorded and published and never shown, so the
+  // scope trace this API was made for (over a Background) never appeared in Preview.
+  noteScriptTouchedControl(id);
   const list = drawCommands.get(id) ?? [];
   list.push({
     ...command,

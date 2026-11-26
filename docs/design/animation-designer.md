@@ -1859,7 +1859,7 @@ from each of Moog, Roland, Yamaha and Korg, with a mockup first. The mockups wer
 additions they proposed. Three panels are built (`scripts/synthPanels.js`, written to
 `CE/panels/Animated Synths/` by `export-showcases.mjs`); the Yamaha reface DX waits for its manual's
 chart of the twelve algorithms, which this environment cannot reach and which is not drawn from
-memory.
+memory. (It was later reached, and has no such chart: see the YC61 below.)
 
 Every knob and slider is bound to a parameter of the instrument's profile as the editor binds a
 dropped one: the binding, then the parameter's range and choices adopted (`parameterAdoptionPatches`),
@@ -1902,7 +1902,8 @@ and both are general:
   order was the panel's scene list, so a "let go" scene listed after its "note" won for good and a
   key lit once never lit again. It is now the order they last started: a trigger, a script's play
   or seek, an effect; a scene a hand drives starts each time the hand moves it, and until then lies
-  under the rest. A looping scene going round keeps its place.
+  under the rest. A looping scene going round keeps its place. (That alone held a loop still under a
+  pop that had ended; a scene that has played out now draws under the rest: see the YC61, below.)
 - **A later scene takes a property over** (`mergeKeyframeOutputs`). With the order right, a key
   still lit up again when another key was struck: Chromium stopped putting the later of two held
   animations of the key's colour on top once a third key, sharing their keyframes, started its own,
@@ -1934,6 +1935,87 @@ Verified locally:
   another note comes; a Moog note sends its pulse and its lamp; the minilogue's screen, once its
   scripts are enabled, names VCO 1's WAVE and its choice, its scope showing that wave, and rolls a
   program's number in.
+
+## As built: the Yamaha YC61, and a drawing on a still control (2026-11-26)
+
+**Why not the reface DX.** With Yamaha's site reachable, the reface DX's manuals were read: both
+editions of the Owner's Manual, the Reference Manual and the Data List. None charts the twelve
+algorithms; the Owner's Manual draws algorithm 8 as an example of the ALGO screen, and that is all.
+A community note on GitHub says seven are the DX9's, three the DX7's 13, 25 and 30, and two custom,
+but not which number is which. With the owner's agreement the fourth panel is the **YC61** instead,
+whose profile carries what an animation needs.
+
+**What the manual gives, and what follows from it.** The Owner's Manual prints each rotary speed's
+range and default: horn fast 209.4 - 817.6 rpm, default 413.8; drum fast 189.3 - 736.8, 373.5; horn
+slow 23.0 - 89.6, 45.4; drum slow 22.7 - 88.3, 44.8. Every default is its range's geometric middle to
+the printed 0.1 rpm, so a value v (1 - 127, default 64) is low x (high / low) ^ ((v - 1) / 126) rpm.
+The ramps are printed as factors, 0.21 - 1.00 - 2.00 for 14 - 64 - 127, with defaults 1.30 (horn, 83)
+and 1.00 (drum, 64): (v - 1) / 63 meets all four. What a factor of 1.00 takes is not printed; the
+panel's script uses 1.2 s and says so. The drawbars' table (0; 1 - 18; 19 - 36; ... 127) gives the
+steps 0 - 8.
+
+**The panel** (`scripts/synthPanels.js`, `Yamaha YC61.cepanel`):
+- Every control bound to the YC61 profile: the upper manual's nine drawbars (pulled down for more),
+  vibrato/chorus, percussion, the rotary speaker's SLOW/FAST and ROTATION, and its eight speed and
+  ramp knobs. Its switches are radio groups that report each change (`emitValueChange`; a group says
+  nothing unless asked) in the segmented style, so a choice's label has room.
+- **The rotary speaker, turned as the YC61 turns it.** A panel script keeps each rotor's speed and
+  angle: the speed eases toward the one SLOW/FAST and ROTATION ask for, at the rotor's own
+  acceleration or deceleration factor; the angle is the speed run on. Each rotor has a scene the
+  script holds at its angle (`animateSeek` 25 times a second) and one it holds at its speed, which
+  fades the rotor into a blur past 100 rpm: at 400 rpm a drawing a frame cannot show it turning.
+  The readouts give the rpm.
+- **The organ's wave**, drawn by a script attached to the screen (`event: 'onDraw'`, `target:
+  'Wave'`): each footage a sine at its pitch (16' an octave down, 5⅓' a fifth up ...), as loud as its
+  drawbar's step in eighths, each faint and their sum bright, with the registration under them. The
+  loudness of a step is the panel's (the manual gives no level law), and is said on the panel.
+- The 61 keys are drawn and do not light; the JU-06A already shows keys held.
+
+**A drawing on a still control never showed.** Preview folds the controls nothing moves into one
+picture baked from the document (the still ground), and a control a script writes to is taken out of
+it (`stores/scriptTouchedControls.js`). A drawing is not a write: it lives only in the script's own
+store, so a script drawing on a folded Label or Background had its commands recorded, published and
+painted onto a control that was not on screen. The drawing API's own description names the case
+("a scope trace over a Background"). Every drawing command now takes its control out of the ground,
+as a write does; `sceneryScripts.test.js` holds it.
+
+**A lamp that stopped blinking after a hover.** CI's browser checks failed on the commit before
+this one, at `scenePlayback`'s hover, and so did a local run of all fifty. The lamp there blinks in a
+loop from the panel's opening, and the pointer over the knob plays a Glow on it, a pop of its scale
+and opacity. The Glow started later, so it was on top, and the Blink's fade, moving nothing the Glow
+does not, was left out under it, as a later scene's take-over says. Right while the Glow ran; but
+the Glow then held its last frame, still the later of the two, so the Blink stayed left out and the
+lamp never blinked again. The check asked for both animations running during the hover, which the
+take-over had made wrong as well.
+
+A scene that has played to its end now draws under every scene still going or held where a seek or
+a hand put it; within each, the one started last is on top, as before. A first cut put every
+stopped scene under the running ones, and `scenePlayback` caught that too: a script holding the roll
+on a knob form's readout with a seek, while the words it rolls were still typing in, saw the typing
+on top. A seek is a script holding a scene where it wants it, and a hand-driven scene once moved is
+where the hand put it; neither is a leftover. A hand-driven scene never moved still lies under all.
+
+Also found on the way, both about scripts rather than the editor: a script answers one event, so one
+that draws needs its event and target (`f.script` takes them now); and a control is painted only
+when a script asks (`drawRedraw`), so the wave's script asks as it starts.
+
+Verified locally:
+- `test/synthPanels.test.js`: the speeds at 1, 64 and 127 against the printed ends and defaults, the
+  factors at 14, 64, 83 and 127, the drawbar table; the rotary script, on a clock of its own, starting
+  at 45 rpm, the horn ahead of the drum a second into FAST, both settling at 413.8 and 373.5 rpm and
+  blurred, and ROTATION off braking to 0; the wave script asking to be painted, drawing one line a
+  sounding footage and their sum, the registration 88 7040 002, and redrawing for a drawbar alone.
+- `test/sceneryScripts.test.js`: a label drawn on leaves the ground, and only it.
+- `test/sceneRuntime.test.js`: a loop on top again once a pop on it has played out, and staying
+  there as it goes round; a scene a script seeks drawing over one still playing, and under it only
+  once both have played out and the other started last; a hand-driven scene under one played out
+  until moved, then over it, and under it again only while it plays.
+- The browser check `scenePlayback`: the Glow plays over the Blink while the pointer is over the
+  knob, and once it has ended the Blink is on top again, running, the Glow under it, held.
+- The browser check `showcases`: the YC61 turns at 45 rpm, FAST ramps the horn up toward 413.8, and
+  the wave shows on its screen.
+- Recorded in the editor's Preview in real time (its rotors run on the script's timers): SLOW, FAST
+  and back, three drawbars moved, ROTATION off.
 
 ## Open
 

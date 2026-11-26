@@ -26,11 +26,15 @@
  * tested without a clock.
  *
  * WHICH DRAWS ON TOP. Every scene that has played stays drawn, held at its end, and where two of
- * them move the same thing of the same control the one later in `plays()` wins. That order is the
- * order the scenes last started in: a trigger, a script's play or seek, an effect; a scene a hand
- * drives starts each time the hand moves it, and until then lies under the rest. A looping scene
- * going round again keeps its place. So a key lit by "a note" and darkened by "a note let go" shows
- * whichever of the two came last, however the two are ordered in the panel's list.
+ * them move the same thing of the same control the one later in `plays()` wins. A scene that has
+ * played to its end draws under every scene still going (a loop, a play not yet at its end) or held
+ * where a script's seek or a hand put it; within each, the one that started last is on top. Started
+ * means a trigger, a script's play or seek, an effect; a scene a hand drives starts each time the
+ * hand moves it, and until then lies under all the rest. A looping scene going round again keeps its
+ * place. So a key lit by "a note" and darkened by "a note let go" shows whichever of the two came
+ * last, however the two are ordered in the panel's list; a lamp that blinks in a loop blinks again
+ * once a hover's pop on it has ended, rather than being held still by the pop's last frame; and a
+ * script that holds one scene at a point while another still plays sees the one it holds.
  *
  * MARKERS (sceneFormat.js `markers`) call `onMarker(action, { scene, marker })` as a play passes
  * them: a timed play at each one's moment, a clock as it moves forward past one (the hand, the ease
@@ -105,7 +109,7 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
   let frameHandle = null;
   let lastFrame = null;
   const extras = new Map();     // key -> scene: one-off effects (ce.anim.effect, swap), one per place
-  const plays = new Map();      // sceneId -> { phase, at, held }: held, a seek's
+  const plays = new Map();      // sceneId -> { phase, at, held, ended }: held, a seek's; ended, run out
   const timers_ = new Map();    // sceneId -> handle
   const markerTimers = new Map(); // sceneId -> handles: the markers of the play under way
   const beatSlots = new Map();  // sceneId -> floor(beats / every), or null while stopped
@@ -167,7 +171,7 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
     stopTimer(scene.id);
     scheduleMarkers(scene);
     if (reducedMotion) {
-      plays.set(scene.id, { phase, at: scene.length });
+      plays.set(scene.id, { phase, at: scene.length, ended: true });
       // At its end at once; a script waiting on it hears so after this call has returned.
       if (dones.has(scene.id)) timers_.set(scene.id, timers.set(() => { timers_.delete(scene.id); finish(scene.id, true); }, 0));
       return;
@@ -179,7 +183,7 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
       if (!current) return;
       if (current.loop) begin(current);
       else {
-        plays.set(current.id, { ...(plays.get(current.id) ?? { phase }), at: current.length });
+        plays.set(current.id, { ...(plays.get(current.id) ?? { phase }), at: current.length, ended: true });
         finish(current.id, true);
       }
       onChange();
@@ -346,15 +350,24 @@ export function createSceneRuntime({ onChange = () => {}, onMarker = () => {}, t
     },
     plays() {
       const out = [];
+      const live = new Set();
       for (const scene of all()) {
         // A scene a gesture drives is always on show, held where its clock is: at its start until
         // the hand first moves it.
-        if (scene.clock) { out.push({ scene, phase: 'a', at: (clocks.get(scene.id)?.shown ?? 0) * scene.length }); continue; }
+        if (scene.clock) {
+          out.push({ scene, phase: 'a', at: (clocks.get(scene.id)?.shown ?? 0) * scene.length });
+          if (started.has(scene.id)) live.add(scene.id);
+          continue;
+        }
         const play = plays.get(scene.id);
-        if (play) out.push({ scene, phase: play.phase, at: play.at });
+        if (!play) continue;
+        out.push({ scene, phase: play.phase, at: play.at });
+        if (!play.ended) live.add(scene.id);
       }
-      // The order they last started in; a sort keeps the panel's order between equals.
-      return out.sort((a, b) => (started.get(a.scene.id) ?? 0) - (started.get(b.scene.id) ?? 0));
+      // Run out under the rest, then the order they last started in; a sort keeps the panel's order
+      // between equals.
+      const rank = (play) => (live.has(play.scene.id) ? 1 : 0);
+      return out.sort((a, b) => (rank(a) - rank(b)) || ((started.get(a.scene.id) ?? 0) - (started.get(b.scene.id) ?? 0)));
     },
     destroy() {
       if (frameHandle !== null) { frames.cancel(frameHandle); frameHandle = null; }
