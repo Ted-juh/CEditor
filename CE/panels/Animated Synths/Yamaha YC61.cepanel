@@ -836,7 +836,7 @@
         "Core": {"name":"VibChoType","id":"ctrl_1716771045032","description":"Vibrato/Chorus Type — parameterChange","controlType":"RadioButtonGroup"},
         "Transform": {"x":44,"y":310,"width":360,"height":26},
         "Text": {"content":"vibratoChorusType","_children":{"Font":{"size":10}}},
-        "Behavior": {"defaultValue":"c3","visualStyle":"segmented","defaultCurrentValue":1,"emitValueChange":true},
+        "Behavior": {"defaultValue":"c3","defaultCurrentValue":1},
         "Value": {"rows":[{"id":"v1","displayText":"V1","internalValue":"v1","sendValue":0,"receiveValue":0},{"id":"c1","displayText":"C1","internalValue":"c1","sendValue":1,"receiveValue":1},{"id":"v2","displayText":"V2","internalValue":"v2","sendValue":2,"receiveValue":2},{"id":"c2","displayText":"C2","internalValue":"c2","sendValue":3,"receiveValue":3},{"id":"v3","displayText":"V3","internalValue":"v3","sendValue":4,"receiveValue":4},{"id":"c3","displayText":"C3","internalValue":"c3","sendValue":5,"receiveValue":5,"selectedByDefault":true}]},
         "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.vibratoChorusType","parameterType":"choice"}]}
       },
@@ -856,7 +856,7 @@
         "Core": {"name":"VibChoOn","id":"ctrl_1716771045034","description":"Vibrato/Chorus Switch — parameterChange","controlType":"RadioButtonGroup"},
         "Transform": {"x":44,"y":364,"width":100,"height":26},
         "Text": {"content":"vibratoChorusSwitch","_children":{"Font":{"size":10}}},
-        "Behavior": {"defaultValue":"off","visualStyle":"segmented","emitValueChange":true},
+        "Behavior": {"defaultValue":"off"},
         "Value": {"rows":[{"id":"off","displayText":"Off","internalValue":"off","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"on","displayText":"On","internalValue":"on","sendValue":1,"receiveValue":1}]},
         "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organUpper.vibratoChorusSwitch","parameterType":"choice"}]}
       },
@@ -876,7 +876,7 @@
         "Core": {"name":"Perc","id":"ctrl_1716771045036","description":"Percussion Switch — parameterChange","controlType":"RadioButtonGroup"},
         "Transform": {"x":156,"y":364,"width":108,"height":26},
         "Text": {"content":"percussionSwitch","_children":{"Font":{"size":10}}},
-        "Behavior": {"defaultValue":"off","visualStyle":"segmented","emitValueChange":true},
+        "Behavior": {"defaultValue":"off"},
         "Value": {"rows":[{"id":"off","displayText":"Off","internalValue":"off","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"on","displayText":"On","internalValue":"on","sendValue":1,"receiveValue":1}]},
         "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.percussionSwitch","parameterType":"choice"}]}
       },
@@ -896,7 +896,7 @@
         "Core": {"name":"PercHarmonic","id":"ctrl_1716771045038","description":"Percussion Type — parameterChange","controlType":"RadioButtonGroup"},
         "Transform": {"x":276,"y":364,"width":128,"height":26},
         "Text": {"content":"percussionType","_children":{"Font":{"size":10}}},
-        "Behavior": {"defaultValue":"3rd","visualStyle":"segmented","emitValueChange":true},
+        "Behavior": {"defaultValue":"3rd"},
         "Value": {"rows":[{"id":"3rd","displayText":"3rd","internalValue":"3rd","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"2nd","displayText":"2nd","internalValue":"2nd","sendValue":1,"receiveValue":1}]},
         "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.percussionType","parameterType":"choice"}]}
       },
@@ -916,7 +916,7 @@
         "Core": {"name":"PercDecay","id":"ctrl_1716771045040","description":"Percussion Decay — parameterChange","controlType":"RadioButtonGroup"},
         "Transform": {"x":44,"y":418,"width":170,"height":26},
         "Text": {"content":"percussionDecay","_children":{"Font":{"size":10}}},
-        "Behavior": {"defaultValue":"slow","visualStyle":"segmented","emitValueChange":true},
+        "Behavior": {"defaultValue":"slow"},
         "Value": {"rows":[{"id":"slow","displayText":"Slow","internalValue":"slow","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"fast","displayText":"Fast","internalValue":"fast","sendValue":1,"receiveValue":1}]},
         "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.percussionDecay","parameterType":"choice"}]}
       },
@@ -936,7 +936,7 @@
         "Core": {"name":"PercVolume","id":"ctrl_1716771045042","description":"Percussion Volume — parameterChange","controlType":"RadioButtonGroup"},
         "Transform": {"x":234,"y":418,"width":170,"height":26},
         "Text": {"content":"percussionVolume","_children":{"Font":{"size":10}}},
-        "Behavior": {"defaultValue":"normal","visualStyle":"segmented","defaultCurrentValue":1,"emitValueChange":true},
+        "Behavior": {"defaultValue":"normal","defaultCurrentValue":1},
         "Value": {"rows":[{"id":"soft","displayText":"Soft","internalValue":"soft","sendValue":0,"receiveValue":0},{"id":"normal","displayText":"Normal","internalValue":"normal","sendValue":1,"receiveValue":1,"selectedByDefault":true}]},
         "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.percussionVolume","parameterType":"choice"}]}
       },
@@ -1109,7 +1109,7 @@
         "Core": {"name":"SlowFast","id":"ctrl_1716771045061","description":"Rotary Speaker Slow/Fast — parameterChange","controlType":"RadioButtonGroup"},
         "Transform": {"x":976,"y":160,"width":182,"height":28},
         "Text": {"content":"rotarySpeakerSlowFast","_children":{"Font":{"size":10}}},
-        "Behavior": {"defaultValue":"slow","visualStyle":"segmented","emitValueChange":true},
+        "Behavior": {"defaultValue":"slow"},
         "Value": {"rows":[{"id":"slow","displayText":"Slow","internalValue":"slow","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"fast","displayText":"Fast","internalValue":"fast","sendValue":1,"receiveValue":1}]},
         "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerSlowFast","parameterType":"choice"}]}
       },
@@ -1129,7 +1129,7 @@
         "Core": {"name":"Rotation","id":"ctrl_1716771045063","description":"Rotary Speaker Rotation Switch — parameterChange","controlType":"RadioButtonGroup"},
         "Transform": {"x":976,"y":216,"width":182,"height":28},
         "Text": {"content":"rotarySpeakerRotationSwitch","_children":{"Font":{"size":10}}},
-        "Behavior": {"defaultValue":"on","visualStyle":"segmented","defaultCurrentValue":1,"emitValueChange":true},
+        "Behavior": {"defaultValue":"on","defaultCurrentValue":1},
         "Value": {"rows":[{"id":"off","displayText":"Off","internalValue":"off","sendValue":0,"receiveValue":0},{"id":"on","displayText":"On","internalValue":"on","sendValue":1,"receiveValue":1,"selectedByDefault":true}]},
         "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerRotationSwitch","parameterType":"choice"}]}
       },

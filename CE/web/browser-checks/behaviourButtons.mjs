@@ -299,7 +299,7 @@ try {
   await kit.preview(false);
 
   // =============================================================================================
-  // visualStyle — three looks for one behaviour.
+  // visualStyle — five looks for one behaviour (docs/design/choice-group.md).
   // =============================================================================================
   await kit.fresh();
   {
@@ -307,41 +307,46 @@ try {
       'Transform.width': 260, 'Transform.height': 46 });
     await kit.preview(true);
     await kit.settle(700);
-    /** The whole-group shape the style picks: a pill for radio, a rounded box for the other two. */
-    const wholeRadius = async () => {
+    /** What a style draws: the control's own frame, a box per option, rings or lamps, an underline. */
+    const drawn = async () => {
       await kit.settle(360);
-      const nodes = await kit.dom(group, '*');
-      const radii = await kit.page.evaluate(({ id }) => {
+      return kit.page.evaluate(({ id }) => {
         const el = document.querySelector(`[data-control-id="${id}"]`);
-        return [...el.querySelectorAll('*')]
-          .map((n) => parseFloat(getComputedStyle(n).borderTopLeftRadius) || 0)
-          .filter((r) => r > 0);
+        const options = [...el.querySelectorAll('[data-choice-key]')];
+        return {
+          // The control's own Background: absorbed into the content box, laid on a layer of its
+          // own, or drawn by a BackgroundRenderer that is not inside an option.
+          frame: !!el.querySelector('.control-background, .control-content.absorbs-fill')
+            || [...el.querySelectorAll('.bg-fill-layer, .bg-border-css')].some((n) => !n.closest('.choice-option')),
+          boxes: options.filter((o) => o.querySelector('.choice-body')).length,
+          options: options.length,
+          rings: el.querySelectorAll('.choice-ring').length,
+          lamps: el.querySelectorAll('.choice-lamp').length,
+          underline: el.querySelectorAll('.choice-underline').length,
+        };
       }, { id: group });
-      return { nodes: nodes.length, maxRadius: radii.length ? Math.max(...radii) : 0 };
     };
-
-    await kit.set(group, { 'Behavior.visualStyle': 'radio' });
-    const asRadio = await wholeRadius();
-    await kit.set(group, { 'Behavior.visualStyle': 'segmented' });
-    const asSegmented = await wholeRadius();
-    await kit.set(group, { 'Behavior.visualStyle': 'tab' });
-    const asTab = await wholeRadius();
+    const looks = {};
+    for (const style of ['segmented', 'buttons', 'radio', 'led', 'tab']) {
+      await kit.set(group, { 'Behavior.visualStyle': style });
+      looks[style] = await drawn();
+    }
     led.check(B, 'visualStyle',
-      'the three styles are three shapes for the same control — a radio group is drawn as a pill and the segmented and tab styles as a rounded box, which is the difference between "pick one of these" and "these are pages"',
-      { radioIsPill: true, segmentedIsBoxy: true, tabIsBoxy: true },
-      { radioIsPill: asRadio.maxRadius > 100,
-        segmentedIsBoxy: asSegmented.maxRadius > 0 && asSegmented.maxRadius < 100,
-        tabIsBoxy: asTab.maxRadius > 0 && asTab.maxRadius < 100 });
+      'five looks for the same control: a segmented strip (one frame, the chosen option a thumb), a row of keys, rings, the set\'s lamps, or tabs; only the strip draws a frame, and nothing draws a box inside a box',
+      { strip: [true, 1], keys: [false, 2], radio: [false, 0, 2], led: [false, 0, 2], tab: [false, 0, 1] },
+      { strip: [looks.segmented.frame, looks.segmented.boxes], keys: [looks.buttons.frame, looks.buttons.boxes],
+        radio: [looks.radio.frame, looks.radio.boxes, looks.radio.rings], led: [looks.led.frame, looks.led.boxes, looks.led.lamps],
+        tab: [looks.tab.frame, looks.tab.boxes, looks.tab.underline] });
     led.check(B, 'visualStyle (it falls back to the subtype, and only when it is absent)',
-      'a control with no style of its own takes its subtype instead, so a panel authored before the field existed is unchanged — and the fallback is `??`, so an EMPTY STRING is a style rather than an absence, and normalizes to radio',
-      { absentTakesSubtype: true, emptyIsRadio: true },
+      'a control with no style of its own takes its subtype instead, so a panel authored before the field existed draws as it asked — and the fallback is `??`, so an EMPTY STRING is a style rather than an absence, and an unknown one is the segmented strip',
+      { absentTakesSubtype: true, emptyIsSegmented: true },
       await (async () => {
-        await kit.set(group, { 'Behavior.visualStyle': null, 'Behavior.subtype': 'segmented' });
-        const bySubtype = await wholeRadius();
+        await kit.set(group, { 'Behavior.visualStyle': null, 'Behavior.subtype': 'radio' });
+        const bySubtype = await drawn();
         await kit.set(group, { 'Behavior.visualStyle': '' });
-        const byEmpty = await wholeRadius();
-        return { absentTakesSubtype: bySubtype.maxRadius > 0 && bySubtype.maxRadius < 100,
-          emptyIsRadio: byEmpty.maxRadius > 100 };
+        const byEmpty = await drawn();
+        return { absentTakesSubtype: bySubtype.rings === 2 && !bySubtype.frame,
+          emptyIsSegmented: byEmpty.frame && byEmpty.boxes === 1 };
       })());
   }
   await kit.preview(false);

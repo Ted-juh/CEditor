@@ -166,14 +166,16 @@ test('resolveInteractionContext keeps built-in radio groups out of the root chec
   assert.equal(signals.checked, false);
 });
 
-test('resolveInteractiveControl still applies checked-driven selected states for radio groups with an active row', () => {
+test('a radio group with a chosen row reports its Selected state, and leaves it to the chosen option to draw', () => {
   const control = makeRadioGroupControl('radio_selected');
   const resolved = resolveInteractiveControl(control, {});
 
   assert.equal(resolved.runtime.signals.checked, false);
   assert.equal(resolved.runtime.signals.selectionActive, true);
   assert.deepEqual(resolved.runtime.activeStates, ['Selected']);
-  assert.equal(resolved.control._children.Background._children.Fill.colour, 'FF2D6F9C');
+  // The whole group used to take the Selected fill: the frame turned the chosen option's colour
+  // (docs/design/choice-group.md). The option draws it now (utils/choiceGroupStyle.js).
+  assert.equal(resolved.control._children.Background._children.Fill.colour, control._children.Background._children.Fill.colour);
 });
 
 test('radio group inspector reads the component Hover patch it writes', () => {

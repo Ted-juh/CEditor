@@ -19,12 +19,8 @@
   import Target from 'lucide-svelte/icons/target';
   import SquareIcon from 'lucide-svelte/icons/square';
   import StickyNote from 'lucide-svelte/icons/sticky-note';
-  import {
-    createEmptyRadioSegmentStyle,
-    RADIO_INDICATOR_SHAPE_OPTIONS,
-    RADIO_SEGMENT_PART_OPTIONS,
-    resolveRadioSegmentStyle,
-  } from '../utils/radioSegmentStyle.js';
+  import { CHOICE_INDICATOR_SHAPES, choicePartOptions, emptyChoiceStyle, resolveChoiceOption } from '../utils/choiceGroupStyle.js';
+  import { choiceStyleOf } from '../utils/choiceGroupLayout.js';
 
   const MIXED_VALUE = '__mixed__';
 
@@ -37,7 +33,7 @@
     ],
     indicatorOuter: [
       { key: 'visible', label: 'Visible', type: 'toggle' },
-      { key: 'shape', label: 'Shape', type: 'select', options: RADIO_INDICATOR_SHAPE_OPTIONS },
+      { key: 'shape', label: 'Shape', type: 'select', options: CHOICE_INDICATOR_SHAPES },
       { key: 'width', label: 'Width', type: 'number', step: 1, min: 0 },
       { key: 'height', label: 'Height', type: 'number', step: 1, min: 0 },
       { key: 'radius', label: 'Radius', type: 'number', step: 1, min: 0 },
@@ -48,7 +44,7 @@
     indicatorInner: [
       { key: 'visible', label: 'Visible', type: 'toggle' },
       { key: 'selectedOnly', label: 'Selected Only', type: 'toggle' },
-      { key: 'shape', label: 'Shape', type: 'select', options: RADIO_INDICATOR_SHAPE_OPTIONS },
+      { key: 'shape', label: 'Shape', type: 'select', options: CHOICE_INDICATOR_SHAPES },
       { key: 'width', label: 'Width', type: 'number', step: 1, min: 0 },
       { key: 'height', label: 'Height', type: 'number', step: 1, min: 0 },
       { key: 'radius', label: 'Radius', type: 'number', step: 1, min: 0 },
@@ -77,6 +73,9 @@
   let multiEdit = $derived($selectedComponentIds.size > 1);
   let buttonType = $derived(String(behavior?.buttonType ?? '').trim().toLowerCase());
   let rows = $derived(Array.isArray(valueSection?.rows) ? valueSection.rows : []);
+  let choiceStyle = $derived(choiceStyleOf(behavior));
+  let partOptions = $derived(choicePartOptions(choiceStyle));
+  let contentLayout = $derived(getSection(control, 'ContentLayout'));
   let activeSegmentScope = $derived($segmentEditScope);
   let activeStateName = $derived(
     stateTargetKey && stateTargetKey !== BASE_STATE_TARGET
@@ -107,7 +106,7 @@
     const segmentLabel = isEditingAllSegments
       ? 'All Segments'
       : targetRows.map((row, index) => getRowLabel(row, index)).join(' + ');
-    const partLabel = RADIO_SEGMENT_PART_OPTIONS.find((part) => part.id === activePartId)?.label ?? 'Whole Item';
+    const partLabel = partOptions.find((part) => part.id === activePartId)?.label ?? 'Whole Item';
     return `${stateLabel} | ${segmentLabel || 'All Segments'} | ${partLabel}`;
   });
   let stateLayerLabel = $derived(activeStateName || 'Base');
@@ -185,11 +184,11 @@
   }
 
   function createStyleObject() {
-    return deepClone(valueSection?.segmentStyle ?? createEmptyRadioSegmentStyle());
+    return deepClone(valueSection?.segmentStyle ?? emptyChoiceStyle());
   }
 
   function createStatePatchObject(stateName = activeStateName) {
-    return deepClone(statesSection?._children?.[stateName]?.patches?.segments ?? createEmptyRadioSegmentStyle());
+    return deepClone(statesSection?._children?.[stateName]?.patches?.segments ?? emptyChoiceStyle());
   }
 
   function currentSelectedFlag(rowId = '') {
@@ -206,18 +205,27 @@
       sharedOnly = false,
     } = {},
   ) {
-    return resolveRadioSegmentStyle({
+    // The resolved option, in the shape the fields read: the body's fill colour, border and
+    // corners under `whole`, beside the spacing, the indicators and the label.
+    const option = resolveChoiceOption({
+      style: choiceStyle,
       row: sharedOnly ? (rows[0] ?? row ?? null) : row,
-      behavior,
+      flags: { selected: currentSelectedFlag(row?.id) },
       background,
       text,
+      contentLayout,
       valueSection,
       statesSection,
-      selected: currentSelectedFlag(row?.id),
-      activeStateNames: includeActiveState && activeStateName ? [activeStateName] : [],
-      includeRowBaseOverrides,
-      includeStateRowOverrides,
+      previewState: includeActiveState ? activeStateName : '',
+      includeRowBase: includeRowBaseOverrides,
+      includeStateRows: includeStateRowOverrides,
     });
+    return {
+      whole: { ...option.whole, fillColour: option.fill?.colour, border: option.border, corners: option.corners },
+      indicatorOuter: option.indicatorOuter,
+      indicatorInner: option.indicatorInner,
+      label: option.label,
+    };
   }
 
   let sharedCurrentStyle = $derived(resolveEditorStyle(rows[0] ?? null, {
@@ -491,7 +499,7 @@
           <strong>{segmentLayerLabel || 'All Segments'}</strong>
           <span class="scope-separator">/</span>
           <span class="scope-label">Part</span>
-          <strong>{RADIO_SEGMENT_PART_OPTIONS.find((part) => part.id === activePartId)?.label ?? 'Whole Item'}</strong>
+          <strong>{partOptions.find((part) => part.id === activePartId)?.label ?? 'Whole Item'}</strong>
         </div>
         <div class="scope-help">
           Base means the normal state layer. The segment chips below decide whether you are editing all options or specific radio options.
@@ -515,7 +523,7 @@
     </PropertyCell>
     <PropertyCell label="Part" span={4} hint="Choose which part of the segment you want to style.">
       <div class="part-strip">
-        {#each RADIO_SEGMENT_PART_OPTIONS as part (part.id)}
+        {#each partOptions as part (part.id)}
           <button
             class="part-chip"
             class:active={activePartId === part.id}
@@ -528,13 +536,13 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title={RADIO_SEGMENT_PART_OPTIONS.find((part) => part.id === activePartId)?.label ?? 'Segment'}>
+  <PropertySection title={partOptions.find((part) => part.id === activePartId)?.label ?? 'Segment'}>
     {#each currentFieldList as field (field.key)}
       {@const state = fieldState(field)}
       <PropertyCell
         label={field.label}
         span={field.type === 'toggle' ? 2 : 2}
-        hint={`${field.label} for the currently targeted ${RADIO_SEGMENT_PART_OPTIONS.find((part) => part.id === activePartId)?.label?.toLowerCase() ?? 'segment part'}.`}
+        hint={`${field.label} for the currently targeted ${partOptions.find((part) => part.id === activePartId)?.label?.toLowerCase() ?? 'segment part'}.`}
       >
         <div class="field-row">
           {#if field.type === 'toggle'}

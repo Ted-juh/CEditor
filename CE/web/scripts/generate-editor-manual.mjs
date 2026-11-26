@@ -48,7 +48,7 @@ export const COMPONENT_NOTES = {
   // Buttons & Choices
   MomentaryButton: 'A button that is on only while it is held down.',
   ToggleButton: 'A button that switches on with one click and off with the next.',
-  RadioButtonGroup: 'A row of buttons of which exactly one is on — for choosing one setting out of a few.',
+  RadioButtonGroup: 'A few settings side by side, one of them chosen (or several, if you allow it): a strip, a row of keys, rings, lamps or tabs.',
   CyclicButton: 'A single button that steps through a list of settings each time it is clicked.',
   Combobox: 'A drop-down list for choosing one setting out of many.',
   Listbox: 'A list that shows several settings at once, one of which is chosen.',

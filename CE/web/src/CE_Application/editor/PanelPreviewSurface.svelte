@@ -74,7 +74,7 @@
   import { initialMountCount, nextMountCount, mountIncomplete, scheduleNextSlice } from '../utils/progressiveMount.js';
   import SceneryGround from './SceneryGround.svelte';
   import { flatControls, controlPanelRect } from '../utils/containment.js';
-  import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
+  import { choiceKeyAtPoint, choiceSelectionMode, isChoiceGroupBehavior, selectedChoiceKeys, stepChoice } from '../utils/choiceGroupLayout.js';
   import {
     listboxRows, listboxRowStride, listboxRowIndexAtPoint, listboxMaxScroll, isSelectableRow,
     listboxConfig, listboxIndexOfValue, listboxStep, listboxScrollIntoView, listboxRowHeight,
@@ -7083,29 +7083,51 @@
     return nearestRole;
   }
 
+  // A choice group's option under a point: the drawn option there (ChoiceGroup.svelte), so the
+  // click lands on what is seen. '' between options, or off them.
   function resolveRadioGroupPreviewValue(control, clientX, clientY) {
-    if (String(getBehavior(control)?.buttonType ?? '') !== 'radio') return '';
-
+    if (!isChoiceGroupBehavior(getBehavior(control))) return '';
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return '';
+    const s = scale || 1;
+    return choiceKeyAtPoint(pointerActiveElement, (clientX - rect.left) / s, (clientY - rect.top) / s);
+  }
 
-    const transformSection = control?._children?.Transform ?? null;
-    const contentLayout = control?._children?.ContentLayout ?? null;
-    const layout = resolveRadioGroupLayout({
-      behavior: getBehavior(control),
-      valueRows: control?._children?.Value?.rows ?? [],
-      width: transformSection?.width ?? rect.width,
-      height: transformSection?.height ?? rect.height,
-      paddingLeft: contentLayout?.paddingLeft ?? 0,
-      paddingRight: contentLayout?.paddingRight ?? 0,
-      paddingTop: contentLayout?.paddingTop ?? 0,
-      paddingBottom: contentLayout?.paddingBottom ?? 0,
-      gap: contentLayout?.gap ?? 8,
-    });
+  /** The option a choice group's keyboard acts on: the focused one, else the one chosen last. */
+  function currentChoiceKey(control) {
+    const session = sessionFor(control);
+    if (session?.choiceFocus) return String(session.choiceFocus);
+    const values = session?.valueOverrideEnabled === true
+      ? (Array.isArray(session.valueOverride) ? session.valueOverride : [session.valueOverride])
+      : [...selectedChoiceKeys(getValueRows(control), getBehavior(control))];
+    return String([...values].reverse().find((value) => value !== '' && value != null) ?? '');
+  }
 
-    const localX = ((clientX - rect.left) / Math.max(rect.width, 1)) * (transformSection?.width ?? rect.width);
-    const localY = ((clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
-    return resolveRadioGroupValueAtPoint(layout, localX, localY);
+  /**
+   * A choice group's keys, as a radio group's are: the arrows and Home/End move the choice (in a
+   * multi-select group, the focus), and Space or Enter, acted on at the key-up, chooses or toggles
+   * the focused option. True when the key was the group's.
+   */
+  function handleChoiceKey(control, event) {
+    const behavior = getBehavior(control);
+    if (!isChoiceGroupBehavior(behavior)) return false;
+    const controlId = getControlId(control);
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      const focus = currentChoiceKey(control);
+      patchControlSession(controlId, { focused: true, pressed: true, choicePressed: focus, choiceFocus: focus, choiceHover: '', inputModality: 'keyboard' });
+      return true;
+    }
+    const current = currentChoiceKey(control);
+    const next = stepChoice(getValueRows(control), current, event.key);
+    if (next == null) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (choiceSelectionMode(behavior) !== 'multi' && next !== current) {
+      commitSelectActionAndEmit(control, { value: next });
+    }
+    patchControlSession(controlId, { focused: true, choiceFocus: next, choiceHover: '', inputModality: 'keyboard' });
+    return true;
   }
 
   function activeDeviceBindings(control) {
@@ -8283,6 +8305,11 @@
 
   function handlePointerMove(control, event) {
     sceneInput(control, 'pointer', pointerFraction(event), controlLocalPoint(event));
+    if (isChoiceGroupBehavior(getBehavior(control)) && !isDisabled(control)) {
+      const at = controlLocalPoint(event);
+      const key = choiceKeyAtPoint(event.currentTarget, at.x, at.y);
+      if (key !== String(sessionFor(control)?.choiceHover ?? '')) patchControlSession(getControlId(control), { choiceHover: key, inputModality: 'pointer' });
+    }
     // onPointerMove: throttled (~30fps) hover-move over a control, control-local coords. Fires for any
     // control; the built-in custom-hit-zone hover tracking below still only runs for custom components.
     const moveAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -8481,6 +8508,9 @@
     // Drop any listbox hover-row highlight when the pointer leaves.
     if (isListboxControl(control) && (sessionFor(control)?.listboxHoverIndex ?? -1) !== -1) {
       patchControlSession(controlId, { listboxHoverIndex: -1 });
+    }
+    if (isChoiceGroupBehavior(getBehavior(control)) && sessionFor(control)?.choiceHover) {
+      patchControlSession(controlId, { choiceHover: '' });
     }
     if (pointerActiveControlId === controlId) {
       patchControlSession(controlId, {
@@ -8836,7 +8866,11 @@
     // script runtime is still dispatching the first and is dropped, which is how press-to-talk came
     // to report its release and never its press.
     const momentaryPress = momentaryButtonPreview.beginPress(pointerActiveControlId, getBehavior(control));
+    const choicePressed = isChoiceGroupBehavior(getBehavior(control))
+      ? choiceKeyAtPoint(event.currentTarget, pointerDownLocal.x, pointerDownLocal.y)
+      : null;
     patchControlSession(pointerActiveControlId, {
+      ...(choicePressed != null ? { choicePressed, choiceHover: choicePressed, inputModality: 'pointer' } : {}),
       hover: true,
       pressed: true,
       focused: false,
@@ -9179,10 +9213,16 @@
             focused: true,
             hover: true,
           });
-        } else {
+        } else if (isChoiceGroupBehavior(getBehavior(activeControl))) {
+          // The option let go on; between options nothing is chosen (it used to choose the default).
           const value = resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY);
+          if (value) {
+            commitSelectActionAndEmit(activeControl, { value });
+            patchControlSession(activeId, { choiceFocus: value });
+          }
+        } else {
           commitSelectActionAndEmit(activeControl, {
-            value,
+            value: resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY),
           });
         }
       }
@@ -9227,7 +9267,9 @@
       : '';
     patchControlSession(controlId, knobZone
       ? { focused: true, activeCustomHitZone: knobZone, domFocusCustomHitZone: knobZone, ...sliderControlFocusZonePatch(sessionFor(control), knobZone) }
-      : { focused: true });
+      : isChoiceGroupBehavior(getBehavior(control))
+        ? { focused: true, choiceFocus: currentChoiceKey(control), inputModality: 'keyboard' }
+        : { focused: true });
   }
 
   function handleBlur(control, event) {
@@ -9284,6 +9326,7 @@
     inspectPreviewControl(controlId);
 
     if (handleComboboxKey(control, event)) return;
+    if (handleChoiceKey(control, event)) return;
 
     if (linkedEnvKey(control, event)) {
       event.preventDefault(); event.stopPropagation();
@@ -9466,6 +9509,11 @@
       timedButtonPreview.releasePress(controlId, getBehavior(control), { inside: true });
     } else if (isCustomComponent(control)) {
       patchCustomKeyboardActivation(control, event);
+    } else if (isChoiceGroupBehavior(getBehavior(control))) {
+      const focus = currentChoiceKey(control);
+      if (focus) commitSelectActionAndEmit(control, { value: focus });
+      patchControlSession(controlId, { focused: true, pressed: false, choicePressed: '', choiceFocus: focus, inputModality: 'keyboard' });
+      return;
     } else if (String(getBehavior(control)?.family ?? 'trigger') === 'select') {
       if (isComboboxControl(control)) {
         toggleCombobox(controlId);
@@ -9498,7 +9546,9 @@
     // wrapper a button role creates an invalid interactive listbox-in-button.
     if (buttonType === 'listbox') return '';
     if (buttonType === 'combobox') return 'combobox';
-    if (buttonType === 'radio') return 'radiogroup';
+    // A choice group is one tab stop holding its options, each a radio (a checkbox when several
+    // can be chosen), named by aria-activedescendant (ChoiceGroup.svelte).
+    if (buttonType === 'radio') return choiceSelectionMode(behavior) === 'multi' ? 'group' : 'radiogroup';
     if (role === 'radio' || role === 'segmented') return 'radio';
     if (role === 'toggle' || role === 'checkbox') return 'checkbox';
     return 'button';
@@ -9554,6 +9604,7 @@
     if (isDisabled(control)) return undefined;
     if (isTextInputControl(control)) return undefined;
     if (String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'listbox') return 0;
+    if (isChoiceGroupBehavior(getBehavior(control))) return 0;
     const role = previewRoleFor(control);
     return ['button', 'checkbox', 'radio', 'combobox', 'slider', 'spinbutton'].includes(role) ? 0 : undefined;
   }

@@ -117,7 +117,6 @@
   import { flatControls } from '../utils/containment.js';
   import { applyPanelDependentChoices } from '../stores/interactionPreview.js';
   import { measurePerfDebug } from '../utils/perfDebug.js';
-  import { resolveRadioGroupLayout } from '../utils/radioGroupLayout.js';
   import { segmentEditScope } from '../stores/segmentEditScope.js';
   import { normalizeSegmentTargetIds } from '../utils/segmentTargets.js';
   import { getBindingCompatibility } from '../models/componentPorts.js';
@@ -135,7 +134,7 @@
     buildFontVariationSettings, buildIconTintStyle, buildTextFillLayerStyle,
     cssColor, customHitZoneStyle, getEnabledValueRows, lineCanvasFont,
     lineGeometry, lineLayerFor, normalizeFillMode, normalizeKey,
-    normalizeTextCaseMode, safeSvgId, svgTextAnchorFor, textAlignFor,
+    normalizeTextCaseMode, parseHexColor, rgbaColor, safeSvgId, svgTextAnchorFor, textAlignFor,
     textCaseVariantCaps, usesIconTint, withFilter,
   } from './canvasControlStyles.js';
   import { resolveTextEffects } from './canvasControlTextEffects.js';
@@ -147,11 +146,12 @@
     measureGlyphAdvance,
   } from './canvasControlTextLayout.js';
   import {
-    buildRadioWholeBackground,
-    resolveRadioSegmentStyle,
-    resolveRadioSelectedKeys,
-    resolveRadioShapeRadius,
-  } from '../utils/radioSegmentStyle.js';
+    choiceGroupLayout, choiceKey, choiceOrientation, choiceRows, choiceSelectionMode, choiceStyleDrawsFrame,
+    choiceStyleOf, choiceStyleOnPanel, isChoiceGroupBehavior, measureChoiceLabel, selectedChoiceKeys,
+  } from '../utils/choiceGroupLayout.js';
+  import { resolveChoiceOption, standsOutFrom } from '../utils/choiceGroupStyle.js';
+  import { lampCss, lampFaceCss } from '../utils/lampFace.js';
+  import ChoiceGroup from './ChoiceGroup.svelte';
   import {
     computeResizedRect, computeRotatedResizedRect, snapRectToGrid, snapToGridAxis,
     clientToPanelPoint, angleFromCenter, computeRotation, normalizeRotation,
@@ -166,7 +166,7 @@
   import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
   import { pictureColour, pictureColourSources, withColourFollows, withPictureColourSources } from '../utils/pictureRecolour.js';
   import { activeControlSet, controlSetSources, CONTROL_SET_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../stores/controlSets.js';
-  import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
+  import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveColourValue, resolveToken } from '../models/controlSets.js';
   import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
   import { macroGeometry, macroValue } from '../utils/macroLayout.js';
   import { macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroKnobSignature, macroUsesSetKnob } from '../utils/macroKnob.js';
@@ -437,7 +437,13 @@
     return namespace ? `${namespace}-${baseId}` : baseId;
   });
   let renderTransform = $derived(getSection(renderControl, 'Transform') ?? transform);
-  let background = $derived(getSection(renderControl, 'Background'));
+  // A choice group draws its Background as a frame in the segmented style only; the others draw
+  // their options on the panel, or each on a key of its own (ChoiceGroup.svelte).
+  let background = $derived(
+    isChoiceGroupBehavior(getSection(renderControl, 'Behavior')) && !choiceStyleDrawsFrame(choiceStyleOf(getSection(renderControl, 'Behavior')))
+      ? null
+      : getSection(renderControl, 'Background')
+  );
   let text = $derived(getSection(renderControl, 'Text'));
   // Radio items need the authored base/state tree, with the same set tokens resolved
   // as the main control. Raw tokens are not valid renderer colours.
@@ -445,7 +451,13 @@
   let sourceBackground = $derived(getSection(resolvedSourceControl, 'Background') ?? background);
   let sourceText = $derived(getSection(resolvedSourceControl, 'Text') ?? text);
   let icon = $derived(getSection(renderControl, 'Icon'));
-  let effects = $derived(getSection(renderControl, 'Effects'));
+  // A choice group whose options sit on the panel (radio, LED, tabs) draws no face, so the face's
+  // effects (a set's drop shadow) would fall on its bare labels and rings; a row of keys keeps them.
+  let effects = $derived(
+    isChoiceGroupBehavior(getSection(renderControl, 'Behavior')) && choiceStyleOnPanel(choiceStyleOf(getSection(renderControl, 'Behavior')))
+      ? null
+      : getSection(renderControl, 'Effects')
+  );
   let contentLayout = $derived(getSection(renderControl, 'ContentLayout'));
   let behavior = $derived(getSection(renderControl, 'Behavior'));
   let valueSection = $derived(getSection(renderControl, 'Value'));
@@ -2401,17 +2413,8 @@
   // below it, so a bat is as tall as three bezels.
   let lampHeight = $derived(lampKind === 'bat' ? lampSize * 3 : lampSize);
   let lampLit = $derived(interactionRuntime?.signals?.checked === true || interactionRuntime?.signals?.selectionActive === true);
-  function lampCss(value, fallback) {
-    const raw = String(value ?? '').replace(/^#/, '').trim();
-    if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(raw)) return fallback;
-    if (raw.length === 6) return `#${raw}`;
-    return `rgba(${parseInt(raw.slice(2, 4), 16)}, ${parseInt(raw.slice(4, 6), 16)}, ${parseInt(raw.slice(6, 8), 16)}, ${(parseInt(raw.slice(0, 2), 16) / 255).toFixed(3)})`;
-  }
   let lampStyle = $derived.by(() => {
     if (!hasLamp) return '';
-    const lit = lampCss(contentLayout?.lampColour, '#5B9BD5');
-    const off = lampCss(contentLayout?.lampOffColour, '#2C2C2C');
-    const bezel = lampCss(contentLayout?.lampBezelColour, 'rgba(255,255,255,0.4)');
     const inset = numberOr(contentLayout?.[lampOnRight ? 'paddingRight' : 'paddingLeft'], 8);
     const left = lampOnRight ? displayW - inset - lampWidth : inset;
     const top = (displayH - lampHeight) / 2;
@@ -2419,15 +2422,9 @@
       // The lever is inline SVG (below); the box only places it.
       return [`left:${left}px`, `top:${top}px`, `width:${lampWidth}px`, `height:${lampHeight}px`].join('; ');
     }
-    const colour = lampLit ? lit : off;
-    const face = lampKind === 'jewel'
-      ? `radial-gradient(circle at 35% 30%, rgba(255,255,255,${lampLit ? 0.75 : 0.35}) 0%, rgba(255,255,255,0) 45%), ${colour}`
-      : colour;
-    const glow = lampLit ? `0 0 ${Math.max(4, lampSize * 0.8)}px ${lit}, 0 0 ${Math.max(2, lampSize * 0.25)}px ${lit}` : 'inset 0 1px 2px rgba(0,0,0,0.6)';
     return [
       `left:${left}px`, `top:${top}px`, `width:${lampWidth}px`, `height:${lampSize}px`,
-      `background:${face}`, `border:1px solid ${bezel}`, `box-shadow:${glow}`,
-      `border-radius:${lampKind === 'window' ? '2px' : '50%'}`,
+      lampFaceCss({ kind: lampKind, lit: lampLit, colour: contentLayout?.lampColour, offColour: contentLayout?.lampOffColour, bezelColour: contentLayout?.lampBezelColour, size: lampSize }),
     ].join('; ');
   });
   // The bat's inks: the bezel is the set's bezel colour, the lever the lamp colour when thrown up
@@ -3296,156 +3293,143 @@
   // The library first, then the icons the open panel carries with it (utils/documentIcons.js) — a
   // shared panel or the exported player has the picture even where the library does not.
   let resolvedStoredIcon = $derived(resolveIcon(icon, $storedIcons, $documentIcons));
-  let radioGroupPreviewStateName = $derived(String(valueSection?.__segmentPreviewState ?? '').trim());
-  let radioGroupPreviewSegmentIds = $derived(
-    radioGroupPreviewStateName
-      ? normalizeSegmentTargetIds(
-        sourceValueSection,
-        $segmentEditScope?.mode === 'segments'
-          ? $segmentEditScope.segmentIds ?? []
-          : []
-      )
-      : []
-  );
-  let radioGroupEditTargetSegmentIds = $derived(
-    $segmentEditScope?.mode === 'segments'
+  // --- The choice group (RadioButtonGroup). utils/choiceGroupLayout.js places its options,
+  // utils/choiceGroupStyle.js resolves each one in its own states, ChoiceGroup.svelte draws them
+  // (docs/design/choice-group.md). Hover, press and keyboard focus are an option's, named in the
+  // session by Preview (choiceHover, choicePressed, choiceFocus); the Segments tab can preview a
+  // state on the options it targets.
+  let choiceStyle = $derived(isRadioGroupControl ? choiceStyleOf(sourceBehavior) : '');
+  let choiceMulti = $derived(choiceSelectionMode(sourceBehavior) === 'multi');
+  let sourceContentLayout = $derived(getSection(resolvedSourceControl, 'ContentLayout') ?? contentLayout);
+  let choicePreviewState = $derived(String(valueSection?.__segmentPreviewState ?? '').trim());
+  let choiceEditTargets = $derived(
+    isRadioGroupControl && $segmentEditScope?.mode === 'segments'
       ? normalizeSegmentTargetIds(sourceValueSection, $segmentEditScope.segmentIds ?? [])
       : []
   );
-  let radioGroupActiveStateNames = $derived.by(() => {
-    if (!isRadioGroupControl) return [];
-    if (Array.isArray(interactionRuntime?.activeStates) && interactionRuntime.activeStates.length > 0) {
-      return interactionRuntime.activeStates;
-    }
-    return radioGroupPreviewStateName ? [radioGroupPreviewStateName] : [];
-  });
-  let radioGroupSelectionMode = $derived(String(sourceBehavior?.selectionMode ?? 'single').trim().toLowerCase() === 'multi' ? 'multi' : 'single');
-  let radioGroupVisualStyle = $derived(String(sourceBehavior?.visualStyle ?? sourceBehavior?.subtype ?? 'radio'));
-  let radioGroupLayout = $derived.by(() => resolveRadioGroupLayout({
-    behavior: sourceBehavior,
-    valueRows,
-    width: displayW,
-    height: displayH,
-    paddingLeft: contentBox.paddingLeft,
-    paddingRight: contentBox.paddingRight,
-    paddingTop: contentBox.paddingTop,
-    paddingBottom: contentBox.paddingBottom,
-    gap: contentBox.gap,
-  }));
-  let radioGroupSelectedKeys = $derived.by(() => {
+  let choicePreviewsChoice = $derived(!!choicePreviewState && (
+    ['selected', 'checked'].includes(choicePreviewState.toLowerCase())
+    || sourceStatesSection?._children?.[choicePreviewState]?.when?.checked === true
+  ));
+  let choiceSelected = $derived.by(() => {
     if (!isRadioGroupControl) return new Set();
-
-    const forcedSelectedRowIds = radioGroupPreviewStateName
-      && (
-        normalizeKey(radioGroupPreviewStateName) === 'selected'
-        || normalizeKey(radioGroupPreviewStateName) === 'checked'
-        || sourceStatesSection?._children?.[radioGroupPreviewStateName]?.when?.checked === true
-      )
-      && radioGroupPreviewSegmentIds.length > 0
-      ? radioGroupPreviewSegmentIds
-      : [];
-
-    if (forcedSelectedRowIds.length > 0) {
-      return resolveRadioSelectedKeys(valueRows, sourceBehavior, { forceSelectedRowIds: forcedSelectedRowIds });
+    if (choicePreviewsChoice && choiceEditTargets.length > 0) {
+      return selectedChoiceKeys(valueRows, sourceBehavior, { forceRowIds: choiceEditTargets });
     }
-
-    const selected = new Set();
-    const runtimeValue = interactionRuntime?.signals?.valueRaw;
-    if (Array.isArray(runtimeValue)) {
-      for (const entry of runtimeValue) {
-        selected.add(String(entry));
-      }
-    } else if (runtimeValue !== undefined && runtimeValue !== null && runtimeValue !== '') {
-      selected.add(String(runtimeValue));
-    }
-
+    const raw = interactionRuntime?.signals?.valueRaw;
+    const values = Array.isArray(raw) ? raw : (raw === undefined || raw === null || raw === '' ? [] : [raw]);
+    const selected = new Set(values.map((value) => String(value).trim()));
     if (selected.size > 0 || previewSession?.valueOverrideEnabled === true) {
-      if (radioGroupSelectionMode !== 'multi' && selected.size > 1) {
-        return new Set([selected.values().next().value]);
-      }
-      return selected;
+      return choiceMulti || selected.size <= 1 ? selected : new Set([selected.values().next().value]);
     }
-
-    return resolveRadioSelectedKeys(valueRows, sourceBehavior);
+    return selectedChoiceKeys(valueRows, sourceBehavior);
   });
-  let radioGroupItems = $derived.by(() => {
+  let choiceHoverKey = $derived(previewSession?.hover === true ? String(previewSession?.choiceHover ?? '') : '');
+  let choicePressedKey = $derived(previewSession?.pressed === true ? String(previewSession?.choicePressed ?? '') : '');
+  let choiceFocusKey = $derived(previewSession?.focused === true && previewSession?.inputModality === 'keyboard'
+    ? String(previewSession?.choiceFocus ?? '') : '');
+  let choicePalette = $derived.by(() => {
+    if (!isRadioGroupControl) return null;
+    const colour = (token) => resolveColourValue(token, controlSet ?? undefined);
+    // The thumb: the set's "on" body, unless that is the face's own colour, as in a fifth of the
+    // built-in sets; then its accent, its fill, its focus colour, whichever stands out.
+    const thumb = standsOutFrom(sourceBackground?._children?.Fill?.colour,
+      ['{surface.checked}', '{accent}', '{control.fill}', '{accent.hot}'].map(colour));
+    return { panelText: colour('{text.primary}'), mutedText: colour('{text.muted}'), accent: colour('{accent}'), thumb, focus: colour('{accent.hot}'), panel: colour('{panel.surface}') };
+  });
+  let choiceOptions = $derived.by(() => {
     if (!isRadioGroupControl) return [];
-
-    return radioGroupLayout.items.map((entry, index) => {
-      const row = entry.row;
-      const rowId = String(row?.id ?? `row_${index + 1}`);
-      const internalKey = String(row?.internalValue ?? row?.id ?? `item_${index + 1}`);
-      const selected = radioGroupSelectedKeys.has(internalKey) || radioGroupSelectedKeys.has(rowId);
-      const editTarget = radioGroupEditTargetSegmentIds.includes(rowId);
-      const resolvedStyle = resolveRadioSegmentStyle({
-        row,
-        behavior: sourceBehavior,
-        background: sourceBackground,
-        text: sourceText,
-        valueSection: sourceValueSection,
-        statesSection: sourceStatesSection,
-        selected,
-        activeStateNames: radioGroupActiveStateNames,
-      });
-      const outerShape = String(resolvedStyle?.indicatorOuter?.shape ?? '').trim().toLowerCase();
-      const innerShape = String(resolvedStyle?.indicatorInner?.shape ?? '').trim().toLowerCase();
-      const outerVisible = resolvedStyle?.indicatorOuter?.visible !== false;
-      const innerVisible = resolvedStyle?.indicatorInner?.visible !== false
-        && (resolvedStyle?.indicatorInner?.selectedOnly !== true || selected);
-
+    const inset = numberOr(sourceContentLayout?.paddingTop, 2);
+    return choiceRows(valueRows).map((row, index) => {
+      const key = choiceKey(row, index);
+      const rowId = String(row?.id ?? '');
+      const flags = {
+        selected: choiceSelected.has(key) || choiceSelected.has(rowId),
+        hover: choiceHoverKey === key,
+        pressed: choicePressedKey === key,
+        focused: choiceFocusKey === key,
+      };
+      const previewed = choicePreviewState && !choicePreviewsChoice
+        && (choiceEditTargets.length === 0 || choiceEditTargets.includes(rowId));
       return {
-        id: rowId,
+        key,
+        rowId,
+        flags,
         label: String(row?.displayText ?? row?.internalValue ?? row?.id ?? `Option ${index + 1}`),
-        selected,
-        editTarget,
-        shellBackground: buildRadioWholeBackground(resolvedStyle?.whole),
-        shellWidth: Math.max(0, numberOr(entry?.width, 0)),
-        shellHeight: Math.max(0, numberOr(entry?.height, 0)),
-        contentStyle: [
-          `padding:${Math.max(0, numberOr(resolvedStyle?.whole?.paddingY, 0))}px ${Math.max(0, numberOr(resolvedStyle?.whole?.paddingX, 0))}px`,
-          `gap:${Math.max(0, numberOr(resolvedStyle?.whole?.indicatorGap, 0))}px`,
-        ].join('; '),
-        indicatorOuterVisible: outerVisible,
-        indicatorOuterStyle: [
-          `width:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.width, 0))}px`,
-          `height:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.height, 0))}px`,
-          `border-width:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.borderWidth, 0))}px`,
-          `border-radius:${resolveRadioShapeRadius(outerShape, resolvedStyle?.indicatorOuter?.radius)}`,
-          `background:${cssColor(resolvedStyle?.indicatorOuter?.fillColour)}`,
-          `border-color:${cssColor(resolvedStyle?.indicatorOuter?.borderColour)}`,
-        ].join('; '),
-        indicatorInnerVisible: innerVisible,
-        indicatorInnerStandalone: !outerVisible && innerVisible,
-        indicatorInnerStyle: [
-          `width:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.width, 0))}px`,
-          `height:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.height, 0))}px`,
-          `border-width:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.borderWidth, 0))}px`,
-          `border-radius:${resolveRadioShapeRadius(innerShape, resolvedStyle?.indicatorInner?.radius)}`,
-          `background:${cssColor(resolvedStyle?.indicatorInner?.fillColour)}`,
-          `border-color:${cssColor(resolvedStyle?.indicatorInner?.borderColour)}`,
-          innerVisible ? 'opacity:1; transform:scale(1)' : 'opacity:0; transform:scale(0.7)',
-        ].join('; '),
-        labelStyle: [
-          `color:${cssColor(resolvedStyle?.label?.colour)}`,
-          `font-size:${Math.max(1, numberOr(resolvedStyle?.label?.fontSize, 11))}px`,
-          `font-weight:${resolvedStyle?.label?.fontWeight ?? 600}`,
-          `letter-spacing:${numberOr(resolvedStyle?.label?.letterSpacing, 0)}px`,
-          resolvedStyle?.label?.fontFamily ? `font-family:${JSON.stringify(resolvedStyle.label.fontFamily)}` : '',
-          resolvedStyle?.label?.fontStyle ? `font-style:${String(resolvedStyle.label.fontStyle).trim().toLowerCase()}` : '',
-          resolvedStyle?.label?.textTransform ? `text-transform:${resolvedStyle.label.textTransform}` : '',
-        ].filter(Boolean).join('; '),
+        resolved: resolveChoiceOption({
+          style: choiceStyle, row, flags, inset,
+          background: sourceBackground, text: sourceText, contentLayout: sourceContentLayout,
+          valueSection: sourceValueSection, statesSection: sourceStatesSection,
+          signals: interactionRuntime?.signals ?? {}, palette: choicePalette,
+          previewState: previewed ? choicePreviewState : '',
+        }),
       };
     });
   });
-  let radioGroupStyle = $derived.by(() => {
-    if (!isRadioGroupControl) return '';
-    return [
-      `padding:${contentBox.paddingTop}px ${contentBox.paddingRight}px ${contentBox.paddingBottom}px ${contentBox.paddingLeft}px`,
-      `gap:${contentBox.gap}px`,
-      `--radio-columns:${Math.max(1, radioGroupLayout.columns)}`,
-      `--radio-rows:${Math.max(1, radioGroupLayout.rowCount)}`,
-    ].join('; ');
+  let choiceLayout = $derived.by(() => {
+    if (!isRadioGroupControl) return null;
+    const first = choiceOptions[0]?.resolved;
+    const indicator = first?.indicatorOuter?.visible
+      ? first.indicatorOuter.width
+      : (choiceStyle !== 'tab' && first?.indicatorInner?.visible ? first.indicatorInner.width : 0);
+    return choiceGroupLayout({
+      style: choiceStyle,
+      behavior: sourceBehavior,
+      valueRows,
+      width: displayW,
+      height: displayH,
+      padding: {
+        top: sourceContentLayout?.paddingTop, right: sourceContentLayout?.paddingRight,
+        bottom: sourceContentLayout?.paddingBottom, left: sourceContentLayout?.paddingLeft,
+      },
+      gap: sourceContentLayout?.gap,
+      labelWidths: choiceOptions.map((option) => measureChoiceLabel(option.label, option.resolved.label)),
+      indicator,
+      indicatorGap: first?.whole?.indicatorGap ?? 6,
+    });
   });
+  let choiceItems = $derived((choiceLayout?.items ?? []).map((item, index) => {
+    const option = choiceOptions[index];
+    return {
+      key: item.key,
+      id: `${svgIdSeed}-choice-${index}`,
+      label: option.label,
+      left: item.left,
+      top: item.top,
+      width: item.width,
+      height: item.height,
+      padX: option.resolved.whole.paddingX ?? item.padX,
+      selected: option.flags.selected,
+      focused: option.flags.focused,
+      editTarget: choiceEditTargets.includes(option.rowId),
+      resolved: option.resolved,
+    };
+  }));
+  // A divider is hidden beside an option drawing a body of its own (the thumb, a hover): it would
+  // cut into it. Hairlines are the label's ink, faint, so they read on whatever the frame is.
+  let choiceDividers = $derived.by(() => {
+    const painted = new Set(choiceItems.filter((item) => item.resolved.body).map((item) => item.key));
+    return (choiceLayout?.dividers ?? []).map((divider) => ({ ...divider, hidden: divider.between.some((key) => painted.has(key)) }));
+  });
+  let choiceInk = $derived(choiceOptions.find((option) => !option.flags.selected)?.resolved.label.colour ?? 'FFFFFFFF');
+  let choiceBaseline = $derived.by(() => {
+    if (choiceStyle !== 'tab' || !choiceLayout?.items.length) return null;
+    const left = numberOr(sourceContentLayout?.paddingLeft, 0);
+    const vertical = choiceOrientation(sourceBehavior) === 'vertical';
+    const right = displayW - numberOr(sourceContentLayout?.paddingRight, 0);
+    const bottom = displayH - numberOr(sourceContentLayout?.paddingBottom, 0);
+    const top = numberOr(sourceContentLayout?.paddingTop, 0);
+    return vertical
+      ? { left, top, width: 1, height: Math.max(0, bottom - top), colour: fadedCss(choicePalette?.mutedText ?? choiceInk, 0.45) }
+      : { left, top: bottom - 1, width: Math.max(0, right - left), height: 1, colour: fadedCss(choicePalette?.mutedText ?? choiceInk, 0.45) };
+  });
+  let choiceActiveId = $derived(
+    (choiceItems.find((item) => item.focused) ?? choiceItems.find((item) => item.selected))?.id
+  );
+  function fadedCss(hex, alpha) {
+    const { r, g, b, a } = parseHexColor(hex);
+    return rgbaColor({ r, g, b, a: a * alpha });
+  }
   let hasIcon = $derived(!hasAnatomy && !isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
   let iconIsTinted = $derived(usesIconTint(icon?.tint));
   // Where the icon sits and how it is drawn: editor/iconLook.js, which a component's icon layer
@@ -3530,6 +3514,8 @@
   aria-label={previewInteractive || (inPreview && previewImageRole) ? previewAriaLabel : undefined}
   aria-disabled={previewInteractive ? previewAriaDisabled : undefined}
   aria-checked={previewInteractive ? previewAriaChecked : undefined}
+  aria-activedescendant={previewInteractive && isRadioGroupControl ? choiceActiveId : undefined}
+  aria-orientation={previewInteractive && isRadioGroupControl ? choiceOrientation(sourceBehavior) : undefined}
   aria-expanded={previewInteractive ? previewAriaExpanded : undefined}
   aria-valuenow={previewInteractive ? previewAriaValueNow : undefined}
   aria-valuemin={previewInteractive ? previewAriaValueMin : undefined}
@@ -3779,37 +3765,18 @@
       </div>
     {/if}
 
-    {#if isRadioGroupControl && radioGroupItems.length}
-      <div class="radio-group-content" style={radioGroupStyle}>
-        {#each radioGroupItems as item (item.id)}
-          <div
-            class="radio-group-item"
-            class:selected={item.selected}
-            class:edit-target={item.editTarget}
-            class:segmented={radioGroupVisualStyle === 'segmented'}
-            class:tab={radioGroupVisualStyle === 'tab'}
-          >
-            <div class="radio-group-item-shell">
-              <BackgroundRenderer background={item.shellBackground} width={item.shellWidth} height={item.shellHeight} />
-            </div>
-            <div class="radio-group-item-content" style={item.contentStyle}>
-              {#if item.indicatorOuterVisible}
-                <span class="radio-indicator-outer" style={item.indicatorOuterStyle}>
-                  {#if item.indicatorInnerVisible}
-                    <span class="radio-indicator-inner" style={item.indicatorInnerStyle}></span>
-                  {/if}
-                </span>
-              {:else if item.indicatorInnerStandalone}
-                <span class="radio-indicator-inner standalone" style={item.indicatorInnerStyle}></span>
-              {/if}
-              <span class="radio-group-label" style={item.labelStyle}>{item.label}</span>
-            </div>
-            {#if item.editTarget}
-              <div class="radio-edit-target-badge">Editing</div>
-            {/if}
-          </div>
-        {/each}
-      </div>
+    {#if isRadioGroupControl && choiceItems.length}
+      <ChoiceGroup
+        style={choiceStyle}
+        orientation={choiceOrientation(sourceBehavior)}
+        items={choiceItems}
+        dividers={choiceDividers}
+        dividerColour={fadedCss(choiceInk, 0.3)}
+        baseline={choiceBaseline}
+        focusColour={cssColor(choicePalette?.focus ?? 'FF5B9BD5')}
+        optionRole={choiceMulti ? 'checkbox' : 'radio'}
+        interactive={previewInteractive}
+      />
     {/if}
 
     {#if isComboboxControl}
@@ -4734,104 +4701,6 @@
     box-sizing: border-box;
     overflow: hidden;
     line-height: 1;
-  }
-
-  .radio-group-content {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    grid-template-columns: repeat(var(--radio-columns, 1), minmax(0, 1fr));
-    grid-template-rows: repeat(var(--radio-rows, 1), minmax(0, 1fr));
-    box-sizing: border-box;
-    pointer-events: none;
-    z-index: 3;
-  }
-
-  .radio-group-item {
-    min-width: 0;
-    min-height: 0;
-    position: relative;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-
-  .radio-group-item.edit-target::after {
-    content: '';
-    position: absolute;
-    inset: 2px;
-    border: 2px solid rgba(46, 139, 87, 0.95);
-    border-radius: 8px;
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.55),
-      0 0 10px rgba(46, 139, 87, 0.45);
-    pointer-events: none;
-    z-index: 6;
-  }
-
-  .radio-group-item-shell {
-    position: absolute;
-    inset: 0;
-  }
-
-  .radio-group-item-content {
-    position: absolute;
-    inset: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 0;
-    min-height: 0;
-    box-sizing: border-box;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1px;
-  }
-
-  .radio-indicator-outer,
-  .radio-indicator-inner {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    box-sizing: border-box;
-  }
-
-  .radio-indicator-outer {
-    border-style: solid;
-  }
-
-  .radio-indicator-inner {
-    border-style: solid;
-    transition: transform 0.14s ease, opacity 0.14s ease;
-  }
-
-  .radio-indicator-inner.standalone {
-    align-self: center;
-  }
-
-  .radio-group-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 1.1;
-  }
-
-  .radio-edit-target-badge {
-    position: absolute;
-    right: 5px;
-    top: 5px;
-    z-index: 7;
-    border-radius: 999px;
-    padding: 2px 5px;
-    background: rgba(14, 63, 42, 0.92);
-    border: 1px solid rgba(46, 139, 87, 0.95);
-    color: #FFF;
-    font-size: 8px;
-    font-weight: 700;
-    line-height: 1;
-    text-transform: uppercase;
-    pointer-events: none;
   }
 
   .combobox-arrow {

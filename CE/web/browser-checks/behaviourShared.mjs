@@ -283,7 +283,7 @@ try {
     '`sceneryCompile.js` — the Screen Builder’s compile step, where it decides whether a control counts towards the fitted bounds of a generated scene. It changes nothing about a panel in preview, and the stage that owns it is the Screen Builder export, not the panel surface.');
   led.closed('Grid', 'cellWidth + cellHeight',
     'the cell size an auto-laid-out panel or a radio group snaps to',
-    '`autoPanel.js` and `radioGroupLayout.js` — the generated-layout path. Both are pure and unit-tested on the Node side; a browser row would re-measure a function that has no surface of its own.');
+    '`autoPanel.js` and `choiceGroupLayout.js` — the generated-layout path. Both are pure and unit-tested on the Node side; a browser row would re-measure a function that has no surface of its own.');
   led.inert('Grid', 'lineWidth',
     'the thickness of the design grid’s lines',
     'an EDITOR-ONLY property, and correctly so: the grid is a design-time aid drawn by EditorRuler and the canvas overlay, and it is not painted in preview or in the exported player at all. Recorded rather than left as a matrix gap.');

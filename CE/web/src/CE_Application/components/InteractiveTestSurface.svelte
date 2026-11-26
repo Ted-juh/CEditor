@@ -8,11 +8,8 @@
   import { isDisplayOnly } from '../utils/displayMode.js';
   import { getNextEnumValue } from '../utils/enumBehavior.js';
   import {
-    resolveRadioGroupLayout,
-    resolveRadioGroupSelection,
-    resolveRadioGroupValueAtPoint,
-  } from '../utils/radioGroupLayout.js';
-  import { resolveRadioSelectedKeys } from '../utils/radioSegmentStyle.js';
+    choiceKeyAtPoint, choiceSelection, choiceSelectionMode, isChoiceGroupBehavior, selectedChoiceKeys, stepChoice,
+  } from '../utils/choiceGroupLayout.js';
   import {
     resolvePreviewTriggerBindingValue,
     shouldPulseTriggerOnRelease,
@@ -767,15 +764,30 @@
       ?? '';
   }
 
+  /** The option a choice group's keyboard acts on: the focused one, else the one chosen last. */
   function currentRadioValue() {
-    const rows = getValueRows(control);
-    if (session?.valueOverrideEnabled === true) return session?.valueOverride;
-    return behavior?.defaultValue
-      ?? rows.find((row) => row?.selectedByDefault === true)?.internalValue
-      ?? rows.find((row) => row?.selectedByDefault === true)?.id
-      ?? rows[0]?.internalValue
-      ?? rows[0]?.id
-      ?? '';
+    if (session?.choiceFocus) return String(session.choiceFocus);
+    const values = session?.valueOverrideEnabled === true
+      ? (Array.isArray(session?.valueOverride) ? session.valueOverride : [session?.valueOverride])
+      : [...selectedChoiceKeys(getValueRows(control), behavior)];
+    return String([...values].reverse().find((value) => value !== '' && value != null) ?? '');
+  }
+
+  /** The option under a point in the page, from the options drawn inside the hitbox (ChoiceGroup.svelte). */
+  function choiceAt(clientX, clientY) {
+    const rect = hitboxElement?.getBoundingClientRect?.();
+    if (!rect) return '';
+    const width = Number(control?._children?.Transform?.width) || rect.width;
+    const height = Number(control?._children?.Transform?.height) || rect.height;
+    return choiceKeyAtPoint(hitboxElement,
+      ((clientX - rect.left) / Math.max(rect.width, 1)) * width,
+      ((clientY - rect.top) / Math.max(rect.height, 1)) * height);
+  }
+
+  function handlePointerMove(event) {
+    if (isDisabled || !isChoiceGroupBehavior(behavior)) return;
+    const key = choiceAt(event.clientX, event.clientY);
+    if (key !== String(session?.choiceHover ?? '')) patchSession({ choiceHover: key, inputModality: 'pointer' });
   }
 
   function rowValue(row) {
@@ -933,29 +945,7 @@
   }
 
   function resolveRadioGroupPreviewValue(clientX, clientY) {
-    if (String(behavior?.buttonType ?? '') !== 'radio') return '';
-
-    const rect = hitboxElement?.getBoundingClientRect?.();
-    if (!rect) return '';
-
-    const transformSection = control?._children?.Transform ?? null;
-    const contentLayout = control?._children?.ContentLayout ?? null;
-    const valueRows = getValueRows(control);
-    const layout = resolveRadioGroupLayout({
-      behavior,
-      valueRows,
-      width: transformSection?.width ?? rect.width,
-      height: transformSection?.height ?? rect.height,
-      paddingLeft: contentLayout?.paddingLeft ?? 0,
-      paddingRight: contentLayout?.paddingRight ?? 0,
-      paddingTop: contentLayout?.paddingTop ?? 0,
-      paddingBottom: contentLayout?.paddingBottom ?? 0,
-      gap: contentLayout?.gap ?? 8,
-    });
-
-    const localX = ((clientX - rect.left) / Math.max(rect.width, 1)) * (transformSection?.width ?? rect.width);
-    const localY = ((clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
-    return resolveRadioGroupValueAtPoint(layout, localX, localY);
+    return isChoiceGroupBehavior(behavior) ? choiceAt(clientX, clientY) : '';
   }
 
   function commitSelectAction(nextValue = undefined) {
@@ -977,8 +967,8 @@
       if (nextValue !== undefined && String(nextValue ?? '').trim() === '') return;
       const currentValues = session?.valueOverrideEnabled === true
         ? (Array.isArray(session?.valueOverride) ? session.valueOverride : [session?.valueOverride])
-        : [...resolveRadioSelectedKeys(valueRows, behavior)];
-      const selection = resolveRadioGroupSelection({
+        : [...selectedChoiceKeys(valueRows, behavior)];
+      const selection = choiceSelection({
         behavior,
         valueRows,
         selectedValues: currentValues,
@@ -990,6 +980,7 @@
         mixed: false,
         valueOverrideEnabled: true,
         valueOverride: selection.value,
+        choiceFocus: String(nextValue ?? ''),
       });
       return;
     }
@@ -1546,7 +1537,9 @@
     }
 
     const momentaryPress = momentaryButtonPreview.beginPress(control?._children?.Core?.id, behavior);
+    const choicePressed = isChoiceGroupBehavior(behavior) ? choiceAt(event.clientX, event.clientY) : null;
     patchSession({
+      ...(choicePressed != null ? { choicePressed, choiceHover: choicePressed, inputModality: 'pointer' } : {}),
       hover: true,
       pressed: true,
       dragging: draggingRange,
@@ -1798,6 +1791,14 @@
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
       hitboxElement?.focus?.();
+      if (isChoiceGroupBehavior(behavior)) {
+        const current = currentRadioValue();
+        const next = stepChoice(getValueRows(control), current, event.key);
+        if (next == null) return;
+        if (choiceSelectionMode(behavior) !== 'multi' && next !== current) commitSelectAction(next);
+        patchSession({ focused: true, choiceFocus: next, choiceHover: '', inputModality: 'keyboard' });
+        return;
+      }
       patchSession({ focused: true, hover: true });
       adjustRangeFromKey(event.key);
     }
@@ -1894,6 +1895,7 @@
           tabindex={isDisabled ? undefined : 0}
           onpointerenter={handlePointerEnter}
           onpointerleave={handlePointerLeave}
+          onpointermove={handlePointerMove}
           onpointerdown={handlePointerDown}
           ondblclick={handleDoubleClick}
           onwheel={handleWheel}

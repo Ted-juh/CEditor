@@ -2187,6 +2187,25 @@ These are the components you can insert, in the groups the icon rail and the Ins
 
 {{COMPONENT_CATALOGUE}}
 
+### A Radio Button Group's looks
+
+A **Radio Button Group** has five looks, chosen with **Style** on the Behavior tab:
+
+- **Segmented**: one strip, with the chosen option filled. The strip is the control's Background.
+- **Buttons**: a key for each option, each painted with the Background.
+- **Radio**: a ring beside each label, with a dot in the chosen one.
+- **LED**: the control set's button lamp beside each label, lit for the chosen one.
+- **Tabs**: a line under the chosen option.
+
+Radio, LED and tabs sit on the panel: the Background draws nothing, and the labels take the panel's
+text colour. **Widths** sizes the options: on **auto** they are equal while every label fits, and
+otherwise as wide as their labels need. The pointer lights the option it is over, and the
+**Segments** tab styles each option, and each option in each state, on its own.
+
+In Preview and in the plugin the group is one Tab stop. The arrow keys move the choice (in a group
+that allows several choices they move the focus, and Space or Enter chooses), and a screen reader
+reads each option as a radio button. Scripts hear every change.
+
 ## Keyboard shortcuts and mouse
 
 The same list as **Help → Keyboard Shortcuts** (F1). Undo, redo and the panel toggles do nothing

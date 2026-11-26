@@ -2209,7 +2209,7 @@ These are the components you can insert, in the groups the icon rail and the Ins
 |---|---|
 | **Momentary Button** | A button that is on only while it is held down. |
 | **Toggle Button** | A button that switches on with one click and off with the next. |
-| **Radio Button Group** | A row of buttons of which exactly one is on — for choosing one setting out of a few. |
+| **Radio Button Group** | A few settings side by side, one of them chosen (or several, if you allow it): a strip, a row of keys, rings, lamps or tabs. |
 | **Cyclic Button** | A single button that steps through a list of settings each time it is clicked. |
 | **Combobox** | A drop-down list for choosing one setting out of many. |
 | **Listbox** | A list that shows several settings at once, one of which is chosen. |
@@ -2265,6 +2265,25 @@ These are the components you can insert, in the groups the icon rail and the Ins
 | **Setlist (scenes on a footswitch)** | A list of scenes you step through during a performance, for example with a footswitch. |
 | **Transport (master clock)** | The panel's master clock: tempo, play and stop. |
 | **Panic button** | A button that silences every stuck note on every channel. |
+
+### A Radio Button Group's looks
+
+A **Radio Button Group** has five looks, chosen with **Style** on the Behavior tab:
+
+- **Segmented**: one strip, with the chosen option filled. The strip is the control's Background.
+- **Buttons**: a key for each option, each painted with the Background.
+- **Radio**: a ring beside each label, with a dot in the chosen one.
+- **LED**: the control set's button lamp beside each label, lit for the chosen one.
+- **Tabs**: a line under the chosen option.
+
+Radio, LED and tabs sit on the panel: the Background draws nothing, and the labels take the panel's
+text colour. **Widths** sizes the options: on **auto** they are equal while every label fits, and
+otherwise as wide as their labels need. The pointer lights the option it is over, and the
+**Segments** tab styles each option, and each option in each state, on its own.
+
+In Preview and in the plugin the group is one Tab stop. The arrow keys move the choice (in a group
+that allows several choices they move the focus, and Space or Enter chooses), and a screen reader
+reads each option as a radio button. Scripts hear every change.
 
 ## Keyboard shortcuts and mouse
 

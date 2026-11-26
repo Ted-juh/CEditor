@@ -679,10 +679,10 @@ function yamahaYc61() {
   f.label('Model', 'YC61', 36, 20, 200, 30, { size: 20, colour: 'FFF2F0EA', weight: 800, spacing: 3, align: 'left' });
   f.label('Kind', 'STAGE KEYBOARD', 880, 25, 284, 22, { size: 11, colour: 'FF8E9298', weight: 600, spacing: 2, align: 'right' });
   const line = { bg };
-  // A switch: its choices side by side, reporting each change (a group says nothing unless asked to).
+  // A switch: its choices side by side in a strip, each change reported to the scripts (both a
+  // choice group's own defaults: docs/design/choice-group.md).
   const group = (cname, parameterId, x, y, w, h, words) => {
     const control = f.bind('RadioButtonGroup', cname, parameterId, x, y, w, h);
-    Object.assign(control._children.Behavior, { emitValueChange: true, visualStyle: 'segmented' });
     control._children.Text._children.Font = { ...control._children.Text._children.Font, size: 10 };
     if (words) f.caption(control, words, { size: 9, width: Math.max(w, 60) });
     return control;

@@ -29,13 +29,17 @@
   import { createRangeVariantSections } from '../utils/rangeVariant.js';
   import { RETURN_CURVE, RETURN_MODE } from '../utils/returnToRest.js';
   import { VALUE_FLOW, valueFlowOf } from '../utils/displayMode.js';
+  import { CHOICE_STYLES, choiceStyleOf } from '../utils/choiceGroupLayout.js';
 
   let { control = null } = $props();
+
+  // The choice group's looks (utils/choiceGroupLayout.js): which one draws a frame, which sit on the panel.
+  const CHOICE_STYLE_LABELS = { segmented: 'segmented', buttons: 'buttons', radio: 'radio', led: 'LED', tab: 'tabs' };
 
   const SUBTYPE_OPTIONS = {
     momentary: ['action', 'repeating', 'press_to_talk'],
     toggle: ['toggle', 'sticky'],
-    radio: ['segmented', 'radio', 'tab'],
+    radio: [...CHOICE_STYLES],
     cyclic: ['cycle', 'tri_state'],
     combobox: ['dropdown', 'searchable'],
     timed: ['hold_to_confirm', 'double_click'],
@@ -48,7 +52,7 @@
   let subtypeOptions = $derived(SUBTYPE_OPTIONS[buttonType] ?? ['custom']);
   let showSubtypeSelector = $derived(!!SUBTYPE_OPTIONS[buttonType] && buttonType !== 'radio' && buttonType !== 'combobox');
   let momentarySubtype = $derived(String(behavior?.subtype ?? 'action'));
-  let radioVisualStyle = $derived(String(behavior?.visualStyle ?? behavior?.subtype ?? 'radio'));
+  let radioVisualStyle = $derived(choiceStyleOf(behavior));
   let isRangeSpinbox = $derived(
     String(behavior?.family ?? '').trim().toLowerCase() === 'range'
     && String(behavior?.role ?? '').trim().toLowerCase() === 'spinbox'
@@ -310,16 +314,24 @@
     </PropertySection>
   {:else if buttonType === 'radio'}
     <PropertySection title="Radio Group" icon={CircleDot}>
-      <PropertyCell label="Style" span={2} hint="Choose the visual style for the group items.">
+      <PropertyCell label="Style" span={4} hint="Segmented: one strip, the chosen option filled. Buttons: a key each, painted with the Background. Radio, LED and tabs sit on the panel: a ring, the set's button lamp, or an underline marks the chosen one.">
         <Segmented
           ariaLabel="Visual style"
           value={radioVisualStyle}
-          options={[
-            { value: 'radio', label: 'radio' },
-            { value: 'segmented', label: 'segmented' },
-            { value: 'tab', label: 'tab' },
-          ]}
+          options={CHOICE_STYLES.map((value) => ({ value, label: CHOICE_STYLE_LABELS[value] }))}
           onchange={(v) => set('visualStyle', v)}
+        />
+      </PropertyCell>
+      <PropertyCell label="Widths" span={2} hint="Auto: equal while every label fits an equal share, otherwise in proportion to the labels. Equal: always the same. Fit: always in proportion to the labels.">
+        <Segmented
+          ariaLabel="Option widths"
+          value={behavior.optionSizing ?? 'auto'}
+          options={[
+            { value: 'auto', label: 'auto' },
+            { value: 'equal', label: 'equal' },
+            { value: 'fit', label: 'fit' },
+          ]}
+          onchange={(v) => set('optionSizing', v)}
         />
       </PropertyCell>
       <PropertyCell label="Layout" span={1} hint="Horizontal lays items in rows, vertical stacks them in one column by default.">

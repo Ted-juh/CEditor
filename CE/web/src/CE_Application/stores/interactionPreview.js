@@ -12,7 +12,7 @@ import { syncCustomArpeggiatorValues } from '../utils/customComponentArpeggiator
 import { applyPanelCustomLinkRoutes } from '../utils/panelCustomComponentLinks.js';
 import { applyPanelValueRoutes } from '../utils/routeSessions.js';
 import { flatControls } from '../utils/containment.js';
-import { resolveRadioSelectedKeys } from '../utils/radioSegmentStyle.js';
+import { choiceSelection, selectedChoiceKeys } from '../utils/choiceGroupLayout.js';
 import { isSliderBehavior, getSliderActiveHandle } from '../utils/sliderBehavior.js';
 import { listboxDefaultSelectedValues } from '../utils/listboxLayout.js';
 
@@ -518,34 +518,17 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
 
   if (buttonType === 'radio' || role === 'radio') {
     const valueRows = getEnabledValueRows(control);
-    // Keyboard activation has no pointer target: retain the current choice instead of
-    // silently jumping to the default. Explicit pointer targets still take precedence.
-    const activeValues = currentSession.valueOverrideEnabled === true
-      ? (Array.isArray(currentSession.valueOverride) ? currentSession.valueOverride : [currentSession.valueOverride])
-      : [...resolveRadioSelectedKeys(valueRows, behavior)];
-    const activeRow = [...activeValues].reverse().map(value => valueRows.find(row =>
-      String(row?.internalValue ?? row?.id ?? '') === String(value))).find(Boolean);
-    const nextRow = valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === requestedValue)
-      ?? (!Object.prototype.hasOwnProperty.call(options, 'value') ? activeRow : null)
-      ?? valueRows.find((row) => row?.selectedByDefault === true)
-      ?? valueRows[0]
-      ?? null;
-    if (!nextRow) return null;
-
-    const nextValue = nextRow?.internalValue ?? nextRow?.id ?? '';
     const currentValues = currentSession.valueOverrideEnabled === true
       ? (Array.isArray(currentSession.valueOverride) ? currentSession.valueOverride : [currentSession.valueOverride])
-      : [...resolveRadioSelectedKeys(valueRows, behavior)];
-    const selected = new Set(currentValues.filter(v => v !== '' && v != null).map(String));
-    const key = String(nextValue);
-    const multi = behavior.selectionMode === 'multi';
-    let value = nextValue;
-    if (multi) {
-      if (selected.has(key)) {
-        if (behavior.allowDeselect === true) selected.delete(key);
-      } else selected.add(key);
-      value = valueRows.filter(row => selected.has(String(row.internalValue ?? row.id))).map(row => row.internalValue ?? row.id);
-    } else if (behavior.allowDeselect === true && selected.has(key)) value = '';
+      : [...selectedChoiceKeys(valueRows, behavior)];
+    // An activation with no option named (an older caller, a key with nothing focused) acts on the
+    // option chosen last, or on the default when nothing is chosen. A named option that is not
+    // there (a click between two) changes nothing: it used to choose the default.
+    const named = Object.prototype.hasOwnProperty.call(options, 'value');
+    const chosenLast = [...currentValues].reverse().find((value) => value !== '' && value != null);
+    const target = named ? requestedValue : String(chosenLast ?? [...selectedChoiceKeys(valueRows, behavior)][0] ?? '');
+    const { matched, value } = choiceSelection({ behavior, valueRows, selectedValues: currentValues, requestedValue: target });
+    if (!matched) return null;
 
     const patch = {
       checked: false,

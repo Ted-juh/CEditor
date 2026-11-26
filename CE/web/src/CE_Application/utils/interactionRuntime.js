@@ -1,6 +1,6 @@
 import { curveIsIdentity, curveSpec, fractionToTravel } from './channelCurves.js';
 import { deepClone } from './deepClone.js';
-import { resolveRadioSelectedKeys } from './radioSegmentStyle.js';
+import { isChoiceGroupBehavior, isOptionState, selectedChoiceKeys } from './choiceGroupLayout.js';
 import { setNestedValue } from '../stores/controlTreeUtils.js';
 import { getEnumNormalizedValue, normalizeEnumValues, resolveEnumDefaultValue } from './enumBehavior.js';
 import {
@@ -74,7 +74,7 @@ function findRowByInternalValue(rows = [], value) {
 }
 
 function isRadioGroupControl(control) {
-  return String(getNodeChild(control, 'Behavior')?.buttonType ?? '').trim().toLowerCase() === 'radio';
+  return isChoiceGroupBehavior(getNodeChild(control, 'Behavior'));
 }
 
 function normalizeKey(value) {
@@ -395,6 +395,30 @@ function applyPatchMap(target, patchMap = {}) {
   for (const [path, value] of Object.entries(patchMap ?? {})) {
     setTreeValueAtPath(target, path, deepClone(value));
   }
+}
+
+/** Whether a state's condition holds for these signals: what decides it is active. */
+export const stateMatches = evaluateState;
+
+/** A state's patch map laid onto a tree, as a state is laid onto its control (paths, `_children`). */
+export const applyStatePatchMap = applyPatchMap;
+
+/**
+ * A States section's children in the order their patches are laid down, later winning: the known
+ * interaction states by KNOWN_STATE_PRECEDENCE (hover first, disabled last), then the section's own
+ * `priority`, then the rest. Every child, whether or not its condition holds.
+ */
+export function statesInPrecedence(statesSection) {
+  const priority = Array.isArray(statesSection?.priority)
+    ? statesSection.priority.map((value) => normalizeKey(value))
+    : [];
+  const rank = ([name, state]) => {
+    const key = normalizeKey(name ?? state?.name);
+    const known = KNOWN_STATE_PRECEDENCE[key];
+    const index = priority.indexOf(key);
+    return known ?? (index === -1 ? Number.MAX_SAFE_INTEGER : 200 + index);
+  };
+  return Object.entries(statesSection?._children ?? {}).sort((left, right) => rank(left) - rank(right));
 }
 
 function applyStatePatches(control, state) {
@@ -942,7 +966,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
       && (valueRaw === '' || (Array.isArray(valueRaw) && valueRaw.length === 0));
     const selectedKeys = multi ? (previewSession?.valueOverrideEnabled === true
       ? (Array.isArray(valueRaw) ? valueRaw : [valueRaw])
-      : [...resolveRadioSelectedKeys(valueRows, behavior)]) : null;
+      : [...selectedChoiceKeys(valueRows, behavior)]) : null;
     const selectedRows = multi ? valueRows.filter(row => selectedKeys.map(String).includes(String(row.internalValue ?? row.id))) : [];
     const resolvedRow = emptyRadio ? null : multi ? selectedRows[0]
       : findRowByInternalValue(valueRows, valueRaw) ?? findDefaultRow(valueRows);
@@ -1143,26 +1167,16 @@ export function resolveInteractiveControl(control, previewSession = {}, { shareU
   applyCustomBindings(resolved, signals);
   const resolvedStates = getNodeChild(resolved, 'States');
 
-  const priority = Array.isArray(resolvedStates?.priority)
-    ? resolvedStates.priority.map((value) => normalizeKey(value))
-    : [];
   const activeStates = resolvedStates?.enabled === false
     ? []
-    : Object.entries(resolvedStates?._children ?? {})
-      .filter(([, state]) => evaluateState(state, signals))
-      .sort((left, right) => {
-        const leftKey = normalizeKey(left[0] ?? left[1]?.name);
-        const rightKey = normalizeKey(right[0] ?? right[1]?.name);
-        const leftKnown = KNOWN_STATE_PRECEDENCE[leftKey];
-        const rightKnown = KNOWN_STATE_PRECEDENCE[rightKey];
-        const leftIndex = priority.indexOf(leftKey);
-        const rightIndex = priority.indexOf(rightKey);
-        const safeLeft = leftKnown ?? (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : 200 + leftIndex);
-        const safeRight = rightKnown ?? (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : 200 + rightIndex);
-        return safeLeft - safeRight;
-      });
+    : statesInPrecedence(resolvedStates).filter(([, state]) => evaluateState(state, signals));
 
+  // A choice group's hover, press, focus and choice belong to its options, each drawn with the
+  // states it is in (choiceGroupStyle.js): laid on the whole control they painted every option and
+  // the frame alike. They are still reported active, for animations keyed to a state.
+  const choiceGroup = isRadioGroupControl(resolved);
   for (const [, state] of activeStates) {
+    if (choiceGroup && isOptionState(state)) continue;
     applyStatePatches(resolved, state);
   }
 
