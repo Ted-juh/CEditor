@@ -41,6 +41,7 @@ import { typeFamilies } from './controlSetRecipes.js';
 import { deepClone } from '../utils/deepClone.js';
 import { conditionOf } from './familyConditions.js';
 import { withReadoutInCap } from './readoutInk.js';
+import { withKeyCaptionOnPanel } from './keyCaption.js';
 
 const pristineCache = new Map();
 
@@ -202,7 +203,11 @@ export function familyPatchFor(set, controlType) {
  */
 export function resolveControlFamily(control, set, sources = {}) {
   set = controlSetForControl(control, set, sources);
-  return withSetVoices(patchFamily(control, set), set);
+  // Once the family has decided whether a button is a key: a key's caption stands on the panel, so
+  // it is not lettered for a filled face when on (models/keyCaption.js). Here rather than with the
+  // tokens, because Preview applies a control's states to its family-patched self (a set may
+  // replace a state), and a caption colour a state has written is one nothing after can take back.
+  return withKeyCaptionOnPanel(withSetVoices(patchFamily(control, set), set));
 }
 
 function patchFamily(control, set) {

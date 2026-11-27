@@ -481,12 +481,11 @@ colour and the light comes on just after.
   already passes every script, and the console said "invalid redefinition of parameter name". The
   browser check now opens the Light and Signals panels with their scripts trusted and fails on any
   script error.
-- **Not fixed, for the owner:** in three sets (Ivory, Pop, Atelier) a toggle's caption is white once
-  it is on, on a light panel, and cannot be read (1.2 to 1.4:1). The type's Selected state letters
-  the text in the set's inverse colour, made for a filled face; on a key the caption stands on the
-  panel. The other 58 sets that draw a toggle as a key happen to have an inverse that reads there.
-  Which colour a toggle's caption takes when on is a design call across every set, so it is left
-  as it is; the Switch panel uses Bakelite.
+- **Left for the owner, then fixed at their word:** in three sets (Ivory, Pop, Atelier) a toggle's
+  caption is white once it is on, on a light panel, and cannot be read (1.2 to 1.4:1). The type's
+  Selected state letters the text in the set's inverse colour, made for a filled face; on a key the
+  caption stands on the panel. The other 58 sets that draw a toggle as a key happen to have an
+  inverse that reads there. See "A toggle's caption when on", below.
 - **Not built in this half:** a word thrown from a button (emitted words were a knob's and a
   slider's, from a pointer a button does not have) and a hold's progress on a timed button. Both
   were in the proposal, and neither had an engine to play on. The owner asked for them next: see
@@ -572,3 +571,40 @@ Verified locally:
 - Every new preset driven by hand in Preview. The hold draws through the same part animations
   WebKitGTK was checked on above; the thrown words are plain HTML with the slider's thrown words'
   CSS, and were not re-checked in WebKitGTK.
+
+### A toggle's caption when on (2026-11-27)
+
+The owner: "Fix the toggle caption in those three sets."
+
+Every toggle is made with a Selected state that letters its caption in the set's inverse text
+colour (`componentTypes.js` `createButtonStates`). That is for a flat face, which the same state
+fills with the checked colour: the words sit on the fill. A set that draws the toggle as a key fills
+no face; the caption stands on the panel beside the key, where the inverse colour is the one made
+not to read. In Ivory, Pop and Atelier, light panels whose inverse text is white, the caption went
+white as the toggle went on.
+
+On a key, a Selected caption colour still at what the type made the state with is now dropped, and
+the caption keeps its own colour on or off (`models/keyCaption.js`, applied in
+`resolveControlFamily`). A colour an author chose is kept; a flat face, which fills, keeps the
+inverse colour. Measured over every set: the caption changed colour as the toggle went on in those
+three and no other, and it now changes in none. Ivory's, Pop's and Atelier's read at 12.0 to 13.6:1
+on their panels, on or off.
+
+It is in the family step rather than with the colours because Preview applies a control's states to
+its family-patched self (a set may replace a state), and a caption colour a state has written there
+is one nothing afterwards can take back: the first version, applied with the colours, gave the
+right colour to a test that resolved in that order and left Preview's caption white.
+
+Five starter panels store the change as data: Pop's (white to its caption's dark ink), and Arc Line,
+Diesel, Recessed and Touch Encoder, whose inverse colour was already their caption's, so nothing
+there looks different.
+
+**Not changed, for the owner:** a toggle's Mixed state letters its caption the same way. On a key it
+reads under 3:1 in 26 sets (Tolex's is its own panel's colour) and differs from the caption at rest
+in 33. The same rule would fix it, and would change those 33 sets' look and 46 starter panels.
+
+Verified locally: `test/keyCaption.test.js` (new) holds every set's key caption the same colour on as
+off, in Preview's order (family, states, colours) as well as the canvas's; Ivory's, Pop's and
+Atelier's at 4.5:1 or better on their panels; a flat face untouched, Graphite's on caption still its
+inverse; an author's colour kept; the stored control untouched. Three of its tests fail on the code
+as it was. Seen in Preview: the three sets' toggles, off and on.
