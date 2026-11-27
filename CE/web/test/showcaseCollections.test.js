@@ -15,7 +15,7 @@ import { DOMINO_SCRIPT, CLOCK_SCRIPT } from '../scripts/mechanismsPanels.js';
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { cleanScene } from '../src/CE_Application/utils/sceneFormat.js';
 
-const NEW = ['mechanisms', 'gallery', 'synths', 'knob', 'slider', 'button'];
+const NEW = ['mechanisms', 'gallery', 'synths', 'knob', 'slider', 'button', 'choice'];
 const named = (panel, name) => panel.controls.find((control) => control._children.Core.name === name);
 
 test('the committed panels are what the scripts write: run export-showcases.mjs after changing one', () => {

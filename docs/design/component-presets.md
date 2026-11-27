@@ -666,3 +666,91 @@ component. Everything asked for is built and verified locally; these were not do
    browser check, `profileDesigner` (a device profile of 7,710 parameters, its last row reached by
    scrolling), which neither the Button nor the caption touches; the next run, on `9406d2d`, passed
    every job. If `ba23459` fails, it is read and reproduced here before anything is pushed again.
+
+## The Choice group (2026-11-27)
+
+The owner's fourth component, chosen after the Button over the Meter, the LCD and the wheels: the
+choice group (`RadioButtonGroup`, redesigned on this branch, [choice-group.md](choice-group.md)). Put
+to the owner as a catalogue of eight panels in two phases, with a set for each; the owner chose both.
+
+**What it draws.** One of five styles, the control's own (`Behavior.visualStyle`, not the set's):
+segmented, buttons, radio, LED and tabs. CanvasControl places and resolves each option
+(`choiceGroupLayout.js`, `choiceGroupStyle.js`) and `ChoiceGroup.svelte` draws them: a body, an
+indicator (a ring and dot, a lamp, an underline) and a label. The control's interaction states are
+its options' (hover, pressed, chosen, focused), evaluated for each option and patching that option.
+
+**What plays today, and what does not.** Everything that moves the whole control: its keyframes
+play on the group as on any control. Its value triggers fire: the runtime gives the chosen option's
+place along the options as the value (`interactionRuntime.js`), so On change fires on a new choice
+and Each step knows whether the choice went on or back. Nothing reaches an option on its own: no
+keyframes, no eased change of look, no text effect on its label, and no thumb, since each option
+paints its own body and the chosen one's simply appears where the last disappears.
+
+1. **Phase 1, what plays today**: the whole group. Attention, and Choosing, which needed one thing
+   the engine did not have: a keyframe animation that goes the way the step went (below).
+2. **Phase 2, options as parts**: what needs the engine to animate one option, or something that
+   travels between them. Thumb, The chosen, Appear, Hover, New options, and Together.
+
+| Group | Phase | Presets |
+|---|---|---|
+| Attention | 1 | Pulse, Breathe, Wiggle, Beat pulse, Look here, Pop in |
+| Choosing | 1 | Lean (the group leans the way the choice went), Blink (once on any new choice), Tick (a knock at each new choice) |
+| Thumb | 2 | Slide, Spring, Stretch (segmented and buttons); Underline glide (tabs); Dot hop (radio); Lamp run (LED: the light runs through the options between) |
+| The chosen | 2 | Pop, Press in, Glow, Label roll, Ink flash, on the option just chosen |
+| Appear | 2 | Cascade, Fan out from the chosen, Typewriter labels, Drop in |
+| Hover | 2 | Lift, Spotlight (the others dim), Grow label |
+| New options | 2 | When a dependent group's list changes: Roll over, Crossfade, Cascade the new ones |
+| Together | 2 | Scenes over a row of groups: Cascade in, Ripple, Wave |
+
+| Panel | Set | Why that set |
+|---|---|---|
+| Attention | Atelier | a black thumb on cream, bold enough to read a pulse from across the panel |
+| Choosing | Ember | copper keys on a dark brown panel, whose lean and tick read in the buttons style |
+| Thumb | Eurorack | a bright green thumb on brushed grey, the one most worth watching travel |
+| The chosen | Chrome | a glossy blue thumb on navy, for a pop and a glow |
+| Appear | Satellite | pale pill outlines on a blueprint grid, options that read as they arrive |
+| Hover | Ceramic | a flat light face, where a lift and a spotlight show without a finish in the way |
+| New options | Studio White | white keys with a teal thumb, words easy to watch change |
+| Together | Receiver | blue on brushed silver, a hi-fi's row of selectors |
+
+None is a set the Knob's, the Slider's or the Button's panels use. Chosen from Preview renders of
+the five styles in each of the 40 sets none of them uses; Satellite and Gemstone drew alike, so Hover
+went to Ceramic.
+
+### As built: phase 1 (2026-11-27)
+
+**Its presets** (`utils/choicePresets.js`, ids `ce:choice:<name>`, category Choice group), written
+with the kit the Knob, the Slider and the Button use, each on a `RadioButtonGroup`. Every one goes on
+a choice group in each of the five styles, as Atelier and Ember draw it. The library lists **Choice
+group** after **Button**.
+
+| Group | Presets |
+|---|---|
+| Attention | Pulse, Breathe, Wiggle, Beat pulse, Look here, Pop in |
+| Choosing | Lean, Blink, Tick |
+
+Two panels, `CE/panels/Components/Choice group/`: Attention in Atelier's segmented strip, Choosing
+in Ember's keys, each on its set's own panel colour with captions at 4.5:1 or better as drawn.
+Look here plays from a script, as the Button's does. Lean starts on its middle option, so it can
+step either way.
+
+**A keyframe animation that follows the turn.** Each step already knew which way the value went, and
+a text effect could go that way; a keyframe animation could not, so a lean toward the next option
+leaned the same way whichever option was chosen. A keyframe animation on Each step may now be set
+to follow the turn (`followTurn`; in the Animation tab, **Step back: Mirrored**, under Steps): a
+step back plays it mirrored side for side, every sideways move and turn the other way, from a rule
+of its own (`keyframeAnimation.js` `mirroredEntry`). Up and down, size and fade stay as written.
+On any other trigger it means nothing: On change does not know which way it went.
+
+Verified locally:
+- `test/choicePresets.test.js` (new): the catalogue, each preset surviving its own file and going on
+  a group in every style; a choice is a step the way it went (the option's place along the options);
+  Lean leans right going on and left going back, a rule of its own, and Tick the same both ways;
+  nothing loops but Pulse and Breathe; the library; the panels, their sets (none another component's)
+  and styles, the presets they carry, Look here's script; every caption at 4.5:1.
+- The browser check `choiceShowcase` (new): Lean leans right toward a later option and left toward an
+  earlier one, and settles; Blink dims and comes back; Tick knocks down; Pop in is hidden as Preview
+  opens and grows in; Pulse keeps on; Look here jumps under its script; Beat pulse swells on the
+  transport's beats. `animationTab`: the library's Choice group section, and Step back offered on Each
+  step for keyframes, written as `followTurn`, and not on On change or for thrown words.
+- Both panels seen in Preview.

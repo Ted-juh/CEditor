@@ -144,6 +144,7 @@ window.__anim = {
     select.dispatchEvent(new Event('change', { bubbles: true }));
   },
   stepsCell: () => [...document.querySelectorAll('.r')].some((row) => textOf(row.querySelector('.lab')) === 'Steps'),
+  stepBackRow: () => [...document.querySelectorAll('.r')].some((row) => textOf(row.querySelector('.lab')) === 'Step back'),
   head: () => textOf(document.querySelector('.who')),
   alarm: () => textOf(document.querySelector('.alarm')),
 

@@ -7828,7 +7828,9 @@ const DEFINE_SPECS = {
       'effect', 'way', 'split', 'order', 'stagger', 'scatter', 'scale', 'spins', 'glyphs', 'colour', 'preset',
       // Words thrown from a knob's pointer or a button's key (utils/keyframeAnimation.js readEmit):
       // what they show, and a button's words of its own.
-      'shows', 'from', 'travel', 'size', 'words'],
+      'shows', 'from', 'travel', 'size', 'words',
+      // A keyframe animation on Each step mirrored on a step back (keyframeAnimation.js mirroredEntry).
+      'followTurn'],
   },
   Bindings: {
     templates: [ENTRY_BASELINES.Bindings],

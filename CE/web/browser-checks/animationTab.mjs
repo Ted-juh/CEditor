@@ -834,13 +834,15 @@ const copy = await ev(() => window.__anim.storedAnimation('pressEcho2'));
 assert.equal(copy.preset.id, savedPreset.id);
 assert.match(await ev(() => window.__anim.presetReport()), /on 1 control, linked/);
 
-check('the Knob\'s, the Slider\'s and the Button\'s built-in presets are listed under them, by group; one applies linked, one that needs a cap is refused', async () => {});
+check('the Knob\'s, the Slider\'s, the Button\'s and the Choice group\'s built-in presets are listed under them, by group; one applies linked, one that needs a cap is refused', async () => {});
 assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
   component: 'Knob', groups: ['Numbers', 'Ticks', 'Touch', 'Turning', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
 }, {
   component: 'Slider', groups: ['Numbers', 'Ticks', 'Touch', 'Moving', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
 }, {
   component: 'Button', groups: ['Press', 'Attention', 'Gestures', 'Light', 'Switch', 'Words', 'Signals', 'Thrown', 'Hold'], count: 52, first: 'Sink press',
+}, {
+  component: 'Choice group', groups: ['Attention', 'Choosing'], count: 9, first: 'Pulse always',
 }]);
 await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
 await settle();
@@ -941,6 +943,7 @@ await ev(() => window.__anim.chooseTrigger('valueStep'));
 await settle();
 const streamNode = await ev(() => window.__anim.knobAnimation('stream'));
 const streamSteps = await ev(() => window.__anim.stepsCell());
+const streamStepBack = await ev(() => window.__anim.stepBackRow());
 await ev(() => window.__anim.clickSegment('Shows', 'How far it moved'));
 await settle();
 const deltaNode = await ev(() => window.__anim.knobAnimation('stream'));
@@ -960,6 +963,29 @@ check('a knob is offered the Words kind: words thrown on each step, the value or
   assert.equal(deltaNode.shows, 'delta');
   assert.ok(!noSteps, 'and only a step trigger');
   assert.ok(!streamTriggers.includes('hold'), 'a knob is never held to confirm');
+  assert.ok(!streamStepBack, 'words thrown have a way of their own, not a mirror');
+});
+
+// --- A keyframe animation that follows the turn (2026-11-27) -------------------------------------
+
+await ev(() => window.__anim.addAnimationNamed('lean'));
+await settle();
+await ev(() => window.__anim.pickKind('keyframes'));
+await settle();
+await ev(() => window.__anim.chooseTrigger('valueStep'));
+await settle();
+const leanOffered = await ev(() => window.__anim.stepBackRow());
+await ev(() => window.__anim.clickSegment('On a step back', 'Mirrored'));
+await settle();
+const leanNode = await ev(() => window.__anim.knobAnimation('lean'));
+await ev(() => window.__anim.chooseTrigger('valueChange'));
+await settle();
+const leanOnChange = await ev(() => window.__anim.stepBackRow());
+check('a keyframe animation on Each step can be mirrored on a step back; on no other trigger', () => {
+  assert.ok(leanOffered, 'Step back, under Steps');
+  assert.equal(leanNode.kind, 'keyframes');
+  assert.equal(leanNode.followTurn, true);
+  assert.ok(!leanOnChange, 'On change does not know which way it went');
 });
 
 // --- A button's words, and a timed button's hold (2026-11-27) ------------------------------------

@@ -11,6 +11,7 @@ import { panelMaker, frames, COMPONENT_KIND } from './festivalKit.js';
 import { KNOB_PRESETS, KNOB_PRESET_GROUPS } from '../src/CE_Application/utils/knobPresets.js';
 import { SLIDER_PRESETS, SLIDER_PRESET_GROUPS } from '../src/CE_Application/utils/sliderPresets.js';
 import { BUTTON_PRESETS, BUTTON_PRESET_GROUPS } from '../src/CE_Application/utils/buttonPresets.js';
+import { CHOICE_PRESETS, CHOICE_PRESET_GROUPS } from '../src/CE_Application/utils/choicePresets.js';
 import { applyPresetPatch } from '../src/CE_Application/utils/animationPresetModel.js';
 import { setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 import { getControlSet } from '../src/CE_Application/models/controlSets.js';
@@ -483,3 +484,85 @@ export const BUTTON_PANELS = [
   ...BUTTON_PRESET_GROUPS.map((group) => [`button-${group.id}`, () => buttonGroupPanel(group)]),
   ['button-together', buttonTogether],
 ];
+
+// --- The Choice group (docs/design/component-presets.md, The Choice group) -----------------------
+//
+// A panel a group, each in a set none of the other components' panels use, on that set's own panel
+// colour, in the style that shows the group best: Attention's segmented strip in Atelier (a black
+// thumb on cream), Choosing's keys in Ember (copper on dark brown). Each group offers a choice a
+// panel would: waveforms, filter modes, an octave.
+
+const CHOICE_LOOKS = {
+  attention: { set: 'atelier', style: 'segmented', bg: 'FFD9D9D4', ink: 'FF1C1C1A', how: 'FF8C2F14', what: 'FF45453F' },
+  choosing: { set: 'ember', style: 'buttons', bg: 'FF1F1A18', ink: 'FFFFF6EC', how: 'FFF08A24', what: 'FFC8B6A2' },
+};
+// What each group offers, and which option it starts on.
+const CHOICES = {
+  pulse: [['Saw', 'Square', 'Tri', 'Sine'], 1],
+  breathe: [['Off', 'Slow', 'Fast'], 1],
+  wiggle: [['LP', 'BP', 'HP'], 0],
+  'beat-pulse': [['1/4', '1/8', '1/16'], 1],
+  'look-here': [['Mono', 'Poly', 'Uni'], 1],
+  'pop-in': [['A', 'B', 'C', 'D'], 0],
+  lean: [['-2', '-1', '0', '+1', '+2'], 2],
+  blink: [['Saw', 'Square', 'Tri', 'Sine'], 0],
+  tick: [['1', '2', '3', '4', '5', '6'], 0],
+};
+const CHOICE_TILE_W = 320;
+const CHOICE_TILE_H = 170;
+const GROUP_W = 280;
+const GROUP_H = 40;
+
+/** Give a choice group its options, the one at `start` chosen. */
+function offer(group, labels, start) {
+  const template = group._children.Value.rows[0];
+  group._children.Value.rows = labels.map((label, i) => ({
+    ...template,
+    id: `opt_${i + 1}`, displayText: label, internalValue: `opt_${i + 1}`, sendValue: i, selectedByDefault: i === start,
+  }));
+  group._children.Behavior.defaultValue = `opt_${start + 1}`;
+}
+
+/** A panel of one group of the Choice group's presets, three to a row. */
+function choiceGroupPanel(group) {
+  const look = CHOICE_LOOKS[group.id];
+  const entries = CHOICE_PRESETS.filter((entry) => entry.group === group.id);
+  const columns = 3;
+  const rows = Math.ceil(entries.length / columns);
+  const width = columns * CHOICE_TILE_W + 60;
+  const height = TOP + rows * CHOICE_TILE_H + 24;
+  const f = panelMaker(`choice-${group.id}`, `Choice group ${group.label}`, { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
+  const carried = new Map();
+  f.label('Title', `Choice group · ${group.label}`, 30, 22, 620, 34, { size: 24, colour: look.ink, align: 'left' });
+  f.label('Note', `${group.note}. Each group wears one built-in preset: Preview (F5) plays it.`, 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
+  entries.forEach((entry, i) => {
+    const x = 30 + (i % columns) * CHOICE_TILE_W;
+    const y = TOP + Math.floor(i / columns) * CHOICE_TILE_H;
+    const name = pascal(entry.slug);
+    const choice = f.add(entry.type ?? 'RadioButtonGroup', name, x + (CHOICE_TILE_W - GROUP_W) / 2, y, GROUP_W, GROUP_H);
+    choice._children.Behavior.visualStyle = look.style;
+    choice._children.Core.description = `${entry.name}: ${entry.what}.`;
+    const [labels, start] = CHOICES[entry.slug];
+    offer(choice, labels, start);
+    wear(choice, entry, carried, look.set);
+    const captionTop = y + GROUP_H + 14;
+    f.label(`${name}Caption`, entry.name, x + 10, captionTop, CHOICE_TILE_W - 20, 22, { size: 16, colour: look.ink });
+    f.label(`${name}How`, entry.how.toUpperCase(), x + 10, captionTop + 22, CHOICE_TILE_W - 20, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600 });
+    f.label(`${name}What`, entry.what, x + 14, captionTop + 40, CHOICE_TILE_W - 28, 36, { size: 12, colour: look.what, weight: 400, lineHeight: 1.25 });
+  });
+  if (entries.some((entry) => entry.slug === 'look-here')) {
+    f.script('Look here', `// Plays the Look here group's own animation every four seconds, as a panel would to draw the
+// eye to one control: ce.anim.play(control, animation).
+function lookHere() {
+  ce.anim.play('LookHere', 'lookHere');
+  after(4000, lookHere);
+}
+after(1500, lookHere);
+`);
+  }
+  const panel = f.scenes([]);
+  panel.animationPresets = [...carried.values()];
+  return panel;
+}
+
+export const CHOICE_PANELS = CHOICE_PRESET_GROUPS.map((group) => [`choice-${group.id}`, () => choiceGroupPanel(group)]);

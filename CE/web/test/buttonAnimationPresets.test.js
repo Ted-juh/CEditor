@@ -177,7 +177,7 @@ test('nothing loops that does not say so', () => {
 
 test('the library lists them under Button, after the Knob and the Slider, by group', () => {
   const button = COMPONENT_PRESETS.find((entry) => entry.component === 'Button');
-  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button']);
+  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button', 'Choice group']);
   assert.deepEqual(button.groups.map((group) => group.label), BUTTON_PRESET_GROUPS.map((group) => group.label));
   assert.equal(button.groups.reduce((n, group) => n + group.entries.length, 0), BUTTON_PRESETS.length);
 });

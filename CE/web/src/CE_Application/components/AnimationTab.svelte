@@ -878,6 +878,15 @@ onMount(() => {
                     <div class="cell"><NumberCell label="0: its own" value={selected.animation.trigger?.steps ?? 0} min={0} max={400} step={1}
                       onchange={(value) => setProp('trigger.steps', Math.max(0, Math.min(400, Math.round(value))))} /></div>
                   </div>
+                  {#if selected.kind === 'keyframes'}
+                    <!-- A step back plays it mirrored, side for side (keyframeAnimation.js mirroredEntry). -->
+                    <div class="r">
+                      <span class="lab">Step back</span>
+                      <Segmented options={[{ value: false, label: 'Same' }, { value: true, label: 'Mirrored' }]}
+                                 value={selected.animation.followTurn === true} ariaLabel="On a step back"
+                                 onchange={(value) => setProp('followTurn', value === true)} />
+                    </div>
+                  {/if}
                 {/if}
                 {#if selected.triggerType === 'stateChange'}
                   <div class="r top">

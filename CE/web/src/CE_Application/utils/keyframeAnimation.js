@@ -68,6 +68,9 @@ import { cleanValueFrames } from './sceneFormat.js';
 // goes, and it knows which way the value turned: a text effect whose direction is `turn` goes that
 // way, and an emitted word (EMIT, below) knows where it came from. A detent, a stream of numbers.
 // The Components showcase's Knob, phase 2 (docs/design/component-presets.md). 2026-11-26.
+// A keyframe animation on it may follow the turn too (`followTurn`): played mirrored, side for side,
+// when the value stepped back (mirroredEntry). A choice group leaning toward the option chosen,
+// whichever side that is: the Choice group's Lean. 2026-11-27.
 // `hold`: a timed button held to confirm (or waiting for its second click): plays from the moment it
 // is held, over exactly as long as it must be held (interactionRuntime.js gives the entry the
 // button's own hold time), and stops if it is let go early. A hold's progress, drawn by whatever
@@ -280,6 +283,8 @@ export function readKeyframes(animation, key = '', { timeScale = 1 } = {}) {
     direction: animation.direction === 'alternate' ? 'alternate' : 'normal',
     trigger,
     frames,
+    // Each step only: mirrored, side for side, when the value stepped back (mirroredEntry, below).
+    followTurn: animation.followTurn === true && trigger.type === 'valueStep',
     // How long one firing runs. Infinity for a loop, which never finishes on its own.
     span: iterations === 'infinite' ? Infinity : delay + duration * iterations,
   };
@@ -335,6 +340,28 @@ export function framesHash(frames) {
   let h = 5381;
   for (let i = 0; i < text.length; i += 1) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
   return h.toString(36);
+}
+
+/**
+ * An entry that follows the turn (`followTurn`, on Each step) as it plays when the value stepped back:
+ * its frames mirrored side for side, every sideways move and turn the other way, so a lean toward
+ * the next choice leans toward the one before when the choice goes back. Its own frames hash to a
+ * rule of its own. The Components showcase's Choice group, Lean (docs/design/component-presets.md).
+ */
+const mirrored = new WeakMap();
+export function mirroredEntry(entry) {
+  if (!mirrored.has(entry)) {
+    mirrored.set(entry, {
+      ...entry,
+      frames: entry.frames.map((frame) => ({
+        ...frame,
+        // 0 - n rather than -n: a frame at rest stays at 0, not -0.
+        ...(frame.x !== undefined ? { x: 0 - frame.x } : {}),
+        ...(frame.rotate !== undefined ? { rotate: 0 - frame.rotate } : {}),
+      })),
+    });
+  }
+  return mirrored.get(entry);
 }
 
 /** The @keyframes rule for one phase of one entry. Numbers and a hash only — nothing to escape. */
@@ -606,11 +633,13 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
           continue;
         }
         if (entry.moves) {
+          // Following the turn, a step back plays it mirrored.
+          const moving = entry.followTurn && (runs.get(entry.name)?.turn ?? 1) < 0 ? mirroredEntry(entry) : entry;
           const list = parts.get(entry.part) ?? [];
-          list.push(animationValue(entry, phase));
+          list.push(animationValue(moving, phase));
           parts.set(entry.part, list);
-          rules.push(keyframesRule(entry, phase));
-          keyParts.push(`${entry.part}:${animationValue(entry, phase)}`);
+          rules.push(keyframesRule(moving, phase));
+          keyParts.push(`${entry.part}:${animationValue(moving, phase)}`);
         }
         for (const channel of CHANNEL_NAMES) {
           if (!channelFrames(entry, channel).length) continue;

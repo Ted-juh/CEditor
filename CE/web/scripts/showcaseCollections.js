@@ -9,7 +9,7 @@ import { SONGS } from './songBookPanels.js';
 import { MECHANISMS } from './mechanismsPanels.js';
 import { GALLERY } from './galleryPanels.js';
 import { SYNTHS } from './synthPanels.js';
-import { KNOB_PANELS, SLIDER_PANELS, BUTTON_PANELS } from './componentPanels.js';
+import { KNOB_PANELS, SLIDER_PANELS, BUTTON_PANELS, CHOICE_PANELS } from './componentPanels.js';
 import { serializePanel } from '../src/CE_Application/stores/panelModel.js';
 
 const PANELS = join(import.meta.dirname, '../../panels');
@@ -24,6 +24,7 @@ export const COLLECTIONS = Object.freeze({
   knob: { folder: 'Components/Knob', list: KNOB_PANELS },
   slider: { folder: 'Components/Slider', list: SLIDER_PANELS },
   button: { folder: 'Components/Button', list: BUTTON_PANELS },
+  choice: { folder: 'Components/Choice group', list: CHOICE_PANELS },
 });
 
 /** The folder a collection is written to. */

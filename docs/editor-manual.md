@@ -1262,7 +1262,9 @@ There are four kinds, and two more for what a value draws:
   held and stops if it is let go early: a lamp that fills as you hold. **On each step
   of the value** plays once each time the value comes to another step, while it is turned too: as
   many steps as the control has (a knob of five choices, four), one every 5% on a knob with none,
-  or the number under **Steps**. A detent felt as you turn. Besides the poses, a frame can **turn**
+  or the number under **Steps**. A detent felt as you turn. With **Step back** set to
+  **Mirrored**, a step back plays it mirrored side for side: a choice group leaning toward the
+  option chosen, whichever side it is. Besides the poses, a frame can **turn**
   the fill's gradient (degrees) and **shift** its stops (percent), so a sheen sweeps across or a
   conic gradient spins while the control stays put. Where the fill has an image, a frame can also
   **pan** it across or down (percent of the box), **zoom** it and **spin** it, inside its clip: a
