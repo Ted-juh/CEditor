@@ -238,6 +238,17 @@ export function textEffectSpan(effect, animatedCount) {
 
 const DIRECTIONS = 12;
 const num = (value) => String(Math.round(value * 1000) / 1000);
+
+// A wipe's clip. It is blended from a shut inset() to an open one: CSS cannot blend an inset() with
+// the text's own `clip-path: none`, and jumps from one to the other halfway, which hid the words
+// for half the wipe and then showed them all at once. Open reaches past the box, as a glow does.
+const WIPE_MARGIN = '1em';
+const WIPE_OPEN = `-${WIPE_MARGIN}`;
+const WIPE_SHUT = `calc(100% + ${WIPE_MARGIN})`;
+const WIPE_REST = `clip-path:inset(${WIPE_OPEN})`;
+const OPPOSITE = { right: 'left', left: 'right', down: 'up', up: 'down' };
+/** Which side of inset(top right bottom left) is shut for a wipe travelling this way. */
+const INSET_SIDE_SHUT_FOR = { up: 0, right: 1, down: 2, left: 3 };
 const colourCss = (argb) => `#${argb.slice(2)}${argb.slice(0, 2)}`;
 
 /** One of twelve directions a letter of an explosion flies in, and a little of its own distance. */
@@ -279,11 +290,12 @@ function poseDeclarations(effect, variant) {
       return `transform:translateX(calc(${side} * (var(--ce-part-reach, 3em) + 1em)))`;
     }
     case 'wipe': {
-      // In: revealed from the side it travels from; out: hidden towards the side it travels to.
-      const edge = effect.way === 'in'
-        ? { right: '0 100% 0 0', left: '0 0 0 100%', down: '0 0 100% 0', up: '100% 0 0 0' }[effect.direction]
-        : { right: '0 0 0 100%', left: '0 100% 0 0', down: '100% 0 0 0', up: '0 0 100% 0' }[effect.direction];
-      return `clip-path:inset(${edge ?? '0 100% 0 0'})`;
+      // In: revealed from the side it travels from; out: hidden towards the side it travels to. The
+      // shut side stands past the opposite one and the other three outside the box (WIPE_OPEN), so
+      // a glow round the letters is neither shown before they are nor cut off as they are wiped.
+      const travel = effect.way === 'in' ? effect.direction : OPPOSITE[effect.direction];
+      const shutSide = INSET_SIDE_SHUT_FOR[travel] ?? INSET_SIDE_SHUT_FOR.right;
+      return `clip-path:inset(${[0, 1, 2, 3].map((side) => (side === shutSide ? WIPE_SHUT : WIPE_OPEN)).join(' ')})`;
     }
     case 'typewriter':
     case 'crossfade':
@@ -317,7 +329,9 @@ function keyframesBody(effect, variant, colourProperty) {
       : `0%{opacity:1}99%{opacity:1}100%{opacity:0}`;
   }
   const pose = poseDeclarations(effect, variant);
-  return effect.way === 'in' ? `0%{${pose}}100%{}` : `0%{}100%{${pose}}`;
+  // Every other pose blends with the words' own style; a wipe's clip only with another inset().
+  const rest = effect.effect === 'wipe' ? WIPE_REST : '';
+  return effect.way === 'in' ? `0%{${pose}}100%{${rest}}` : `0%{${rest}}100%{${pose}}`;
 }
 
 /** A short, stable name for an effect's settings, for its keyframes rules. */

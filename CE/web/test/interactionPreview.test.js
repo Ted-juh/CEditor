@@ -958,3 +958,47 @@ test('applyCustomLinks executes map, offset, condition, toggle, and reset operat
  assert.equal(commitPanelPreviewSelectAction('radio_keyboard'),null);
  } finally {panels.set(old[0]);activePanelId.set(old[1]);activeEditorTab.set(old[2]);panelPreviewSessions.set(old[3]);}
 });
+
+// A toggle made to start on (the Button showcase's Breathe while on and Key lights) went off at the
+// first click in Preview and stayed off: the click read it as "on, or made to start on", which a
+// toggle made to start on always is. Its session starts at the default and keeps what happened since.
+test('a toggle that starts on switches off and on again in Preview, as one that starts off does', async () => {
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { previewSwitchOn } = await import('../src/CE_Application/stores/interactionPreview.js');
+  const previousPanels = get(panels);
+  const previousActivePanelId = get(activePanelId);
+  const previousActiveEditorTab = get(activeEditorTab);
+  const previousPreviewSessions = get(panelPreviewSessions);
+  const toggle = (id, startsOn) => {
+    const control = createControl('ToggleButton');
+    control._children.Core.id = id;
+    control._children.Behavior.defaultValue = startsOn;
+    return control;
+  };
+  const panel = { id: 102, name: 'Toggles', controls: [toggle('starts_on', true), toggle('starts_off', false)] };
+  try {
+    panels.set([panel]);
+    activePanelId.set(panel.id);
+    activeEditorTab.set({ type: 'panel', id: panel.id });
+    for (const seeded of [false, true]) {
+      // Both before Preview has made the sessions and after (syncPanelPreviewSessions seeds them).
+      panelPreviewSessions.set(seeded
+        ? Object.fromEntries(panel.controls.map((c) => [c._children.Core.id, createInteractionPreviewSession(c)]))
+        : {});
+      const clicks = (id) => [1, 2, 3, 4].map(() => { commitPanelPreviewSelectAction(id); return get(panelPreviewSessions)[id].checked; });
+      assert.deepEqual(clicks('starts_on'), [false, true, false, true], `starts on, sessions ${seeded ? 'made' : 'not yet made'}`);
+      assert.deepEqual(clicks('starts_off'), [true, false, true, false], `starts off, sessions ${seeded ? 'made' : 'not yet made'}`);
+    }
+  } finally {
+    panels.set(previousPanels);
+    activePanelId.set(previousActivePanelId);
+    activeEditorTab.set(previousActiveEditorTab);
+    panelPreviewSessions.set(previousPreviewSessions);
+  }
+  // What an LCD on the panel reads as the toggle's On/Off: the session, and the default only before it.
+  const startsOn = { valueType: 'bool', defaultValue: true };
+  assert.equal(previewSwitchOn(startsOn, null), true, 'before any session: as made');
+  assert.equal(previewSwitchOn(startsOn, { checked: false }), false, 'switched off: off');
+  assert.equal(previewSwitchOn({ valueType: 'bool', defaultValue: false }, { checked: true }), true);
+  assert.equal(previewSwitchOn({ valueType: 'float', defaultValue: true }, null), false, 'not an on/off control');
+});

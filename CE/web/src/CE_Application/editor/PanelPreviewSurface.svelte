@@ -59,6 +59,7 @@
     updatePanelPreviewSession,
     commitPanelPreviewSelectAction,
     setPreviewInspectedControlId,
+    previewSwitchOn,
   } from '../stores/interactionPreview.js';
   import { keyframeOverlays } from '../stores/keyframeOverlays.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
@@ -988,7 +989,7 @@
       const row = getValueRows(src).find((r) => String(rowValue(r)) === String(choice ?? ''));
       info.text = String(row?.displayText ?? choice ?? '');
     } else if (family === 'select' || String(behavior?.valueType ?? '') === 'bool') {
-      info.on = session?.checked === true || behavior?.defaultValue === true;
+      info.on = previewSwitchOn(behavior, session);
       info.text = info.on ? 'On' : 'Off';
       info.value = info.on ? 1 : 0; info.min = 0; info.max = 1;
       info.selector = info.on ? '1' : '0';

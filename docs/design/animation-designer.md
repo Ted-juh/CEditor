@@ -2067,6 +2067,31 @@ throws them, rising from its key (drawn by CanvasControl beside the content); an
 animation can play on `hold`, over exactly a timed button's own hold time, stopping if it is let go
 early. 11 presets, two panels.
 
+## Corrected: the wipe, and a toggle made to start on (2026-11-27)
+
+Both found recording the Button showcase in Preview for the owner, who said to fix them.
+
+**The wipe never wiped.** Since step 2 its keyframes ran from `clip-path: inset(…)` to nothing, the
+words' own `clip-path: none`, and CSS cannot blend an inset() with `none`: it holds the first and
+jumps to the second halfway. So every wipe — the text effect, the Wipe swap of a scene, the Button's
+Wipe preset — hid the words for half its time and then showed them whole. Measured in Chromium and
+in WebKitGTK 2.52 alike: closed at 490 ms of 1000, `none` at 510. Both ends are now an inset(), shut
+on one side and open on the rest, and blend in both engines; open stands 1em outside the words' box
+(and shut 1em past the far side), so a glow round the letters is not cut off as they are wiped. An
+in fills backwards only, so once a wipe is over the words have no clip at all.
+
+**A toggle made to start on stayed off.** In Preview a click asked whether the toggle was "on, or
+made to start on", which a toggle made to start on always is, so the first click switched it off and
+every one after switched it off again; an LCD reading its On/Off said On throughout. The session
+starts at the default and keeps what has happened since, which is what the drawing already read:
+both now ask the session (`previewSwitchOn`, `stores/interactionPreview.js`), and the default only
+before there is one. Breathe while on and Key lights, the showcase's two, switch off and on again.
+
+Verified locally: `test/textEffects.test.js` holds both ends of every wipe, eight ways, an inset();
+`test/interactionPreview.test.js` clicks a toggle that starts on and one that starts off four times
+each, before and after Preview made their sessions. Both fail on the code as it was. Seen in Preview:
+the Words panel's Wipe reveals its caption a letter at a time, and Breathe while on goes off and on.
+
 ## Open
 
 Nothing for the owner at present.

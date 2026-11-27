@@ -245,13 +245,22 @@ function getEnabledValueRows(control) {
   return Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
 }
 
+/**
+ * Whether an on/off control is on in Preview: what its session holds, and the control's default only
+ * before it has one. A session starts at the default (createInteractionPreviewSession) and keeps what
+ * has happened since, so the default cannot be asked again: read as "on, or made to start on", a
+ * toggle that starts on read as on after it was switched off, and each click switched it off again.
+ * The drawing reads it this way already (interactionRuntime.js).
+ */
+export function previewSwitchOn(behavior, session = null) {
+  if (typeof session?.checked === 'boolean') return session.checked;
+  const onOff = String(behavior?.valueType ?? '') === 'bool' || String(behavior?.family ?? '') === 'select';
+  return onOff && behavior?.defaultValue === true;
+}
+
 function currentPreviewBoolValue(control, session = null) {
-  const behavior = control?._children?.Behavior ?? null;
   if (session?.valueOverrideEnabled === true) return session?.valueOverride === true;
-  if (String(behavior?.valueType ?? '') === 'bool' || String(behavior?.family ?? '') === 'select') {
-    return session?.checked === true || behavior?.defaultValue === true;
-  }
-  return session?.checked === true;
+  return previewSwitchOn(control?._children?.Behavior ?? null, session);
 }
 
 function createPreviewSessionsMap(controls = []) {

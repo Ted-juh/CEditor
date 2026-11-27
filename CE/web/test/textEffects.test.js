@@ -110,8 +110,31 @@ test('in and out of roll, push and wipe go the way they say', () => {
   assert.match(rule('roll', 'out', 'up'), /100%\{transform:translateY\(-110%\)\}/, 'and leaves over the top');
   assert.match(rule('push', 'in', 'right'), /0%\{transform:translateX\(-110%\)\}/, 'pushed right, it comes from the left');
   assert.match(rule('push', 'out', 'right'), /100%\{transform:translateX\(110%\)\}/);
-  assert.match(rule('wipe', 'in', 'right'), /0%\{clip-path:inset\(0 100% 0 0\)\}/, 'wiped in from the left');
-  assert.match(rule('wipe', 'out', 'right'), /100%\{clip-path:inset\(0 0 0 100%\)\}/);
+  assert.match(rule('wipe', 'in', 'right'), /0%\{clip-path:inset\(-1em calc\(100% \+ 1em\) -1em -1em\)\}/, 'wiped in from the left');
+  assert.match(rule('wipe', 'out', 'right'), /100%\{clip-path:inset\(-1em -1em -1em calc\(100% \+ 1em\)\)\}/);
+});
+
+// CSS cannot blend an inset() with the words' own `clip-path: none`: it holds one and jumps to the
+// other halfway, so a wipe hid the words for half its time and then showed them whole (seen in the
+// Button showcase's Wipe, 2026-11-27). Both ends of a wipe are an inset(), shut on one side and open
+// on the others: open past the box, so a glow round the letters is not cut off as they are wiped.
+test('a wipe blends from shut to open: both ends of its clip are an inset(), shut on the side it comes from or goes to', () => {
+  const frames = (way, direction) => {
+    const rule = textEffectRules(readTextEffect({ ...newTextEffectShape('t', 'wipe', way), direction }));
+    const [, from, to] = rule.match(/\{0%\{([^}]*)\}100%\{([^}]*)\}\}$/);
+    return { from, to };
+  };
+  const open = 'clip-path:inset(-1em)';
+  const shut = (side) => `clip-path:inset(${[0, 1, 2, 3].map((s) => (s === side ? 'calc(100% + 1em)' : '-1em')).join(' ')})`;
+  const TOP = 0, RIGHT = 1, BOTTOM = 2, LEFT = 3;
+  // In: revealed from the side it travels from, so the side it travels to is shut at the start.
+  const shutGoingIn = { right: RIGHT, left: LEFT, down: BOTTOM, up: TOP };
+  // Out: hidden towards the side it travels to, so the side it leaves from closes over it.
+  const shutGoingOut = { right: LEFT, left: RIGHT, down: TOP, up: BOTTOM };
+  for (const direction of ['right', 'left', 'down', 'up']) {
+    assert.deepEqual(frames('in', direction), { from: shut(shutGoingIn[direction]), to: open }, `in, travelling ${direction}`);
+    assert.deepEqual(frames('out', direction), { from: open, to: shut(shutGoingOut[direction]) }, `out, travelling ${direction}`);
+  }
 });
 
 // --- The name ↔ value swap -----------------------------------------------------------------------
