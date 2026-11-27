@@ -620,7 +620,7 @@
             "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
           }
         },
-        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF6D747B"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF6D747B"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD39576"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFD39576","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF6D747B","Background.Border.colour":"FFE0A43A","Text.Fill.colour":"FFF7F4EC"}}}}}
+        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF6D747B"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF6D747B"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD39576"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFD39576","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF6D747B","Background.Border.colour":"FFE0A43A","_removed":["Text.Fill.colour"]}}}}}
       },
       "_type": "Control"
     },

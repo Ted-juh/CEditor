@@ -599,12 +599,42 @@ Five starter panels store the change as data: Pop's (white to its caption's dark
 Diesel, Recessed and Touch Encoder, whose inverse colour was already their caption's, so nothing
 there looks different.
 
-**Not changed, for the owner:** a toggle's Mixed state letters its caption the same way. On a key it
-reads under 3:1 in 26 sets (Tolex's is its own panel's colour) and differs from the caption at rest
-in 33. The same rule would fix it, and would change those 33 sets' look and 46 starter panels.
+A toggle's Mixed state letters its caption the same way, and this first change left it for the
+owner: on a key it read under 3:1 in 26 sets, and fixing it changes 33 sets' look.
 
 Verified locally: `test/keyCaption.test.js` (new) holds every set's key caption the same colour on as
 off, in Preview's order (family, states, colours) as well as the canvas's; Ivory's, Pop's and
 Atelier's at 4.5:1 or better on their panels; a flat face untouched, Graphite's on caption still its
 inverse; an author's colour kept; the stored control untouched. Three of its tests fail on the code
 as it was. Seen in Preview: the three sets' toggles, off and on.
+
+### A toggle's caption when mixed (2026-11-27)
+
+The owner, shown every affected set at rest, mixed as it was and mixed with the rule: "Yes, apply
+it."
+
+The Mixed state is made the way Selected is, its caption in the set's inverse text colour for a face
+it fills with the mixed colour, and on a key it went wrong in more sets than Selected did, since a
+set's inverse text is so often its own panel's colour. Measured on each set's panel, in Preview:
+
+| Before | Sets | Mixed caption before → after |
+|---|---|---|
+| Unreadable | 26 | 1.0 to 2.6:1 → 5.2 to 17.9:1. Most were the panel's own colour (Neon, Blueprint, Phosphor, Backlit at 1.00:1; Tolex 1.01:1): the word was simply gone |
+| Weak | 3 | Flightdeck 3.38 → 4.16, Obsidian 3.47 → 4.05, Machined 3.88 → 4.02. No better than their caption at rest, which is itself about 4:1 on those panels: a matter for those sets' own caption colour, not for this rule |
+| Readable | 4 | Rackmount 6.41 → 5.57, Console 6.83 → 6.21, Aerospace 14.31 → 14.83, Ember 17.22 → 16.11 |
+
+So `keyCaption.js` drops a Mixed caption colour still at what the type made it with, as it does
+Selected's, and the caption is one colour on, off and mixed. What is given up: Obsidian and
+Aerospace tinted the mixed caption light cyan, a sign of the state in the word itself, and it is now
+the caption's colour at rest. In every other set the colour Mixed gave the word was the panel's or
+near it, so there was no sign to lose. The key and its lamp still show the state, as they do on.
+
+46 starter panels store the change as data, one line each: Mixed's caption colour removed. 22 of
+them are of the 33 sets and look different; in the other 24 the inverse colour was already the
+caption's, and nothing there looks different.
+
+Verified locally: `test/keyCaption.test.js` holds every key's caption the same mixed as off, in
+Preview's order as well; all 26 that were unreadable at 4.5:1 or better on their panels; Graphite's flat face
+still inverse when mixed; an author's mixed colour kept; the stored control untouched. Three of its
+tests fail on the rule as it was. Seen in Preview: all 33 sets, at rest, mixed before and mixed
+after.

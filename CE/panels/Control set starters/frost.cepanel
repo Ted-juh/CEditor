@@ -510,7 +510,7 @@
             "legend": {"visible":true,"offText":"O","onText":"I","fontSize":10,"_children":{"Layout":{"x":43.75,"y":41.25,"width":12.5,"height":17.5},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}}}
           }
         },
-        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"55FFFFFF"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"22FFFFFF"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFFFE27A"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFFFE27A","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FFCCB562","Background.Border.colour":"FFFFE27A","Text.Fill.colour":"FF2B2270"}}}}}
+        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"55FFFFFF"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"22FFFFFF"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFFFE27A"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFFFE27A","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FFCCB562","Background.Border.colour":"FFFFE27A","_removed":["Text.Fill.colour"]}}}}}
       },
       "_type": "Control"
     },
