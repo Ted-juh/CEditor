@@ -117,7 +117,7 @@ test('nothing loops that does not say so', () => {
 });
 
 test('the library lists them under Choice group, after the Button, by group', () => {
-  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button', 'Choice group']);
+  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button', 'Choice group', 'Meter']);
   const choice = COMPONENT_PRESETS.find((entry) => entry.component === 'Choice group');
   assert.deepEqual(choice.groups.map((group) => group.label), ['Attention', 'Choosing', 'Thumb', 'The chosen', 'Appear', 'Hover', 'New options']);
   assert.equal(choice.groups.reduce((n, group) => n + group.entries.length, 0), CHOICE_PRESETS.length);

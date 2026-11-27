@@ -12,6 +12,7 @@ import { KNOB_PRESETS, KNOB_PRESET_GROUPS } from '../src/CE_Application/utils/kn
 import { SLIDER_PRESETS, SLIDER_PRESET_GROUPS } from '../src/CE_Application/utils/sliderPresets.js';
 import { BUTTON_PRESETS, BUTTON_PRESET_GROUPS } from '../src/CE_Application/utils/buttonPresets.js';
 import { CHOICE_PRESETS, CHOICE_PRESET_GROUPS } from '../src/CE_Application/utils/choicePresets.js';
+import { METER_PRESETS, METER_PRESET_GROUPS } from '../src/CE_Application/utils/meterPresets.js';
 import { applyPresetPatch } from '../src/CE_Application/utils/animationPresetModel.js';
 import { setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 import { getControlSet } from '../src/CE_Application/models/controlSets.js';
@@ -686,3 +687,147 @@ export const CHOICE_PANELS = [
   ...CHOICE_PRESET_GROUPS.map((group) => [`choice-${group.id}`, () => (group.id === 'new-options' ? choiceNewOptionsPanel(group) : choiceGroupPanel(group))]),
   ['choice-together', choiceTogether],
 ];
+
+// --- The Meter -----------------------------------------------------------------------------------
+//
+// A meter wearing each preset, three to a row, a panel a group, each in a set of its own: the plain
+// bar (Graphite Classic), a valve VU (Valve), a ruler (Ivory); Together's rows of lamps in Phosphor.
+// A meter shows a level that comes from elsewhere: where a preset needs one that moves (Readout), a
+// script stands in for the signal; elsewhere each sits at a level of its own.
+
+const METER_LOOKS = {
+  attention: { set: 'graphite', bg: 'FF2C2D30', ink: 'FFF1F3F5', how: 'FF89C2FF', what: 'FFBFC9D3', size: [240, 44], meter: { segments: 16, segmentGap: 2 } },
+  needle: { set: 'valve', bg: 'FF4A321F', ink: 'FFF6E7C8', how: 'FFE3C67A', what: 'FFD9C7A6', size: [210, 118], meter: {} },
+  readout: { set: 'ivory', bg: 'FFEFEAE0', ink: 'FF22201C', how: 'FF1F5C88', what: 'FF4E4A43', size: [220, 64], meter: { valueMin: -48, valueMax: 0, valuePrecision: 1, valueSuffix: ' dB' } },
+};
+// Where each starts: a sweep or a kick shows best from a level part-way up.
+const METER_LEVELS = { 'self-test': 0.55, 'wake-up': 0.7, 'beat-kick': 0.45, 'tap-sweep': 0.4, shiver: 0.62, 'drop-out': 0.66 };
+const METER_TILE_W = 320;
+
+/** A panel of one group of the Meter's presets: a meter (and its reading, for Readout) a tile. */
+function meterGroupPanel(group) {
+  const look = METER_LOOKS[group.id];
+  const entries = METER_PRESETS.filter((entry) => entry.group === group.id);
+  const [mw, mh] = look.size;
+  const reading = entries.some((entry) => entry.on === 'label');
+  const tileH = mh + (reading ? 30 : 0) + 104;
+  const columns = 3;
+  const rows = Math.ceil(entries.length / columns);
+  const width = columns * METER_TILE_W + 60;
+  const height = TOP + rows * tileH + 10;
+  const f = panelMaker(`meter-${group.id}`, `Meter ${group.label}`, { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
+  const carried = new Map();
+  f.label('Title', `Meter · ${group.label}`, 30, 22, 620, 34, { size: 24, colour: look.ink, align: 'left' });
+  f.label('Note', `${group.note}. Each meter wears one built-in preset: Preview (F5) plays it.`, 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
+  entries.forEach((entry, i) => {
+    const x = 30 + (i % columns) * METER_TILE_W;
+    const y = TOP + Math.floor(i / columns) * tileH;
+    const name = pascal(entry.slug);
+    const meter = f.add('Meter', name, x + (METER_TILE_W - mw) / 2, y, mw, mh);
+    Object.assign(meter._children.Meter, look.meter);
+    const { valueMin = 0, valueMax = 1 } = look.meter;
+    meter._children.Meter.value = valueMin + (valueMax - valueMin) * (METER_LEVELS[entry.slug] ?? 0.6);
+    meter._children.Core.description = `${entry.name}: ${entry.what}.`;
+    let captionTop = y + mh + 12;
+    if (entry.on === 'label') {
+      // A meter prints no reading of its own: its reading is a Label showing its value, which wears it.
+      const shows = f.label(`${name}Reading`, '', x + 40, y + mh + 4, METER_TILE_W - 80, 26, { size: 18, colour: look.how, family: 'JetBrains Mono', weight: 600 });
+      shows._children.Text.shows = entry.label?.shows ?? 'value';
+      shows._children.Text.showsControl = meter._children.Core.id;
+      shows._children.Core.attachedTo = meter._children.Core.id;
+      wear(shows, entry, carried);
+      captionTop += 30;
+    } else {
+      wear(meter, entry, carried);
+    }
+    f.label(`${name}Caption`, entry.name, x + 10, captionTop, METER_TILE_W - 20, 22, { size: 16, colour: look.ink });
+    f.label(`${name}How`, entry.how.toUpperCase(), x + 10, captionTop + 22, METER_TILE_W - 20, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600 });
+    f.label(`${name}What`, entry.what, x + 14, captionTop + 40, METER_TILE_W - 28, 36, { size: 12, colour: look.what, weight: 400, lineHeight: 1.25 });
+  });
+  if (entries.some((entry) => entry.slug === 'look-here')) {
+    f.script('Look here', `// Plays the Look here meter's own animation every four seconds, as a panel would to draw the
+// eye to one control: ce.anim.play(control, animation).
+function lookHere() {
+  ce.anim.play('LookHere', 'lookHere');
+  after(4000, lookHere);
+}
+after(1500, lookHere);
+`);
+  }
+  if (reading) {
+    const names = entries.map((entry) => pascal(entry.slug));
+    f.script('Signal', `// Stands in for a signal: nothing is plugged in, so each meter's level wanders, in decibels,
+// and the Label that shows its reading changes with it.
+const meters = ${JSON.stringify(names)};
+const level = {};
+function wander() {
+  for (const name of meters) {
+    const next = Math.min(-3, Math.max(-42, (level[name] ?? -18) + (Math.random() - 0.5) * 14));
+    level[name] = next;
+    ce.components.meter.value(name, next);
+  }
+  after(1200, wander);
+}
+after(900, wander);
+`);
+  }
+  const panel = f.scenes([]);
+  panel.animationPresets = [...carried.values()];
+  return panel;
+}
+
+/**
+ * Together, on rows of meters, scenes over each row: Power-on sweeps each to full scale and back in
+ * turn as the panel opens; Spectrum moves a row like an analyser, always; Chase runs a peak along a
+ * row, over and over; Beat bounce kicks a row on each beat. What the meters draw moves, and hands
+ * back to each one's level.
+ */
+function meterTogether() {
+  const look = { set: 'phosphor', bg: 'FF0B0D0B', ink: 'FFD6FFE3', how: 'FF39FF7A', what: 'FF9CC7AA' };
+  // Phosphor draws a meter as a block of lamps of one shape, about 2.3 times as wide as it is tall,
+  // whatever the box: so a row of six small ones, side by side.
+  const COUNT = 6;
+  const width = 1000;
+  const height = 112 + 4 * 118 + 10;
+  const f = panelMaker('meter-together', 'Meter Together', { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
+  f.label('Title', 'Meter · Together', 30, 22, 620, 34, { size: 24, colour: look.ink, align: 'left' });
+  f.label('Note', 'scenes over a row of meters: what they draw moves, each a little after the last, and comes back to its level.', 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
+  const lanes = [
+    ['PowerOn', 'Power-on', 'PANEL OPENS', 'each sweeps to full scale and back, in turn'],
+    ['Spectrum', 'Spectrum', 'ALWAYS', 'the row moves like an analyser'],
+    ['Chase', 'Chase', 'ALWAYS', 'a peak runs along the row'],
+    ['Bounce', 'Beat bounce', 'TRANSPORT BEAT', 'the row kicks up on each beat'],
+  ];
+  const rest = [0.35, 0.5, 0.42, 0.6, 0.3, 0.46];
+  lanes.forEach(([key, name, how, what], lane) => {
+    const y = 112 + lane * 118;
+    f.label(`${key}Caption`, name, 30, y + 10, 230, 22, { size: 16, colour: look.ink, align: 'left' });
+    f.label(`${key}How`, how, 30, y + 34, 230, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600, align: 'left' });
+    f.label(`${key}What`, what, 30, y + 52, 230, 36, { size: 12, colour: look.what, weight: 400, lineHeight: 1.25, align: 'left' });
+    for (let k = 0; k < COUNT; k += 1) {
+      const meter = f.add('Meter', `${key}${k + 1}`, 280 + k * 118, y + 8, 110, 48);
+      meter._children.Meter.value = rest[k];
+    }
+  });
+  // Pseudo-random but fixed heights, so the analyser looks the same each time it is opened.
+  const heights = (k, n) => Array.from({ length: n }, (_, j) => 0.2 + 0.75 * Math.abs(Math.sin((k + 1) * 12.9898 + (j + 1) * 78.233) % 1));
+  for (let k = 0; k < COUNT; k += 1) {
+    f.clip(`PowerOn${k + 1}`, 'Value', 300 + k * 120, { kind: 'value', easing: 'inOutCubic', frames: [{ at: 0, value: 0 }, { at: 0.5, value: 1 }, { at: 1 }] }, 900, 0);
+    const h = heights(k, 5);
+    f.clip(`Spectrum${k + 1}`, 'Value', 0, { kind: 'value', easing: 'inOutSine', frames: [{ at: 0 }, { at: 0.2, value: h[0] }, { at: 0.4, value: h[1] }, { at: 0.6, value: h[2] }, { at: 0.8, value: h[3] }, { at: 1 }] }, 2400, 1);
+    f.clip(`Chase${k + 1}`, 'Value', k * 110, { kind: 'value', easing: 'outQuad', frames: [{ at: 0 }, { at: 0.3, value: 0.95 }, { at: 1 }] }, 520, 2);
+    f.clip(`Bounce${k + 1}`, 'Value', k * 18, { kind: 'value', easing: 'outQuad', frames: [{ at: 0 }, { at: 0.12, by: 0.15 + 0.3 * h[4] }, { at: 1 }] }, 440, 3);
+  }
+  return f.scenes([
+    { name: 'Power-on', length: 300 + (COUNT - 1) * 120 + 900, loop: false },
+    { name: 'Spectrum', length: 2400, loop: true },
+    { name: 'Chase', length: (COUNT - 1) * 110 + 520 + 500, loop: true },
+    { name: 'Beat bounce', length: (COUNT - 1) * 18 + 440, trigger: { type: 'beat', every: 1 }, loop: false },
+  ]);
+}
+
+export const METER_PANELS = [
+  ...METER_PRESET_GROUPS.map((group) => [`meter-${group.id}`, () => meterGroupPanel(group)]),
+  ['meter-together', meterTogether],
+];
+

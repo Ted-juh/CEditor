@@ -1361,15 +1361,18 @@ Below them are the presets each kind of control comes with, under its name: **Kn
 left it and back, **Lift** and **Grip** lift and squeeze the fader cap. **Choice group** has
 **Attention** and **Choosing**, which move the whole group (**Lean** leans the way the choice went),
 and **Thumb**, **The chosen**, **Appear**, **Hover** and **New options**, which play on its options.
-Each row
+**Meter** has **Attention**; **Needle**, which moves what the level draws (a sweep, a kick, a shiver)
+and hands it back to the level, the reading never changing; and **Readout**, which goes on the Label
+that shows the meter's reading and plays on each new one. A meter has no states, so what a hand plays
+there, a click or a double-click plays. Each row
 says what plays it (hover, let go, panel opens, a flick) and what it does, and **Apply** puts it on
 the selected controls, linked, as one of yours. A few need something the control may not show: a
 preset on the scale's numbers is refused on a knob whose numbers are off, and one on a key's lamp
 on a button whose set draws no lamp, each with the reason. **Glide**,
 **Snap** and **Spring** take the place of the knob's own glide rather than adding a second one.
 **Name ↔ value** and **Decode** go on the control's name Label, not on the control. The
-**Components** showcase (below) shows every one of them on a knob, a fader, a button or a choice
-group. They come with
+**Components** showcase (below) shows every one of them on a knob, a fader, a button, a choice
+group or a meter. They come with
 CEditor, so a panel that uses one never asks you to add it to your library.
 
 The **States** tab has a **Motion** section for the state you are editing: **Entering** (mouse over,
@@ -1559,7 +1562,11 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
   group; **Thumb**, the mark of the choice travelling to the next; **The chosen**; **Appear**, the
   options arriving one after another; **Hover**; **New options**, three groups that take a new list
   when you choose another section above them; and **Choice group Together**, rows of groups that
-  cascade in, rise in turn, and pass a pulse along when you choose on the first.
+  cascade in, rise in turn, and pass a pulse along when you choose on the first. **Meter** is the
+  fifth, each meter drawn as its set draws one: **Meter Attention**; **Needle**, a valve VU's needle
+  sweeping, kicking and trembling; **Readout**, readings that roll, spin and push as the level moves;
+  and **Meter Together**, rows of lamps that power on in turn, move like an analyser, chase a peak
+  and bounce on the beat.
 
 Most of them play by themselves. A few wait for you:
 
@@ -1573,7 +1580,8 @@ Most of them play by themselves. A few wait for you:
   and the JU-06A's beat lamp follow the transport.
 - Most of the **Components** knobs, faders, buttons and choice groups wait for your hand: hover,
   press, turn or move, let go, flick, a turn of the wheel, a double-click or a long press, or a
-  choice, as each caption says.
+  choice, as each caption says. Nothing is plugged into **Meter Readout**, so a small script moves
+  its meters; trust its scripts for the readings to change.
   **Focus nod** nods when Tab reaches it: click the panel, then press Tab. **Numbers** and
   **Attention** run a small script each (a synth sending new values; a "look here"), as do
   **Button Light** (a synth switching a toggle) and **Button Signals** (an alert); **Beat pulse**

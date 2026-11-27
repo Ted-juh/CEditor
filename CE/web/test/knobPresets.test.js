@@ -205,7 +205,7 @@ test('in the library: a built-in applies linked, the panel carries it, and nobod
   initHistory(); addPanel(createPanel('Knobs')); flushHistory();
   const knob = addControl('Knob')._children.Core.id;
   const label = addControl('Label')._children.Core.id;
-  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button', 'Choice group']);
+  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button', 'Choice group', 'Meter']);
   assert.equal(COMPONENT_PRESETS[0].groups.reduce((n, group) => n + group.entries.length, 0), KNOB_PRESETS.length);
 
   const result = applyAnimationPreset([knob, label], byId('lift').id);

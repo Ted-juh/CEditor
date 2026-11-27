@@ -844,3 +844,103 @@ Verified locally:
 - In WebKitGTK 2.52: a `calc()` delay over a custom property resolves per option (0, 0.11, 0.22,
   0.33 s), each held unseen until its turn; a transition with one timing per edge eases the edge
   ahead in its 150 ms and the one behind over its 600, as in Chromium.
+
+## The Meter (2026-11-27)
+
+The owner's fifth component, chosen after the Choice group over the LCD display, the pitch and
+mod wheels and the keyboard. Put to the owner as eight panels in two phases, with a set for each;
+the owner chose both.
+
+**What it draws.** A meter shows a level that arrives from elsewhere: a route, a binding on its
+`level` port or raw MIDI, another control named by `Meter.valueSourceId`, or a script
+(`ce.components.meter.value`); else its own `Meter.value` (PanelPreviewSurface's
+`applyMeterValueSource`, which the player shares). Nothing moves one on its own. The plain look
+(`MeterRenderer.svelte`) is a bar, LED segments or an arc, with zones, a peak marker, ticks and
+scale labels. Most sets draw it as device parts instead (`models/meterDeviceParts.js`: housing,
+face, track, scale, indicator, marker, cover, legend, lamp; a needle that swings, a bar that fills,
+lamps that light, a clip lamp). It prints no reading of its own: its reading is a Label showing its
+value (`utils/labelShows.js`).
+
+**What plays today, and what does not.** Keyframes on the whole meter. Value effects
+(`utils/valueDrawn.js`): what the level draws moves and is handed back, the reading and what the
+meter reports staying the level. Text effects on its reading's Label, as its words change. A
+gesture (a click, a double-click) on it. Not:
+- its parts: they are offered as places, and nothing they are given plays (`ControlAnatomy.svelte`
+  hands the meter's parts no animations);
+- its level as its value: a plain control's value signal is read from its Behavior, which a meter
+  has not got, so On change and Each step never hear it, and nothing hears a clip;
+- anything over the pointer: a meter has no States;
+- how a needle moves: a bar or needle jumps to each new level, its peak marker the only thing eased;
+- one lamp of a row, or the peak marker, alone;
+- a level in Preview with nothing connected.
+
+| Group | Phase | Presets |
+|---|---|---|
+| Attention | 1 | Pulse, Breathe, Knock (a click), Beat pulse, Look here, Pop in |
+| Needle | 1 | Self-test (a full-scale sweep as the panel opens), Wake up, Beat kick, Tap sweep (a click), Shiver, Drop out (a double-click) |
+| Readout | 1 | On its reading: Odometer, Reel, Roll, Push, Crossfade |
+| Together | 1 | Scenes over rows of meters: Power-on, Spectrum, Chase, Beat bounce |
+| Parts | 2 | Lamp flash, Face glow, Needle glow, Cover glint, Scale light-up |
+| Level | 2 | Clip flash, Clip shake, Red wash, Peak flare, "OVER" thrown |
+| Ballistics | 2 | VU, PPM, Bouncy, Lazy, Sticky peak |
+| Segments | 2 | Cascade, Ripple, Sparkle, Peak drop |
+
+Phase 2's engine work: a meter's parts that animate (as the Button's key parts do); its level as its
+value, with triggers When it clips and When it crosses a level; a needle's ballistics (rise and fall
+times, overshoot) as settings the Ballistics presets set; each lamp of a row, and the peak marker, a
+part of its own, one after another as the Choice group's options are; and a test signal, so a meter
+moves in Preview with nothing connected.
+
+| Panel | Set | Why that set |
+|---|---|---|
+| Attention | Graphite Classic | the plain look: a bar in zones, segments and an arc, the meter every set starts from |
+| Needle | Valve | a brown valve VU with its needle, where a sweep reads best |
+| Readout | Ivory | a ruler and a pointer on cream: the reading under it reads plainly |
+| Together | Phosphor | green lamps on black: a bank of them, an analyser |
+| Parts | Anodised | a VU with a coloured scale, a lamp and a cover |
+| Level | Carbon Pro | two rows of amber lamps, a clip worth seeing |
+| Ballistics | Valve Console | a large cream VU, a needle worth watching move |
+| Segments | Gimbal Ring | rows of lamps like a spectrum |
+
+None is a set the Knob's, the Slider's, the Button's or the Choice group's panels use: chosen from
+Preview renders of a meter, wide, in segments and as an arc, in each of the 32 sets none of them uses.
+
+### As built: phase 1 (2026-11-27)
+
+**Its presets** (`utils/meterPresets.js`, ids `ce:meter:<name>`, category Meter), with the kit the
+other components' use. The library lists **Meter** after **Choice group**.
+
+| Group | Presets |
+|---|---|
+| Attention | Pulse, Breathe, Knock, Beat pulse, Look here, Pop in |
+| Needle | Self-test, Wake up, Beat kick, Tap sweep, Shiver, Drop out |
+| Readout | Odometer, Reel, Roll, Push, Crossfade |
+
+A meter has no States, so nothing waits for the pointer to be over it: what a hand plays, a click
+(Knock, Tap sweep) or a double-click (Drop out) plays. A Needle preset is a value effect, refused on
+a control that draws no value; each ends on the level. A Readout preset goes on the meter's reading,
+a Label showing its value (`on: 'label'`), and plays on each new reading (`textChange`).
+
+Four panels, `CE/panels/Components/Meter/`: Attention on Graphite Classic's plain bar, Needle on
+Valve's VU, Readout on Ivory's ruler with each meter's reading under it, and Together in Phosphor.
+Look here plays from a script. Readout's meters run from -48 to 0 dB, and a script stands in for a
+signal, wandering each level every 1.2 s, so each reading changes and plays its effect; the panel's
+scripts run once trusted. Together's rows are six meters side by side: Phosphor draws a meter as a
+block of lamps of one shape, about 2.3 times as wide as tall, whatever the meter's box, so a tall
+narrow one is a speck. Its scenes are value clips: Power-on as the panel opens, each meter 120 ms
+after the last; Spectrum and Chase always; Beat bounce on the transport's beats.
+
+Verified locally:
+- `test/meterPresets.test.js` (new): the catalogue; each preset surviving its own file; every one
+  going on a meter as each panel's set draws it, or on its reading; the Needle's refused on a button;
+  each needle preset ending on the level; none waiting for a state; nothing looping but Pulse,
+  Breathe and Shiver; the library; the panels, their sets (none another component's), what each
+  meter or reading wears, Look here's script and Readout's signal; every caption at 4.5:1.
+- The browser check `meterShowcase` (new): Self-test and Wake up move Valve's needle as Preview opens
+  and hand it back; a click sends Tap sweep up and back to where it was, a double-click drops Drop out;
+  Shiver keeps moving; Beat kick kicks on the transport's beats; Pop in is hidden as Preview opens and
+  grows in; Pulse swells; a click knocks Knock; Look here jumps under its script; Beat pulse swells on
+  the beats; each reading changes and starts its effect again with each new reading; Power-on reaches
+  each meter of its row in turn; Spectrum and Chase keep moving; Beat bounce kicks its row.
+  `animationTab`: the library's Meter section.
+- All four panels watched in Preview.

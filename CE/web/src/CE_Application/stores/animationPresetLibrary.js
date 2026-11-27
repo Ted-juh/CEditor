@@ -36,6 +36,7 @@ import { KNOB_PRESETS, KNOB_PRESET_GROUPS } from '../utils/knobPresets.js';
 import { SLIDER_PRESETS, SLIDER_PRESET_GROUPS } from '../utils/sliderPresets.js';
 import { BUTTON_PRESETS, BUTTON_PRESET_GROUPS } from '../utils/buttonPresets.js';
 import { CHOICE_PRESETS, CHOICE_PRESET_GROUPS } from '../utils/choicePresets.js';
+import { METER_PRESET_GROUPS, METER_PRESETS } from '../utils/meterPresets.js';
 import {
   LINK_KEY,
   PRESET_FORMAT,
@@ -62,7 +63,7 @@ const cleanList = (list) => (Array.isArray(list) ? list.map(cleanPreset).filter(
 /**
  * The components' built-in presets, as the library lists them: each component, its groups, and in
  * each group its presets with what plays them and what they do. The Knob's are the first, then the
- * Slider's, the Button's and the Choice group's.
+ * Slider's, the Button's, the Choice group's and the Meter's.
  */
 const byGroups = (groups, presets) => groups.map((group) => ({ ...group, entries: presets.filter((entry) => entry.group === group.id) }));
 export const COMPONENT_PRESETS = Object.freeze([
@@ -70,6 +71,7 @@ export const COMPONENT_PRESETS = Object.freeze([
   { component: 'Slider', groups: byGroups(SLIDER_PRESET_GROUPS, SLIDER_PRESETS) },
   { component: 'Button', groups: byGroups(BUTTON_PRESET_GROUPS, BUTTON_PRESETS) },
   { component: 'Choice group', groups: byGroups(CHOICE_PRESET_GROUPS, CHOICE_PRESETS) },
+  { component: 'Meter', groups: byGroups(METER_PRESET_GROUPS, METER_PRESETS) },
 ]);
 
 const BUILT_IN_BY_ID = new Map(COMPONENT_PRESETS.flatMap(({ groups }) => groups.flatMap((group) => group.entries.map((entry) => [entry.id, entry.preset]))));

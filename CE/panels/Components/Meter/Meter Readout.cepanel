@@ -1,0 +1,708 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "2a80e645-c0b5-4e1a-9f3d-2a80e6452a80",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Meter Readout",
+  "scriptId": "component_meter-readout",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 502,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFEFEAE0",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [
+    {
+      "id": "component_meter-readout_1",
+      "name": "Signal",
+      "language": "javascript",
+      "source": "// Stands in for a signal: nothing is plugged in, so each meter's level wanders, in decibels,\n// and the Label that shows its reading changes with it.\nconst meters = [\"Odometer\",\"Reel\",\"Roll\",\"Push\",\"Crossfade\"];\nconst level = {};\nfunction wander() {\n  for (const name of meters) {\n    const next = Math.min(-3, Math.max(-42, (level[name] ?? -18) + (Math.random() - 0.5) * 14));\n    level[name] = next;\n    ce.components.meter.value(name, next);\n  }\n  after(1200, wander);\n}\nafter(900, wander);\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "ivory"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1783090629000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Meter · Readout","_children":{"Fill":{"colour":"FF22201C"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1783090629001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its reading, a Label showing its value, as the level changes. Each meter wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF4E4A43"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Odometer","id":"ctrl_1783090629002","description":"Odometer: only the digits that changed roll.","controlType":"Meter"},
+        "Transform": {"x":80,"y":96,"height":64},
+        "Meter": {"value":-19.200000000000003,"valueMin":-48,"valueMax":0,"valuePrecision":1,"valueSuffix":" dB"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerReading","id":"ctrl_1783090629003","attachedTo":"ctrl_1783090629002","controlType":"Label"},
+        "Transform": {"x":70,"y":164,"width":240,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":18}},"shows":"value","showsControl":"ctrl_1783090629002"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"odometer":{"_type":"Animation","name":"odometer","enabled":true,"kind":"text","effect":"odometer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":260,"direction":"up","trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:odometer","revision":1,"from":"odometer"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerCaption","id":"ctrl_1783090629004","controlType":"Label"},
+        "Transform": {"x":40,"y":202,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Odometer","_children":{"Fill":{"colour":"FF22201C"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerHow","id":"ctrl_1783090629005","controlType":"Label"},
+        "Transform": {"x":40,"y":224,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"NEW READING","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerWhat","id":"ctrl_1783090629006","controlType":"Label"},
+        "Transform": {"x":44,"y":242,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"only the digits that changed roll","_children":{"Fill":{"colour":"FF4E4A43"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Reel","id":"ctrl_1783090629007","description":"Reel: each new reading spins in through other digits.","controlType":"Meter"},
+        "Transform": {"x":400,"y":96,"height":64},
+        "Meter": {"value":-19.200000000000003,"valueMin":-48,"valueMax":0,"valuePrecision":1,"valueSuffix":" dB"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReelReading","id":"ctrl_1783090629008","attachedTo":"ctrl_1783090629007","controlType":"Label"},
+        "Transform": {"x":390,"y":164,"width":240,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":18}},"shows":"value","showsControl":"ctrl_1783090629007"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"reel":{"_type":"Animation","name":"reel","enabled":true,"kind":"text","effect":"reel","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":40,"duration":420,"trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:reel","revision":1,"from":"reel"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReelCaption","id":"ctrl_1783090629009","controlType":"Label"},
+        "Transform": {"x":360,"y":202,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Reel","_children":{"Fill":{"colour":"FF22201C"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReelHow","id":"ctrl_1783090629010","controlType":"Label"},
+        "Transform": {"x":360,"y":224,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"NEW READING","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReelWhat","id":"ctrl_1783090629011","controlType":"Label"},
+        "Transform": {"x":364,"y":242,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each new reading spins in through other digits","_children":{"Fill":{"colour":"FF4E4A43"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Roll","id":"ctrl_1783090629012","description":"Roll: the new reading rolls up into place, whole.","controlType":"Meter"},
+        "Transform": {"x":720,"y":96,"height":64},
+        "Meter": {"value":-19.200000000000003,"valueMin":-48,"valueMax":0,"valuePrecision":1,"valueSuffix":" dB"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RollReading","id":"ctrl_1783090629013","attachedTo":"ctrl_1783090629012","controlType":"Label"},
+        "Transform": {"x":710,"y":164,"width":240,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":18}},"shows":"value","showsControl":"ctrl_1783090629012"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"roll":{"_type":"Animation","name":"roll","enabled":true,"kind":"text","effect":"roll","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":300,"direction":"up","trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:roll","revision":1,"from":"roll"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RollCaption","id":"ctrl_1783090629014","controlType":"Label"},
+        "Transform": {"x":680,"y":202,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Roll","_children":{"Fill":{"colour":"FF22201C"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RollHow","id":"ctrl_1783090629015","controlType":"Label"},
+        "Transform": {"x":680,"y":224,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"NEW READING","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RollWhat","id":"ctrl_1783090629016","controlType":"Label"},
+        "Transform": {"x":684,"y":242,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the new reading rolls up into place, whole","_children":{"Fill":{"colour":"FF4E4A43"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Push","id":"ctrl_1783090629017","description":"Push: the new reading pushes the last one out.","controlType":"Meter"},
+        "Transform": {"x":80,"y":294,"height":64},
+        "Meter": {"value":-19.200000000000003,"valueMin":-48,"valueMax":0,"valuePrecision":1,"valueSuffix":" dB"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PushReading","id":"ctrl_1783090629018","attachedTo":"ctrl_1783090629017","controlType":"Label"},
+        "Transform": {"x":70,"y":362,"width":240,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":18}},"shows":"value","showsControl":"ctrl_1783090629017"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"pushIn":{"_type":"Animation","name":"pushIn","enabled":true,"kind":"text","effect":"push","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":280,"direction":"left","trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:push","revision":1,"from":"pushIn"}},"pushOut":{"_type":"Animation","name":"pushOut","enabled":true,"kind":"text","effect":"push","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":280,"direction":"left","trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:push","revision":1,"from":"pushOut"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PushCaption","id":"ctrl_1783090629019","controlType":"Label"},
+        "Transform": {"x":40,"y":400,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Push","_children":{"Fill":{"colour":"FF22201C"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PushHow","id":"ctrl_1783090629020","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"NEW READING","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PushWhat","id":"ctrl_1783090629021","controlType":"Label"},
+        "Transform": {"x":44,"y":440,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the new reading pushes the last one out","_children":{"Fill":{"colour":"FF4E4A43"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Crossfade","id":"ctrl_1783090629022","description":"Crossfade: the new reading fades in over the last.","controlType":"Meter"},
+        "Transform": {"x":400,"y":294,"height":64},
+        "Meter": {"value":-19.200000000000003,"valueMin":-48,"valueMax":0,"valuePrecision":1,"valueSuffix":" dB"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CrossfadeReading","id":"ctrl_1783090629023","attachedTo":"ctrl_1783090629022","controlType":"Label"},
+        "Transform": {"x":390,"y":362,"width":240,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":18}},"shows":"value","showsControl":"ctrl_1783090629022"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"fadeIn":{"_type":"Animation","name":"fadeIn","enabled":true,"kind":"text","effect":"crossfade","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":360,"trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:crossfade","revision":1,"from":"fadeIn"}},"fadeOut":{"_type":"Animation","name":"fadeOut","enabled":true,"kind":"text","effect":"crossfade","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":360,"trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:crossfade","revision":1,"from":"fadeOut"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CrossfadeCaption","id":"ctrl_1783090629024","controlType":"Label"},
+        "Transform": {"x":360,"y":400,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Crossfade","_children":{"Fill":{"colour":"FF22201C"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CrossfadeHow","id":"ctrl_1783090629025","controlType":"Label"},
+        "Transform": {"x":360,"y":422,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"NEW READING","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CrossfadeWhat","id":"ctrl_1783090629026","controlType":"Label"},
+        "Transform": {"x":364,"y":440,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the new reading fades in over the last","_children":{"Fill":{"colour":"FF4E4A43"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:odometer",
+      "name": "Odometer",
+      "category": "Meter",
+      "tags": [
+        "Readout",
+        "new reading"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "odometer": {
+          "_type": "Animation",
+          "name": "odometer",
+          "enabled": true,
+          "kind": "text",
+          "effect": "odometer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 260,
+          "direction": "up",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "value"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:reel",
+      "name": "Reel",
+      "category": "Meter",
+      "tags": [
+        "Readout",
+        "new reading"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "reel": {
+          "_type": "Animation",
+          "name": "reel",
+          "enabled": true,
+          "kind": "text",
+          "effect": "reel",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 40,
+          "duration": 420,
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "value"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:roll",
+      "name": "Roll",
+      "category": "Meter",
+      "tags": [
+        "Readout",
+        "new reading"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "roll": {
+          "_type": "Animation",
+          "name": "roll",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 300,
+          "direction": "up",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "value"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:push",
+      "name": "Push",
+      "category": "Meter",
+      "tags": [
+        "Readout",
+        "new reading"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pushIn": {
+          "_type": "Animation",
+          "name": "pushIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 280,
+          "direction": "left",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "pushOut": {
+          "_type": "Animation",
+          "name": "pushOut",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "out",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 280,
+          "direction": "left",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "value"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:crossfade",
+      "name": "Crossfade",
+      "category": "Meter",
+      "tags": [
+        "Readout",
+        "new reading"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "fadeIn": {
+          "_type": "Animation",
+          "name": "fadeIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 360,
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "fadeOut": {
+          "_type": "Animation",
+          "name": "fadeOut",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "out",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 360,
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "value"
+      }
+    }
+  ]
+}
