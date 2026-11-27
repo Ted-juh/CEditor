@@ -638,3 +638,31 @@ Preview's order as well; all 26 that were unreadable at 4.5:1 or better on their
 still inverse when mixed; an author's mixed colour kept; the stored control untouched. Three of its
 tests fail on the rule as it was. Seen in Preview: all 33 sets, at rest, mixed before and mixed
 after.
+
+### Left open (2026-11-27)
+
+The owner asked for what still needs doing on the Button to be written down before the next
+component. Everything asked for is built and verified locally; these were not done.
+
+1. **Thrown words, on Linux.** A button's thrown words (+1, a count, ON and OFF, SENT, ×2, HELD) are
+   drawn in a layer of their own beside the control's content (`CanvasControl.svelte`, `.key-words`),
+   with the slider's thrown words' CSS, which WebKitGTK draws as Chromium does. The button's layer
+   itself has not been watched in WebKitGTK. To do: open the Thrown panel in a WebKit2 4.1 `WebView`
+   under Xvfb (CLAUDE.md, "WebKitGTK draws SVG differently", says how), click each key, and compare
+   with Chromium.
+2. **A toggle made to start on, in an exported plug-in.** Fixed in Preview by `ba23459`
+   (animation-designer.md, "Corrected: the wipe, and a toggle made to start on"). The player uses
+   the same surface and store (`Player.svelte` reuses `PanelPreviewSurface` and
+   `stores/interactionPreview.js`), so the fix reaches it, but no exported plug-in has been clicked.
+   To do: export a panel with Breathe while on or Key lights, load it in a host (or the standalone
+   player), and switch the toggle off and on again.
+3. **Three sets' captions at rest, for the owner.** In Flightdeck, Obsidian and Machined a key's
+   caption reads at about 4.0 to 4.2:1 on its set's panel at rest, under the 4.5:1 the other sets
+   reach, and so on and mixed too, since a key's caption is now one colour in every state. That is
+   each set's own caption colour, not the Button's animation, and changing it changes those sets'
+   look: the owner's call. The Button's panels are not in those sets, except Gestures in Machined,
+   whose panel colour was lightened so its captions read (see the table above).
+4. **Windows CI on `ba23459`.** Running when this was written. The run on `457bfe1` failed one
+   browser check, `profileDesigner` (a device profile of 7,710 parameters, its last row reached by
+   scrolling), which neither the Button nor the caption touches; the next run, on `9406d2d`, passed
+   every job. If `ba23459` fails, it is read and reproduced here before anything is pushed again.
