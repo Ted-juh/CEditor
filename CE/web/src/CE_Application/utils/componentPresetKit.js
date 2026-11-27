@@ -2,8 +2,8 @@
  * componentPresetKit.js — what a component's built-in animation presets are written with: the
  * shapes of an animation (a transition, keyframes, a text effect, words thrown, a value effect), the
  * triggers as the Animation tab writes them, states and parts, and the catalogue a component's
- * presets are built into. The Knob's (knobPresets.js) and the Slider's (sliderPresets.js) are each a
- * list of these (docs/design/component-presets.md).
+ * presets are built into. The Knob's (knobPresets.js), the Slider's (sliderPresets.js) and the
+ * Button's (buttonPresets.js) are each a list of these (docs/design/component-presets.md).
  *
  * IMPORTS ONLY THE FORMAT, which imports nothing: the export tools and the showcase script read the
  * presets under plain Node.
@@ -129,6 +129,9 @@ export function buildComponentPresets({ component, prefix, groups, byGroup }) {
     on: entry.on ?? 'control',
     label: entry.label ?? null,
     knob: entry.knob ?? {},
+    // The kind of control the showcase puts it on, where a component has more than one (a toggle, a
+    // momentary button): the showcase's, not the preset's, which fits any control it can move.
+    type: entry.type ?? null,
     preset: cleanPreset({
       format: PRESET_FORMAT,
       version: PRESET_FORMAT_VERSION,

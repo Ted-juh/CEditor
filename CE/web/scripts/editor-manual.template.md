@@ -1341,7 +1341,7 @@ the selected controls, linked, as one of yours. A few need something the control
 preset on the scale's numbers is refused on a knob whose numbers are off, with the reason. **Glide**,
 **Snap** and **Spring** take the place of the knob's own glide rather than adding a second one.
 **Name ↔ value** and **Decode** go on the control's name Label, not on the control. The
-**Components** showcase (below) shows every one of them on a knob or a fader. They come with
+**Components** showcase (below) shows every one of them on a knob, a fader or a button. They come with
 CEditor, so a panel that uses one never asks you to add it to your library.
 
 The **States** tab has a **Motion** section for the state you are editing: **Entering** (mouse over,
@@ -1521,7 +1521,9 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
   **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words**, and **Knob
   Together**, whose scenes play one effect along a row of knobs. **Slider** is the second, on
   faders: **Slider Numbers**, **Ticks**, **Touch**, **Moving**, **Attention**, **Gestures** and
-  **Words**, and **Slider Together**, a mixing desk's row.
+  **Words**, and **Slider Together**, a mixing desk's row. **Button** is the third, each key drawn as
+  its set draws one: **Button Press**, **Attention** and **Gestures**, and **Button Together**, a
+  row of keys that pop in, rise in turn and pass a press along when you click the first.
 
 Most of them play by themselves. A few wait for you:
 
@@ -1533,8 +1535,9 @@ Most of them play by themselves. A few wait for you:
   scripts' actions says so in the script console.
 - The **Animated Synths** answer MIDI from the synth or a keyboard, and the minilogue's step lamps
   and the JU-06A's beat lamp follow the transport.
-- Most of the **Components** knobs and faders wait for your hand: hover, press, turn or move, let
-  go, flick, a turn of the wheel or a double-click, as each caption says. **Numbers** and
+- Most of the **Components** knobs, faders and buttons wait for your hand: hover, press, turn or
+  move, let go, flick, a turn of the wheel, a double-click or a long press, as each caption says.
+  **Focus nod** nods when Tab reaches it: click the panel, then press Tab. **Numbers** and
   **Attention** run a small script each (a synth sending new values; a "look here"), and **Beat
   pulse** follows the transport.
 

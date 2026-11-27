@@ -348,3 +348,80 @@ Verified locally:
   `animationTab`: the library's two sections.
 - WebKitGTK 2.52 draws Unfold, the flights, a lifted cap, the readout and a thrown word as Chromium
   does, posed part-way through each.
+
+## The Button (2026-11-26)
+
+The owner's third component, and the first whose drawing the Knob's groups do not fit: a button has
+no pointer, no fill and no readout, and most sets draw it as a device key built from parts (a
+housing, a key, a symbol, an indicator lamp and a legend, `models/buttonDeviceParts.js`), a few as a
+flat face (the Graphites, Ceramic) and two as an illustration (Iris, Satellite). Put to the owner
+with a catalogue of eight groups, in two phases, and the owner chose both:
+
+1. **What plays today**: motion of the whole button, which every one of the three drawings shows.
+   Press, Attention and Gestures, and Together.
+2. **What a key's parts need the engine to learn**: on a device key only the whole control moves
+   today (`ButtonDeviceParts.svelte` takes no animation of its parts), so the lamp, the legend's
+   words and the key itself cannot be animated apart from the rest. Light (the lamp), On/off (a
+   toggle's latch), Words (the legend), Signals (sent, done, refused), a word thrown from a button,
+   a hold's progress, and Together's Chase and Radio follow.
+
+**Its presets** (`utils/buttonPresets.js`, ids `ce:button:<name>`, category Button), phase 1:
+
+| Group | Presets |
+|---|---|
+| Press | Sink, Lift, Bounce back, Jelly, Tilt, Focus nod |
+| Attention | Pulse, Breathe, Wiggle, Beat pulse, Look here, Alarm, Pop in |
+| Gestures | Double flash, Pop, Nudge, Spin, Wheel bump |
+
+Written with the Knob's and the Slider's kit; each entry names the kind of button the showcase puts
+it on (`type`, `MomentaryButton` for all of these). Every one goes on a momentary button and a
+toggle in every set the showcase uses. The library lists **Button** after **Slider**.
+
+| Panel | Set | Why that set |
+|---|---|---|
+| Press | Tolex | a round cream cap on a dark tolex panel, whose sink and lift read |
+| Attention | Pop | a paper slip with a hard shadow, which shows a pulse and a pop in |
+| Gestures | Machined | a hex key with a lit lamp, whose turn shows in a spin |
+| Together | Rackmount | a row of legend-bar keys, a drum machine's |
+
+None is a set the Knob's or the Slider's panels use. Each panel is on its set's own panel colour,
+since a key's legend is lettered for it; Machined's and Rackmount's are lightened (C4C8CE and
+BFC2C6), because a mid grey under their finish leaves black at 5:1 at best and no coloured caption
+at 4.5:1. Every caption reads at 4.96:1 or better on its panel as drawn.
+
+### As built: phase 1
+
+- **A preset's state no longer keeps what the button's type made.** Sink deepens a press, and on
+  every button it pressed to 0.985, a pixel and a half on a 100 px key. A preset merges its states
+  into the control's and keeps every value the control already sets, so that an author's number
+  wins (`applyPresetPatch`, and the Animation tab's own presets in `animationPresets.js`), and every
+  button is made with a Pressed state that scales to 0.985 (`componentTypes.js`
+  `createButtonStates`). That 0.985 was kept as if somebody had chosen it. The Animation tab's
+  **Press squish** has always done the same on a button: it asked for 0.94 and kept 0.985. A value
+  still at what the type made the state with is now the type's, and gives way
+  (`utils/authorsStateValue.js`); a value anyone has changed is kept, as before. No other showcase
+  panel changed.
+- **Together** plays Pop in (each key hidden until its turn, then grown in past its size), Wave (the
+  keys rise in turn) and Ripple, a scene whose trigger is a click on the first key, a press passed
+  along the row. The proposal's Chase and Radio follow light lamps and follow a toggle, which is
+  phase 2.
+- **Focus nod plays when Tab reaches the key.** Tab moves on from wherever focus is, and from the
+  editor's own toolbar it walks a dozen of the editor's controls before it reaches the panel, so the
+  manual says to click the panel first; from there the keys are tab stops in their order.
+- A key is 200 by 100: the legend sits under the key in every set the showcase uses, and the key is
+  large enough to see a sink of a tenth.
+
+Verified locally:
+- `test/buttonAnimationPresets.test.js` (new): the catalogue; every preset survives its file and
+  fits a momentary button and a toggle in every set the showcase uses; a state's value replaces the
+  type's and never an author's (Sink, and Lift and Tilt beside what is there); loops; the library;
+  the panels, a set each and none the Knob's or the Slider's, Ripple on a click on the first key, a
+  script for Look here; every caption at 4.5:1 on its panel as drawn. `test/animationPresets.test.js`:
+  Press squish on a button. `test/showcaseCollections.test.js` now holds the Slider's and the
+  Button's committed panels to their script as well (the Slider's were held by
+  `export-showcases.mjs --check` only).
+- The browser check `buttonShowcase` (new): Sink at 0.9 while held, Lift, Focus nod on Tab, Spin on
+  a flick, Wheel bump, Pop in hidden until its turn, Ripple on a click. `animationTab`: the library's
+  three sections.
+- Every preset driven by hand in Preview, in Chromium; no drawing code changed, so WebKitGTK was not
+  asked.

@@ -7,9 +7,10 @@
 // The presets are utils/knobPresets.js; this only lays them out. Change a preset there, run
 // export-showcases.mjs, and the panels follow.
 
-import { panelMaker, COMPONENT_KIND } from './festivalKit.js';
+import { panelMaker, frames, COMPONENT_KIND } from './festivalKit.js';
 import { KNOB_PRESETS, KNOB_PRESET_GROUPS } from '../src/CE_Application/utils/knobPresets.js';
 import { SLIDER_PRESETS, SLIDER_PRESET_GROUPS } from '../src/CE_Application/utils/sliderPresets.js';
+import { BUTTON_PRESETS, BUTTON_PRESET_GROUPS } from '../src/CE_Application/utils/buttonPresets.js';
 import { applyPresetPatch } from '../src/CE_Application/utils/animationPresetModel.js';
 import { setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 import { getControlSet } from '../src/CE_Application/models/controlSets.js';
@@ -311,3 +312,120 @@ export const SLIDER_PANELS = [
   ['slider-together', sliderTogether],
 ];
 
+
+// --- The Button ----------------------------------------------------------------------------------
+//
+// Buttons in tiles, a panel a group, each in a set of its own: a device key (Tolex's cream cap, Pop's
+// paper slip, Machined's hex with its lamp, Rackmount's legend bar) differs from set to set more than
+// any other control. Each panel is the set's own panel colour, lightened where a mid grey would not
+// let a caption read at 4.5:1 (Machined's and Rackmount's, as drawn under their finish); the captions
+// read at 4.96:1 or better on each.
+
+const BUTTON_LOOKS = {
+  press: { set: 'tolex', bg: 'FF1C1A17', ink: 'FFF1E6CC', how: 'FFF08A5D', what: 'FFCDBF9E' },
+  attention: { set: 'pop', bg: 'FFF6D96B', ink: 'FF1B1B1B', how: 'FF9C1F12', what: 'FF5A4A1E' },
+  gestures: { set: 'machined', bg: 'FFC4C8CE', ink: 'FF1B1D20', how: 'FF0A2540', what: 'FF2A2D31' },
+};
+// What each key says: a word a panel's key would carry, so the row reads as keys rather than labels.
+const LEGENDS = {
+  sink: 'Play', lift: 'Stop', 'bounce-back': 'Rec', jelly: 'Tap', tilt: 'Shift', 'focus-nod': 'Enter',
+  pulse: 'Start', breathe: 'Sleep', wiggle: 'Help', 'beat-pulse': 'Tempo', 'look-here': 'Look', alarm: 'Alarm', 'pop-in': 'New',
+  'double-flash': 'Mute', pop: 'Hold', nudge: 'Next', spin: 'Turn', 'wheel-bump': 'Scroll',
+};
+const BUTTON_TILE_W = 260;
+const BUTTON_TILE_H = 216;
+const KEY_W = 200;
+const KEY_H = 100;
+
+/** A panel of one group of the Button's presets: rows of three, or four when there are seven or more. */
+function buttonGroupPanel(group) {
+  const look = BUTTON_LOOKS[group.id];
+  const entries = BUTTON_PRESETS.filter((entry) => entry.group === group.id);
+  const columns = entries.length >= 7 ? 4 : 3;
+  const rows = Math.ceil(entries.length / columns);
+  const width = columns * BUTTON_TILE_W + 60;
+  const height = TOP + rows * BUTTON_TILE_H + 24;
+  const f = panelMaker(`button-${group.id}`, `Button ${group.label}`, { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
+  const carried = new Map();
+  f.label('Title', `Button · ${group.label}`, 30, 22, 520, 34, { size: 24, colour: look.ink, align: 'left' });
+  f.label('Note', `${group.note}. Each button wears one built-in preset: Preview (F5) plays it.`, 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
+
+  entries.forEach((entry, i) => {
+    const x = 30 + (i % columns) * BUTTON_TILE_W;
+    const y = TOP + Math.floor(i / columns) * BUTTON_TILE_H;
+    const name = pascal(entry.slug);
+    const button = f.add(entry.type ?? 'MomentaryButton', name, x + (BUTTON_TILE_W - KEY_W) / 2, y, KEY_W, KEY_H);
+    button._children.Text.content = LEGENDS[entry.slug] ?? entry.name;
+    button._children.Core.description = `${entry.name}: ${entry.what}.`;
+    wear(button, entry, carried);
+    const captionTop = y + KEY_H + 10;
+    f.label(`${name}Caption`, entry.name, x + 10, captionTop, BUTTON_TILE_W - 20, 22, { size: 16, colour: look.ink });
+    f.label(`${name}How`, entry.how.toUpperCase(), x + 10, captionTop + 22, BUTTON_TILE_W - 20, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600 });
+    f.label(`${name}What`, entry.what, x + 14, captionTop + 40, BUTTON_TILE_W - 28, 36, { size: 12, colour: look.what, weight: 400, lineHeight: 1.25 });
+  });
+  if (entries.some((entry) => entry.slug === 'look-here')) {
+    f.script('Look here', `// Plays the Look here button's own animation every four seconds, as a panel would to draw the
+// eye to one control: ce.anim.play(control, animation).
+function lookHere() {
+  ce.anim.play('LookHere', 'lookHere');
+  after(4000, lookHere);
+}
+after(1500, lookHere);
+`);
+  }
+  const panel = f.scenes([]);
+  panel.animationPresets = [...carried.values()];
+  return panel;
+}
+
+/**
+ * Together, on a row of keys: Pop in grows each in from nothing as the panel opens, one after
+ * another; Wave lifts them in turn, over and over; Ripple sends a press along the row from the first,
+ * each time it is clicked.
+ */
+function buttonTogether() {
+  const look = { set: 'rackmount', bg: 'FFBFC2C6', ink: 'FF1B1B1D', how: 'FF0A2540', what: 'FF2A2D31' };
+  const width = 1040;
+  const height = 560;
+  const f = panelMaker('button-together', 'Button Together', { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
+  f.label('Title', 'Button · Together', 30, 22, 520, 34, { size: 24, colour: look.ink, align: 'left' });
+  f.label('Note', 'scenes over a row of keys: one effect on many, each a little after the last.', 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
+  const lanes = [
+    ['PopIn', 'Pop in', 'PANEL OPENS', 'each key grows in from nothing, 120 ms after the last'],
+    ['Wave', 'Wave', 'ALWAYS', 'the keys rise in turn along the row'],
+    ['Ripple', 'Ripple', 'CLICK THE FIRST', 'a press runs along the row from it'],
+  ];
+  const words = ['Kick', 'Snare', 'Hat', 'Clap', 'Tom', 'Rim'];
+  const COUNT = words.length;
+  lanes.forEach(([key, name, how, what], lane) => {
+    const y = 110 + lane * 146;
+    f.label(`${key}Caption`, name, 30, y + 8, 220, 22, { size: 16, colour: look.ink, align: 'left' });
+    f.label(`${key}How`, how, 30, y + 32, 220, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600, align: 'left' });
+    f.label(`${key}What`, what, 30, y + 50, 220, 36, { size: 12, colour: look.what, weight: 400, lineHeight: 1.25, align: 'left' });
+    for (let k = 0; k < COUNT; k += 1) {
+      const button = f.add('MomentaryButton', `${key}${k + 1}`, 270 + k * 124, y, 112, 84);
+      button._children.Text.content = words[k];
+      if (key === 'Ripple' && k === 0) button._children.Core.description = 'Click it: a press runs along the row.';
+    }
+  });
+  // Pop in: each key hidden until its turn, then grown in past its size and settled.
+  const POP = 500;
+  const popLength = 300 + (COUNT - 1) * 120 + POP;
+  for (let k = 0; k < COUNT; k += 1) {
+    const at = (300 + k * 120) / popLength;
+    const grown = (300 + k * 120 + 0.6 * POP) / popLength;
+    f.clip(`PopIn${k + 1}`, 'Transform', 0, frames([{ at: 0, scale: 0.2, opacity: 0 }, { at, scale: 0.2, opacity: 0 }, { at: grown, scale: 1.1, opacity: 1 }, { at: 1, scale: 1, opacity: 1 }], { easing: 'linear' }), popLength, 0);
+    f.clip(`Wave${k + 1}`, 'Transform', 400 + k * 140, frames([{ at: 0, y: 0 }, { at: 0.4, y: -10 }, { at: 1, y: 0 }], { easing: 'inOutSine' }), 560, 1);
+    f.clip(`Ripple${k + 1}`, 'Transform', k * 90, frames([{ at: 0, scale: 1 }, { at: 0.35, scale: 0.9 }, { at: 0.7, scale: 1.05 }, { at: 1, scale: 1 }], { easing: 'outQuad' }), 360, 2);
+  }
+  return f.scenes([
+    { name: 'Pop in', length: popLength, loop: false },
+    { name: 'Wave', length: 3000, loop: true },
+    { name: 'Ripple', length: (COUNT - 1) * 90 + 360, trigger: { type: 'event', controlId: f.ids.Ripple1, event: 'click' }, loop: false },
+  ]);
+}
+
+export const BUTTON_PANELS = [
+  ...BUTTON_PRESET_GROUPS.map((group) => [`button-${group.id}`, () => buttonGroupPanel(group)]),
+  ['button-together', buttonTogether],
+];

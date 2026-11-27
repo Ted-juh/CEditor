@@ -2048,6 +2048,15 @@ in the Knob's groups, read for a fader, and eight panels. For this record: a fad
 vertical slider's readout clear of its cap; words thrown and ticks flying and unfolding on a line;
 and a gesture that plays a value effect or words, which the Animation tab offered and never played.
 
+## As built: Components, the Button, phase 1 (2026-11-26)
+
+The third component, in [component-presets.md](component-presets.md): 18 presets that move the
+whole button, in three groups, and four panels. For this record: a preset's state used to keep every
+value the control already set, the type's own included, so Sink and the Animation tab's Press squish
+pressed every button to the 0.985 its type gives it; a value still at what the type made is now
+nobody's choice and gives way (`authorsStateValue.js`). Phase 2, animating a device key's parts
+(its lamp, its legend, the key), is next.
+
 ## Open
 
 Nothing for the owner at present.

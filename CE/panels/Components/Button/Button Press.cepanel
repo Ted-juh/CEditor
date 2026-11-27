@@ -1,0 +1,747 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "ed3407c3-c0b5-4e1a-9f3d-ed3407c3ed34",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Press",
+  "scriptId": "component_button-press",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 840,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1C1A17",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "tolex"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1719610051000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Press","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1719610051001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":780,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how it answers the hand. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFCDBF9E"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sink","id":"ctrl_1719610051002","description":"Sink: sinks under the finger and rises as it is let go.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Play"},
+        "States": {"_children":{"Pressed":{"patches":{"component":{"Transform.scale":0.9}}}}},
+        "Animations": {"_children":{"sink":{"_type":"Animation","name":"sink","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["pressed"],"reverse":true},"targets":[{"path":"Transform.scale","properties":["transform"]}],"duration":110,"delay":0,"easing":"outQuad","preset":{"id":"ce:button:sink","revision":1,"from":"sink"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SinkCaption","id":"ctrl_1719610051003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Sink","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SinkHow","id":"ctrl_1719610051004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FFF08A5D"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SinkWhat","id":"ctrl_1719610051005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"sinks under the finger and rises as it is let go","_children":{"Fill":{"colour":"FFCDBF9E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lift","id":"ctrl_1719610051006","description":"Lift: rises toward you while the pointer is over it.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Stop"},
+        "States": {"_children":{"Hover":{"patches":{"component":{"Transform.scale":1.06}}}}},
+        "Animations": {"_children":{"lift":{"_type":"Animation","name":"lift","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["hover"],"reverse":true},"targets":[{"path":"Transform.scale","properties":["transform"]}],"duration":160,"delay":0,"easing":"outCubic","preset":{"id":"ce:button:lift","revision":1,"from":"lift"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftCaption","id":"ctrl_1719610051007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Lift","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftHow","id":"ctrl_1719610051008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FFF08A5D"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftWhat","id":"ctrl_1719610051009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"rises toward you while the pointer is over it","_children":{"Fill":{"colour":"FFCDBF9E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BounceBack","id":"ctrl_1719610051010","description":"Bounce back: springs past its size and settles as it is let go.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Rec"},
+        "Animations": {"_children":{"bounce":{"_type":"Animation","name":"bounce","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["pressed"],"to":["*"],"leaving":true},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":0.94},{"at":0.4,"scale":1.08},{"at":0.7,"scale":0.98},{"at":1,"scale":1}],"duration":420,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:bounce-back","revision":1,"from":"bounce"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BounceBackCaption","id":"ctrl_1719610051011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Bounce back","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BounceBackHow","id":"ctrl_1719610051012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FFF08A5D"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BounceBackWhat","id":"ctrl_1719610051013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"springs past its size and settles as it is let go","_children":{"Fill":{"colour":"FFCDBF9E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Jelly","id":"ctrl_1719610051014","description":"Jelly: wobbles like jelly when it is pressed.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Tap"},
+        "Animations": {"_children":{"jelly":{"_type":"Animation","name":"jelly","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["pressed"]},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.2,"scale":0.88},{"at":0.45,"scale":1.06},{"at":0.65,"scale":0.96},{"at":0.85,"scale":1.02},{"at":1,"scale":1}],"duration":560,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:jelly","revision":1,"from":"jelly"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"JellyCaption","id":"ctrl_1719610051015","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Jelly","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"JellyHow","id":"ctrl_1719610051016","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FFF08A5D"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"JellyWhat","id":"ctrl_1719610051017","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"wobbles like jelly when it is pressed","_children":{"Fill":{"colour":"FFCDBF9E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tilt","id":"ctrl_1719610051018","description":"Tilt: rocks back under the finger, as a rocker does.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Shift"},
+        "States": {"_children":{"Pressed":{"patches":{"component":{"Transform.rotation":-6}}}}},
+        "Animations": {"_children":{"tilt":{"_type":"Animation","name":"tilt","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["pressed"],"reverse":true},"targets":[{"path":"Transform.rotation","properties":["transform"]}],"duration":120,"delay":0,"easing":"outBack","preset":{"id":"ce:button:tilt","revision":1,"from":"tilt"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TiltCaption","id":"ctrl_1719610051019","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Tilt","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TiltHow","id":"ctrl_1719610051020","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FFF08A5D"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TiltWhat","id":"ctrl_1719610051021","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"rocks back under the finger, as a rocker does","_children":{"Fill":{"colour":"FFCDBF9E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusNod","id":"ctrl_1719610051022","description":"Focus nod: nods once as the keys reach it.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":312,"width":200,"height":100},
+        "Text": {"content":"Enter"},
+        "Animations": {"_children":{"nod":{"_type":"Animation","name":"nod","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["focused"]},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.4,"scale":1.08},{"at":1,"scale":1}],"duration":360,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:focus-nod","revision":1,"from":"nod"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusNodCaption","id":"ctrl_1719610051023","controlType":"Label"},
+        "Transform": {"x":560,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Focus nod","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusNodHow","id":"ctrl_1719610051024","controlType":"Label"},
+        "Transform": {"x":560,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"KEYBOARD FOCUS","_children":{"Fill":{"colour":"FFF08A5D"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusNodWhat","id":"ctrl_1719610051025","controlType":"Label"},
+        "Transform": {"x":564,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"nods once as the keys reach it","_children":{"Fill":{"colour":"FFCDBF9E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:sink",
+      "name": "Sink",
+      "category": "Button",
+      "tags": [
+        "Press",
+        "press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "sink": {
+          "_type": "Animation",
+          "name": "sink",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Transform.scale",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 110,
+          "delay": 0,
+          "easing": "outQuad"
+        }
+      },
+      "states": {
+        "Pressed": {
+          "when": {
+            "pressed": true
+          },
+          "patches": {
+            "component": {
+              "Transform.scale": 0.9
+            },
+            "parts": {}
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:lift",
+      "name": "Lift",
+      "category": "Button",
+      "tags": [
+        "Press",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "lift": {
+          "_type": "Animation",
+          "name": "lift",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Transform.scale",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outCubic"
+        }
+      },
+      "states": {
+        "Hover": {
+          "when": {
+            "hover": true
+          },
+          "patches": {
+            "component": {
+              "Transform.scale": 1.06
+            },
+            "parts": {}
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:bounce-back",
+      "name": "Bounce back",
+      "category": "Button",
+      "tags": [
+        "Press",
+        "let go"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "bounce": {
+          "_type": "Animation",
+          "name": "bounce",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "pressed"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 0.94
+            },
+            {
+              "at": 0.4,
+              "scale": 1.08
+            },
+            {
+              "at": 0.7,
+              "scale": 0.98
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:jelly",
+      "name": "Jelly",
+      "category": "Button",
+      "tags": [
+        "Press",
+        "press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "jelly": {
+          "_type": "Animation",
+          "name": "jelly",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.2,
+              "scale": 0.88
+            },
+            {
+              "at": 0.45,
+              "scale": 1.06
+            },
+            {
+              "at": 0.65,
+              "scale": 0.96
+            },
+            {
+              "at": 0.85,
+              "scale": 1.02
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 560,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:tilt",
+      "name": "Tilt",
+      "category": "Button",
+      "tags": [
+        "Press",
+        "press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "tilt": {
+          "_type": "Animation",
+          "name": "tilt",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Transform.rotation",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 120,
+          "delay": 0,
+          "easing": "outBack"
+        }
+      },
+      "states": {
+        "Pressed": {
+          "when": {
+            "pressed": true
+          },
+          "patches": {
+            "component": {
+              "Transform.rotation": -6
+            },
+            "parts": {}
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:focus-nod",
+      "name": "Focus nod",
+      "category": "Button",
+      "tags": [
+        "Press",
+        "keyboard focus"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "nod": {
+          "_type": "Animation",
+          "name": "nod",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "focused"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.4,
+              "scale": 1.08
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 360,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

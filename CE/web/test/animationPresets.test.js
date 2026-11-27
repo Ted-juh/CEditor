@@ -60,9 +60,15 @@ test('a state the control already has keeps everything it had', () => {
   const after = button._children.States._children.Pressed;
   assert.deepEqual(after.when, before.when);
   assert.equal(after.patches.component['Background.Fill.colour'], before.patches.component['Background.Fill.colour'], 'its colour stays');
-  assert.equal(after.patches.component['Transform.scale'], before.patches.component['Transform.scale'],
-    'and a scale it already set is the author\'s, not the preset\'s');
+  assert.equal(before.patches.component['Transform.scale'], 0.985, 'a button is made pressing to 0.985');
+  assert.equal(after.patches.component['Transform.scale'], 0.94,
+    'which is its type\'s, not an author\'s: the preset\'s squash takes its place');
   assert.equal(Object.keys(button._children.States._children).filter((k) => k.toLowerCase() === 'pressed').length, 1, 'no second Pressed');
+  // A scale someone set is theirs, and stays.
+  const chosen = createControl('Button');
+  chosen._children.States._children.Pressed.patches.component['Transform.scale'] = 0.97;
+  apply(chosen, 'pressSquish');
+  assert.equal(chosen._children.States._children.Pressed.patches.component['Transform.scale'], 0.97, 'the author\'s number wins');
 });
 
 test('a control with no such state gets one, named the way triggers find it', () => {

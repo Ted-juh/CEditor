@@ -47,6 +47,7 @@ export {
 import { readTrigger } from './interactionRuntime.js';
 import { labelShows } from './labelShows.js';
 import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
+import { setByAuthor } from './authorsStateValue.js';
 
 /** The fields of an animation that are its identity in a control, not a setting. */
 const IDENTITY = new Set(['_type', 'name', LINK_KEY]);
@@ -289,7 +290,8 @@ export function presetFitsTypes(preset, types, create) {
  * or in the place of the one it would tie with (`replacedBy`: a knob's own glide, for a Glide) —
  * linked (`preset: { id, revision, from }`) unless `link` is false; each state merged into one the
  * control has — it keeps everything, and gains only the values it does not set already, as the
- * built-in presets merge — or made; and the recipe's fields. `{ patch, names }`, or
+ * built-in presets merge (a value still at what its type made it with is not set by anyone:
+ * authorsStateValue.js) — or made; and the recipe's fields. `{ patch, names }`, or
  * `{ patch: null, reason }`.
  */
 export function applyPresetPatch(control, preset, { link = true } = {}) {
@@ -313,13 +315,16 @@ export function applyPresetPatch(control, preset, { link = true } = {}) {
     const existingKey = stateKey(states, key);
     const current = existingKey ? deepCopy(states[existingKey]) : null;
     const component = { ...(current?.patches?.component ?? {}) };
+    const stateName = existingKey ?? key;
     for (const [path, value] of Object.entries(wanted.patches?.component ?? {})) {
-      if (!(path in component)) component[path] = deepCopy(value);
+      if (!setByAuthor(control, stateName, component, path)) component[path] = deepCopy(value);
     }
     const parts = { ...(current?.patches?.parts ?? {}) };
     for (const [part, patchValues] of Object.entries(wanted.patches?.parts ?? {})) {
       const merged = { ...(parts[part] ?? {}) };
-      for (const [path, value] of Object.entries(patchValues ?? {})) if (!(path in merged)) merged[path] = deepCopy(value);
+      for (const [path, value] of Object.entries(patchValues ?? {})) {
+        if (!setByAuthor(control, stateName, merged, path, part)) merged[path] = deepCopy(value);
+      }
       parts[part] = merged;
     }
     patch[`States.${existingKey ?? key}`] = current

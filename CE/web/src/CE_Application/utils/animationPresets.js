@@ -7,13 +7,15 @@
  * buttons knew this and wrote the state too, but REPLACED any state of that name, so pressing
  * "Scale" on a button threw away its own Pressed colour. These merge: an existing state keeps
  * everything it had and gains the one value the preset needs, unless it already sets that value,
- * in which case it is left alone — the author's number wins over the preset's.
+ * in which case it is left alone — the author's number wins over the preset's. A value still at what
+ * the control's type made the state with is nobody's choice, and gives way (authorsStateValue.js).
  *
  * Every preset is applied to every selected control in one undo step (the Animation tab does the
  * transaction; this file only builds patches and has no stores in it).
  */
 import { uniqueAnimationName, keyframeTargets } from './animationModel.js';
 import { readTrigger } from './interactionRuntime.js';
+import { setByAuthor } from './authorsStateValue.js';
 
 const transition = (name, trigger, targets, duration, easing) => ({
   _type: 'Animation', name, enabled: true, kind: 'transition', trigger, targets, duration, delay: 0, easing,
@@ -159,7 +161,9 @@ export function presetPatch(control, presetId) {
     // A copy: the new state node must share nothing with the one it replaces, which undo keeps.
     const current = key ? JSON.parse(JSON.stringify(states[key])) : null;
     const component = { ...(current?.patches?.component ?? {}) };
-    if (preset.state.path && !(preset.state.path in component)) component[preset.state.path] = preset.state.value;
+    if (preset.state.path && !setByAuthor(control, key ?? preset.state.key, component, preset.state.path)) {
+      component[preset.state.path] = preset.state.value;
+    }
     // A state the control already has keeps its condition, group and part patches as they were.
     patch[`States.${key ?? preset.state.key}`] = current
       ? { ...current, patches: { ...(current.patches ?? {}), component } }

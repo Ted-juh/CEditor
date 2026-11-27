@@ -32,6 +32,7 @@ import { flatControls } from '../utils/containment.js';
 import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
 import { KNOB_PRESETS, KNOB_PRESET_GROUPS } from '../utils/knobPresets.js';
 import { SLIDER_PRESETS, SLIDER_PRESET_GROUPS } from '../utils/sliderPresets.js';
+import { BUTTON_PRESETS, BUTTON_PRESET_GROUPS } from '../utils/buttonPresets.js';
 import {
   LINK_KEY,
   PRESET_FORMAT,
@@ -64,6 +65,7 @@ const byGroups = (groups, presets) => groups.map((group) => ({ ...group, entries
 export const COMPONENT_PRESETS = Object.freeze([
   { component: 'Knob', groups: byGroups(KNOB_PRESET_GROUPS, KNOB_PRESETS) },
   { component: 'Slider', groups: byGroups(SLIDER_PRESET_GROUPS, SLIDER_PRESETS) },
+  { component: 'Button', groups: byGroups(BUTTON_PRESET_GROUPS, BUTTON_PRESETS) },
 ]);
 
 const BUILT_IN_BY_ID = new Map(COMPONENT_PRESETS.flatMap(({ groups }) => groups.flatMap((group) => group.entries.map((entry) => [entry.id, entry.preset]))));

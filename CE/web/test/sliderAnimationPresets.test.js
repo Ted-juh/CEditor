@@ -151,7 +151,7 @@ test('every readout a showcase fader shows reads against its panel\'s ground', (
 
 test('the library lists them under Slider, after the Knob, by group', () => {
   const slider = COMPONENT_PRESETS.find((entry) => entry.component === 'Slider');
-  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider']);
+  assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button']);
   assert.deepEqual(slider.groups.map((group) => group.label), SLIDER_PRESET_GROUPS.map((group) => group.label));
   assert.equal(slider.groups.reduce((n, group) => n + group.entries.length, 0), SLIDER_PRESETS.length);
 });
