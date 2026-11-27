@@ -102,7 +102,14 @@ knob._children.Core.id = 'ctrl_knob';
 knob._children.Core.name = 'Cutoff';
 knob._children.Transform.x = 600;
 
-panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [control, knob] }]);
+// A timed button: the Words kind from a key, and the hold trigger (2026-11-27).
+const timed = createControl('TimedButton');
+timed._children.Core.id = 'ctrl_timed';
+timed._children.Core.name = 'Erase';
+timed._children.Transform.x = 300;
+timed._children.Transform.y = 250;
+
+panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [control, knob, timed] }]);
 activePanelId.set('p1');
 selectedComponentIds.set(new Set([CONTROL_ID]));
 
@@ -116,6 +123,10 @@ window.__anim = {
   kindLabels: () => [...document.querySelectorAll('[aria-label="Kind"] button')].map(textOf),
   // The tab follows its own target, not the selection (stores/editorTarget.js): open it on the knob.
   selectKnob: () => { selectedComponentIds.set(new Set(['ctrl_knob'])); activateEditorTarget('animation', 'ctrl_knob'); },
+  selectTimed: () => { selectedComponentIds.set(new Set(['ctrl_timed'])); activateEditorTarget('animation', 'ctrl_timed'); },
+  timedAnimation: (name) => JSON.parse(JSON.stringify(get(panels)[0].controls.find((c) => c._children.Core.id === 'ctrl_timed')._children.Animations?._children?.[name] ?? null)),
+  segmentLabels: (label) => [...document.querySelectorAll(`[data-emit-animation] [aria-label="${label}"] button`)].map(textOf),
+  wordsField: () => !!document.querySelector('[data-emit-words] input'),
   addAnimationNamed: (name) => {
     const input = document.querySelector('input[aria-label="New animation name"]');
     input.value = name;

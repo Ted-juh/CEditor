@@ -41,8 +41,8 @@ const applied = (control, preset) => {
 };
 const scaleWhen = (control, session) => resolveInteractiveControl(control, session).control._children.Transform.scale;
 
-test('the catalogue: seven groups in order, each preset an ordinary preset under Button, ids of its own', () => {
-  assert.deepEqual(BUTTON_PRESET_GROUPS.map((group) => group.id), ['press', 'attention', 'gestures', 'light', 'switch', 'words', 'signals']);
+test('the catalogue: nine groups in order, each preset an ordinary preset under Button, ids of its own', () => {
+  assert.deepEqual(BUTTON_PRESET_GROUPS.map((group) => group.id), ['press', 'attention', 'gestures', 'light', 'switch', 'words', 'signals', 'thrown', 'hold']);
   for (const group of BUTTON_PRESET_GROUPS) assert.ok(BUTTON_PRESETS.some((entry) => entry.group === group.id), `${group.id} has presets`);
   const ids = BUTTON_PRESETS.map((entry) => entry.id);
   assert.equal(new Set(ids).size, ids.length, 'no id twice');
@@ -53,7 +53,8 @@ test('the catalogue: seven groups in order, each preset an ordinary preset under
     assert.match(entry.id, /^ce:button:[a-z-]+$/);
     assert.equal(entry.preset.category, 'Button');
     assert.equal(entry.preset.tags[0], entry.groupLabel);
-    assert.ok(['MomentaryButton', 'ToggleButton'].includes(entry.type), `${entry.slug}: the kind of button the showcase puts it on`);
+    assert.ok(['MomentaryButton', 'ToggleButton', 'TimedButton'].includes(entry.type), `${entry.slug}: the kind of button the showcase puts it on`);
+    assert.equal(entry.type === 'TimedButton', entry.group === 'hold', `${entry.slug}: a timed button for the hold, and only there`);
     assert.ok(entry.how && entry.what, `${entry.slug} says what plays it and what it does`);
     assert.deepEqual(readPresetFile(presetFileText(entry.preset)).preset, entry.preset, `${entry.slug} survives its file`);
   }
@@ -62,7 +63,7 @@ test('the catalogue: seven groups in order, each preset an ordinary preset under
 test('every button preset goes on a momentary button and a toggle, in every set the showcase uses', () => {
   const sets = [...new Set(BUTTON_PANELS.map(([, make]) => make().controlSet.id))];
   for (const entry of BUTTON_PRESETS) {
-    for (const type of ['MomentaryButton', 'ToggleButton']) {
+    for (const type of ['MomentaryButton', 'ToggleButton', 'TimedButton']) {
       assert.equal(presetDoesNotFit(entry.preset, createControl(type)), '', `${entry.slug} fits a ${type}`);
       for (const set of sets) {
         assert.equal(presetDoesNotFit(entry.preset, resolveControlForSet(createControl(type), getControlSet(set))), '', `${entry.slug} on a ${set} ${type}`);
@@ -143,6 +144,26 @@ test('in the library, a lamp preset is judged as the panel\'s set draws the butt
   assert.equal(applyAnimationPreset([key], byId('sink').id).applied.length, 1, 'the whole button moves on any');
   setActivePanelControlSet('stompbox');
   assert.equal(applyAnimationPreset([key], byId('flare').id).applied.length, 1, 'Stompbox draws a key with a lamp');
+});
+
+test('Thrown throws words of its own or a count from the key; Hold plays over the hold, and brings a state to fire into', () => {
+  for (const entry of BUTTON_PRESETS.filter((e) => e.group === 'thrown')) {
+    for (const node of Object.values(entry.preset.animations)) {
+      assert.equal(node.kind, 'emit', entry.slug);
+      assert.ok(['words', 'count'].includes(node.shows), `${entry.slug}: words a button can say`);
+      assert.equal(node.direction, 'up', `${entry.slug}: rising from the key`);
+    }
+  }
+  for (const entry of BUTTON_PRESETS.filter((e) => e.group === 'hold')) {
+    const triggers = Object.values(entry.preset.animations).map((node) => node.trigger.type);
+    const fires = Object.values(entry.preset.animations).some((node) => node.trigger.to?.includes('executed'));
+    assert.ok(triggers.includes('hold') || fires, `${entry.slug}: plays over the hold, or as it fires`);
+    assert.equal('Executed' in (entry.preset.states ?? {}), fires, `${entry.slug}: brings an Executed state exactly when it plays on one`);
+  }
+  // A timed button has no state for having fired; the preset's makes one, with no look of its own.
+  const timed = applied(createControl('TimedButton'), byId('confirmed').preset);
+  assert.deepEqual(timed._children.States._children.Executed.when, { executed: true });
+  assert.deepEqual(timed._children.States._children.Executed.patches.component, {});
 });
 
 test('nothing loops that does not say so', () => {

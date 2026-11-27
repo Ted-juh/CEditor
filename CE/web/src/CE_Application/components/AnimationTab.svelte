@@ -74,6 +74,8 @@
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import PropertySelect from '../properties/PropertySelect.svelte';
+  import PropertyText from '../properties/PropertyText.svelte';
+  import { isTimedButtonBehavior } from '../utils/timedButtonPreview.js';
   import { activePanel, selectedComponentIds, openAnimationDesigner } from '../stores/panels.js';
   import Maximize2 from 'lucide-svelte/icons/maximize-2';
   import { updateControlProperty, removeControlNode, getSection, applyControlPatch } from '../stores/controls.js';
@@ -108,6 +110,7 @@
     animationKindsFor,
     VALUE_KIND,
     EMIT_KIND,
+    throwsFromKey,
     SEQUENCE_KIND,
     EASING_NAMES,
     offeredTargetsFor,
@@ -181,6 +184,10 @@
   let valueKind = $derived(selected?.kind === VALUE_KIND);
   // Words thrown from the pointer (phase 2 of the Components' Knob): a knob or slider only.
   let emitKind = $derived(selected?.kind === EMIT_KIND);
+  // A button throws words from its key: words of its own or a count, rising; it has no value or pointer.
+  let fromKey = $derived(throwsFromKey(control));
+  // The hold trigger is a timed button's: no other control is ever held to confirm.
+  let holdOffered = $derived(isTimedButtonBehavior(control?._children?.Behavior));
   let kinds = $derived.by(() => {
     const list = animationKindsFor(control);
     return valueKind && !list.includes(VALUE_KIND) ? [...list, VALUE_KIND] : list;
@@ -211,7 +218,7 @@
     sequence: 'Tracks along a time axis, one per change, each with its own keyframes; a value trigger scrubs it',
     text: 'Real words, whole or a piece at a time: typewriter, explode, roll, push, wipe, crossfade, shimmer',
     value: 'What the value draws — its arc, its pointer — moved for a moment, then handed back to the value: a ring sweep',
-    emit: 'Words thrown out from the pointer as the value steps: the value, or how far it moved, flying off and fading',
+    emit: 'Words thrown: from a knob\'s or a slider\'s pointer as the value steps, or rising from a button\'s key as it plays',
   };
 
   const ORIGIN_LABELS = { any: 'Any', user: 'Mine', external: 'Outside' };
@@ -854,7 +861,9 @@ onMount(() => {
                   <span class="lab">Trigger</span>
                   <!-- A value animation "all the time" would never let the value be seen, and words
                        "all the time" would never be thrown: not offered. -->
-                  <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES.filter((type) => !(valueKind || emitKind) || type !== 'always')).map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] }))}
+                  <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES.filter((type) => !(valueKind || emitKind) || type !== 'always'))
+                                    .filter((type) => type !== 'hold' || holdOffered || selected.triggerType === 'hold')
+                                    .map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] ?? KEYFRAME_TRIGGER_LABELS[value] }))}
                                   value={selected.triggerType} ariaLabel="Keyframe trigger"
                                   onchange={(value) => setProps({ trigger: {
                                     ...(selected.animation.trigger ?? {}),
@@ -1068,18 +1077,34 @@ onMount(() => {
               <div class="panebody" data-emit-animation>
                 <div class="r">
                   <span class="lab">Shows</span>
-                  <Segmented options={[{ value: 'value', label: 'The value' }, { value: 'delta', label: 'How far it moved' }]}
-                             value={selected.animation.shows ?? 'value'} ariaLabel="Shows" onchange={(value) => setProp('shows', value)} />
+                  <Segmented options={[
+                    ...(fromKey ? [] : [{ value: 'value', label: 'The value' }, { value: 'delta', label: 'How far it moved' }]),
+                    { value: 'words', label: 'Words' }, { value: 'count', label: 'A count' },
+                  ]}
+                             value={selected.animation.shows ?? (fromKey ? 'words' : 'value')} ariaLabel="Shows" onchange={(value) => setProps(value === 'words' && !String(selected.animation.words ?? '').trim() ? { shows: value, words: '+1' } : { shows: value })} />
                 </div>
+                {#if (selected.animation.shows ?? (fromKey ? 'words' : 'value')) === 'words'}
+                  <div class="r">
+                    <span class="lab">Words</span>
+                    <div class="cell" data-emit-words><PropertyText value={selected.animation.words ?? ''} placeholder="+1" ariaLabel="Words thrown"
+                      commit={(value) => setProp('words', String(value ?? '').trim().slice(0, 24))} /></div>
+                  </div>
+                {/if}
                 <div class="r">
                   <span class="lab">From</span>
-                  <Segmented options={[{ value: 'tip', label: 'The pointer’s tip' }, { value: 'centre', label: 'The centre' }]}
-                             value={selected.animation.from ?? 'tip'} ariaLabel="From" onchange={(value) => setProp('from', value)} />
+                  <Segmented options={fromKey
+                    ? [{ value: 'centre', label: 'The key' }, { value: 'tip', label: 'Above it' }]
+                    : [{ value: 'tip', label: 'The pointer’s tip' }, { value: 'centre', label: 'The centre' }]}
+                             value={selected.animation.from ?? (fromKey ? 'centre' : 'tip')} ariaLabel="From" onchange={(value) => setProp('from', value)} />
                 </div>
                 <div class="r">
                   <span class="lab">Flies</span>
-                  <Segmented options={[{ value: 'pointer', label: 'Along the pointer' }, { value: 'up', label: 'Up' }]}
-                             value={selected.animation.direction ?? 'pointer'} ariaLabel="Flies" onchange={(value) => setProp('direction', value)} />
+                  {#if fromKey}
+                    <span class="note">Up</span>
+                  {:else}
+                    <Segmented options={[{ value: 'pointer', label: 'Along the pointer' }, { value: 'up', label: 'Up' }]}
+                               value={selected.animation.direction ?? 'pointer'} ariaLabel="Flies" onchange={(value) => setProp('direction', value)} />
+                  {/if}
                   <div class="cell"><NumberCell label="px" value={selected.animation.travel ?? 36} min={0} max={400} step={2}
                     onchange={(value) => setProp('travel', Math.max(0, Math.min(400, Math.round(value))))} /></div>
                 </div>
@@ -1088,7 +1113,11 @@ onMount(() => {
                   <div class="cell"><NumberCell label="px" value={selected.animation.size ?? 12} min={6} max={72} step={1}
                     onchange={(value) => setProp('size', Math.max(6, Math.min(72, Math.round(value))))} /></div>
                 </div>
-                <p class="hint">Each time it plays, {controlName}'s value — or how far it moved since the last word — flies out and fades. Several can be in the air at once. On a step trigger, one word a step, while it is turned too.</p>
+                {#if fromKey}
+                  <p class="hint">Each time it plays, the words — or how many times it has played — rise from {controlName} and fade. Several can be in the air at once.</p>
+                {:else}
+                  <p class="hint">Each time it plays, {controlName}'s value — or how far it moved since the last word — flies out and fades. Several can be in the air at once. On a step trigger, one word a step, while it is turned too.</p>
+                {/if}
               </div>
             </div>
           {:else if valueKind}

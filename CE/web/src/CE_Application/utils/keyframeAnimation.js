@@ -68,7 +68,11 @@ import { cleanValueFrames } from './sceneFormat.js';
 // goes, and it knows which way the value turned: a text effect whose direction is `turn` goes that
 // way, and an emitted word (EMIT, below) knows where it came from. A detent, a stream of numbers.
 // The Components showcase's Knob, phase 2 (docs/design/component-presets.md). 2026-11-26.
-export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event'];
+// `hold`: a timed button held to confirm (or waiting for its second click): plays from the moment it
+// is held, over exactly as long as it must be held (interactionRuntime.js gives the entry the
+// button's own hold time), and stops if it is let go early. A hold's progress, drawn by whatever
+// the animation moves: a lamp that fills, a key that colours. The Components showcase's Button.
+export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold'];
 
 /** What a frame can set, and the value each has when a frame leaves it out. */
 export const FRAME_PROPERTIES = ['scale', 'rotate', 'x', 'y', 'opacity'];
@@ -80,12 +84,19 @@ export const FRAME_DEFAULTS = Object.freeze({ scale: 1, rotate: 0, x: 0, y: 0, o
  * (or the dial's centre), along the pointer or straight up, and fades as it goes. Several can be in
  * the air at once. The player keeps each word while it flies; the slider renderer draws them.
  *
- *   { kind: 'emit', shows: 'value' | 'delta', from: 'tip' | 'centre', direction: 'pointer' | 'up',
- *     travel (px), size (px), colour (AARRGGBB or none: the readout's), duration, delay, easing,
- *     trigger }
+ *   { kind: 'emit', shows: 'value' | 'delta' | 'words' | 'count', words, from: 'tip' | 'centre',
+ *     direction: 'pointer' | 'up', travel (px), size (px), colour (AARRGGBB or none: the readout's),
+ *     duration, delay, easing, trigger }
+ *
+ * `words` throws words of its own ("SENT", "+1"), and `count` how many times it has thrown (1, 2,
+ * 3…), which is what a button can say: it has no value to speak of. On a button a word rises from
+ * the key (`centre`) or from its top edge (`tip`); CanvasControl draws it. The Components
+ * showcase's Button.
  */
 export const EMIT_KIND = 'emit';
-export const EMIT_SHOWS = Object.freeze(['value', 'delta']);
+export const EMIT_SHOWS = Object.freeze(['value', 'delta', 'words', 'count']);
+/** Words of its own, as many as read at a glance. */
+export const EMIT_WORDS_LIMIT = 24;
 export const EMIT_FROM = Object.freeze(['tip', 'centre']);
 export const EMIT_DIRECTIONS = Object.freeze(['pointer', 'up']);
 const EMIT_LIMITS = { travel: [0, 400], size: [6, 72], duration: [80, 5000] };
@@ -103,6 +114,7 @@ export function readEmit(animation, key = '', { timeScale = 1 } = {}) {
   const delay = Math.max(0, Number(animation.delay) || 0) * scale;
   const emit = {
     shows: EMIT_SHOWS.includes(animation.shows) ? animation.shows : 'value',
+    words: String(animation.words ?? '').trim().slice(0, EMIT_WORDS_LIMIT),
     from: EMIT_FROM.includes(animation.from) ? animation.from : 'tip',
     direction: EMIT_DIRECTIONS.includes(animation.direction) ? animation.direction : 'pointer',
     travel: clampTo(animation.travel, EMIT_LIMITS.travel, 36),
@@ -444,20 +456,25 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
   let previousFrame = null;
   let previousBeatSlot = new Map();     // name -> floor(beats / every)
   let previousStepSlot = new Map();     // name -> the step the value was on (valueStep)
-  let emitted = [];                     // words in the air: [{ id, name, emit, at, value, from, turn }]
+  let emitted = [];                     // words in the air: [{ id, name, emit, at, value, from, turn, count }]
   let emitSeq = 0;
   const previousEmitValue = new Map();  // name -> the value when its last word was thrown
+  const emitCount = new Map();          // name -> how many words it has thrown
   let previousPlays = {};
   const heldBefore = new Map();         // name -> whether a looping state animation's state held
   const runs = new Map();               // name -> { phase, startedAt } for anything that has played
   let last = { parts: new Map(), colours: new Map(), texts: new Map(), values: [], emits: [], rules: '', fired: [], key: '' };
 
   // A word thrown: the value now and the value at the last word, for a delta.
+  // A word of its own or a count needs no value: a button has none.
   const throwWord = (entry, t, value, turn) => {
-    if (!Number.isFinite(value)) return;
+    const own = entry.emit.shows === 'words' || entry.emit.shows === 'count';
+    if (!own && !Number.isFinite(value)) return;
     const from = previousEmitValue.get(entry.name) ?? value;
     previousEmitValue.set(entry.name, value);
-    emitted.push({ id: (emitSeq += 1), name: entry.name, emit: entry.emit, at: t, value, from, turn });
+    const count = (emitCount.get(entry.name) ?? 0) + 1;
+    emitCount.set(entry.name, count);
+    emitted.push({ id: (emitSeq += 1), name: entry.name, emit: entry.emit, at: t, value, from, turn, count });
   };
 
   const flip = (name, t, turn = null) => {
@@ -484,6 +501,19 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
         if (trigger.type === 'always') {
           if (!runs.has(entry.name)) runs.set(entry.name, { phase: 'a', startedAt: t });
           playing.set(entry.name, runs.get(entry.name).phase);
+          continue;
+        }
+
+        if (trigger.type === 'hold') {
+          // Held to confirm: from the moment the hold begins, once, for as long as it lasts. Let go
+          // early, it stops where it was and the part goes back; held to the end, the button fires
+          // (the Executed state) as it reaches its last frame.
+          const holds = frame.signals?.pending === true;
+          const held = heldBefore.get(entry.name) === true;
+          heldBefore.set(entry.name, holds);
+          if (holds && !held && !requested) { flip(entry.name, t); fired.push(entry.name); }
+          if (holds || requested) playing.set(entry.name, runs.get(entry.name).phase);
+          if (entry.emit && holds && !held) throwWord(entry, t, Number(frame.signals?.valueNormalized), 1);
           continue;
         }
 

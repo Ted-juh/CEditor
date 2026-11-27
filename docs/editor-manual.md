@@ -1257,7 +1257,9 @@ There are four kinds, and two more for what a value draws:
   centre and stops glide from one state's gradient to the next, as long as it keeps its type and has
   no more than twelve stops.
 - **Keyframes** — a little loop of poses, played all the time, in a state, when the value changes,
-  on each step of the value, on the beat, on a gesture, or when a script asks for it. **On each step
+  on each step of the value, on the beat, on a gesture, or when a script asks for it; on a timed
+  button, also **While held to confirm**, which plays once over exactly as long as the button must be
+  held and stops if it is let go early: a lamp that fills as you hold. **On each step
   of the value** plays once each time the value comes to another step, while it is turned too: as
   many steps as the control has (a knob of five choices, four), one every 5% on a knob with none,
   or the number under **Steps**. A detent felt as you turn. Besides the poses, a frame can **turn**
@@ -1301,12 +1303,14 @@ There are four kinds, and two more for what a value draws:
   the range, or so far from the value. Only the drawing moves: the value, its readout and what it
   sends stay as they are, and while you turn the knob it shows where you turned it to. A looping
   one counts two against the panel's ten loops.
-- **Words** (knobs and sliders) — throws words out of the dial each time it plays, which fly and
-  fade, several in the air at once: **The value**, as the readout prints it, or **How far it moved**
-  since the last word, signed ("+2.4"). From **The pointer's tip** or **The centre**, **Along the
-  pointer** or **Up**, so many px, at a **Size**. On each step of the value it is a stream of numbers
-  as the knob turns; when the knob is let go, how far it was turned. The words fly within the knob's
-  own box, as its readout does: give it room round the dial.
+- **Words** (knobs, sliders and buttons) — throws words out each time it plays, which fly and
+  fade, several in the air at once: **The value**, as the readout prints it, **How far it moved**
+  since the last word, signed ("+2.4"), **Words** of your own ("+1", "SENT"), or **A count** of how
+  many times it has played. From **The pointer's tip** or **The centre**, **Along the pointer** or
+  **Up**, so many px, at a **Size**. On each step of the value it is a stream of numbers as the knob
+  turns; when the knob is let go, how far it was turned. The words fly within the knob's own box,
+  as its readout does: give it room round the dial. A button has no value to throw, so it throws
+  words or a count, rising from **The key** or from **Above it**, past its box.
 
 What an animation changes is picked as a path — **Knob01 › Body › Cap › Scale** — by stepping through
 the levels, typing (`text col`), or **Browse**, which shows them side by side.
@@ -1525,8 +1529,9 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
   **Words**, and **Slider Together**, a mixing desk's row. **Button** is the third, each key drawn as
   its set draws one: **Button Press**, **Attention** and **Gestures**, which move the whole key;
   **Light**, **Switch**, **Words** and **Signals**, which play on the key's own parts (its lamp,
-  the key, its legend and caption); and **Button Together**, a row of keys that pop in, rise in
-  turn, pass a press along when you click the first, and chase a light along their bars.
+  the key, its legend and caption); **Thrown**, words rising from the key; **Hold**, a timed button
+  held to confirm; and **Button Together**, a row of keys that pop in, rise in turn, pass a press
+  along when you click the first, and chase a light along their bars.
 
 Most of them play by themselves. A few wait for you:
 

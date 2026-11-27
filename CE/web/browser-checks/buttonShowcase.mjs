@@ -12,6 +12,10 @@
  *     lamp up rather than snapping it; Flare grows the lamp and whitens it; From the synth flashes
  *     when its script switches it, the script loaded and running; Key lights eases the key off;
  *     the O / I legend rolls; Ink flash colours the caption; Alert's script blinks the lamp red.
+ *   - Thrown: a click throws "+1" up from the key, fading as it rises; a click on Count throws how
+ *     many there have been.
+ *   - Hold: held, a timed button's lamp fills green over its hold and flashes as it fires; let go
+ *     early, it goes straight back; held to the end, Confirmed throws OK.
  *   - Together: Pop in keeps each key hidden until its turn; a click on the first Ripple key runs a
  *     press along the row, the scene a click on a key plays; Chase lights one key's bar at a time.
  *
@@ -229,6 +233,67 @@ try {
   check('Signals: Alert\'s script blinks the lamp red', () => {
     assert.deepEqual(signalErrors, []);
     assert.ok(alerting.some((p) => p.fill === 'rgb(229, 72, 77)'), [...new Set(alerting.map((p) => p.fill))].join(' / '));
+  });
+
+  // --- Thrown -----------------------------------------------------------------------------------
+  const wordsOf = (id) => page.evaluate((sel) => [...document.querySelectorAll(`${sel} .key-word`)].map((word) => {
+    const r = word.getBoundingClientRect();
+    return { text: word.textContent.trim(), y: r.y, opacity: Number(getComputedStyle(word).opacity) };
+  }), inPreview(id));
+  ids = await open('Thrown');
+  await kit.preview(true);
+  await kit.settle(800);
+  await page.mouse.move(5, 5);
+  const plus = await box(ids.PlusOne);
+  await page.mouse.click(plus.x, plus.y - plus.height * 0.15);
+  await page.waitForTimeout(60);
+  const thrownEarly = await wordsOf(ids.PlusOne);
+  await page.waitForTimeout(600);
+  const thrownLate = await wordsOf(ids.PlusOne);
+  const tally = await box(ids.Count);
+  for (let k = 0; k < 3; k += 1) { await page.mouse.click(tally.x, tally.y - tally.height * 0.15); await page.waitForTimeout(120); }
+  const counted = (await wordsOf(ids.Count)).map((word) => word.text);
+  check('Thrown: a click throws "+1" up from the key, fading as it rises; Count counts', () => {
+    assert.deepEqual(thrownEarly.map((word) => word.text), ['+1']);
+    assert.ok(thrownLate[0].y < thrownEarly[0].y - 15, `it rises: ${thrownEarly[0].y} → ${thrownLate[0].y}`);
+    assert.ok(thrownLate[0].opacity < thrownEarly[0].opacity, 'and fades');
+    assert.deepEqual(counted, ['1', '2', '3']);
+  });
+
+  // --- Hold -------------------------------------------------------------------------------------
+  ids = await open('Hold');
+  await kit.preview(true);
+  await kit.settle(800);
+  await page.mouse.move(5, 5);
+  const fills = await box(ids.LampFills);
+  const restLamp = await partOf(ids.LampFills, 'indicator');
+  await page.mouse.move(fills.x, fills.y - fills.height * 0.15);
+  await page.mouse.down();
+  const filling = await partSeries(ids.LampFills, 'indicator', 1400, 100);
+  await page.mouse.up();
+  await page.mouse.move(5, 5);
+  await kit.settle(900);
+  await page.mouse.move(fills.x, fills.y - fills.height * 0.15);
+  await page.mouse.down();
+  await page.waitForTimeout(500);
+  await page.mouse.up();
+  await page.waitForTimeout(80);
+  const letGo = await partOf(ids.LampFills, 'indicator');
+  await page.mouse.move(5, 5);
+  const confirm = await box(ids.Confirmed);
+  await page.mouse.move(confirm.x, confirm.y - confirm.height * 0.15);
+  await page.mouse.down();
+  await page.waitForTimeout(1650);
+  await page.mouse.up();
+  const ok = (await wordsOf(ids.Confirmed)).map((word) => word.text);
+  check('Hold: the lamp fills over the hold, goes back if let go early, and Confirmed throws OK when it fires', () => {
+    const scales = filling.map((p) => p.scale);
+    assert.ok(scales.every((scale, i) => i === 0 || scale >= scales[i - 1] - 0.001), `it grows steadily: ${scales.join(' ')}`);
+    assert.ok(Math.max(...scales) > 1.2, 'most of the way by the end of the hold');
+    assert.equal(new Set(filling.map((p) => p.fill)).size > 4, true, 'its colour moves toward green');
+    assert.equal(letGo.fill, restLamp.fill, 'let go early, the lamp is as it was');
+    assert.equal(letGo.scale, 1);
+    assert.deepEqual(ok, ['OK']);
   });
 
   // --- Together ---------------------------------------------------------------------------------

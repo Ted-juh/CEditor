@@ -2424,6 +2424,31 @@
 
   let textFill = $derived(text?._children?.Fill ?? null);
   let textFont = $derived(text?._children?.Font ?? null);
+  // Words a button throws (utils/keyframeAnimation.js EMIT): words of its own or a count, rising from
+  // the key (`centre`) or its top edge (`tip`), in its caption's colour and face. Drawn here, beside
+  // the control's content and not in it, so the box does not cut them off as they rise; each fades
+  // as it goes, and the player forgets it once it has flown. A knob's and a slider's are the slider
+  // renderer's. The Components showcase's Button.
+  let keyWords = $derived.by(() => {
+    if (!BUTTON_DEVICE_TYPES.has(String(core?.controlType ?? '')) || !activeKeyframes?.emits?.length) return [];
+    return activeKeyframes.emits.map((word) => {
+      const emit = word.emit;
+      const said = emit.shows === 'count' ? String(word.count ?? 1) : (emit.words || '+1');
+      const top = emit.from === 'tip' ? 0 : displayH / 2;
+      const colour = emit.colour ? cssColor(emit.colour) : cssColor(textFill?.colour ?? 'FFFFFFFF');
+      const family = textFont?.family ? `font-family:'${String(textFont.family).replace(/'/g, '')}', sans-serif` : '';
+      return {
+        id: word.id,
+        text: said,
+        style: [
+          `left:${(displayW / 2).toFixed(1)}px`, `top:${top.toFixed(1)}px`, `color:${colour}`, `font-size:${emit.size}px`, family,
+          `--ce-emit-y:${(-emit.travel).toFixed(1)}px`,
+          `animation-duration:${Math.round(emit.duration)}ms`, `animation-delay:${Math.round(emit.delay)}ms`,
+          `animation-timing-function:${emit.easing}, cubic-bezier(0.7, 0, 0.9, 0.45)`,
+        ].filter(Boolean).join(';'),
+      };
+    });
+  });
   let textMultiline = $derived(text?._children?.Multiline ?? null);
   let textEffects = $derived(text?._children?.Effects ?? null);
   let textPosition = $derived(text?._children?.Position ?? null);
@@ -4344,6 +4369,14 @@
   </div>
   </EffectSurface>
 
+  {#if keyWords.length}
+    <div class="key-words" aria-hidden="true">
+      {#each keyWords as word (word.id)}
+        <div class="key-word" data-emitted-word style={word.style}>{word.text}</div>
+      {/each}
+    </div>
+  {/if}
+
   {#if showCustomHitZones && customHitZoneEntries.length}
     <div class="custom-hit-zone-label-tray" aria-hidden="true">
       {#each customHitZoneEntries as [zoneName] (zoneName)}
@@ -4625,6 +4658,29 @@
   /* A knob's or slider's readout and thrown words hang past its box (SliderFamilyRenderer clips its
      drawing to the box itself instead). */
   .control-content.labels-hang { overflow: visible; }
+
+  /* Words a button threw: up from the key by --ce-emit-y, growing a little, and fading after they
+     have been read (the slider renderer's thrown words, on a key). From/to only: a percentage stop
+     in a component's keyframes puts its class on every element it draws (Svelte 5). */
+  .key-words { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+  .key-word {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
+    line-height: 1;
+    font-weight: 700;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+    animation-name: ce-key-word-move, ce-key-word-fade;
+    animation-fill-mode: both;
+  }
+  @keyframes ce-key-word-move {
+    from { translate: 0 0; scale: 0.85; }
+    to { translate: 0 var(--ce-emit-y, -36px); scale: 1.12; }
+  }
+  @keyframes ce-key-word-fade {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
 
   /* A plain fill paints on .control-content and text on .text-span; both glide with the control's
      colour timing, which arrives as an inherited custom property (utils/transitionCss.js). */

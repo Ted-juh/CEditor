@@ -487,9 +487,10 @@ colour and the light comes on just after.
   panel. The other 58 sets that draw a toggle as a key happen to have an inverse that reads there.
   Which colour a toggle's caption takes when on is a design call across every set, so it is left
   as it is; the Switch panel uses Bakelite.
-- **Not built:** a word thrown from a button (emitted words are a knob's and a slider's, from a
-  pointer a button does not have) and a hold's progress on a timed button. Both were in the
-  proposal; neither has an engine to play on yet.
+- **Not built in this half:** a word thrown from a button (emitted words were a knob's and a
+  slider's, from a pointer a button does not have) and a hold's progress on a timed button. Both
+  were in the proposal, and neither had an engine to play on. The owner asked for them next: see
+  "What the second half left", below.
 
 Verified locally:
 - `test/buttonDeviceAnimation.test.js` (new) renders keys through `ControlAnatomy`: every part's
@@ -509,3 +510,65 @@ Verified locally:
 - WebKitGTK 2.52 against Chromium, on live loops on a key's parts (a lamp that grows, a key that
   changes colour, a lamp that fades amber, a caption and a legend that roll): the same values
   computed through the loop in both, and drawn the same.
+
+### As built: what the second half left (2026-11-27)
+
+The owner: "Build what is not built yet." The two pieces the second half recorded as not built.
+
+**Words thrown from a button.** Thrown words (the emit kind) were a knob's and a slider's: the
+value, or how far it moved, from the pointer's tip. A button has neither a value to speak of nor a
+pointer.
+
+- An emit now also throws **words of its own** (`shows: 'words'`, `words` up to 24 characters:
+  "+1", "SENT") or **a count** of how many times it has thrown (`shows: 'count'`), and neither
+  needs a value (`keyframeAnimation.js`). A knob or a slider can say these too.
+- On a button a word **rises from the key** (`from: 'centre'`) or from its top edge (`'tip'`), in its
+  caption's colour and face, drawn by CanvasControl in a layer beside the control's content, not in
+  it, so the box does not cut it off as it rises. Over a device key and a flat face alike.
+- A button is offered the Words kind in the Animation tab, as words or a count, from the key or
+  above it, always rising; a preset that throws the value is refused on a button, saying why.
+
+**A timed button's hold.** A timed button marks itself `pending` while it is held to confirm (or
+waits for its second click) and `executed` when it fires (`utils/timedButtonPreview.js`), but nothing
+knew how far through the hold it was.
+
+- A keyframe animation can now play on **`hold`**: from the moment the button is held, once, over
+  exactly as long as that button must be held (or, for a double-click one, its wait for the next
+  click), stopping where it is if the button is let go early. The runtime gives the entry the
+  button's own hold time (`interactionRuntime.js`), so a preset need not know it: the same preset
+  fills over 1.5 seconds on one button and 3 on another. Offered in the Animation tab on a timed
+  button only, as "While held to confirm"; the stage's Play holds the button that long and lets it
+  fire.
+- A timed button has no state for having fired, so a preset that plays when it fires brings an
+  Executed state with no look of its own, as presets bring states a control lacks.
+
+**The presets**, 11 more (52 in all):
+
+| Group | Presets |
+|---|---|
+| Thrown | +1, Count, Says so (ON and OFF), Sent word, Times two, Held |
+| Hold | Lamp fills, Key fills, Swell, Tremble, Confirmed |
+
+| Panel | Set | Why that set |
+|---|---|---|
+| Thrown | Switchboard | a caption that reads on a dark panel, which a thrown word takes the colour of |
+| Hold | Hi-Fi | a key with a lamp that can fill, on a timed button |
+
+Verified locally:
+- `test/buttonThrownAndHold.test.js` (new): words of their own and a count, needing no value, a count
+  counting; a button offered words or a count and refused the value, the Words kind starting from
+  "+1", rising from the key; the hold trigger playing from the hold, over the button's own hold time
+  (a double-click one's wait, slowed with the preview), one run while held, gone when let go early,
+  again when held again; the preset's Executed state firing what plays then; the stage's Play
+  holding for the button's hold; a slider saying words and counting.
+- `test/buttonAnimationPresets.test.js`: nine groups; a timed button for the Hold group and only
+  there; Thrown throwing words or a count, rising; Hold playing over the hold or as it fires, and
+  bringing an Executed state exactly when it plays on one.
+- `test/keyframeAnimation.test.js`: the trigger list and an emit's fields, with `hold` and `words`.
+- The browser check `animationTab`: a timed button offered the Words kind, as words or a count from
+  the key, and the hold trigger, which a knob is not offered; the library's nine Button groups.
+- The browser check `buttonShowcase`: "+1" rising and fading on a click, Count counting 1, 2, 3; the
+  lamp filling steadily over the hold, back as it was when let go early, OK thrown when it fires.
+- Every new preset driven by hand in Preview. The hold draws through the same part animations
+  WebKitGTK was checked on above; the thrown words are plain HTML with the slider's thrown words'
+  CSS, and were not re-checked in WebKitGTK.

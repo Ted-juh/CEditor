@@ -7826,8 +7826,9 @@ const DEFINE_SPECS = {
     // LINK_KEY), which Apply writes. The Components showcase's knobs carry all of them.
     extra: ['iterations', 'direction', 'loop', 'hold', 'bezier', 'spring',
       'effect', 'way', 'split', 'order', 'stagger', 'scatter', 'scale', 'spins', 'glyphs', 'colour', 'preset',
-      // Words thrown from a knob's pointer (utils/keyframeAnimation.js readEmit).
-      'shows', 'from', 'travel', 'size'],
+      // Words thrown from a knob's pointer or a button's key (utils/keyframeAnimation.js readEmit):
+      // what they show, and a button's words of its own.
+      'shows', 'from', 'travel', 'size', 'words'],
   },
   Bindings: {
     templates: [ENTRY_BASELINES.Bindings],

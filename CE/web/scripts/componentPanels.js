@@ -336,6 +336,10 @@ const BUTTON_LOOKS = {
   switch: { set: 'bakelite', bg: 'FF24262A', ink: 'FFF7F4EC', how: 'FFF08A3C', what: 'FFBDB8AC' },
   words: { set: 'neon', bg: 'FF0E1116', ink: 'FFEAF2FF', how: 'FF6EF2E8', what: 'FF8FA3B8' },
   signals: { set: 'porcelain', bg: 'FFD8D9D4', ink: 'FF202529', how: 'FF0E5A73', what: 'FF3A4045' },
+  // Words thrown from the key, in its caption's colour: a set whose caption reads on a dark panel.
+  // A timed button held to confirm: a key with a lamp that can fill.
+  thrown: { set: 'switchboard', bg: 'FF232932', ink: 'FFF7F4EC', how: 'FF8CBDAC', what: 'FFB8C0CC' },
+  hold: { set: 'hi-fi', bg: 'FF32383B', ink: 'FFF7F4EC', how: 'FF99C5B2', what: 'FFB8BCC2' },
 };
 // What each key says: a word a panel's key would carry, so the row reads as keys rather than labels.
 const LEGENDS = {
@@ -346,6 +350,8 @@ const LEGENDS = {
   kick: 'Bypass', 'key-lights': 'Hold', 'housing-flash': 'Mute', 'guard-glow': 'Arm', 'caption-turns': 'Loop',
   'roll-in': 'Start', 'push-on-press': 'Next', 'o-i-roll': 'Power', 'hover-fade': 'Info', 'ink-flash': 'Copy', wipe: 'Clear',
   sent: 'Send', refused: 'Delete', pending: 'Hold', done: 'Save', working: 'Sync', alert: 'Alarm',
+  'plus-one': 'Like', count: 'Tally', 'says-so': 'Mute', 'sent-word': 'Send', double: 'Boost', 'held-word': 'Hold',
+  'lamp-fills': 'Erase', 'key-fills': 'Reset', swell: 'Purge', tremble: 'Wipe', confirmed: 'Commit',
 };
 // Toggles that start on: one that breathes while on, and one whose key is lit while on.
 const STARTS_ON = new Set(['breathe-while-on', 'key-lights']);

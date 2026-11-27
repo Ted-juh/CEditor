@@ -1,0 +1,665 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "8ba0e6fc-c0b5-4e1a-9f3d-8ba0e6fc8ba0",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Thrown",
+  "scriptId": "component_button-thrown",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 840,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF232932",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "SaysSo.value",
+      "label": "SaysSo",
+      "controlName": "SaysSo",
+      "path": "SaysSo.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "switchboard"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1702577916000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Thrown","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1702577916001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":780,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"words thrown from the key. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFB8C0CC"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PlusOne","id":"ctrl_1702577916002","description":"+1: \"+1\" rises from the key with each click.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Like"},
+        "Animations": {"_children":{"plusOne":{"_type":"Animation","name":"plusOne","enabled":true,"kind":"emit","trigger":{"type":"event","event":"click"},"targets":[],"shows":"words","from":"centre","direction":"up","travel":44,"size":18,"duration":800,"delay":0,"easing":"outCubic","iterations":1,"words":"+1","preset":{"id":"ce:button:plus-one","revision":1,"from":"plusOne"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PlusOneCaption","id":"ctrl_1702577916003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"+1","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PlusOneHow","id":"ctrl_1702577916004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FF8CBDAC"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PlusOneWhat","id":"ctrl_1702577916005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"\"+1\" rises from the key with each click","_children":{"Fill":{"colour":"FFB8C0CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Count","id":"ctrl_1702577916006","description":"Count: each click throws how many there have been.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Tally"},
+        "Animations": {"_children":{"count":{"_type":"Animation","name":"count","enabled":true,"kind":"emit","trigger":{"type":"event","event":"click"},"targets":[],"shows":"count","from":"centre","direction":"up","travel":44,"size":20,"duration":800,"delay":0,"easing":"outCubic","iterations":1,"preset":{"id":"ce:button:count","revision":1,"from":"count"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CountCaption","id":"ctrl_1702577916007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Count","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CountHow","id":"ctrl_1702577916008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FF8CBDAC"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CountWhat","id":"ctrl_1702577916009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each click throws how many there have been","_children":{"Fill":{"colour":"FFB8C0CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SaysSo","id":"ctrl_1702577916010","description":"Says so: ON rises as it goes on, OFF as it goes off.","controlType":"ToggleButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Mute"},
+        "Animations": {"_children":{"saysOn":{"_type":"Animation","name":"saysOn","enabled":true,"kind":"emit","trigger":{"type":"stateChange","from":["*"],"to":["selected"]},"targets":[],"shows":"words","from":"tip","direction":"up","travel":32,"size":14,"duration":800,"delay":0,"easing":"outCubic","iterations":1,"words":"ON","preset":{"id":"ce:button:says-so","revision":1,"from":"saysOn"}},"saysOff":{"_type":"Animation","name":"saysOff","enabled":true,"kind":"emit","trigger":{"type":"stateChange","from":["selected"],"to":["*"],"leaving":true},"targets":[],"shows":"words","from":"tip","direction":"up","travel":32,"size":14,"duration":800,"delay":0,"easing":"outCubic","iterations":1,"words":"OFF","preset":{"id":"ce:button:says-so","revision":1,"from":"saysOff"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SaysSoCaption","id":"ctrl_1702577916011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Says so","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SaysSoHow","id":"ctrl_1702577916012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SWITCH","_children":{"Fill":{"colour":"FF8CBDAC"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SaysSoWhat","id":"ctrl_1702577916013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ON rises as it goes on, OFF as it goes off","_children":{"Fill":{"colour":"FFB8C0CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SentWord","id":"ctrl_1702577916014","description":"Sent word: SENT rises off the top of the key.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Send"},
+        "Animations": {"_children":{"sentWord":{"_type":"Animation","name":"sentWord","enabled":true,"kind":"emit","trigger":{"type":"event","event":"click"},"targets":[],"shows":"words","from":"tip","direction":"up","travel":30,"size":13,"duration":900,"delay":0,"easing":"outCubic","iterations":1,"words":"SENT","preset":{"id":"ce:button:sent-word","revision":1,"from":"sentWord"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SentWordCaption","id":"ctrl_1702577916015","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Sent word","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SentWordHow","id":"ctrl_1702577916016","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FF8CBDAC"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SentWordWhat","id":"ctrl_1702577916017","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SENT rises off the top of the key","_children":{"Fill":{"colour":"FFB8C0CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Double","id":"ctrl_1702577916018","description":"Times two: a double-click throws ×2.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Boost"},
+        "Animations": {"_children":{"double":{"_type":"Animation","name":"double","enabled":true,"kind":"emit","trigger":{"type":"event","event":"doubleClick"},"targets":[],"shows":"words","from":"centre","direction":"up","travel":44,"size":22,"duration":800,"delay":0,"easing":"outCubic","iterations":1,"words":"×2","preset":{"id":"ce:button:double","revision":1,"from":"double"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoubleCaption","id":"ctrl_1702577916019","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Times two","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoubleHow","id":"ctrl_1702577916020","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FF8CBDAC"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoubleWhat","id":"ctrl_1702577916021","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a double-click throws ×2","_children":{"Fill":{"colour":"FFB8C0CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HeldWord","id":"ctrl_1702577916022","description":"Held: HELD rises once the press has been held.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":312,"width":200,"height":100},
+        "Text": {"content":"Hold"},
+        "Animations": {"_children":{"heldWord":{"_type":"Animation","name":"heldWord","enabled":true,"kind":"emit","trigger":{"type":"event","event":"longPress"},"targets":[],"shows":"words","from":"centre","direction":"up","travel":44,"size":14,"duration":1000,"delay":0,"easing":"outCubic","iterations":1,"words":"HELD","preset":{"id":"ce:button:held-word","revision":1,"from":"heldWord"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HeldWordCaption","id":"ctrl_1702577916023","controlType":"Label"},
+        "Transform": {"x":560,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Held","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HeldWordHow","id":"ctrl_1702577916024","controlType":"Label"},
+        "Transform": {"x":560,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LONG PRESS","_children":{"Fill":{"colour":"FF8CBDAC"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HeldWordWhat","id":"ctrl_1702577916025","controlType":"Label"},
+        "Transform": {"x":564,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HELD rises once the press has been held","_children":{"Fill":{"colour":"FFB8C0CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:plus-one",
+      "name": "+1",
+      "category": "Button",
+      "tags": [
+        "Thrown",
+        "click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "plusOne": {
+          "_type": "Animation",
+          "name": "plusOne",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [],
+          "shows": "words",
+          "from": "centre",
+          "direction": "up",
+          "travel": 44,
+          "size": 18,
+          "duration": 800,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "words": "+1"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:count",
+      "name": "Count",
+      "category": "Button",
+      "tags": [
+        "Thrown",
+        "click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "count": {
+          "_type": "Animation",
+          "name": "count",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [],
+          "shows": "count",
+          "from": "centre",
+          "direction": "up",
+          "travel": 44,
+          "size": 20,
+          "duration": 800,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:says-so",
+      "name": "Says so",
+      "category": "Button",
+      "tags": [
+        "Thrown",
+        "switch"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "saysOn": {
+          "_type": "Animation",
+          "name": "saysOn",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "selected"
+            ]
+          },
+          "targets": [],
+          "shows": "words",
+          "from": "tip",
+          "direction": "up",
+          "travel": 32,
+          "size": 14,
+          "duration": 800,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "words": "ON"
+        },
+        "saysOff": {
+          "_type": "Animation",
+          "name": "saysOff",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "selected"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [],
+          "shows": "words",
+          "from": "tip",
+          "direction": "up",
+          "travel": 32,
+          "size": 14,
+          "duration": 800,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "words": "OFF"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:sent-word",
+      "name": "Sent word",
+      "category": "Button",
+      "tags": [
+        "Thrown",
+        "click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "sentWord": {
+          "_type": "Animation",
+          "name": "sentWord",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [],
+          "shows": "words",
+          "from": "tip",
+          "direction": "up",
+          "travel": 30,
+          "size": 13,
+          "duration": 900,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "words": "SENT"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:double",
+      "name": "Times two",
+      "category": "Button",
+      "tags": [
+        "Thrown",
+        "double-click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "double": {
+          "_type": "Animation",
+          "name": "double",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [],
+          "shows": "words",
+          "from": "centre",
+          "direction": "up",
+          "travel": 44,
+          "size": 22,
+          "duration": 800,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "words": "×2"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:held-word",
+      "name": "Held",
+      "category": "Button",
+      "tags": [
+        "Thrown",
+        "long press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "heldWord": {
+          "_type": "Animation",
+          "name": "heldWord",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "event",
+            "event": "longPress"
+          },
+          "targets": [],
+          "shows": "words",
+          "from": "centre",
+          "direction": "up",
+          "travel": 44,
+          "size": 14,
+          "duration": 1000,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "words": "HELD"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

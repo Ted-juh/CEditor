@@ -9,7 +9,8 @@
  * first three groups are made of. The second half plays on a key's own parts: its lamp (`indicator`),
  * its legend's words, the key and its housing (editor/ButtonDeviceParts.svelte), and on the caption
  * a key is drawn with. Those go on a button drawn as a key whose set draws the part; anywhere else
- * the library says so (animationPresetModel.js keyPartsNotDrawn).
+ * the library says so (animationPresetModel.js keyPartsNotDrawn). Thrown throws words from the key,
+ * and Hold plays over a timed button's hold (keyframeAnimation.js EMIT and `hold`).
  *
  * Every preset is an ordinary animation preset, id `ce:button:<name>`, applied linked and carried by
  * the panel as any other. `type` is the kind of button the showcase puts it on.
@@ -18,7 +19,7 @@
  * these under plain Node.
  */
 import {
-  transition, keyframes, words, ONCE_OPEN, entering, enteringOnce, leaving, gesture, state, part, VALUE_CHANGE, buildComponentPresets,
+  transition, keyframes, words, emit, ONCE_OPEN, entering, enteringOnce, leaving, gesture, state, part, VALUE_CHANGE, buildComponentPresets,
 } from './componentPresetKit.js';
 
 export const BUTTON_PRESET_GROUPS = Object.freeze([
@@ -29,6 +30,8 @@ export const BUTTON_PRESET_GROUPS = Object.freeze([
   { id: 'switch', label: 'Switch', note: 'a toggle going over' },
   { id: 'words', label: 'Words', note: 'the caption and the legend' },
   { id: 'signals', label: 'Signals', note: 'the lamp saying what happened' },
+  { id: 'thrown', label: 'Thrown', note: 'words thrown from the key' },
+  { id: 'hold', label: 'Hold', note: 'a timed button held to confirm' },
 ]);
 
 const MOMENTARY = 'MomentaryButton';
@@ -42,6 +45,17 @@ const FROM_OUTSIDE = { ...VALUE_CHANGE, origin: 'external' };
 const LAMP_PATHS = [['Parts.indicator.Background.Fill.colour', 'colour'], ['Parts.indicator.opacity', 'opacity']];
 // The caption a key is drawn with: the control's own text.
 const caption = (name, trigger, effect, way, settings) => ({ ...words(name, trigger, 'legend', effect, way, settings), targets: [{ path: 'Text' }] });
+// Words rising from the key (keyframeAnimation.js EMIT): words of its own, or a count.
+const fromKey = (name, trigger, said, extra = {}) => emit(name, trigger, {
+  shows: typeof said === 'string' ? 'words' : 'count', ...(typeof said === 'string' ? { words: said } : {}),
+  from: 'centre', direction: 'up', travel: 44, size: 18, duration: 800, easing: 'outCubic', ...extra,
+});
+// A timed button held to confirm (keyframeAnimation.js `hold`): plays over exactly its hold time.
+const HOLD = { type: 'hold' };
+const TIMED = 'TimedButton';
+// A timed button has no state for having fired: the preset brings one, with no look of its own, so
+// what plays when it fires has a state to enter.
+const EXECUTED = { Executed: state({ executed: true }) };
 const GREEN = 'FF2BB673';
 const RED = 'FFE5484D';
 const AMBER = 'FFF5A524';
@@ -254,11 +268,69 @@ const SIGNALS = [
   },
 ];
 
+const THROWN = [
+  {
+    id: 'plus-one', name: '+1', how: 'click', what: '"+1" rises from the key with each click', type: MOMENTARY,
+    animations: { plusOne: fromKey('plusOne', gesture('click'), '+1') },
+  },
+  {
+    id: 'count', name: 'Count', how: 'click', what: 'each click throws how many there have been', type: MOMENTARY,
+    animations: { count: fromKey('count', gesture('click'), 1, { size: 20 }) },
+  },
+  {
+    id: 'says-so', name: 'Says so', how: 'switch', what: 'ON rises as it goes on, OFF as it goes off', type: TOGGLE,
+    animations: {
+      saysOn: fromKey('saysOn', enteringOnce('selected'), 'ON', { from: 'tip', travel: 32, size: 14 }),
+      saysOff: fromKey('saysOff', leaving('selected'), 'OFF', { from: 'tip', travel: 32, size: 14 }),
+    },
+  },
+  {
+    id: 'sent-word', name: 'Sent word', how: 'click', what: 'SENT rises off the top of the key', type: MOMENTARY,
+    animations: { sentWord: fromKey('sentWord', gesture('click'), 'SENT', { from: 'tip', travel: 30, size: 13, duration: 900 }) },
+  },
+  {
+    id: 'double', name: 'Times two', how: 'double-click', what: 'a double-click throws ×2', type: MOMENTARY,
+    animations: { double: fromKey('double', gesture('doubleClick'), '×2', { size: 22 }) },
+  },
+  {
+    id: 'held-word', name: 'Held', how: 'long press', what: 'HELD rises once the press has been held', type: MOMENTARY,
+    animations: { heldWord: fromKey('heldWord', gesture('longPress'), 'HELD', { size: 14, duration: 1000 }) },
+  },
+];
+
+const HOLDING = [
+  {
+    id: 'lamp-fills', name: 'Lamp fills', how: 'hold to confirm', what: 'the lamp fills green over the hold and flashes as it fires', type: TIMED,
+    states: EXECUTED,
+    animations: {
+      lampFills: keyframes('lampFills', HOLD, 'indicator', [{ at: 0, scale: 1 }, { at: 1, scale: 1.3, fill: GREEN }], 1500, { easing: 'linear' }),
+      lampFired: keyframes('lampFired', enteringOnce('executed'), 'indicator', [{ at: 0, scale: 1.3, fill: GREEN }, { at: 0.7, scale: 1, fill: GREEN }, { at: 1 }], 700, { easing: 'outQuad' }),
+    },
+  },
+  {
+    id: 'key-fills', name: 'Key fills', how: 'hold to confirm', what: 'the key colours amber over the hold, and goes back if let go', type: TIMED,
+    animations: { keyFills: keyframes('keyFills', HOLD, 'key', [{ at: 0, scale: 1 }, { at: 1, scale: 1, fill: AMBER }], 1500, { easing: 'linear' }) },
+  },
+  {
+    id: 'swell', name: 'Swell', how: 'hold to confirm', what: 'the key grows as you hold, and snaps back if let go early', type: TIMED,
+    animations: { swell: keyframes('swell', HOLD, '', [{ at: 0, scale: 1 }, { at: 1, scale: 1.12 }], 1500, { easing: 'linear' }) },
+  },
+  {
+    id: 'tremble', name: 'Tremble', how: 'hold to confirm', what: 'it trembles harder the nearer the hold comes to firing', type: TIMED,
+    animations: { tremble: keyframes('tremble', HOLD, '', [{ at: 0, x: 0 }, { at: 0.3, x: 0 }, { at: 0.4, x: -1 }, { at: 0.5, x: 1 }, { at: 0.6, x: -2 }, { at: 0.7, x: 2 }, { at: 0.8, x: -3 }, { at: 0.9, x: 3 }, { at: 1, x: 0 }], 1500, { easing: 'linear' }) },
+  },
+  {
+    id: 'confirmed', name: 'Confirmed', how: 'when it fires', what: 'OK rises from the key once the hold has done its work', type: TIMED,
+    states: EXECUTED,
+    animations: { confirmed: fromKey('confirmed', enteringOnce('executed'), 'OK', { from: 'tip', travel: 34, size: 16, duration: 900 }) },
+  },
+];
+
 export const BUTTON_PRESETS = buildComponentPresets({
   component: 'Button',
   prefix: 'button',
   groups: BUTTON_PRESET_GROUPS,
-  byGroup: { press: PRESS, attention: ATTENTION, gestures: GESTURES, light: LIGHT, switch: SWITCH, words: WORDS, signals: SIGNALS },
+  byGroup: { press: PRESS, attention: ATTENTION, gestures: GESTURES, light: LIGHT, switch: SWITCH, words: WORDS, signals: SIGNALS, thrown: THROWN, hold: HOLDING },
 });
 
 export const buttonPresetId = (slug) => `ce:button:${slug}`;

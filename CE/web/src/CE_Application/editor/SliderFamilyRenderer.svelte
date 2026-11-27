@@ -918,8 +918,13 @@
 
   // --- Emitted words (utils/keyframeAnimation.js EMIT) -------------------------------------------
   const valueAt = (normalized) => numberOr(behavior?.min, 0) + (numberOr(behavior?.max, 1) - numberOr(behavior?.min, 0)) * clamp(numberOr(normalized, 0), 0, 1);
-  /** What a word says: the value as the readout prints it, or the change since the last word, signed. */
+  /**
+   * What a word says: the value as the readout prints it, the change since the last word, signed,
+   * words of its own, or how many it has thrown.
+   */
   function emittedText(word) {
+    if (word.emit.shows === 'words') return word.emit.words || '+1';
+    if (word.emit.shows === 'count') return String(word.count ?? 1);
     if (word.emit.shows !== 'delta') return formatSliderNumericValue(behavior, valueAt(word.value));
     const span = numberOr(behavior?.max, 1) - numberOr(behavior?.min, 0);
     const change = (numberOr(word.value, 0) - numberOr(word.from, 0)) * span;

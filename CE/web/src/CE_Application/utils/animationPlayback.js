@@ -19,6 +19,7 @@
  * it. A condition the session cannot hold at all is reported (`exact: false`) and played as near as
  * it can be, because a near miss shown honestly beats a Play button that does nothing.
  */
+import { resolveTimedButtonConfig } from './timedButtonPreview.js';
 import { readTrigger, stepsOfControl, STATE_RULE_VALUE_NAMES } from './interactionRuntime.js';
 import { getCustomValueChannels, customChannelDefaultValue, customConditionMatches } from './customComponentInteraction.js';
 import { controlStateNames, ANY_STATE, DEFAULT_STATE } from './animationModel.js';
@@ -331,6 +332,24 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
         session: { ...REST_SESSION, ...patches[i] },
         hold: i === 0 ? LEAD_MS : Math.max(320, Math.min(span, 900)),
       })),
+    };
+  }
+
+  if (trigger.type === 'hold') {
+    // Held to confirm, for exactly as long as this button must be held (or waits for its next
+    // click), then let go confirmed: the hold's animation runs over it and the Executed state shows.
+    const config = resolveTimedButtonConfig(control?._children?.Behavior ?? {});
+    const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
+    const holdMs = (config.subtype === 'double_click' ? config.clickWindow : config.holdDuration) * scale;
+    return {
+      ok: true,
+      exact: true,
+      note: '',
+      steps: [
+        { label: 'rest', session: { ...REST_SESSION }, hold: LEAD_MS },
+        { label: 'held', session: { ...REST_SESSION, hover: true, pressed: true, pending: true }, hold: holdMs },
+        { label: 'confirmed', session: { ...REST_SESSION, hover: true, executed: true }, hold: TAIL_MS + 600 },
+      ],
     };
   }
 

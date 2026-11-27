@@ -34,6 +34,7 @@ import { cleanValueFrames, VALUE_TARGET } from './sceneFormat.js';
 import { controlDrawsValue } from './valueDrawn.js';
 import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+import { BUTTON_DEVICE_TYPES } from '../models/buttonDeviceParts.js';
 import {
   KEYFRAME_TRIGGER_TYPES,
   FRAME_PROPERTIES,
@@ -76,11 +77,15 @@ export const VALUE_KIND = 'value';
 /**
  * `emit`: words thrown out from a knob's or a slider's pointer as its value steps — the value, or
  * how far it moved (utils/keyframeAnimation.js EMIT). Drawn by the slider renderer, so offered on
- * the knob and slider family only. The Components showcase's Knob, phase 2, 2026-11-26.
+ * the knob and slider family. The Components showcase's Knob, phase 2, 2026-11-26. And from a
+ * button's key: words of its own, or a count (CanvasControl draws them); the Button, 2026-11-27.
  */
 export const EMIT_KIND = 'emit';
+/** Whether a control throws words from a key: a button of any kind. */
+export const throwsFromKey = (control) => BUTTON_DEVICE_TYPES.has(String(control?._children?.Core?.controlType ?? ''));
 /** The kinds an animation on this control may be: a knob or a slider has the value kind too. */
 export function animationKindsFor(control) {
+  if (throwsFromKey(control)) return [...ANIMATION_KINDS, EMIT_KIND];
   if (!controlDrawsValue(control)) return ANIMATION_KINDS;
   return isSliderFamily(control) ? [...ANIMATION_KINDS, VALUE_KIND, EMIT_KIND] : [...ANIMATION_KINDS, VALUE_KIND];
 }
@@ -639,6 +644,7 @@ export const KEYFRAME_TRIGGER_LABELS = {
   beat: 'On the beat',
   script: 'When a script plays it',
   event: 'On a click or gesture',
+  hold: 'While held to confirm',
 };
 
 /** Where a keyframe animation plays, as a targets list: a part, or the control itself. */
@@ -715,17 +721,24 @@ export function kindPatch(row, kind, control = null) {
     // Words thrown from the pointer: the value, from its tip, along it, on each step — or on a
     // trigger a keyframe animation answers, except "all the time", which would throw nothing.
     const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) && trigger.type !== 'always' ? trigger.type : null;
+    // A button has no value to throw: words of its own ("+1" until it is given others), or a count.
+    const key = throwsFromKey(control);
+    const shows = key ? (['words', 'count'].includes(animation.shows) ? animation.shows : 'words')
+      : (['value', 'delta', 'words', 'count'].includes(animation.shows) ? animation.shows : 'value');
     const patch = {
       kind: EMIT_KIND,
-      shows: ['value', 'delta'].includes(animation.shows) ? animation.shows : 'value',
+      shows,
+      ...(shows === 'words' && !String(animation.words ?? '').trim() ? { words: '+1' } : {}),
       from: ['tip', 'centre'].includes(animation.from) ? animation.from : 'tip',
       direction: ['pointer', 'up'].includes(animation.direction) ? animation.direction : 'pointer',
       travel: Number(animation.travel) > 0 ? Number(animation.travel) : 36,
       size: Number(animation.size) > 0 ? Number(animation.size) : 12,
-      trigger: type ? { ...trigger, type } : { type: 'valueStep' },
+      trigger: type ? { ...trigger, type } : (key ? { type: 'event', event: 'click' } : { type: 'valueStep' }),
       targets: [],
       iterations: 1,
     };
+    if (key && !['tip', 'centre'].includes(animation.from)) patch.from = 'centre';
+    if (key) patch.direction = 'up';
     if (!(Number(animation.duration) >= 200)) patch.duration = 700;
     return patch;
   }
@@ -851,6 +864,7 @@ export function triggerSummary(row) {
     if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
     if (t.type === 'script') return 'from a script';
     if (t.type === 'event') return `on ${EVENT_WORDS[t.event] ?? 'a gesture'}`;
+    if (t.type === 'hold') return 'while held to confirm';
   }
   if (t.type === 'valueChange') return `when ${t.source} changes`;
   if (t.leaving === true) return `leaving ${!t.from?.length || t.from.includes('*') ? 'any state' : t.from.join(', ')}`;

@@ -1,3 +1,4 @@
+import { resolveTimedButtonConfig } from './timedButtonPreview.js';
 import { curveIsIdentity, curveSpec, fractionToTravel } from './channelCurves.js';
 import { deepClone } from './deepClone.js';
 import { isChoiceGroupBehavior, isOptionState, selectedChoiceKeys } from './choiceGroupLayout.js';
@@ -676,6 +677,14 @@ function textEffectEntry(animation, key, timeScale) {
   };
 }
 
+/** How long a timed button must be held, or waits for its next click: a hold entry's duration. */
+function holdTiming(control, entry, timeScale = 1) {
+  const config = resolveTimedButtonConfig(getNodeChild(control, 'Behavior') ?? {});
+  const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
+  const duration = (config.subtype === 'double_click' ? config.clickWindow : config.holdDuration) * scale;
+  return { duration, iterations: 1, span: (entry.delay ?? 0) + duration };
+}
+
 function buildKeyframeCatalog(control, previewSession) {
   const animations = getNodeChild(control, 'Animations');
   const enabled = animations?.enabled !== false && previewSession?.animationsEnabled !== false;
@@ -690,6 +699,10 @@ function buildKeyframeCatalog(control, previewSession) {
     if (!entry) continue;
     // A step trigger that names no count steps as the control does.
     if (entry.trigger?.type === 'valueStep' && !entry.trigger.steps) entry.trigger = { ...entry.trigger, steps: stepsOfControl(control) };
+    // A keyframe animation on a hold plays once, over the button's own hold (or, for a double-click
+    // one, its wait for the next click): its own duration is not asked for. A text effect or a word
+    // keeps its own.
+    if (entry.trigger?.type === 'hold' && entry.frames?.length) Object.assign(entry, holdTiming(control, entry, previewSession?.animationTimeScale));
     entries.push(entry);
   }
   return { enabled: true, reducedMotion, entries };

@@ -2062,6 +2062,11 @@ ControlAnatomy, given what CanvasControl plays); a preset on a part the button's
 is refused, judged as drawn. 23 presets on the lamp, the key, the legend and the caption, four
 panels, and Chase in Together.
 
+And what that left, on 2026-11-27: thrown words say words of their own or a count, and a button
+throws them, rising from its key (drawn by CanvasControl beside the content); and a keyframe
+animation can play on `hold`, over exactly a timed button's own hold time, stopping if it is let go
+early. 11 presets, two panels.
+
 ## Open
 
 Nothing for the owner at present.

@@ -840,7 +840,7 @@ assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
 }, {
   component: 'Slider', groups: ['Numbers', 'Ticks', 'Touch', 'Moving', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
 }, {
-  component: 'Button', groups: ['Press', 'Attention', 'Gestures', 'Light', 'Switch', 'Words', 'Signals'], count: 41, first: 'Sink press',
+  component: 'Button', groups: ['Press', 'Attention', 'Gestures', 'Light', 'Switch', 'Words', 'Signals', 'Thrown', 'Hold'], count: 52, first: 'Sink press',
 }]);
 await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
 await settle();
@@ -959,6 +959,48 @@ check('a knob is offered the Words kind: words thrown on each step, the value or
   assert.ok(streamSteps, 'a step trigger says how many steps');
   assert.equal(deltaNode.shows, 'delta');
   assert.ok(!noSteps, 'and only a step trigger');
+  assert.ok(!streamTriggers.includes('hold'), 'a knob is never held to confirm');
+});
+
+// --- A button's words, and a timed button's hold (2026-11-27) ------------------------------------
+
+await ev(() => window.__anim.selectTimed());
+await settle();
+await ev(() => window.__anim.addAnimationNamed('thrown'));
+await settle();
+const timedKinds = await ev(() => window.__anim.kindLabels());
+await ev(() => window.__anim.pickKind('words'));
+await settle();
+const thrownNode = await ev(() => window.__anim.timedAnimation('thrown'));
+const thrownShows = await ev(() => window.__anim.segmentLabels('Shows'));
+const thrownFrom = await ev(() => window.__anim.segmentLabels('From'));
+const wordsField = await ev(() => window.__anim.wordsField());
+await ev(() => window.__anim.clickSegment('Shows', 'A count'));
+await settle();
+const countNode = await ev(() => window.__anim.timedAnimation('thrown'));
+const countField = await ev(() => window.__anim.wordsField());
+check('a button is offered the Words kind: "+1", rising from the key; words of its own or a count', () => {
+  assert.ok(timedKinds.includes('Words'), `kinds: ${timedKinds.join(', ')}`);
+  assert.deepEqual([thrownNode.kind, thrownNode.shows, thrownNode.words, thrownNode.from, thrownNode.direction], ['emit', 'words', '+1', 'centre', 'up']);
+  assert.equal(thrownNode.trigger.type, 'stateChange', 'the trigger it had is kept, as on a knob');
+  assert.deepEqual(thrownShows, ['Words', 'A count'], 'no value to throw');
+  assert.deepEqual(thrownFrom, ['The key', 'Above it']);
+  assert.ok(wordsField, 'the words, to write');
+  assert.equal(countNode.shows, 'count');
+  assert.ok(!countField, 'a count has no words to write');
+});
+
+await ev(() => window.__anim.addAnimationNamed('filling'));
+await settle();
+await ev(() => window.__anim.pickKind('keyframes'));
+await settle();
+const holdTriggers = await ev(() => window.__anim.triggerOptions());
+await ev(() => window.__anim.chooseTrigger('hold'));
+await settle();
+const holdNode = await ev(() => window.__anim.timedAnimation('filling'));
+check('a timed button is offered the hold: a keyframe animation that plays while it is held to confirm', () => {
+  assert.ok(holdTriggers.includes('hold'), `triggers: ${holdTriggers.join(', ')}`);
+  assert.equal(holdNode.trigger.type, 'hold');
 });
 
 // --- The rules --------------------------------------------------------------------------------

@@ -45,7 +45,8 @@ test('the trigger types a keyframe animation answers', () => {
   // `event` joined on 2026-11-24: a gesture (click, long press, flick…), the States tab's Events
   // row, played on request as `script` is (stateMotion.js). `valueStep` on 2026-11-26: once each
   // time a knob's value crosses into another of its steps (the Components showcase's Detent).
-  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event']);
+  // `hold` on 2026-11-27: while a timed button is held to confirm, over its own hold time.
+  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold']);
   assert.equal(defaultIterations('always'), 'infinite');
   assert.equal(defaultIterations('stateChange'), 'infinite', 'a state animation loops while the state holds');
   assert.equal(defaultIterations('valueChange'), 1);
@@ -333,7 +334,7 @@ test('an emit animation reads what it throws, from where and how far, kept in ra
   const entry = readEmit(emitNode({ shows: 'delta', from: 'centre', direction: 'up', travel: 9999, size: 1 }));
   assert.deepEqual(
     { ...entry.emit, easing: undefined },
-    { shows: 'delta', from: 'centre', direction: 'up', travel: 400, size: 6, colour: null, duration: 700, delay: 0, easing: undefined },
+    { shows: 'delta', words: '', from: 'centre', direction: 'up', travel: 400, size: 6, colour: null, duration: 700, delay: 0, easing: undefined },
   );
   assert.equal(entry.moves, false);
   assert.deepEqual(entry.frames, []);

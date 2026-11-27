@@ -229,8 +229,13 @@ export function presetDoesNotFit(preset, control) {
   if (Object.values(preset.animations ?? {}).some((node) => node?.kind === 'value') && !controlDrawsValue(control)) {
     return 'It moves what a value draws, and this control draws none: it goes on a knob, a slider, a Macro or a meter.';
   }
-  if (Object.values(preset.animations ?? {}).some((node) => node?.kind === 'emit') && !isSliderFamily(control)) {
-    return 'It throws words from a pointer, and this control has none: it goes on a knob or a slider.';
+  // Words are thrown from a knob's or a slider's pointer, or from a button's key; a button throws
+  // only words of its own or a count, having no value to speak of.
+  const emits = Object.values(preset.animations ?? {}).filter((node) => node?.kind === 'emit');
+  if (emits.length) {
+    const button = BUTTON_DEVICE_TYPES.has(String(control._children.Core?.controlType ?? ''));
+    if (!button && !isSliderFamily(control)) return 'It throws words from a pointer or a key, and this control has neither: it goes on a knob, a slider or a button.';
+    if (button && emits.some((node) => !['words', 'count'].includes(node.shows))) return 'It throws the value, and a button has none to throw: words of its own or a count go on a button.';
   }
   return wordsNotShown(preset, control);
 }
