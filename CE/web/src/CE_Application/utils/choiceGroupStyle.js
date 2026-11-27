@@ -202,6 +202,10 @@ function applyWhole(look, patch) {
   for (const key of ['paddingX', 'paddingY', 'indicatorGap']) {
     if (patch[key] != null) look.whole[key] = Math.max(0, numberOr(patch[key], 0));
   }
+  // The option's own motion, as a state sets it (an option that grows under the pointer, the others
+  // dimmed): drawn as a scale and an opacity, which a transition on `Parts.option` eases.
+  if (patch.scale != null) look.motion.scale = Math.min(3, Math.max(0.2, numberOr(patch.scale, 1)));
+  if (patch.opacity != null) look.motion.opacity = Math.min(1, Math.max(0, numberOr(patch.opacity, 1)));
 }
 
 function applyLabel(look, patch) {
@@ -216,6 +220,9 @@ function applyLabel(look, patch) {
   if (patch.fontWeight != null) font.weightValue = patch.fontWeight;
   if (patch.letterSpacing != null) font.letterSpacing = numberOr(patch.letterSpacing, 0);
   if (patch.fontFamily != null) font.family = patch.fontFamily;
+  // Its words grown or shrunk about their middle, without moving the options: `Parts.optionLabel`'s
+  // transition eases it.
+  if (patch.scale != null) look.motion.labelScale = Math.min(3, Math.max(0.2, numberOr(patch.scale, 1)));
 }
 
 function applyParts(look, patch) {
@@ -360,6 +367,7 @@ export function resolveChoiceOption({
   const rowId = String(row?.id ?? '');
   const selected = flags.selected === true;
   const look = baseLook({ style, background, text, contentLayout, palette, flags, inset });
+  look.motion = { scale: 1, opacity: 1, labelScale: 1 };
 
   // The Segments tab leaves layers out to find what a field inherits (SegmentsEditor.svelte).
   if (includeRowBase) applyLegacyRow(look, row, selected);
@@ -373,6 +381,8 @@ export function resolveChoiceOption({
     focused: flags.focused === true,
     checked: selected,
     selectionActive: selected,
+    // Another option is under the pointer: a state about it dims the rest (the Spotlight preset).
+    peerHover: flags.peerHover === true,
   };
   // An option state paints the option (where the style paints options) with its component patch;
   // any other state that holds is the control's, and paints it, except in the buttons style, where
@@ -423,5 +433,6 @@ export function resolveChoiceOption({
     indicatorOuter: look.indicatorOuter,
     indicatorInner: { ...look.indicatorInner, shown: look.indicatorInner.visible !== false && (look.indicatorInner.selectedOnly !== true || selected) },
     whole: look.whole,
+    motion: look.motion,
   };
 }

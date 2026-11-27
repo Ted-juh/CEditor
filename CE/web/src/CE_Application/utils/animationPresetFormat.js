@@ -70,6 +70,10 @@ export function cleanPreset(raw) {
       patches: {
         component: state.patches?.component && typeof state.patches.component === 'object' ? deepCopy(state.patches.component) : {},
         parts: state.patches?.parts && typeof state.patches.parts === 'object' ? deepCopy(state.patches.parts) : {},
+        // A choice group's options, all alike (choiceGroupStyle.js): an option grown under the
+        // pointer, the others dimmed. Only the shared layer: a preset cannot name another group's rows.
+        ...(state.patches?.segments?.shared && typeof state.patches.segments.shared === 'object'
+          ? { segments: { shared: deepCopy(state.patches.segments.shared) } } : {}),
       },
     };
   }

@@ -67,3 +67,11 @@ test('the rule builder offers the control\'s value, which every control has', as
   const { STATE_RULE_VALUE_NAMES } = await import('../src/CE_Application/utils/interactionRuntime.js');
   assert.deepEqual(STATE_RULE_VALUE_NAMES, ['value', 'valueNormalized', 'valueEnum']);
 });
+
+test('a choice group\'s States tab offers Other hovered, which the runtime gives its options; no other control\'s does', () => {
+  const s = src('CE_Application/sections/StatesEditor.svelte');
+  assert.match(s, /key: 'peerHover', label: 'Other hovered'/);
+  assert.match(s, /choicePartNames\(control\)\.length \? \[\.\.\.COMMON_FLAGS, \.\.\.CHOICE_FLAGS\] : COMMON_FLAGS/, 'on a choice group only');
+  assert.match(s, /#each flags as flag/, 'and the toggles are drawn from that list');
+  assert.match(src('CE_Application/utils/choiceGroupLayout.js'), /OPTION_STATE_SIGNALS = Object\.freeze\(\[[^\]]*'peerHover'/, 'a state about the options');
+});

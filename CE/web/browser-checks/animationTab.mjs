@@ -842,7 +842,7 @@ assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
 }, {
   component: 'Button', groups: ['Press', 'Attention', 'Gestures', 'Light', 'Switch', 'Words', 'Signals', 'Thrown', 'Hold'], count: 52, first: 'Sink press',
 }, {
-  component: 'Choice group', groups: ['Attention', 'Choosing'], count: 9, first: 'Pulse always',
+  component: 'Choice group', groups: ['Attention', 'Choosing', 'Thumb', 'The chosen', 'Appear', 'Hover', 'New options'], count: 30, first: 'Pulse always',
 }]);
 await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
 await settle();
@@ -1027,6 +1027,47 @@ const holdNode = await ev(() => window.__anim.timedAnimation('filling'));
 check('a timed button is offered the hold: a keyframe animation that plays while it is held to confirm', () => {
   assert.ok(holdTriggers.includes('hold'), `triggers: ${holdTriggers.join(', ')}`);
   assert.equal(holdNode.trigger.type, 'hold');
+});
+
+// --- A choice group's options as parts (2026-11-27) ----------------------------------------------
+
+const knobTriggers = holdTriggers;
+await ev(() => window.__anim.selectChoice());
+await settle();
+await ev(() => window.__anim.addAnimationNamed('cascade'));
+await settle();
+await ev(() => window.__anim.pickKind('keyframes'));
+await settle();
+const choiceTriggers = await ev(() => window.__anim.triggerOptions());
+const choiceParts = await ev(() => window.__anim.playsOnOptions());
+const wholeStagger = await ev(() => window.__anim.hasRow('Each option'));
+assert.ok(await ev(() => window.__anim.playOn('Every option')), `plays on: ${choiceParts.join(' | ')}`);
+await settle();
+const optionStagger = await ev(() => window.__anim.hasRow('Each option'));
+const orderBefore = await ev(() => window.__anim.hasRow('Order'));
+await ev(() => window.__anim.typeOptionStagger(90));
+await settle();
+const orderAfter = await ev(() => window.__anim.hasRow('Order'));
+await ev(() => window.__anim.clickSegment('Option order', 'Out from the chosen'));
+await settle();
+await ev(() => window.__anim.chooseTrigger('optionsChange'));
+await settle();
+const cascadeNode = await ev(() => window.__anim.choiceAnimation('cascade'));
+check('a choice group\'s options are places a keyframe animation plays on: the thumb, the chosen, every option and label', () => {
+  for (const label of ['Thumb', 'Chosen option', 'Every option', 'Chosen label', 'Every label']) assert.ok(choiceParts.includes(label), choiceParts.join(' | '));
+});
+check('on every option it can take them one after another, in an order; not on the whole group', () => {
+  assert.ok(!wholeStagger, 'the whole group is one thing');
+  assert.ok(optionStagger, 'Each option, so many ms later');
+  assert.ok(!orderBefore && orderAfter, 'an order once there is a stagger to order');
+  assert.deepEqual(cascadeNode.targets, [{ path: 'Parts.option' }]);
+  assert.equal(cascadeNode.optionStagger, 90);
+  assert.equal(cascadeNode.optionOrder, 'fromChosen');
+});
+check('"when its options change" is offered on a choice group, and on nothing else', () => {
+  assert.ok(choiceTriggers.includes('optionsChange'), choiceTriggers.join(', '));
+  assert.equal(cascadeNode.trigger.type, 'optionsChange');
+  assert.ok(!knobTriggers.includes('optionsChange'), `a timed button: ${knobTriggers.join(', ')}`);
 });
 
 // --- The rules --------------------------------------------------------------------------------

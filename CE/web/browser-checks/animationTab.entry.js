@@ -109,7 +109,15 @@ timed._children.Core.name = 'Erase';
 timed._children.Transform.x = 300;
 timed._children.Transform.y = 250;
 
-panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [control, knob, timed] }]);
+// A choice group: its options as parts, each a stagger after the last, and the trigger for a new list
+// of options (2026-11-27).
+const choice = createControl('RadioButtonGroup');
+choice._children.Core.id = 'ctrl_choice';
+choice._children.Core.name = 'Shape';
+choice._children.Transform.x = 600;
+choice._children.Transform.y = 250;
+
+panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [control, knob, timed, choice] }]);
 activePanelId.set('p1');
 selectedComponentIds.set(new Set([CONTROL_ID]));
 
@@ -125,6 +133,30 @@ window.__anim = {
   selectKnob: () => { selectedComponentIds.set(new Set(['ctrl_knob'])); activateEditorTarget('animation', 'ctrl_knob'); },
   selectTimed: () => { selectedComponentIds.set(new Set(['ctrl_timed'])); activateEditorTarget('animation', 'ctrl_timed'); },
   timedAnimation: (name) => JSON.parse(JSON.stringify(get(panels)[0].controls.find((c) => c._children.Core.id === 'ctrl_timed')._children.Animations?._children?.[name] ?? null)),
+  selectChoice: () => { selectedComponentIds.set(new Set(['ctrl_choice'])); activateEditorTarget('animation', 'ctrl_choice'); },
+  choiceAnimation: (name) => JSON.parse(JSON.stringify(get(panels)[0].controls.find((c) => c._children.Core.id === 'ctrl_choice')._children.Animations?._children?.[name] ?? null)),
+  /** Where a keyframe animation plays, from its pane's path bar: a place, or a part within one. */
+  playsOnOptions: () => [...document.querySelectorAll('.playson [data-step] select option')].map((o) => o.textContent.trim()),
+  playOn: (label) => {
+    for (const step of ['place', 'part']) {
+      const select = document.querySelector(`.playson [data-step="${step}"] select`);
+      const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
+      if (!select || !option) continue;
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    return false;
+  },
+  /** The rows a labelled row of the tab has, by label: true when it is there. */
+  hasRow: (label) => [...document.querySelectorAll('.r')].some((row) => textOf(row.querySelector('.lab, label')) === label),
+  typeOptionStagger: (ms) => {
+    const input = document.querySelector('input[aria-label="ms later"]');
+    input.focus();
+    input.value = String(ms);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  },
   segmentLabels: (label) => [...document.querySelectorAll(`[data-emit-animation] [aria-label="${label}"] button`)].map(textOf),
   wordsField: () => !!document.querySelector('[data-emit-words] input'),
   addAnimationNamed: (name) => {

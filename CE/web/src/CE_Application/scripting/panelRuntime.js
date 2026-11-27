@@ -7829,8 +7829,9 @@ const DEFINE_SPECS = {
       // Words thrown from a knob's pointer or a button's key (utils/keyframeAnimation.js readEmit):
       // what they show, and a button's words of its own.
       'shows', 'from', 'travel', 'size', 'words',
-      // A keyframe animation on Each step mirrored on a step back (keyframeAnimation.js mirroredEntry).
-      'followTurn'],
+      // A keyframe animation on Each step mirrored on a step back (keyframeAnimation.js mirroredEntry);
+      // on a choice group's every option, each a little after the last (optionStagger.js).
+      'followTurn', 'optionStagger', 'optionOrder'],
   },
   Bindings: {
     templates: [ENTRY_BASELINES.Bindings],

@@ -49,6 +49,7 @@ import { labelShows } from './labelShows.js';
 import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
 import { setByAuthor } from './authorsStateValue.js';
 import { BUTTON_DEVICE_PARTS, BUTTON_DEVICE_TYPES, buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
+import { choicePartNames } from './choiceGroupLayout.js';
 
 /** The fields of an animation that are its identity in a control, not a setting. */
 const IDENTITY = new Set(['_type', 'name', LINK_KEY]);
@@ -210,8 +211,8 @@ export function presetNeeds(preset) {
   return { parts: [...parts].sort(), sections: [...sections].sort(), states };
 }
 
-/** The parts a control has, by name. */
-const partNamesOf = (control) => new Set(Object.keys(control?._children?.Parts?._children ?? {}));
+/** The parts a control has, by name: its own, and a choice group's drawn from its rows. */
+const partNamesOf = (control) => new Set([...Object.keys(control?._children?.Parts?._children ?? {}), ...choicePartNames(control)]);
 
 /**
  * Why a preset cannot go on this control, or '' when it can. A control without an Animations section
@@ -352,8 +353,10 @@ export function applyPresetPatch(control, preset, { link = true, drawn = null } 
       }
       parts[part] = merged;
     }
+    // A choice group's options, all alike: what the state already sets for them is kept.
+    const segments = mergedSegments(current?.patches?.segments, wanted.patches?.segments);
     patch[`States.${existingKey ?? key}`] = current
-      ? { ...current, patches: { ...(current.patches ?? {}), component, parts } }
+      ? { ...current, patches: { ...(current.patches ?? {}), component, parts, ...(segments ? { segments } : {}) } }
       : {
         _type: 'State',
         name: key,
@@ -362,11 +365,29 @@ export function applyPresetPatch(control, preset, { link = true, drawn = null } 
         enabled: true,
         when: deepCopy(wanted.when ?? {}),
         ...(wanted.rule ? { rule: wanted.rule } : {}),
-        patches: { component, parts },
+        patches: { component, parts, ...(segments ? { segments } : {}) },
       };
   }
   for (const [path, value] of Object.entries(preset.fields ?? {})) patch[path] = value;
   return { patch, names };
+}
+
+/**
+ * A state's options patch (`segments`, choiceGroupStyle.js) with a preset's shared layer laid in:
+ * each value the state does not set yet, part by part. Null when the preset brings none.
+ */
+function mergedSegments(current, wanted) {
+  const shared = wanted?.shared;
+  if (!shared || typeof shared !== 'object' || !Object.keys(shared).length) return null;
+  const out = deepCopy(current && typeof current === 'object' ? current : {});
+  out.shared = out.shared && typeof out.shared === 'object' ? out.shared : {};
+  for (const [part, values] of Object.entries(shared)) {
+    if (!values || typeof values !== 'object') continue;
+    const into = out.shared[part] && typeof out.shared[part] === 'object' ? out.shared[part] : {};
+    for (const [key, value] of Object.entries(values)) if (into[key] === undefined) into[key] = deepCopy(value);
+    out.shared[part] = into;
+  }
+  return out;
 }
 
 // --- Following it -------------------------------------------------------------------------------

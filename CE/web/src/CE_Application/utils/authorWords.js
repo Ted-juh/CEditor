@@ -128,6 +128,8 @@ const FLAG_WORDS = {
   checked: 'checked',
   mixed: 'mixed',
   pending: 'pending',
+  // A choice group's option, while the pointer is on another of its options (choiceGroupStyle.js).
+  peerHover: 'another option hovered',
 };
 
 const either = (value) => (Array.isArray(value) ? value.join(' or ') : String(value));

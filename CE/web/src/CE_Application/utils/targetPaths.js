@@ -31,6 +31,7 @@ import {
   resolvedPartsOf,
 } from './animationModel.js';
 import { patternLabel } from './patternLayers.js';
+import { choicePartNames } from './choiceGroupLayout.js';
 
 /** The role groups a slider-family part's name starts with, in the order they are listed. */
 export const PART_GROUPS = Object.freeze([
@@ -46,6 +47,12 @@ const KNOWN_PART_LABELS = Object.freeze({
   bodySelectedRange: 'Range fill',
   bodyCenterMarker: 'Centre marker',
   tickNumber: 'Numbers',
+  // A choice group's, drawn from its rows (choiceGroupLayout.js CHOICE_PARTS).
+  thumb: 'Thumb',
+  chosen: 'Chosen option',
+  option: 'Every option',
+  chosenLabel: 'Chosen label',
+  optionLabel: 'Every label',
 });
 
 /** Where a property of the control itself is listed, and what it is called there. */
@@ -95,7 +102,7 @@ export function partPlace(partName) {
       return { group: group.label, label: KNOWN_PART_LABELS[name] ?? words(rest) };
     }
   }
-  return { group: '', label: name };
+  return { group: '', label: KNOWN_PART_LABELS[name] ?? name };
 }
 
 function partOfferedLabel(propertyPath) {
@@ -147,7 +154,7 @@ export function describeTargetPath(control, target) {
  * A keyframe animation plays on a place, not a property: its entries are the places themselves.
  */
 export function targetTree(control, kind = 'transition') {
-  const parts = Object.keys(resolvedPartsOf(control));
+  const parts = [...Object.keys(resolvedPartsOf(control)), ...choicePartNames(control)];
   if (kind === 'keyframes') return keyframeTree(parts);
 
   const rootOffered = offeredTargetsFor(control, kind, { onControl: true });
@@ -187,7 +194,7 @@ export function targetTree(control, kind = 'transition') {
     const frame = framesByPart.get(partName);
     if (frame) properties.push(entry(buildTarget(CONTROL_ITSELF, frame), 'Frame'));
     if (!where.group) {
-      ungrouped.push({ id: `part:${partName}`, label: partName, properties, parts: [], part: partName });
+      ungrouped.push({ id: `part:${partName}`, label: where.label, properties, parts: [], part: partName });
       continue;
     }
     if (!groups.has(where.group)) groups.set(where.group, []);
@@ -212,7 +219,7 @@ function keyframeTree(parts) {
     const where = partPlace(partName);
     const target = { path: `Parts.${partName}` };
     if (!where.group) {
-      places.push({ id: `part:${partName}`, label: partName, properties: [], parts: [], target, part: partName });
+      places.push({ id: `part:${partName}`, label: where.label, properties: [], parts: [], target, part: partName });
       continue;
     }
     if (!groups.has(where.group)) groups.set(where.group, []);

@@ -1259,7 +1259,9 @@ There are four kinds, and two more for what a value draws:
 - **Keyframes** — a little loop of poses, played all the time, in a state, when the value changes,
   on each step of the value, on the beat, on a gesture, or when a script asks for it; on a timed
   button, also **While held to confirm**, which plays once over exactly as long as the button must be
-  held and stops if it is let go early: a lamp that fills as you hold. **On each step
+  held and stops if it is let go early: a lamp that fills as you hold; on a choice group, also
+  **When its options change**, for a group whose options follow another group's choice: it plays
+  over the new ones. **On each step
   of the value** plays once each time the value comes to another step, while it is turned too: as
   many steps as the control has (a knob of five choices, four), one every 5% on a knob with none,
   or the number under **Steps**. A detent felt as you turn. With **Step back** set to
@@ -1317,6 +1319,21 @@ There are four kinds, and two more for what a value draws:
 What an animation changes is picked as a path — **Knob01 › Body › Cap › Scale** — by stepping through
 the levels, typing (`text col`), or **Browse**, which shows them side by side.
 
+A choice group's options are places of their own: **Thumb**, the mark of the choice (a strip's
+thumb, the chosen key's face, the radio's dot, the lit lamp, the tab's underline); **Chosen
+option** and **Chosen label**, the option just chosen and its word; and **Every option** and
+**Every label**. Anything played on the **Thumb** draws it apart, so a new choice sends it across to
+the option chosen instead of moving it at once. A transition on its **x** eases the edge ahead as
+it travels and one on its **width** the edge behind: give the width the longer time and the thumb
+stretches toward the new option, then draws in after it. On **Every option** or **Every label**,
+**Each option** starts each one so many ms after the last, **In order**, **Last first** or **Out from
+the chosen**, each waiting unseen until its turn: options that cascade in as the panel opens, or
+words typed one label after another. A state can move one option: in its options patch, a
+**scale** and an **opacity** for the option and a **scale** for its word, eased by a transition on
+**Every option** or **Every label**. Hover moves the option under the pointer; a state with **Other
+hovered** switched on (a choice group's own toggle in the **States** tab) moves every other one, so
+the rest can dim.
+
 Below the editor, **Easing** sets the feel of the movement (linear, smooth in and out, overshooting
 "back" curves, a custom curve, or a spring), and **Presets** add ready-made animations: **Hover
 lift**, **Press squish**, **Fade when disabled**, **Blink while on**, **Beat pulse**, **Value
@@ -1341,14 +1358,18 @@ Below them are the presets each kind of control comes with, under its name: **Kn
 **Numbers**, **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words** — and
 **Slider**, the same groups read for a fader (**Moving** for **Turning**), with a few of its own:
 **Unfold** slides the ticks up out of the bottom one, **Throw** sends the cap past where a flick
-left it and back, **Lift** and **Grip** lift and squeeze the fader cap. Each row
+left it and back, **Lift** and **Grip** lift and squeeze the fader cap. **Choice group** has
+**Attention** and **Choosing**, which move the whole group (**Lean** leans the way the choice went),
+and **Thumb**, **The chosen**, **Appear**, **Hover** and **New options**, which play on its options.
+Each row
 says what plays it (hover, let go, panel opens, a flick) and what it does, and **Apply** puts it on
 the selected controls, linked, as one of yours. A few need something the control may not show: a
 preset on the scale's numbers is refused on a knob whose numbers are off, and one on a key's lamp
 on a button whose set draws no lamp, each with the reason. **Glide**,
 **Snap** and **Spring** take the place of the knob's own glide rather than adding a second one.
 **Name ↔ value** and **Decode** go on the control's name Label, not on the control. The
-**Components** showcase (below) shows every one of them on a knob, a fader or a button. They come with
+**Components** showcase (below) shows every one of them on a knob, a fader, a button or a choice
+group. They come with
 CEditor, so a panel that uses one never asks you to add it to your library.
 
 The **States** tab has a **Motion** section for the state you are editing: **Entering** (mouse over,
@@ -1533,7 +1554,12 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
   **Light**, **Switch**, **Words** and **Signals**, which play on the key's own parts (its lamp,
   the key, its legend and caption); **Thrown**, words rising from the key; **Hold**, a timed button
   held to confirm; and **Button Together**, a row of keys that pop in, rise in turn, pass a press
-  along when you click the first, and chase a light along their bars.
+  along when you click the first, and chase a light along their bars. **Choice group** is the
+  fourth, in its five styles: **Choice group Attention** and **Choosing**, which move the whole
+  group; **Thumb**, the mark of the choice travelling to the next; **The chosen**; **Appear**, the
+  options arriving one after another; **Hover**; **New options**, three groups that take a new list
+  when you choose another section above them; and **Choice group Together**, rows of groups that
+  cascade in, rise in turn, and pass a pulse along when you choose on the first.
 
 Most of them play by themselves. A few wait for you:
 
@@ -1545,8 +1571,9 @@ Most of them play by themselves. A few wait for you:
   scripts' actions says so in the script console.
 - The **Animated Synths** answer MIDI from the synth or a keyboard, and the minilogue's step lamps
   and the JU-06A's beat lamp follow the transport.
-- Most of the **Components** knobs, faders and buttons wait for your hand: hover, press, turn or
-  move, let go, flick, a turn of the wheel, a double-click or a long press, as each caption says.
+- Most of the **Components** knobs, faders, buttons and choice groups wait for your hand: hover,
+  press, turn or move, let go, flick, a turn of the wheel, a double-click or a long press, or a
+  choice, as each caption says.
   **Focus nod** nods when Tab reaches it: click the panel, then press Tab. **Numbers** and
   **Attention** run a small script each (a synth sending new values; a "look here"), as do
   **Button Light** (a synth switching a toggle) and **Button Signals** (an alert); **Beat pulse**

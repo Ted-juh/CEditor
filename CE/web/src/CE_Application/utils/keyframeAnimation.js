@@ -58,6 +58,7 @@ import { describeChange, matchStrength } from './transitionSelection.js';
 import { textEffectRules } from './textEffects.js';
 import { GRADIENT_VARS } from './gradientPaint.js';
 import { cleanValueFrames } from './sceneFormat.js';
+import { readOptionStagger, staggeredDelay } from './optionStagger.js';
 
 // `event`: a gesture on the control — click, double-click, long press, flick, a wheel turn — played
 // on request from where the gesture is recognised, as `script` is from ce.anim.play. Its id is in
@@ -75,7 +76,10 @@ import { cleanValueFrames } from './sceneFormat.js';
 // is held, over exactly as long as it must be held (interactionRuntime.js gives the entry the
 // button's own hold time), and stops if it is let go early. A hold's progress, drawn by whatever
 // the animation moves: a lamp that fills, a key that colours. The Components showcase's Button.
-export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold'];
+// `optionsChange`: a choice group's list of options changed (a group whose options depend on
+// another's choice, choiceGroupLayout.js dependent rows). CanvasControl asks for the play itself, as
+// a script would; the player needs no branch for it. The Choice group's New options. 2026-11-27.
+export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold', 'optionsChange'];
 
 /** What a frame can set, and the value each has when a frame leaves it out. */
 export const FRAME_PROPERTIES = ['scale', 'rotate', 'x', 'y', 'opacity'];
@@ -285,6 +289,8 @@ export function readKeyframes(animation, key = '', { timeScale = 1 } = {}) {
     frames,
     // Each step only: mirrored, side for side, when the value stepped back (mirroredEntry, below).
     followTurn: animation.followTurn === true && trigger.type === 'valueStep',
+    // On a choice group's every option, each this many ms after the last (optionStagger.js).
+    optionStagger: readOptionStagger(animation, scale),
     // How long one firing runs. Infinity for a loop, which never finishes on its own.
     span: iterations === 'infinite' ? Infinity : delay + duration * iterations,
   };
@@ -383,8 +389,8 @@ export function keyframesRule(entry, phase = 'a') {
 function timing(entry, { at = null, fill = 'none' } = {}) {
   const count = entry.iterations === 'infinite' ? 'infinite' : String(entry.iterations);
   const posed = Number.isFinite(at);
-  const delay = Math.round(entry.delay - (posed ? at : 0));
-  return `${Math.round(entry.duration)}ms ${entry.easing} ${delay}ms ${count} ${entry.direction} ${fill}${posed ? ' paused' : ''}`;
+  const delay = staggeredDelay(entry.delay - (posed ? at : 0), entry.optionStagger);
+  return `${Math.round(entry.duration)}ms ${entry.easing} ${delay} ${count} ${entry.direction} ${fill}${posed ? ' paused' : ''}`;
 }
 
 /**
@@ -393,7 +399,10 @@ function timing(entry, { at = null, fill = 'none' } = {}) {
  * 1.08 by mistake does not stick there.
  */
 export function animationValue(entry, phase = 'a', options = {}) {
-  return `ce-kf-${framesHash(entry.frames)}-${phase} ${timing(entry, options)}`;
+  // Staggered over a choice group's options, each holds its first frame until its turn: an option
+  // that cascades in is not there before it does.
+  const fill = options.fill ?? (entry.optionStagger ? 'backwards' : 'none');
+  return `ce-kf-${framesHash(entry.frames)}-${phase} ${timing(entry, { ...options, fill })}`;
 }
 
 /**

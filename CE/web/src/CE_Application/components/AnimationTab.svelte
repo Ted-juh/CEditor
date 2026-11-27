@@ -76,6 +76,8 @@
   import PropertySelect from '../properties/PropertySelect.svelte';
   import PropertyText from '../properties/PropertyText.svelte';
   import { isTimedButtonBehavior } from '../utils/timedButtonPreview.js';
+  import { choicePartNames } from '../utils/choiceGroupLayout.js';
+  import { OPTION_ORDERS, OPTION_ORDER_LABELS } from '../utils/optionStagger.js';
   import { activePanel, selectedComponentIds, openAnimationDesigner } from '../stores/panels.js';
   import Maximize2 from 'lucide-svelte/icons/maximize-2';
   import { updateControlProperty, removeControlNode, getSection, applyControlPatch } from '../stores/controls.js';
@@ -148,7 +150,12 @@
   let controlId = $derived(control?._children?.Core?.id ?? '');
   let controlName = $derived(control?._children?.Core?.name || control?._children?.Core?.controlType || '');
   let section = $derived(getSection(control, 'Animations'));
-  let partNames = $derived(Object.keys(getSection(control, 'Parts')?._children ?? {}));
+  // Its own parts, and a choice group's drawn from its rows (the thumb, the chosen option, every option).
+  let partNames = $derived([...Object.keys(getSection(control, 'Parts')?._children ?? {}), ...choicePartNames(control)]);
+  // A choice group's own trigger: its list of options changed (a group that depends on another's choice).
+  let choiceOffered = $derived(choicePartNames(control).length > 0);
+  // Playing on every option or every label, it can take them one after another.
+  let staggerOffered = $derived(choiceOffered && ['option', 'optionLabel'].includes(String(selected?.part ?? (selected?.animation?.targets?.[0]?.path ?? '').replace(/^Parts\./, ''))));
 
   let rows = $derived(control ? readAnimations(control) : []);
   let allOn = $derived(control ? animationsEnabled(control) : true);
@@ -814,6 +821,23 @@ onMount(() => {
                   <div class="cell"><NumberCell label="ms" value={selected.delay} min={0} step={10}
                     onchange={(value) => setProp('delay', Math.max(0, Math.round(value)))} /></div>
                 </div>
+                {#if staggerOffered}
+                  <!-- On a choice group's every option or label: each this many ms after the last
+                       (utils/optionStagger.js), in this order. -->
+                  <div class="r">
+                    <span class="lab">Each option</span>
+                    <div class="cell"><NumberCell label="ms later" value={selected.animation.optionStagger ?? 0} min={0} max={2000} step={10}
+                      onchange={(value) => setProp('optionStagger', Math.max(0, Math.min(2000, Math.round(value))))} /></div>
+                  </div>
+                  {#if (selected.animation.optionStagger ?? 0) > 0}
+                    <div class="r">
+                      <span class="lab">Order</span>
+                      <Segmented options={OPTION_ORDERS.map((value) => ({ value, label: OPTION_ORDER_LABELS[value] }))}
+                                 value={selected.animation.optionOrder ?? 'forward'} ariaLabel="Option order"
+                                 onchange={(value) => setProp('optionOrder', value)} />
+                    </div>
+                  {/if}
+                {/if}
               {/if}
               {#if keyframes || valueKind}
                 <div class="r">
@@ -863,6 +887,7 @@ onMount(() => {
                        "all the time" would never be thrown: not offered. -->
                   <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES.filter((type) => !(valueKind || emitKind) || type !== 'always'))
                                     .filter((type) => type !== 'hold' || holdOffered || selected.triggerType === 'hold')
+                                    .filter((type) => type !== 'optionsChange' || choiceOffered || selected.triggerType === 'optionsChange')
                                     .map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] ?? KEYFRAME_TRIGGER_LABELS[value] }))}
                                   value={selected.triggerType} ariaLabel="Keyframe trigger"
                                   onchange={(value) => setProps({ trigger: {

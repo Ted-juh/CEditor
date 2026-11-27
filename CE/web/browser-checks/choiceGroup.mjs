@@ -36,8 +36,13 @@ const options = (id) => page.evaluate((id) => {
       role: option.getAttribute('role'),
       checked: option.getAttribute('aria-checked'),
       id: option.id,
-      body: !!option.querySelector('.choice-body'),
-      bodyColour: option.querySelector('.choice-body *') ? getComputedStyle([...option.querySelectorAll('.choice-body *')].find((n) => getComputedStyle(n).backgroundColor !== 'rgba(0, 0, 0, 0)') ?? option).backgroundColor : '',
+      // An option's face is drawn on a layer under the options' words (ChoiceGroup.svelte), by its key.
+      body: !!el.querySelector(`[data-choice-face="${CSS.escape(option.dataset.choiceKey)}"] .choice-body, [data-choice-face="${CSS.escape(option.dataset.choiceKey)}"]`),
+      bodyColour: (() => {
+        const face = el.querySelector(`[data-choice-face="${CSS.escape(option.dataset.choiceKey)}"]`);
+        if (!face) return '';
+        return getComputedStyle([...face.querySelectorAll('*')].find((n) => getComputedStyle(n).backgroundColor !== 'rgba(0, 0, 0, 0)') ?? face).backgroundColor;
+      })(),
       focusRing: !!option.querySelector('.choice-focus'),
       centre: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
       right: rect.x + rect.width,

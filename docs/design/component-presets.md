@@ -754,3 +754,90 @@ Verified locally:
   transport's beats. `animationTab`: the library's Choice group section, and Step back offered on Each
   step for keyframes, written as `followTurn`, and not on On change or for thrown words.
 - Both panels seen in Preview.
+
+### As built: phase 2 (2026-11-27)
+
+**The options as parts.** A choice group now has five parts of its own, drawn from its rows rather
+than stored under `Parts` (`choiceGroupLayout.js` `CHOICE_PARTS`): **Thumb** (`thumb`), the mark of
+the choice; **Chosen option** and **Chosen label** (`chosen`, `chosenLabel`), the option just
+chosen and its word; **Every option** and **Every label** (`option`, `optionLabel`). The Animation
+tab's path bar, a preset's fit check and the target tree offer them on a choice group and on nothing
+else, so a Slide preset applied to a knob is refused with "does not have: thumb".
+
+- **The thumb** (`utils/choiceGroupMotion.js`). Unanimated, each option draws its own mark of being
+  chosen, and a new choice moves it at once. Anything played on `Parts.thumb` draws the chosen
+  option's mark apart, on a layer of its own, and the option leaves its own out: the strip's thumb
+  or the chosen key's face (segmented, buttons), under the words; the radio's dot and the lit lamp
+  over their rings, every lamp drawing unlit; the tab's underline. It stands as four edges, and a
+  transition eases them: the edge ahead (as it travels) on the timing of `Parts.thumb.Layout.x`, the
+  edge behind on that of `Parts.thumb.Layout.width`, the cross axis with the edge ahead. Equal
+  timings slide it whole; a slower one behind stretches it toward the new option and draws it in.
+  Keyframes on the thumb (Dot hop's hop, Lamp run's flare) play on that layer.
+- **The chosen**: keyframes, colour frames and text effects on `chosen` or `chosenLabel` play on
+  the chosen option alone. Glow flashes the face's fill, which a face painting a solid colour shows.
+- **Every option, one after another** (`utils/optionStagger.js`). An animation on `option` or
+  `optionLabel` may take **Each option** so many ms after the last (`optionStagger`, 0 to 2000) in
+  an order (`optionOrder`: **In order**, **Last first**, **Out from the chosen**). The player writes
+  one rule for all the options; each option carries its rank as custom properties
+  (`--ce-rank-forward`, `-reverse`, `-chosen`), and the delay is `calc()` over the one the order
+  reads, so the player never counts options. A staggered keyframe animation fills backwards, so an
+  option waits unseen for its turn; a text effect's pieces add the option's delay to their own.
+- **An option's motion in its states** (`choiceGroupStyle.js`). A state's options patch
+  (`patches.segments.shared`) may now carry `whole.scale`, `whole.opacity` and `label.scale`; it
+  applies to the option the state is about, eased by a transition on `Parts.option` or
+  `Parts.optionLabel`. A new option signal, `peerHover` ("another option hovered" in the States tab),
+  is true on every option but the one under the pointer: Spotlight's dimming. The timings come from
+  every transition on those parts, whichever state they are written for, so an option eases back
+  out as it eased in.
+- **When its options change** (`optionsChange`). A group whose rows follow another group's choice
+  (`Value.dependsOn`, rows tagged with `parentValue`) gets a new list when that choice changes.
+  CanvasControl notices the list it draws is different and asks for a play, as a script asks with
+  `ce.anim.play`, once per change: keyframes and text effects can wait for it. The trigger is
+  offered on a choice group only.
+- **Presets carry state motion**. A preset's state may carry its options patch (`segments`, the
+  shared layer only: a preset names no group's rows), and applying it fills in what the group's
+  state lacks without overwriting what an author set (`mergedSegments`).
+
+The player draws with the same Preview surface (`Player.svelte` uses `PanelPreviewSurface`), so all
+of it plays in the exported plug-in. A script's `define` takes `optionStagger` and `optionOrder`.
+
+**Its presets**, 21 more, with the same kit and ids:
+
+| Group | Presets |
+|---|---|
+| Thumb | Slide, Spring (an overshooting curve), Stretch (the edge ahead in 180 ms, the one behind in 420), Underline glide, Dot hop, Lamp run |
+| The chosen | Pop, Press in, Glow, Label roll, Ink flash |
+| Appear | Cascade, Fan out (from the chosen), Typewriter labels (each label after the one before), Drop in (the last first) |
+| Hover | Lift, Spotlight, Grow label |
+| New options | Roll over, Crossfade, Cascade the new |
+
+Each is shown in the style its group reads best in (`knob: { 'Behavior.visualStyle': … }`), and
+plays in every style that draws what it moves.
+
+Six panels more: Thumb (Eurorack), The chosen (Chrome), Appear (Satellite), Hover (Ceramic),
+New options (Studio White) and Together (Receiver), each on its set's panel colour, Eurorack's and
+Receiver's lightened from the brushed metal so every caption reads at 4.5:1. New options puts a
+**Section** group over three that depend on it; choose Filter and the three take LP, BP and HP,
+each playing its preset over them. Together is three scenes over rows of five segmented groups:
+**Cascade in** (each group 140 ms after the last as the panel opens), **Wave** (the groups rise in
+turn, always) and **Ripple** (a pulse along the row from a click on the first).
+
+Verified locally:
+- `test/choiceGroupParts.test.js` (new): the parts on a choice group and not on a knob; the thumb's
+  box in every style, its direction and its two edges' timings; the stagger's `calc()` and the rank
+  variables, the fill held backwards, and a text effect's pieces staggered by option; an option's
+  scale and fade from its state, and from `peerHover`; a preset's state motion surviving its file
+  and leaving an author's alone; `optionsChange` as a trigger of both kinds.
+  `test/choicePresets.test.js`: the catalogue's 30, the library's seven groups, the eight panels.
+- The browser check `choiceShowcase`, extended: each thumb travels through the options between and
+  ends on the chosen one, Stretch more than twice its width on the way; Pop and Press in scale the
+  chosen option alone, Label roll rolls it in pieces, Ink flash changes its ink; Cascade, Fan out
+  and Drop in arrive in their orders and Typewriter labels finishes the first word before the last
+  begins; Lift and Grow label grow the hovered option only, Spotlight dims the others to 0.35; a new
+  section gives the three groups its options and plays them in; Cascade in, Wave and Ripple each go
+  along the row in turn. `animationTab`: the five places on a choice group, Each option and Order
+  on every option and not on the whole group, written as `optionStagger` and `optionOrder`, and
+  When its options change offered on a choice group and not on a timed button.
+- In WebKitGTK 2.52: a `calc()` delay over a custom property resolves per option (0, 0.11, 0.22,
+  0.33 s), each held unseen until its turn; a transition with one timing per edge eases the edge
+  ahead in its 150 ms and the one behind over its 600, as in Chromium.

@@ -13,13 +13,28 @@ export const CHOICE_STYLES = Object.freeze(['segmented', 'buttons', 'radio', 'le
  * The interaction signals an option has of its own. A state whose condition asks about one of
  * these is the options' (choiceGroupStyle.js), and the control's state engine leaves it alone.
  */
-export const OPTION_STATE_SIGNALS = Object.freeze(['hover', 'pressed', 'focused', 'checked']);
+export const OPTION_STATE_SIGNALS = Object.freeze(['hover', 'pressed', 'focused', 'checked', 'peerHover']);
+
+/**
+ * The parts of a choice group an animation can play on, though none is in its document: the
+ * options are drawn from its rows (ChoiceGroup.svelte). `thumb` is the chosen option's mark (the
+ * strip's thumb, a key's colour, the radio's dot, the lit lamp, the tab's underline), drawn apart so
+ * it can travel to the next; `chosen` the option chosen; `option` every option, one after another;
+ * `chosenLabel` and `optionLabel` their words. The Components showcase's Choice group, phase 2
+ * (docs/design/component-presets.md).
+ */
+export const CHOICE_PARTS = Object.freeze(['thumb', 'chosen', 'option', 'chosenLabel', 'optionLabel']);
 
 const trimmed = (value) => String(value ?? '').trim();
 const lower = (value) => trimmed(value).toLowerCase();
 
 export function isChoiceGroupBehavior(behavior) {
   return lower(behavior?.buttonType) === 'radio';
+}
+
+/** The parts an animation can play on in this control as a choice group draws it, or none. */
+export function choicePartNames(control) {
+  return isChoiceGroupBehavior(control?._children?.Behavior) ? [...CHOICE_PARTS] : [];
 }
 
 /** The style a group is drawn in. A group with no `visualStyle` takes its subtype, as it always did. */

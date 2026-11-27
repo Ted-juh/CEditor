@@ -95,7 +95,7 @@
   import { resolveInteractiveControl, resolveInteractionContext } from '../utils/interactionRuntime.js';
   import { authoredShownText } from '../utils/labelText.js';
   import { createTransitionTracker } from '../utils/transitionSelection.js';
-  import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
+  import { rootTransitionDeclaration, colourTransitionVar, transitionDeclaration } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { noteAnimationsFired, animationPlays, requestAnimationPlay } from '../stores/animationActivity.js';
   import { splitText, textEffectSpan, textPieceStyles, reelColumns, REEL_WINDOW, odometerChanged, wordsHistory } from '../utils/textEffects.js';
@@ -152,6 +152,9 @@
   import { resolveChoiceOption, standsOutFrom } from '../utils/choiceGroupStyle.js';
   import { lampCss, lampFaceCss } from '../utils/lampFace.js';
   import ChoiceGroup from './ChoiceGroup.svelte';
+  import { animatedParts, thumbBox, thumbDirection, thumbEdges, thumbTransition } from '../utils/choiceGroupMotion.js';
+  import { optionRankVars } from '../utils/optionStagger.js';
+  const NO_CHOICE_PARTS = new Set();
   import {
     computeResizedRect, computeRotatedResizedRect, snapRectToGrid, snapToGridAxis,
     clientToPanelPoint, angleFromCenter, computeRotation, normalizeRotation,
@@ -1826,8 +1829,20 @@
     if (!keyframeEntries.length || !id) return undefined;
     return animationPlays.subscribe((all) => { playsNow = all?.[id] ?? {}; });
   });
+  // A choice group whose options changed (it depends on another's choice) plays what waits for that:
+  // asked for here, as a script asks for a play, once each time the list is different.
+  let choiceListSeen = null;
+  let choiceListChanges = 0;
+  let choiceListPlays = $derived.by(() => {
+    if (!isRadioGroupControl || !keyframeEntries.some((entry) => entry.trigger?.type === 'optionsChange')) return null;
+    const list = choiceRows(valueRows).map((row, index) => `${choiceKey(row, index)}\u0001${row?.displayText ?? ''}`).join('\u0002');
+    if (choiceListSeen !== null && list !== choiceListSeen) choiceListChanges += 1;
+    choiceListSeen = list;
+    if (!choiceListChanges) return null;
+    return Object.fromEntries(keyframeEntries.filter((entry) => entry.trigger?.type === 'optionsChange').map((entry) => [entry.name, `options:${choiceListChanges}`]));
+  });
   let playerKeyframes = $derived(keyframePlayer.next(previewSessionOverride != null ? interactionRuntime : null,
-    { reducedMotion: $systemReducedMotion, beats: beatsNow, plays: playsNow }));
+    { reducedMotion: $systemReducedMotion, beats: beatsNow, plays: choiceListPlays ? { ...playsNow, ...choiceListPlays } : playsNow }));
   // The Animation Designer's stage (stores/sceneStage.js): the scene it shows, posed at its playhead
   // or playing, joins this control's own animations. Anywhere else there is no stage, and nothing.
   // In Preview and the plug-in (step 5b) the surface's scene runtime gives every scene playing, each
@@ -3392,9 +3407,18 @@
       ['{surface.checked}', '{accent}', '{control.fill}', '{accent.hot}'].map(colour));
     return { panelText: colour('{text.primary}'), mutedText: colour('{text.muted}'), accent: colour('{accent}'), thumb, focus: colour('{accent.hot}'), panel: colour('{panel.surface}') };
   });
+  /** One option resolved in its own states (utils/choiceGroupStyle.js), with these flags. */
+  function resolveChoice(row, flags, previewed = false) {
+    return resolveChoiceOption({
+      style: choiceStyle, row, flags, inset: numberOr(sourceContentLayout?.paddingTop, 2),
+      background: sourceBackground, text: sourceText, contentLayout: sourceContentLayout,
+      valueSection: sourceValueSection, statesSection: sourceStatesSection,
+      signals: interactionRuntime?.signals ?? {}, palette: choicePalette,
+      previewState: previewed ? choicePreviewState : '',
+    });
+  }
   let choiceOptions = $derived.by(() => {
     if (!isRadioGroupControl) return [];
-    const inset = numberOr(sourceContentLayout?.paddingTop, 2);
     return choiceRows(valueRows).map((row, index) => {
       const key = choiceKey(row, index);
       const rowId = String(row?.id ?? '');
@@ -3403,21 +3427,18 @@
         hover: choiceHoverKey === key,
         pressed: choicePressedKey === key,
         focused: choiceFocusKey === key,
+        // Another option is under the pointer (a state about it dims the rest: Spotlight).
+        peerHover: choiceHoverKey !== '' && choiceHoverKey !== key,
       };
       const previewed = choicePreviewState && !choicePreviewsChoice
         && (choiceEditTargets.length === 0 || choiceEditTargets.includes(rowId));
       return {
         key,
         rowId,
+        row,
         flags,
         label: String(row?.displayText ?? row?.internalValue ?? row?.id ?? `Option ${index + 1}`),
-        resolved: resolveChoiceOption({
-          style: choiceStyle, row, flags, inset,
-          background: sourceBackground, text: sourceText, contentLayout: sourceContentLayout,
-          valueSection: sourceValueSection, statesSection: sourceStatesSection,
-          signals: interactionRuntime?.signals ?? {}, palette: choicePalette,
-          previewState: previewed ? choicePreviewState : '',
-        }),
+        resolved: resolveChoice(row, flags, previewed),
       };
     });
   });
@@ -3443,7 +3464,69 @@
       indicatorGap: first?.whole?.indicatorGap ?? 6,
     });
   });
-  let choiceItems = $derived((choiceLayout?.items ?? []).map((item, index) => {
+  // --- Its options as parts (choiceGroupLayout.js CHOICE_PARTS, utils/choiceGroupMotion.js) ------
+  // Which parts anything COULD play on: a part with something on it is drawn ready to move, the
+  // thumb on a layer of its own. Outside Preview nothing plays, and the group draws as it always did.
+  let choiceAnimated = $derived(isRadioGroupControl && keyframeEntries.length + (interactionRuntime?.transitions?.partTransitions?.size ?? 0) > 0
+    ? animatedParts({ partTransitions: interactionRuntime?.transitions?.partTransitions, keyframeEntries })
+    : NO_CHOICE_PARTS);
+  let choiceChosenIndex = $derived(choiceOptions.findIndex((option) => option.flags.selected));
+  // The options' and the thumb's timings: what COULD play on them, not what changed this frame. The
+  // pointer going from one option to the next changes no state of the control's, and a move of the
+  // thumb is a new choice whatever made it (the hand, a script, the synth).
+  let choiceTimings = $derived(isRadioGroupControl ? (interactionRuntime?.transitions?.partTransitions ?? null) : null);
+  let choiceThumbOn = $derived(!choiceMulti && choiceAnimated.has('thumb') && choiceChosenIndex >= 0);
+
+  /** The colour frames on several parts at once, channel by channel; null when there are none. */
+  function joinedChannels(...all) {
+    const present = all.filter(Boolean);
+    if (!present.length) return null;
+    return Object.fromEntries(['paint', 'shape', 'stroke', 'text', 'gradient', 'image'].map((channel) => [channel, present.flatMap((lists) => lists[channel] ?? [])]));
+  }
+  /**
+   * What moves one option, its face and its words together: where it stands among the options (a
+   * staggered animation reads it, utils/optionStagger.js), its own scale and opacity as its states
+   * set them, eased on `Parts.option`'s transition, and what plays on every option and on the chosen
+   * one. Its colour frames are set only where some are played, so the control's own still reach it.
+   */
+  function choiceMotionCss(index, option, count) {
+    const chosen = option.flags.selected;
+    const moves = [...(activeKeyframes?.parts?.get?.('option') ?? []), ...(chosen ? (activeKeyframes?.parts?.get?.('chosen') ?? []) : [])];
+    const colours = joinedChannels(keyframeColours?.get?.('option'), chosen ? keyframeColours?.get?.('chosen') : null);
+    const bucket = choiceTimings?.get?.('option') ?? null;
+    const motion = option.resolved.motion;
+    return [
+      optionRankVars(index, count, choiceChosenIndex),
+      motion.scale !== 1 || motion.opacity !== 1 ? `scale:${motion.scale};opacity:${motion.opacity};` : '',
+      bucket ? transitionDeclaration({ transform: bucket.transform ?? null, opacity: bucket.opacity ?? null, size: null, colour: null }, { target: 'root' }) : '',
+      animationDeclaration(moves),
+      colours ? colourVariables(colours) : '',
+    ].join('');
+  }
+  /** One option's words: their scale and motion, their colour frames, and a text effect's pieces. */
+  function choiceLabelPlay(option) {
+    const chosen = option.flags.selected;
+    const moves = [...(activeKeyframes?.parts?.get?.('optionLabel') ?? []), ...(chosen ? (activeKeyframes?.parts?.get?.('chosenLabel') ?? []) : [])];
+    const colours = joinedChannels(keyframeColours?.get?.('optionLabel'), chosen ? keyframeColours?.get?.('chosenLabel') : null);
+    const bucket = choiceTimings?.get?.('optionLabel') ?? null;
+    const scale = option.resolved.motion.labelScale;
+    const words = (chosen ? activeKeyframes?.texts?.get?.('chosenLabel')?.at(-1) : null) ?? activeKeyframes?.texts?.get?.('optionLabel')?.at(-1) ?? null;
+    const outer = [
+      scale !== 1 ? `scale:${scale};` : '',
+      bucket ? transitionDeclaration({ transform: bucket.transform ?? null, opacity: bucket.opacity ?? null, size: null, colour: null }, { target: 'root' }) : '',
+      animationDeclaration(moves),
+      colours ? colourVariables(colours) : '',
+    ].join('');
+    let pieces = null;
+    if (words) {
+      const cut = splitText(option.label, words.effect.split);
+      const styles = textPieceStyles(words.effect, cut, { phase: words.phase, seedText: `${core?.id ?? ''}:${option.key}:${words.name}`, at: words.at ?? null });
+      pieces = cut.map((piece, k) => ({ text: piece.text, style: styles[k] }));
+    }
+    return { outer, colours: !!colours, pieces };
+  }
+
+  let choiceItems = $derived((choiceLayout?.items ?? []).map((item, index, all) => {
     const option = choiceOptions[index];
     return {
       key: item.key,
@@ -3458,8 +3541,40 @@
       focused: option.flags.focused,
       editTarget: choiceEditTargets.includes(option.rowId),
       resolved: option.resolved,
+      // Its mark is the thumb's, drawn apart where it can travel.
+      thumbbed: choiceThumbOn && option.flags.selected,
+      motion: choiceMotionCss(index, option, all.length),
+      words: choiceLabelPlay(option),
     };
   }));
+
+  // The thumb: the chosen option's mark in its chosen look alone (the pointer over it is the
+  // option's business), where it stands now, the way it last went, and its timing.
+  let lastThumbBox = null;
+  let lastThumbDirection = 1;
+  let choiceThumb = $derived.by(() => {
+    if (!choiceThumbOn) return null;
+    const item = choiceItems[choiceChosenIndex];
+    const option = choiceOptions[choiceChosenIndex];
+    if (!item || !option) return null;
+    const orientation = choiceOrientation(sourceBehavior);
+    const resolved = resolveChoice(option.row, { selected: true });
+    const box = thumbBox(choiceStyle, orientation, item, resolved);
+    if (!box) return null;
+    const direction = thumbDirection(lastThumbBox, box, orientation);
+    if (direction !== 0) lastThumbDirection = direction;
+    lastThumbBox = box;
+    const bucket = choiceTimings?.get?.('thumb') ?? null;
+    const colours = keyframeColours?.get?.('thumb') ?? null;
+    return {
+      box,
+      resolved,
+      edges: thumbEdges(box, displayW, displayH),
+      timing: thumbTransition(bucket, lastThumbDirection, orientation),
+      moves: animationDeclaration(activeKeyframes?.parts?.get?.('thumb') ?? null),
+      colours: colours ? colourVariables(colours) : '',
+    };
+  });
   // A divider is hidden beside an option drawing a body of its own (the thumb, a hover): it would
   // cut into it. Hairlines are the label's ink, faint, so they read on whatever the frame is.
   let choiceDividers = $derived.by(() => {
@@ -3834,6 +3949,7 @@
         focusColour={cssColor(choicePalette?.focus ?? 'FF5B9BD5')}
         optionRole={choiceMulti ? 'checkbox' : 'radio'}
         interactive={previewInteractive}
+        thumb={choiceThumb}
       />
     {/if}
 

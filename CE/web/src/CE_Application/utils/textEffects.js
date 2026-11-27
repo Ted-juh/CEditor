@@ -25,6 +25,7 @@
  * Everything written into a <style> element is numbers, a hash and an AARRGGBB colour that has been
  * checked: nothing from the document's text, as keyframeAnimation.js keeps it.
  */
+import { readOptionStagger, staggeredDelay } from './optionStagger.js';
 import { cleanFrameColour } from './keyframeAnimation.js';
 import { easingToCss } from './easing.js';
 import { readTrigger } from './interactionRuntime.js';
@@ -41,7 +42,7 @@ export const TEXT_DIRECTIONS = Object.freeze(['left', 'right', 'up', 'down', 'tu
  * (a Label that shows a knob's value, or its name and its value by turns). A textChange trigger's
  * `to` waits for one of a "name, value while touched" Label's two texts: ['value'], ['name'], or any.
  */
-export const TEXT_TRIGGER_TYPES = Object.freeze(['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'textChange']);
+export const TEXT_TRIGGER_TYPES = Object.freeze(['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'textChange', 'optionsChange']);
 export const TEXT_TRIGGER_LABELS = Object.freeze({
   always: 'All the time',
   stateChange: 'In a state',
@@ -51,6 +52,7 @@ export const TEXT_TRIGGER_LABELS = Object.freeze({
   event: 'On a click or gesture',
   valueStep: 'On each step of the value',
   textChange: 'When its words change',
+  optionsChange: 'When its options change',
 });
 
 /**
@@ -144,6 +146,8 @@ export function readTextEffect(animation, key = '', { timeScale = 1 } = {}) {
     iterations,
     part: textEffectPart(animation),
     trigger,
+    // On a choice group's every label, each this many ms after the last (optionStagger.js).
+    optionStagger: readOptionStagger(animation, scale),
   };
 }
 
@@ -379,7 +383,7 @@ export function textPieceStyles(effect, pieces, { phase = 'a', colourProperty = 
     // every piece's delay moves back by it, and the pieces are paused (keyframeAnimation.js timing).
     const posed = Number.isFinite(at);
     const delay = effect.delay + ranks[index] * effect.stagger - (posed ? at : 0);
-    return `${display}animation:ce-tx-${hash}-${variant}-${phase} ${Math.round(effect.duration)}ms ${effect.easing} ${Math.round(delay)}ms ${count} normal ${fill}${posed ? ' paused' : ''};`;
+    return `${display}animation:ce-tx-${hash}-${variant}-${phase} ${Math.round(effect.duration)}ms ${effect.easing} ${staggeredDelay(delay, effect.optionStagger)} ${count} normal ${fill}${posed ? ' paused' : ''};`;
   });
 }
 

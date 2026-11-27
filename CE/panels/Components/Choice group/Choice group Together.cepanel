@@ -1,0 +1,1168 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "05c4c4ab-c0b5-4e1a-9f3d-05c4c4ab05c4",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Choice group Together",
+  "scriptId": "component_choice-together",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1040,
+  "height": 560,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFC6C9CD",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "CascadeIn1.value",
+      "label": "CascadeIn1",
+      "controlName": "CascadeIn1",
+      "path": "CascadeIn1.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Sqr",
+        "Tri"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CascadeIn2.value",
+      "label": "CascadeIn2",
+      "controlName": "CascadeIn2",
+      "path": "CascadeIn2.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "LP",
+        "BP",
+        "HP"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CascadeIn3.value",
+      "label": "CascadeIn3",
+      "controlName": "CascadeIn3",
+      "path": "CascadeIn3.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "1/4",
+        "1/8",
+        "1/16"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CascadeIn4.value",
+      "label": "CascadeIn4",
+      "controlName": "CascadeIn4",
+      "path": "CascadeIn4.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Off",
+        "On"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CascadeIn5.value",
+      "label": "CascadeIn5",
+      "controlName": "CascadeIn5",
+      "path": "CascadeIn5.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "A",
+        "B",
+        "C"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave1.value",
+      "label": "Wave1",
+      "controlName": "Wave1",
+      "path": "Wave1.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Sqr",
+        "Tri"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave2.value",
+      "label": "Wave2",
+      "controlName": "Wave2",
+      "path": "Wave2.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "LP",
+        "BP",
+        "HP"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave3.value",
+      "label": "Wave3",
+      "controlName": "Wave3",
+      "path": "Wave3.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "1/4",
+        "1/8",
+        "1/16"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave4.value",
+      "label": "Wave4",
+      "controlName": "Wave4",
+      "path": "Wave4.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Off",
+        "On"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave5.value",
+      "label": "Wave5",
+      "controlName": "Wave5",
+      "path": "Wave5.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "A",
+        "B",
+        "C"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ripple1.value",
+      "label": "Ripple1",
+      "controlName": "Ripple1",
+      "path": "Ripple1.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Sqr",
+        "Tri"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ripple2.value",
+      "label": "Ripple2",
+      "controlName": "Ripple2",
+      "path": "Ripple2.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "LP",
+        "BP",
+        "HP"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ripple3.value",
+      "label": "Ripple3",
+      "controlName": "Ripple3",
+      "path": "Ripple3.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "1/4",
+        "1/8",
+        "1/16"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ripple4.value",
+      "label": "Ripple4",
+      "controlName": "Ripple4",
+      "path": "Ripple4.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Off",
+        "On"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ripple5.value",
+      "label": "Ripple5",
+      "controlName": "Ripple5",
+      "path": "Ripple5.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "A",
+        "B",
+        "C"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "receiver"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1706781483000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Choice group · Together","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1706781483001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":980,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"scenes over a row of groups: one effect on many, each a little after the last.","_children":{"Fill":{"colour":"FF2F3338"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeInCaption","id":"ctrl_1706781483002","controlType":"Label"},
+        "Transform": {"x":30,"y":120,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Cascade in","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeInHow","id":"ctrl_1706781483003","controlType":"Label"},
+        "Transform": {"x":30,"y":144,"width":220,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF0E3466"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeInWhat","id":"ctrl_1706781483004","controlType":"Label"},
+        "Transform": {"x":30,"y":162,"width":220,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each group comes in, 140 ms after the last","_children":{"Fill":{"colour":"FF2F3338"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeIn1","id":"ctrl_1706781483005","controlType":"RadioButtonGroup"},
+        "Transform": {"x":270,"y":120,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Saw","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Sqr","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Tri","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeIn2","id":"ctrl_1706781483006","controlType":"RadioButtonGroup"},
+        "Transform": {"x":420,"y":120,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"LP","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"BP","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"HP","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeIn3","id":"ctrl_1706781483007","controlType":"RadioButtonGroup"},
+        "Transform": {"x":570,"y":120,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"1/4","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"1/8","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"1/16","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeIn4","id":"ctrl_1706781483008","controlType":"RadioButtonGroup"},
+        "Transform": {"x":720,"y":120,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Off","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"On","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeIn5","id":"ctrl_1706781483009","controlType":"RadioButtonGroup"},
+        "Transform": {"x":870,"y":120,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"A","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"B","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"C","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveCaption","id":"ctrl_1706781483010","controlType":"Label"},
+        "Transform": {"x":30,"y":260,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wave","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveHow","id":"ctrl_1706781483011","controlType":"Label"},
+        "Transform": {"x":30,"y":284,"width":220,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF0E3466"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveWhat","id":"ctrl_1706781483012","controlType":"Label"},
+        "Transform": {"x":30,"y":302,"width":220,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the groups rise in turn along the row","_children":{"Fill":{"colour":"FF2F3338"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave1","id":"ctrl_1706781483013","controlType":"RadioButtonGroup"},
+        "Transform": {"x":270,"y":260,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Saw","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Sqr","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Tri","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave2","id":"ctrl_1706781483014","controlType":"RadioButtonGroup"},
+        "Transform": {"x":420,"y":260,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"LP","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"BP","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"HP","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave3","id":"ctrl_1706781483015","controlType":"RadioButtonGroup"},
+        "Transform": {"x":570,"y":260,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"1/4","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"1/8","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"1/16","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave4","id":"ctrl_1706781483016","controlType":"RadioButtonGroup"},
+        "Transform": {"x":720,"y":260,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Off","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"On","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave5","id":"ctrl_1706781483017","controlType":"RadioButtonGroup"},
+        "Transform": {"x":870,"y":260,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"A","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"B","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"C","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleCaption","id":"ctrl_1706781483018","controlType":"Label"},
+        "Transform": {"x":30,"y":400,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Ripple","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleHow","id":"ctrl_1706781483019","controlType":"Label"},
+        "Transform": {"x":30,"y":424,"width":220,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE ON THE FIRST","_children":{"Fill":{"colour":"FF0E3466"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleWhat","id":"ctrl_1706781483020","controlType":"Label"},
+        "Transform": {"x":30,"y":442,"width":220,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a pulse runs along the row from it","_children":{"Fill":{"colour":"FF2F3338"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple1","id":"ctrl_1706781483021","description":"Choose on it: a pulse runs along the row.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":270,"y":400,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Saw","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Sqr","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Tri","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple2","id":"ctrl_1706781483022","controlType":"RadioButtonGroup"},
+        "Transform": {"x":420,"y":400,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"LP","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"BP","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"HP","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple3","id":"ctrl_1706781483023","controlType":"RadioButtonGroup"},
+        "Transform": {"x":570,"y":400,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"1/4","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"1/8","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"1/16","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple4","id":"ctrl_1706781483024","controlType":"RadioButtonGroup"},
+        "Transform": {"x":720,"y":400,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Off","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"On","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple5","id":"ctrl_1706781483025","controlType":"RadioButtonGroup"},
+        "Transform": {"x":870,"y":400,"width":136,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"A","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"B","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"C","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_choice-together",
+      "name": "Cascade in",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 1320,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_choice-together_1",
+          "controlId": "ctrl_1706781483005",
+          "target": "Transform",
+          "start": 0,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.22727272727272727,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.43636363636363634,
+                "scale": 1.04,
+                "opacity": 1,
+                "y": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_4",
+          "controlId": "ctrl_1706781483006",
+          "target": "Transform",
+          "start": 0,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.3333333333333333,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.5424242424242425,
+                "scale": 1.04,
+                "opacity": 1,
+                "y": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_7",
+          "controlId": "ctrl_1706781483007",
+          "target": "Transform",
+          "start": 0,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.4393939393939394,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.6484848484848484,
+                "scale": 1.04,
+                "opacity": 1,
+                "y": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_10",
+          "controlId": "ctrl_1706781483008",
+          "target": "Transform",
+          "start": 0,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.5454545454545454,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.7545454545454545,
+                "scale": 1.04,
+                "opacity": 1,
+                "y": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_13",
+          "controlId": "ctrl_1706781483009",
+          "target": "Transform",
+          "start": 0,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.6515151515151515,
+                "scale": 0.6,
+                "opacity": 0,
+                "y": 10
+              },
+              {
+                "at": 0.8606060606060606,
+                "scale": 1.04,
+                "opacity": 1,
+                "y": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1,
+                "y": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_choice-together_2",
+      "name": "Wave",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 2600,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_choice-together_2",
+          "controlId": "ctrl_1706781483013",
+          "target": "Transform",
+          "start": 400,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -9
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_5",
+          "controlId": "ctrl_1706781483014",
+          "target": "Transform",
+          "start": 550,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -9
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_8",
+          "controlId": "ctrl_1706781483015",
+          "target": "Transform",
+          "start": 700,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -9
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_11",
+          "controlId": "ctrl_1706781483016",
+          "target": "Transform",
+          "start": 850,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -9
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_14",
+          "controlId": "ctrl_1706781483017",
+          "target": "Transform",
+          "start": 1000,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -9
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_choice-together_3",
+      "name": "Ripple",
+      "trigger": {
+        "type": "event",
+        "controlId": "ctrl_1706781483021",
+        "event": "click"
+      },
+      "length": 760,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_choice-together_3",
+          "controlId": "ctrl_1706781483021",
+          "target": "Transform",
+          "start": 0,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 1.08
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_6",
+          "controlId": "ctrl_1706781483022",
+          "target": "Transform",
+          "start": 100,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 1.08
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_9",
+          "controlId": "ctrl_1706781483023",
+          "target": "Transform",
+          "start": 200,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 1.08
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_12",
+          "controlId": "ctrl_1706781483024",
+          "target": "Transform",
+          "start": 300,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 1.08
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_choice-together_15",
+          "controlId": "ctrl_1706781483025",
+          "target": "Transform",
+          "start": 400,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 1.08
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

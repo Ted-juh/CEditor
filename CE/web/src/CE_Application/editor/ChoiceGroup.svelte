@@ -8,6 +8,13 @@
   // other styles draw none. Each option is a box with, where it has them, a body (BackgroundRenderer),
   // an indicator (a ring and dot, a lamp, an underline) and a label; the keyboard's option has a
   // focus ring. Option ids are what the group's aria-activedescendant names.
+  //
+  // Drawn in layers, so the options can be animated as parts (choiceGroupLayout.js CHOICE_PARTS):
+  // the options' faces, then their words, indicators and focus rings, each option's two moving as
+  // one (`motion`, worked out by CanvasControl). The thumb, when anything plays on it, is the chosen
+  // option's mark drawn apart, where it can travel (utils/choiceGroupMotion.js): under the words in
+  // the styles that paint options and in the tab style, over the indicators in the radio and LED
+  // styles, where it is the dot or the light.
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import { cssColor } from './canvasControlStyles.js';
   import { indicatorRadius } from '../utils/choiceGroupStyle.js';
@@ -23,7 +30,11 @@
     focusColour = 'rgba(91,155,213,1)',
     optionRole = 'radio',
     interactive = false,
+    thumb = null,
   } = $props();
+
+  // The radio's dot and the LED's light travel over the rings and lamps; a face, an underline under the words.
+  const THUMB_OVER = new Set(['radio', 'led']);
 
   const centred = (value) => value === 'segmented' || value === 'buttons' || value === 'tab';
 
@@ -49,11 +60,28 @@
     ].join('; ');
   }
 
-  function lampCssFor(option) {
-    const { indicatorOuter: rest, indicatorInner: lit } = option.resolved;
+  function lampFor(resolved, lit) {
+    const { indicatorOuter: rest, indicatorInner: light } = resolved;
     const kind = rest.jewel ? 'jewel' : rest.shape === 'rounded' ? 'window' : 'led';
-    return [`width:${rest.width}px`, `height:${rest.height}px`,
-      lampFaceCss({ kind, lit: lit.shown, colour: lit.fillColour, offColour: rest.fillColour, bezelColour: rest.borderColour, size: rest.height })].join('; ');
+    return lampFaceCss({ kind, lit, colour: light.fillColour, offColour: rest.fillColour, bezelColour: rest.borderColour, size: rest.height });
+  }
+
+  function lampCssFor(option) {
+    const rest = option.resolved.indicatorOuter;
+    // With a thumb, the light is the thumb's: the chosen lamp is drawn out, and the light travels to it.
+    return [`width:${rest.width}px`, `height:${rest.height}px`, lampFor(option.resolved, option.resolved.indicatorInner.shown && !option.thumbbed)].join('; ');
+  }
+
+  /** The thumb's own look: a face (drawn inside it), the dot, the light, or the underline's colour. */
+  function thumbLook() {
+    const resolved = thumb.resolved;
+    if (style === 'radio') {
+      const dot = resolved.indicatorInner;
+      return `box-sizing:border-box;border:${dot.borderWidth}px solid ${cssColor(dot.borderColour)};border-radius:${indicatorRadius(dot.shape, dot.radius)};background:${cssColor(dot.fillColour)};`;
+    }
+    if (style === 'led') return lampFor(resolved, true);
+    if (style === 'tab') return `background:${cssColor(resolved.indicatorInner.fillColour)};`;
+    return '';
   }
 
   function underlineCss(option) {
@@ -70,6 +98,16 @@
   }
 </script>
 
+{#snippet thumbMark()}
+  <div class="choice-thumb" data-choice-thumb style="{thumb.edges}{thumb.timing}{thumb.moves}{thumb.colours}{thumbLook()}">
+    {#if (style === 'segmented' || style === 'buttons') && thumb.resolved.body}
+      <div class="choice-body">
+        <BackgroundRenderer background={thumb.resolved.body} width={thumb.box.width} height={thumb.box.height} />
+      </div>
+    {/if}
+  </div>
+{/snippet}
+
 <div class="choice-group" data-style={style}>
   {#if baseline}
     <span class="choice-baseline" style="left:{baseline.left}px; top:{baseline.top}px; width:{baseline.width}px; height:{baseline.height}px; background:{baseline.colour};"></span>
@@ -81,6 +119,15 @@
       style="left:{Math.min(divider.x1, divider.x2) - 0.5}px; top:{Math.min(divider.y1, divider.y2) - 0.5}px; width:{Math.max(1, Math.abs(divider.x2 - divider.x1))}px; height:{Math.max(1, Math.abs(divider.y2 - divider.y1))}px; background:{dividerColour};"
     ></span>
   {/each}
+  <!-- The faces, under everything: the chosen one's is the thumb's when there is one. -->
+  {#each items as option (option.key)}
+    {#if option.resolved.body && !option.thumbbed}
+      <div class="choice-face" data-choice-face={option.key} style="left:{option.left}px; top:{option.top}px; width:{option.width}px; height:{option.height}px;{option.motion ?? ''}">
+        <BackgroundRenderer background={option.resolved.body} width={option.width} height={option.height} />
+      </div>
+    {/if}
+  {/each}
+  {#if thumb && !THUMB_OVER.has(style)}{@render thumbMark()}{/if}
   {#each items as option (option.key)}
     {@const resolved = option.resolved}
     <div
@@ -90,13 +137,8 @@
       role={interactive ? optionRole : undefined}
       aria-checked={interactive ? option.selected : undefined}
       data-choice-key={option.key}
-      style="left:{option.left}px; top:{option.top}px; width:{option.width}px; height:{option.height}px;"
+      style="left:{option.left}px; top:{option.top}px; width:{option.width}px; height:{option.height}px;{option.motion ?? ''}"
     >
-      {#if resolved.body}
-        <div class="choice-body">
-          <BackgroundRenderer background={resolved.body} width={option.width} height={option.height} />
-        </div>
-      {/if}
       <div
         class="choice-content"
         style="padding:{resolved.whole.paddingY}px {option.padX}px; gap:{resolved.whole.indicatorGap}px; justify-content:{centred(style) ? 'center' : 'flex-start'};"
@@ -105,16 +147,16 @@
           <span class="choice-lamp" style={lampCssFor(option)}></span>
         {:else if resolved.indicatorOuter.visible}
           <span class="choice-ring" style={shapeCss(resolved.indicatorOuter)}>
-            {#if resolved.indicatorInner.shown && style !== 'tab'}
+            {#if resolved.indicatorInner.shown && style !== 'tab' && !option.thumbbed}
               <span class="choice-dot" style={shapeCss(resolved.indicatorInner)}></span>
             {/if}
           </span>
-        {:else if resolved.indicatorInner.shown && style !== 'tab'}
+        {:else if resolved.indicatorInner.shown && style !== 'tab' && !option.thumbbed}
           <span class="choice-dot" style={shapeCss(resolved.indicatorInner)}></span>
         {/if}
-        <span class="radio-group-label choice-label" style={labelCss(resolved.label)}>{option.label}</span>
+        <span class="radio-group-label choice-label" style="{labelCss(resolved.label)};{option.words?.outer ?? ''}">{#if option.words?.pieces}{#each option.words.pieces as piece, k (k)}<span class="choice-piece" style={piece.style}>{piece.text}</span>{/each}{:else if option.words?.colours}<span class="choice-ink">{option.label}</span>{:else}{option.label}{/if}</span>
       </div>
-      {#if style === 'tab' && resolved.indicatorInner.shown}
+      {#if style === 'tab' && resolved.indicatorInner.shown && !option.thumbbed}
         <span class="choice-underline" style={underlineCss(option)}></span>
       {/if}
       {#if option.focused}
@@ -127,6 +169,7 @@
       {/if}
     </div>
   {/each}
+  {#if thumb && THUMB_OVER.has(style)}{@render thumbMark()}{/if}
 </div>
 
 <style>
@@ -145,6 +188,17 @@
   .choice-body {
     position: absolute;
     inset: 0;
+  }
+
+  .choice-face,
+  .choice-thumb {
+    position: absolute;
+    box-sizing: border-box;
+  }
+
+  /* A colour frame on an option's words (`Parts.chosenLabel`, `Parts.optionLabel`). */
+  .choice-ink {
+    animation: var(--ce-kf-text, none);
   }
 
   .choice-content {

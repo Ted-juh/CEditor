@@ -317,8 +317,9 @@ try {
           // The control's own Background: absorbed into the content box, laid on a layer of its
           // own, or drawn by a BackgroundRenderer that is not inside an option.
           frame: !!el.querySelector('.control-background, .control-content.absorbs-fill')
-            || [...el.querySelectorAll('.bg-fill-layer, .bg-border-css')].some((n) => !n.closest('.choice-option')),
-          boxes: options.filter((o) => o.querySelector('.choice-body')).length,
+            || [...el.querySelectorAll('.bg-fill-layer, .bg-border-css')].some((n) => !n.closest('.choice-option, .choice-face, .choice-thumb')),
+          // An option's face is on a layer of its own under the options' words (ChoiceGroup.svelte).
+          boxes: el.querySelectorAll('[data-choice-face]').length,
           options: options.length,
           rings: el.querySelectorAll('.choice-ring').length,
           lamps: el.querySelectorAll('.choice-lamp').length,

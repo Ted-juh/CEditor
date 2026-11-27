@@ -37,9 +37,16 @@ const choiceGroup = (style = 'segmented', options = 4) => {
   return control;
 };
 
-test('the catalogue: Attention and Choosing in order, each preset an ordinary preset under Choice group, ids of its own', () => {
-  assert.deepEqual(CHOICE_PRESET_GROUPS.map((group) => group.id), ['attention', 'choosing']);
-  assert.deepEqual(CHOICE_PRESETS.map((entry) => entry.slug), ['pulse', 'breathe', 'wiggle', 'beat-pulse', 'look-here', 'pop-in', 'lean', 'blink', 'tick']);
+test('the catalogue: seven groups in order, each preset an ordinary preset under Choice group, ids of its own', () => {
+  assert.deepEqual(CHOICE_PRESET_GROUPS.map((group) => group.id), ['attention', 'choosing', 'thumb', 'chosen', 'appear', 'hover', 'new-options']);
+  assert.deepEqual(CHOICE_PRESETS.map((entry) => entry.slug), [
+    'pulse', 'breathe', 'wiggle', 'beat-pulse', 'look-here', 'pop-in', 'lean', 'blink', 'tick',
+    'slide', 'spring', 'stretch', 'underline-glide', 'dot-hop', 'lamp-run',
+    'pop', 'press-in', 'glow', 'label-roll', 'ink-flash',
+    'cascade', 'fan-out', 'typewriter-labels', 'drop-in',
+    'lift', 'spotlight', 'grow-label',
+    'roll-over', 'crossfade', 'cascade-new',
+  ]);
   for (const entry of CHOICE_PRESETS) {
     assert.equal(entry.id, choicePresetId(entry.slug));
     assert.equal(entry.preset.category, 'Choice group');
@@ -112,30 +119,49 @@ test('nothing loops that does not say so', () => {
 test('the library lists them under Choice group, after the Button, by group', () => {
   assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button', 'Choice group']);
   const choice = COMPONENT_PRESETS.find((entry) => entry.component === 'Choice group');
-  assert.deepEqual(choice.groups.map((group) => group.label), ['Attention', 'Choosing']);
+  assert.deepEqual(choice.groups.map((group) => group.label), ['Attention', 'Choosing', 'Thumb', 'The chosen', 'Appear', 'Hover', 'New options']);
   assert.equal(choice.groups.reduce((n, group) => n + group.entries.length, 0), CHOICE_PRESETS.length);
 });
 
-test('the showcase: one panel a group, every choice group wearing its preset, in a set and a style of its own', () => {
-  assert.deepEqual(CHOICE_PANELS.map(([id]) => id), ['choice-attention', 'choice-choosing']);
+test('the showcase: one panel a group and Together, every choice group wearing its preset, in a set of its own and the style the preset names', () => {
+  assert.deepEqual(CHOICE_PANELS.map(([id]) => id), [...CHOICE_PRESET_GROUPS.map((group) => `choice-${group.id}`), 'choice-together']);
   const taken = new Set([...KNOB_PANELS, ...SLIDER_PANELS, ...BUTTON_PANELS].map(([, make]) => make().controlSet.id));
-  const expected = { 'choice-attention': ['atelier', 'segmented'], 'choice-choosing': ['ember', 'buttons'] };
+  const sets = { 'choice-attention': 'atelier', 'choice-choosing': 'ember', 'choice-thumb': 'eurorack', 'choice-chosen': 'chrome', 'choice-appear': 'satellite', 'choice-hover': 'ceramic', 'choice-new-options': 'studio-white', 'choice-together': 'receiver' };
+  const seen = new Set();
   for (const [id, make] of CHOICE_PANELS) {
     const panel = make();
-    assert.equal(panel.controlSet.id, expected[id][0], id);
-    assert.ok(!taken.has(panel.controlSet.id), `${id}: a set none of the other components' panels use`);
+    assert.equal(panel.controlSet.id, sets[id], id);
+    assert.ok(!taken.has(panel.controlSet.id) && !seen.has(panel.controlSet.id), `${id}: a set of its own`);
+    seen.add(panel.controlSet.id);
+    if (id === 'choice-together') {
+      assert.deepEqual(panel.animationScenes.map((scene) => scene.name), ['Cascade in', 'Wave', 'Ripple']);
+      const first = panel.controls.find((control) => control._children.Core.name === 'Ripple1');
+      assert.deepEqual(panel.animationScenes[2].trigger, { type: 'event', controlId: first._children.Core.id, event: 'click' }, 'Ripple plays on a choice made on the first group');
+      continue;
+    }
     const groups = panel.controls.filter((control) => control._children.Core.controlType === 'RadioButtonGroup');
-    assert.ok(groups.every((control) => control._children.Behavior.visualStyle === expected[id][1]), `${id}: ${expected[id][1]}`);
     const entries = CHOICE_PRESETS.filter((entry) => entry.group === id.slice('choice-'.length));
     assert.deepEqual(panel.animationPresets.map((preset) => preset.id).sort(), entries.map((entry) => entry.id).sort(), `${id} carries its presets`);
-    const followed = new Set(groups.flatMap((control) => Object.values(control._children.Animations?._children ?? {}).map((node) => presetLink(node)?.id).filter(Boolean)));
-    for (const entry of entries) assert.ok(followed.has(entry.id), `${id}: a group wears ${entry.slug}`);
+    for (const entry of entries) {
+      const wearing = groups.find((control) => Object.values(control._children.Animations?._children ?? {}).some((node) => presetLink(node)?.id === entry.id));
+      assert.ok(wearing, `${id}: a group wears ${entry.slug}`);
+      const style = entry.knob?.['Behavior.visualStyle'];
+      if (style) assert.equal(wearing._children.Behavior.visualStyle, style, `${entry.slug} in the ${style} style`);
+    }
   }
   const attention = CHOICE_PANELS[0][1]();
   assert.match(attention.scripts.find((script) => script.name === 'Look here').source, /ce\.anim\.play\('LookHere', 'lookHere'\)/, 'a script plays Look here');
   const lean = CHOICE_PANELS[1][1]().controls.find((control) => control._children.Core.name === 'Lean');
   assert.equal(lean._children.Behavior.defaultValue, 'opt_3', 'Lean starts in the middle, so it can go either way');
   assert.equal(lean._children.Value.rows.length, 5);
+  // New options: three groups take their options from the Section group's choice.
+  const fresh = CHOICE_PANELS.find(([id]) => id === 'choice-new-options')[1]();
+  const section = fresh.controls.find((control) => control._children.Core.name === 'Section');
+  for (const name of ['RollOver', 'Crossfade', 'CascadeNew']) {
+    const child = fresh.controls.find((control) => control._children.Core.name === name);
+    assert.equal(child._children.Value.dependsOn, section._children.Core.id, `${name} depends on Section`);
+    assert.deepEqual([...new Set(child._children.Value.rows.map((row) => row.parentValue))], ['osc', 'filter', 'amp']);
+  }
 });
 
 const luminance = (argb) => [2, 4, 6].map((at) => parseInt(argb.slice(at, at + 2), 16) / 255)

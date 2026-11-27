@@ -46,7 +46,8 @@ test('the trigger types a keyframe animation answers', () => {
   // row, played on request as `script` is (stateMotion.js). `valueStep` on 2026-11-26: once each
   // time a knob's value crosses into another of its steps (the Components showcase's Detent).
   // `hold` on 2026-11-27: while a timed button is held to confirm, over its own hold time.
-  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold']);
+  // `optionsChange` the same day: a choice group whose list of options changed (choiceGroupParts.test.js).
+  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold', 'optionsChange']);
   assert.equal(defaultIterations('always'), 'infinite');
   assert.equal(defaultIterations('stateChange'), 'infinite', 'a state animation loops while the state holds');
   assert.equal(defaultIterations('valueChange'), 1);

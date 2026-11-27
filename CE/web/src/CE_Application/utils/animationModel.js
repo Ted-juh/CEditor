@@ -645,6 +645,7 @@ export const KEYFRAME_TRIGGER_LABELS = {
   script: 'When a script plays it',
   event: 'On a click or gesture',
   hold: 'While held to confirm',
+  optionsChange: 'When its options change',
 };
 
 /** Where a keyframe animation plays, as a targets list: a part, or the control itself. */

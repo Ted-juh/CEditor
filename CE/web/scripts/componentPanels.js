@@ -495,6 +495,12 @@ export const BUTTON_PANELS = [
 const CHOICE_LOOKS = {
   attention: { set: 'atelier', style: 'segmented', bg: 'FFD9D9D4', ink: 'FF1C1C1A', how: 'FF8C2F14', what: 'FF45453F' },
   choosing: { set: 'ember', style: 'buttons', bg: 'FF1F1A18', ink: 'FFFFF6EC', how: 'FFF08A24', what: 'FFC8B6A2' },
+  // Phase 2, the options as parts: each preset in the style that shows what it moves (its `knob`).
+  thumb: { set: 'eurorack', style: 'segmented', bg: 'FFC8CBCE', ink: 'FF1B1D20', how: 'FF0B4027', what: 'FF1C1F23' },
+  chosen: { set: 'chrome', style: 'buttons', bg: 'FF10151F', ink: 'FFEEF3F8', how: 'FF2FC4FF', what: 'FF9AA6B4' },
+  appear: { set: 'satellite', style: 'buttons', bg: 'FF162B35', ink: 'FFF7F4EC', how: 'FF70CFC0', what: 'FFB9C6CC' },
+  hover: { set: 'ceramic', style: 'buttons', bg: 'FFE9E7E1', ink: 'FF2B2A26', how: 'FF1F4F72', what: 'FF4E4A43' },
+  'new-options': { set: 'studio-white', style: 'segmented', bg: 'FFE1E3DE', ink: 'FF202529', how: 'FF22525A', what: 'FF41474C' },
 };
 // What each group offers, and which option it starts on.
 const CHOICES = {
@@ -507,6 +513,24 @@ const CHOICES = {
   lean: [['-2', '-1', '0', '+1', '+2'], 2],
   blink: [['Saw', 'Square', 'Tri', 'Sine'], 0],
   tick: [['1', '2', '3', '4', '5', '6'], 0],
+  slide: [['Saw', 'Square', 'Tri', 'Sine'], 1],
+  spring: [['1', '2', '3', '4'], 0],
+  stretch: [['A', 'B', 'C', 'D', 'E'], 0],
+  'underline-glide': [['Mix', 'Env', 'LFO', 'Arp'], 0],
+  'dot-hop': [['Off', 'Low', 'Mid', 'High'], 1],
+  'lamp-run': [['1', '2', '3', '4', '5', '6'], 0],
+  pop: [['Lo', 'Mid', 'Hi'], 1],
+  'press-in': [['Mono', 'Poly', 'Uni'], 0],
+  glow: [['Saw', 'Sqr', 'Tri'], 0],
+  'label-roll': [['Hall', 'Room', 'Plate', 'Spring'], 0],
+  'ink-flash': [['Edit', 'Mix', 'Save'], 0],
+  cascade: [['Saw', 'Square', 'Tri', 'Sine'], 1],
+  'fan-out': [['-2', '-1', '0', '+1', '+2'], 2],
+  'typewriter-labels': [['Sine', 'Square', 'Noise'], 0],
+  'drop-in': [['A', 'B', 'C', 'D'], 0],
+  lift: [['Lo', 'Mid', 'Hi'], 1],
+  spotlight: [['Rate', 'Depth', 'Shape', 'Sync'], 0],
+  'grow-label': [['Mix', 'Env', 'LFO'], 0],
 };
 const CHOICE_TILE_W = 320;
 const CHOICE_TILE_H = 170;
@@ -540,7 +564,7 @@ function choiceGroupPanel(group) {
     const y = TOP + Math.floor(i / columns) * CHOICE_TILE_H;
     const name = pascal(entry.slug);
     const choice = f.add(entry.type ?? 'RadioButtonGroup', name, x + (CHOICE_TILE_W - GROUP_W) / 2, y, GROUP_W, GROUP_H);
-    choice._children.Behavior.visualStyle = look.style;
+    choice._children.Behavior.visualStyle = entry.knob?.['Behavior.visualStyle'] ?? look.style;
     choice._children.Core.description = `${entry.name}: ${entry.what}.`;
     const [labels, start] = CHOICES[entry.slug];
     offer(choice, labels, start);
@@ -565,4 +589,100 @@ after(1500, lookHere);
   return panel;
 }
 
-export const CHOICE_PANELS = CHOICE_PRESET_GROUPS.map((group) => [`choice-${group.id}`, () => choiceGroupPanel(group)]);
+/**
+ * New options: a group whose choice decides the options of the three below it (each row tagged with
+ * the parent's choice it belongs to, utils/dependentChoices.js). Choose another section and each of
+ * the three plays its preset over its new options.
+ */
+function choiceNewOptionsPanel(group) {
+  const look = CHOICE_LOOKS[group.id];
+  const entries = CHOICE_PRESETS.filter((entry) => entry.group === group.id);
+  const width = 3 * CHOICE_TILE_W + 60;
+  const height = TOP + 90 + CHOICE_TILE_H + 24;
+  const f = panelMaker(`choice-${group.id}`, `Choice group ${group.label}`, { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
+  const carried = new Map();
+  f.label('Title', `Choice group · ${group.label}`, 30, 22, 620, 34, { size: 24, colour: look.ink, align: 'left' });
+  f.label('Note', 'choose a section, and the three below take its options, each playing one built-in preset.', 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
+  const sections = [['osc', 'Oscillator', ['Saw', 'Square', 'Noise']], ['filter', 'Filter', ['LP', 'BP', 'HP']], ['amp', 'Amp', ['Gate', 'Env', 'Hold']]];
+  const parent = f.add('RadioButtonGroup', 'Section', (width - 420) / 2, TOP, 420, GROUP_H);
+  parent._children.Behavior.visualStyle = look.style;
+  parent._children.Core.description = 'Choose a section: the groups below take its options.';
+  offer(parent, sections.map(([, label]) => label), 0);
+  parent._children.Value.rows.forEach((row, i) => { row.id = sections[i][0]; row.internalValue = sections[i][0]; });
+  parent._children.Behavior.defaultValue = sections[0][0];
+  entries.forEach((entry, i) => {
+    const x = 30 + i * CHOICE_TILE_W;
+    const y = TOP + 90;
+    const name = pascal(entry.slug);
+    const child = f.add('RadioButtonGroup', name, x + (CHOICE_TILE_W - GROUP_W) / 2, y, GROUP_W, GROUP_H);
+    child._children.Behavior.visualStyle = entry.knob?.['Behavior.visualStyle'] ?? look.style;
+    child._children.Core.description = `${entry.name}: ${entry.what}.`;
+    const template = child._children.Value.rows[0];
+    child._children.Value.rows = sections.flatMap(([section, , labels]) => labels.map((label, k) => ({
+      ...template, id: `${section}_${k + 1}`, displayText: label, internalValue: `${section}_${k + 1}`, sendValue: k,
+      selectedByDefault: section === sections[0][0] && k === 0, parentValue: section,
+    })));
+    child._children.Behavior.defaultValue = `${sections[0][0]}_1`;
+    child._children.Value.dependsOn = parent._children.Core.id;
+    wear(child, entry, carried, look.set);
+    const captionTop = y + GROUP_H + 14;
+    f.label(`${name}Caption`, entry.name, x + 10, captionTop, CHOICE_TILE_W - 20, 22, { size: 16, colour: look.ink });
+    f.label(`${name}How`, entry.how.toUpperCase(), x + 10, captionTop + 22, CHOICE_TILE_W - 20, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600 });
+    f.label(`${name}What`, entry.what, x + 14, captionTop + 40, CHOICE_TILE_W - 28, 36, { size: 12, colour: look.what, weight: 400, lineHeight: 1.25 });
+  });
+  const panel = f.scenes([]);
+  panel.animationPresets = [...carried.values()];
+  return panel;
+}
+
+/**
+ * Together, on rows of choice groups: Cascade in brings each group in after the last as the panel
+ * opens; Wave lifts them in turn, over and over; Ripple sends a pulse along the row from the first,
+ * each time a choice is made on it.
+ */
+function choiceTogether() {
+  const look = { set: 'receiver', bg: 'FFC6C9CD', ink: 'FF1B1D20', how: 'FF0E3466', what: 'FF2F3338' };
+  const width = 1040;
+  const height = 560;
+  const f = panelMaker('choice-together', 'Choice group Together', { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
+  f.label('Title', 'Choice group · Together', 30, 22, 620, 34, { size: 24, colour: look.ink, align: 'left' });
+  f.label('Note', 'scenes over a row of groups: one effect on many, each a little after the last.', 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
+  const lanes = [
+    ['CascadeIn', 'Cascade in', 'PANEL OPENS', 'each group comes in, 140 ms after the last'],
+    ['Wave', 'Wave', 'ALWAYS', 'the groups rise in turn along the row'],
+    ['Ripple', 'Ripple', 'CHOOSE ON THE FIRST', 'a pulse runs along the row from it'],
+  ];
+  const offers = [['Saw', 'Sqr', 'Tri'], ['LP', 'BP', 'HP'], ['1/4', '1/8', '1/16'], ['Off', 'On'], ['A', 'B', 'C']];
+  const COUNT = offers.length;
+  lanes.forEach(([key, name, how, what], lane) => {
+    const y = 120 + lane * 140;
+    f.label(`${key}Caption`, name, 30, y, 220, 22, { size: 16, colour: look.ink, align: 'left' });
+    f.label(`${key}How`, how, 30, y + 24, 220, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600, align: 'left' });
+    f.label(`${key}What`, what, 30, y + 42, 220, 36, { size: 12, colour: look.what, weight: 400, lineHeight: 1.25, align: 'left' });
+    for (let k = 0; k < COUNT; k += 1) {
+      const choice = f.add('RadioButtonGroup', `${key}${k + 1}`, 270 + k * 150, y, 136, 40);
+      choice._children.Behavior.visualStyle = 'segmented';
+      offer(choice, offers[k], 0);
+      if (key === 'Ripple' && k === 0) choice._children.Core.description = 'Choose on it: a pulse runs along the row.';
+    }
+  });
+  const POP = 460;
+  const popLength = 300 + (COUNT - 1) * 140 + POP;
+  for (let k = 0; k < COUNT; k += 1) {
+    const at = (300 + k * 140) / popLength;
+    const grown = (300 + k * 140 + 0.6 * POP) / popLength;
+    f.clip(`CascadeIn${k + 1}`, 'Transform', 0, frames([{ at: 0, scale: 0.6, opacity: 0, y: 10 }, { at, scale: 0.6, opacity: 0, y: 10 }, { at: grown, scale: 1.04, opacity: 1, y: 0 }, { at: 1, scale: 1, opacity: 1, y: 0 }], { easing: 'linear' }), popLength, 0);
+    f.clip(`Wave${k + 1}`, 'Transform', 400 + k * 150, frames([{ at: 0, y: 0 }, { at: 0.4, y: -9 }, { at: 1, y: 0 }], { easing: 'inOutSine' }), 560, 1);
+    f.clip(`Ripple${k + 1}`, 'Transform', k * 100, frames([{ at: 0, scale: 1 }, { at: 0.35, scale: 1.08 }, { at: 1, scale: 1 }], { easing: 'outQuad' }), 360, 2);
+  }
+  return f.scenes([
+    { name: 'Cascade in', length: popLength, loop: false },
+    { name: 'Wave', length: 2600, loop: true },
+    { name: 'Ripple', length: (COUNT - 1) * 100 + 360, trigger: { type: 'event', controlId: f.ids.Ripple1, event: 'click' }, loop: false },
+  ]);
+}
+
+export const CHOICE_PANELS = [
+  ...CHOICE_PRESET_GROUPS.map((group) => [`choice-${group.id}`, () => (group.id === 'new-options' ? choiceNewOptionsPanel(group) : choiceGroupPanel(group))]),
+  ['choice-together', choiceTogether],
+];
