@@ -119,11 +119,13 @@
       style="left:{Math.min(divider.x1, divider.x2) - 0.5}px; top:{Math.min(divider.y1, divider.y2) - 0.5}px; width:{Math.max(1, Math.abs(divider.x2 - divider.x1))}px; height:{Math.max(1, Math.abs(divider.y2 - divider.y1))}px; background:{dividerColour};"
     ></span>
   {/each}
-  <!-- The faces, under everything: the chosen one's is the thumb's when there is one. -->
+  <!-- The faces, under everything. With a thumb, the chosen one's chosen look is the thumb's, and
+       it keeps the face it has when not chosen (a key stays a key while the colour comes to it). -->
   {#each items as option (option.key)}
-    {#if option.resolved.body && !option.thumbbed}
+    {@const body = option.thumbbed ? option.restingBody : option.resolved.body}
+    {#if body}
       <div class="choice-face" data-choice-face={option.key} style="left:{option.left}px; top:{option.top}px; width:{option.width}px; height:{option.height}px;{option.motion ?? ''}">
-        <BackgroundRenderer background={option.resolved.body} width={option.width} height={option.height} />
+        <BackgroundRenderer background={body} width={option.width} height={option.height} />
       </div>
     {/if}
   {/each}

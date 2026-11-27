@@ -3543,6 +3543,9 @@
       resolved: option.resolved,
       // Its mark is the thumb's, drawn apart where it can travel.
       thumbbed: choiceThumbOn && option.flags.selected,
+      // And under the thumb it keeps its face as it is when not chosen, so a key stays a key while
+      // the colour travels to it (a strip's options have none: there the thumb is all there is).
+      restingBody: choiceThumbOn && option.flags.selected ? (resolveChoice(option.row, { ...option.flags, selected: false }).body ?? null) : null,
       motion: choiceMotionCss(index, option, all.length),
       words: choiceLabelPlay(option),
     };

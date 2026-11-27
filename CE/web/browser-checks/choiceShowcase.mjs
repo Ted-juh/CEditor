@@ -15,7 +15,8 @@
  * each option, or the thumb, does:
  *
  *   - Thumb: a new choice sends the thumb across to it, through the options between, in every style
- *     (Slide, Underline glide, Dot hop, Lamp run); Stretch reaches ahead before its back edge follows.
+ *     (Slide, Underline glide, Dot hop, Lamp run); Stretch reaches ahead before its back edge follows;
+ *     Spring's keys stay keys while the colour travels over them.
  *   - The chosen: the option chosen pops, presses in, rolls its label in or flashes its ink, and the
  *     others do not.
  *   - Appear: the options come in one after another as the panel opens: in order, out from the one
@@ -230,6 +231,21 @@ try {
       assert.ok(centres.at(-1) > start && centres.at(-1) < end, `ends on it: ${centres.at(-1).toFixed(1)} in ${start.toFixed(0)}-${end.toFixed(0)}`);
     });
     await page.mouse.move(5, 5);
+  }
+  {
+    // Keys keep their faces: only the colour travels, and the key it goes to is still a key.
+    const faces = () => page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-choice-face]`)].map((f) => f.dataset.choiceFace), inPreview(ids.Spring));
+    const restFaces = await faces();
+    const [rest] = await now([ids.Spring]);
+    await page.mouse.click(option(rest, 'opt_3').x, option(rest, 'opt_3').y);
+    await page.waitForTimeout(60);
+    const travelling = await faces();
+    await page.mouse.move(5, 5);
+    await kit.settle(600);
+    check('Thumb: Spring\'s keys keep their faces while the colour travels, the key chosen among them', () => {
+      assert.deepEqual(restFaces, ['opt_1', 'opt_2', 'opt_3', 'opt_4']);
+      assert.deepEqual(travelling, ['opt_1', 'opt_2', 'opt_3', 'opt_4']);
+    });
   }
   {
     const [rest] = await now([ids.Stretch]);

@@ -766,9 +766,10 @@ else, so a Slide preset applied to a knob is refused with "does not have: thumb"
 
 - **The thumb** (`utils/choiceGroupMotion.js`). Unanimated, each option draws its own mark of being
   chosen, and a new choice moves it at once. Anything played on `Parts.thumb` draws the chosen
-  option's mark apart, on a layer of its own, and the option leaves its own out: the strip's thumb
-  or the chosen key's face (segmented, buttons), under the words; the radio's dot and the lit lamp
-  over their rings, every lamp drawing unlit; the tab's underline. It stands as four edges, and a
+  option's mark apart, on a layer of its own, and the option draws itself as if not chosen: the
+  strip's thumb or the chosen key's colour (segmented, buttons), under the words, over a key that
+  stays a key (a strip's options have no face of their own); the radio's dot and the lit lamp over
+  their rings, every lamp drawing unlit; the tab's underline. It stands as four edges, and a
   transition eases them: the edge ahead (as it travels) on the timing of `Parts.thumb.Layout.x`, the
   edge behind on that of `Parts.thumb.Layout.width`, the cross axis with the edge ahead. Equal
   timings slide it whole; a slower one behind stretches it toward the new option and draws it in.
@@ -830,7 +831,9 @@ Verified locally:
   and leaving an author's alone; `optionsChange` as a trigger of both kinds.
   `test/choicePresets.test.js`: the catalogue's 30, the library's seven groups, the eight panels.
 - The browser check `choiceShowcase`, extended: each thumb travels through the options between and
-  ends on the chosen one, Stretch more than twice its width on the way; Pop and Press in scale the
+  ends on the chosen one, Stretch more than twice its width on the way, and Spring's four keys all
+  keep their faces while the colour travels (the key it went to first drew none, a hole in the row,
+  until the recording showed it); Pop and Press in scale the
   chosen option alone, Label roll rolls it in pieces, Ink flash changes its ink; Cascade, Fan out
   and Drop in arrive in their orders and Typewriter labels finishes the first word before the last
   begins; Lift and Grow label grow the hovered option only, Spotlight dims the others to 0.35; a new
