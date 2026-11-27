@@ -49,6 +49,8 @@ import { labelShows } from './labelShows.js';
 import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
 import { setByAuthor } from './authorsStateValue.js';
 import { BUTTON_DEVICE_PARTS, BUTTON_DEVICE_TYPES, buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
+import { METER_CELL_PART, METER_DEVICE_PARTS, METER_DEVICE_TYPES, meterDeviceDrawn, meterDrawsCells, meterPartNames } from '../models/meterDeviceParts.js';
+import { LEVEL_TRIGGER_TYPES } from './keyframeAnimation.js';
 import { choicePartNames } from './choiceGroupLayout.js';
 
 /** The fields of an animation that are its identity in a control, not a setting. */
@@ -205,6 +207,7 @@ export function presetNeeds(preset) {
   }
   for (const path of Object.keys(preset?.fields ?? {})) {
     if (path.startsWith('Text.')) sections.add('Text');
+    if (path.startsWith('Meter.')) sections.add('Meter');
     if (path.startsWith('Parts.')) parts.add(path.split('.')[1]);
   }
   const states = Object.keys(preset?.states ?? {});
@@ -212,7 +215,7 @@ export function presetNeeds(preset) {
 }
 
 /** The parts a control has, by name: its own, and a choice group's drawn from its rows. */
-const partNamesOf = (control) => new Set([...Object.keys(control?._children?.Parts?._children ?? {}), ...choicePartNames(control)]);
+const partNamesOf = (control) => new Set([...Object.keys(control?._children?.Parts?._children ?? {}), ...choicePartNames(control), ...meterPartNames(control)]);
 
 /**
  * Why a preset cannot go on this control, or '' when it can. A control without an Animations section
@@ -230,13 +233,22 @@ export function presetDoesNotFit(preset, control) {
   if (Object.values(preset.animations ?? {}).some((node) => node?.kind === 'value') && !controlDrawsValue(control)) {
     return 'It moves what a value draws, and this control draws none: it goes on a knob, a slider, a Macro or a meter.';
   }
-  // Words are thrown from a knob's or a slider's pointer, or from a button's key; a button throws
-  // only words of its own or a count, having no value to speak of.
+  // Only a meter's level clips or crosses a line (keyframeAnimation.js LEVEL_TRIGGER_TYPES): played
+  // so on anything else, it would never play.
+  if (Object.values(preset.animations ?? {}).some((node) => LEVEL_TRIGGER_TYPES.includes(node?.trigger?.type))
+    && !METER_DEVICE_TYPES.has(String(control._children.Core?.controlType ?? ''))) {
+    return 'It plays as a meter\'s level clips or crosses a line, and this control is no meter.';
+  }
+  // Words are thrown from a knob's or a slider's pointer, from a button's key, or from a meter; a
+  // button or a meter throws only words of its own or a count, having no pointer to throw a value from.
   const emits = Object.values(preset.animations ?? {}).filter((node) => node?.kind === 'emit');
   if (emits.length) {
-    const button = BUTTON_DEVICE_TYPES.has(String(control._children.Core?.controlType ?? ''));
-    if (!button && !isSliderFamily(control)) return 'It throws words from a pointer or a key, and this control has neither: it goes on a knob, a slider or a button.';
+    const type = String(control._children.Core?.controlType ?? '');
+    const button = BUTTON_DEVICE_TYPES.has(type);
+    const meter = METER_DEVICE_TYPES.has(type);
+    if (!button && !meter && !isSliderFamily(control)) return 'It throws words from a pointer, a key or a meter, and this control is none of them: it goes on a knob, a slider, a button or a meter.';
     if (button && emits.some((node) => !['words', 'count'].includes(node.shows))) return 'It throws the value, and a button has none to throw: words of its own or a count go on a button.';
+    if (meter && emits.some((node) => !['words', 'count'].includes(node.shows))) return 'It throws the value from a pointer, and a meter has none: words of its own or a count go on a meter.';
   }
   return wordsNotShown(preset, control);
 }
@@ -257,6 +269,27 @@ export function keyPartsNotDrawn(preset, drawn) {
   if (!buttonDeviceDrawn(drawn)) return `It plays on the key's ${names(wanted)}, and this button's set draws it whole, with no parts to play on.`;
   const hidden = wanted.filter((part) => drawn._children.Parts?._children?.[part]?.visible !== true);
   return hidden.length ? `It plays on the key's ${names(hidden)}, which this button's set does not draw.` : '';
+}
+
+/**
+ * Why a preset that plays on a meter's own parts (its lamp, its needle, its scale, every lamp:
+ * models/meterDeviceParts.js) would play on nothing on this meter as its set draws it, or ''. As a
+ * button's (keyPartsNotDrawn): a meter keeps its parts hidden in the document whatever its set draws.
+ * A part the preset turns on itself (`Parts.lamp.visible`, the clip lamp no set draws) is there once
+ * it is applied. The Meter, phase 2.
+ */
+export function meterPartsNotDrawn(preset, drawn) {
+  if (!METER_DEVICE_TYPES.has(String(drawn?._children?.Core?.controlType ?? ''))) return '';
+  const wanted = presetNeeds(preset).parts.filter((part) => METER_DEVICE_PARTS.includes(part) || part === METER_CELL_PART);
+  if (!wanted.length) return '';
+  const label = (part) => (part === METER_CELL_PART ? 'every lamp' : part);
+  const names = (list) => list.map(label).join(' and ');
+  if (!meterDeviceDrawn(drawn)) return `It plays on the meter's ${names(wanted)}, and this meter's set draws it plain, with no parts to play on.`;
+  const turnedOn = (part) => preset.fields?.[`Parts.${part}.visible`] === true;
+  const hidden = wanted.filter((part) => (part === METER_CELL_PART
+    ? !meterDrawsCells(drawn)
+    : drawn._children.Parts?._children?.[part]?.visible !== true && !turnedOn(part)));
+  return hidden.length ? `It plays on the meter's ${names(hidden)}, which this meter's set does not draw.` : '';
 }
 
 /**
@@ -321,7 +354,7 @@ export function presetFitsTypes(preset, types, create) {
  * parts is refused where the set draws none of them (keyPartsNotDrawn).
  */
 export function applyPresetPatch(control, preset, { link = true, drawn = null } = {}) {
-  const reason = presetDoesNotFit(preset, control) || (drawn ? keyPartsNotDrawn(preset, drawn) : '');
+  const reason = presetDoesNotFit(preset, control) || (drawn ? keyPartsNotDrawn(preset, drawn) || meterPartsNotDrawn(preset, drawn) : '');
   if (reason) return { patch: null, reason };
   const taken = Object.keys(control._children.Animations?._children ?? {});
   const nodes = {};

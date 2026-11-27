@@ -32,6 +32,7 @@ import {
 } from './animationModel.js';
 import { patternLabel } from './patternLayers.js';
 import { choicePartNames } from './choiceGroupLayout.js';
+import { meterPartNames } from '../models/meterDeviceParts.js';
 
 /** The role groups a slider-family part's name starts with, in the order they are listed. */
 export const PART_GROUPS = Object.freeze([
@@ -53,6 +54,8 @@ const KNOWN_PART_LABELS = Object.freeze({
   option: 'Every option',
   chosenLabel: 'Chosen label',
   optionLabel: 'Every label',
+  // A meter's every lamp (models/meterDeviceParts.js METER_CELL_PART).
+  cell: 'Every lamp',
 });
 
 /** Where a property of the control itself is listed, and what it is called there. */
@@ -154,7 +157,7 @@ export function describeTargetPath(control, target) {
  * A keyframe animation plays on a place, not a property: its entries are the places themselves.
  */
 export function targetTree(control, kind = 'transition') {
-  const parts = [...Object.keys(resolvedPartsOf(control)), ...choicePartNames(control)];
+  const parts = [...Object.keys(resolvedPartsOf(control)), ...choicePartNames(control), ...meterPartNames(control)];
   if (kind === 'keyframes') return keyframeTree(parts);
 
   const rootOffered = offeredTargetsFor(control, kind, { onControl: true });

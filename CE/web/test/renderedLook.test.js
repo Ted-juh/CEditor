@@ -218,9 +218,11 @@ test('the export bakes each control as it is drawn, and the slider and the butto
   const meter = read('CE_Application/editor/MeterDeviceParts.svelte');
   assert.match(meter, /rendered: renderedPart\(name, part, drawing\),/);
   assert.match(meter, /const spec = renderedMeterPartSpec\(part, \{ colour, topColour: part\?\.renderTopColour \|\| null, lamp: \$activeControlSet\?\.lamp, name \}\);/);
-  assert.match(meter, /\{#if item\.rendered\}\s*<image data-rendered-look=\{item\.name\}/);
+  // After every lamp drawn alone, when something plays on them (the Meter, phase 2), which a rendered
+  // housing or clip lamp never is: neither lights cells.
+  assert.match(meter, /\{:else if item\.rendered\}\s*<image data-rendered-look=\{item\.name\}/);
   // What the image draws, its cells and zone are not drawn again over it.
-  assert.match(meter, /\{#if !item\.rendered\}\s*\{#each item\.zoned as path, i \(i\)\}/);
+  assert.match(meter, /\{#if !item\.rendered && !item\.cells\}\s*\{#each item\.zoned as path, i \(i\)\}/);
 });
 
 test('a slider\'s rendered cap, a button\'s rendered key and a meter\'s rendered housing are made into layers too', async () => {

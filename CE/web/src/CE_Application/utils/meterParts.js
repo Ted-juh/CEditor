@@ -4,7 +4,7 @@
 // renderer (editor/MeterDeviceParts.svelte) only paints them, so what a part does with the value is
 // tested here rather than in a browser.
 //
-// Returns { box, transform, paths, zoneFill, texts, labels }:
+// Returns { box, transform, paths, zoneFill, texts, labels, cells? }:
 //   transform   the part's own turn and move: its rotation, and a swing or a slide with the value
 //   paths       [{ d, role, colour? }], role 'base' (the part's own paint), 'lit' (a cell lit by the
 //               value, or a clip lamp lit, in the active colour, moved by the part's travel) or
@@ -15,6 +15,8 @@
 //   texts       [{ x, y, text, size }]: a legend's words or figures, baseline at y, centred on x
 //   labels      [{ x, y, text, size, anchor }]: a scale's numerals, centred on (x, y), upright and
 //               already where the part's rotation puts them (drawn outside its transform)
+//   cells       a part that lights cells: each alone, [{ d, lit, colour?, index, count }], its place
+//               along the row counted from the edge it lights from, for an animation on every lamp
 
 import { deviceShapeOptions, deviceShapePath, devicePatternCells } from './deviceShapes.js';
 import { meterFillColourAt, meterZones } from './meterLayout.js';
@@ -289,17 +291,24 @@ export function meterPartDrawing(name, part, { p = 0, peak = null, figures = '0'
     const bottom = String(part?.lightFrom ?? 'left') === 'bottom';
     const base = [];
     const lit = [];
+    // Each lamp alone as well, for an animation on every lamp (`Parts.cell`, models/meterDeviceParts.js
+    // METER_CELL_PART): its place along the row from the edge it lights from, and the row's length.
+    const each = [];
     for (const cell of cells) {
       const index = bottom ? cell.rows - 1 - cell.row : cell.col;
       const count = bottom ? cell.rows : cell.cols;
       const d = shape(cell.x, cell.y, cell.w, cell.h);
       if (litAt(index / count, reading)) {
-        lit.push({ d, colour: zones === 'position' ? meterZoneColour((index + 0.5) / count, meter) : (levelColour ?? undefined) });
+        const colour = zones === 'position' ? meterZoneColour((index + 0.5) / count, meter) : (levelColour ?? undefined);
+        lit.push({ d, colour });
+        each.push({ d, lit: true, colour, index, count });
       } else {
         base.push({ d });
+        each.push({ d, lit: false, index, count });
       }
     }
     result.paths = [...byColour(base, 'base'), ...byColour(lit, 'lit')];
+    result.cells = each;
   } else if (motion === 'clip') {
     // The lamp lights at its level and holds with the meter's peak.
     const d = cells.map((cell) => shape(cell.x, cell.y, cell.w, cell.h)).filter(Boolean).join(' ');

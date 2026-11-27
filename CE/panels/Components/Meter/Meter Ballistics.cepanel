@@ -1,0 +1,347 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "12e86e0d-c0b5-4e1a-9f3d-12e86e0d12e8",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Meter Ballistics",
+  "scriptId": "component_meter-ballistics",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 574,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF28231F",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "valve-console"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1747222413000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Meter · Ballistics","_children":{"Fill":{"colour":"FFF3E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1747222413001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how the needle gets to each new level, set by one built-in preset a meter. All five hear one test signal.","_children":{"Fill":{"colour":"FFD2C4AA"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vu","id":"ctrl_1747222413002","description":"VU: reaches each level in 300 ms and swings a little past it first, as a VU meter does.","controlType":"Meter"},
+        "Transform": {"x":86,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"riseTime":300,"fallTime":300,"overshoot":0.015,"testSignal":"program"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VuCaption","id":"ctrl_1747222413003","controlType":"Label"},
+        "Transform": {"x":40,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"VU","_children":{"Fill":{"colour":"FFF3E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VuHow","id":"ctrl_1747222413004","controlType":"Label"},
+        "Transform": {"x":40,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ITS NEEDLE","_children":{"Fill":{"colour":"FFE6BC6E"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VuWhat","id":"ctrl_1747222413005","controlType":"Label"},
+        "Transform": {"x":44,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"reaches each level in 300 ms and swings a little past it first, as a VU meter does","_children":{"Fill":{"colour":"FFD2C4AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ppm","id":"ctrl_1747222413006","description":"PPM: leaps up at once and sinks back slowly, as a peak programme meter does.","controlType":"Meter"},
+        "Transform": {"x":406,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"riseTime":10,"fallTime":1700,"testSignal":"program"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PpmCaption","id":"ctrl_1747222413007","controlType":"Label"},
+        "Transform": {"x":360,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PPM","_children":{"Fill":{"colour":"FFF3E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PpmHow","id":"ctrl_1747222413008","controlType":"Label"},
+        "Transform": {"x":360,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ITS NEEDLE","_children":{"Fill":{"colour":"FFE6BC6E"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PpmWhat","id":"ctrl_1747222413009","controlType":"Label"},
+        "Transform": {"x":364,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"leaps up at once and sinks back slowly, as a peak programme meter does","_children":{"Fill":{"colour":"FFD2C4AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bouncy","id":"ctrl_1747222413010","description":"Bouncy: springs past each new level and bounces back to it.","controlType":"Meter"},
+        "Transform": {"x":726,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"riseTime":180,"fallTime":260,"overshoot":0.25,"testSignal":"program"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BouncyCaption","id":"ctrl_1747222413011","controlType":"Label"},
+        "Transform": {"x":680,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Bouncy","_children":{"Fill":{"colour":"FFF3E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BouncyHow","id":"ctrl_1747222413012","controlType":"Label"},
+        "Transform": {"x":680,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ITS NEEDLE","_children":{"Fill":{"colour":"FFE6BC6E"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BouncyWhat","id":"ctrl_1747222413013","controlType":"Label"},
+        "Transform": {"x":684,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"springs past each new level and bounces back to it","_children":{"Fill":{"colour":"FFD2C4AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lazy","id":"ctrl_1747222413014","description":"Lazy: takes its time, as a heavy needle would.","controlType":"Meter"},
+        "Transform": {"x":86,"y":330,"width":208,"height":130},
+        "Meter": {"value":0.6,"riseTime":900,"fallTime":1400,"testSignal":"program"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LazyCaption","id":"ctrl_1747222413015","controlType":"Label"},
+        "Transform": {"x":40,"y":472,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Lazy","_children":{"Fill":{"colour":"FFF3E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LazyHow","id":"ctrl_1747222413016","controlType":"Label"},
+        "Transform": {"x":40,"y":494,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ITS NEEDLE","_children":{"Fill":{"colour":"FFE6BC6E"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LazyWhat","id":"ctrl_1747222413017","controlType":"Label"},
+        "Transform": {"x":44,"y":512,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"takes its time, as a heavy needle would","_children":{"Fill":{"colour":"FFD2C4AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StickyPeak","id":"ctrl_1747222413018","description":"Sticky peak: catches each peak at once and lets go of it over four seconds.","controlType":"Meter"},
+        "Transform": {"x":406,"y":330,"width":208,"height":130},
+        "Meter": {"value":0.6,"riseTime":15,"fallTime":4000,"testSignal":"program"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StickyPeakCaption","id":"ctrl_1747222413019","controlType":"Label"},
+        "Transform": {"x":360,"y":472,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Sticky peak","_children":{"Fill":{"colour":"FFF3E6CC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StickyPeakHow","id":"ctrl_1747222413020","controlType":"Label"},
+        "Transform": {"x":360,"y":494,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ITS NEEDLE","_children":{"Fill":{"colour":"FFE6BC6E"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"StickyPeakWhat","id":"ctrl_1747222413021","controlType":"Label"},
+        "Transform": {"x":364,"y":512,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"catches each peak at once and lets go of it over four seconds","_children":{"Fill":{"colour":"FFD2C4AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ]
+}

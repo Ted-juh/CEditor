@@ -86,6 +86,7 @@
   import { recallRowSlot } from '../stores/presetChoiceSync.js';
   import { visibleChoiceRows, dependsOnId, dependentControl, sortDependentControls } from '../utils/dependentChoices.js';
   import { decibelFraction, decibelPosition, meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
+  import { meterBallistics, meterTestLevel, meterValueAt, stepNeedle } from '../utils/meterMotion.js';
   import { meterNeedsPeak } from '../models/meterDeviceParts.js';
   import {
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
@@ -349,6 +350,9 @@
     bgLayers = {},
     gridStyle = '',
     surfaceRef = $bindable(null),
+    // A meter's test signal (utils/meterMotion.js) moves it with nothing connected: in the editor's
+    // Preview and its stages, never in an exported plug-in (Player.svelte says false).
+    testSignals = true,
   } = $props();
 
   // Several control families own self-scheduling animation loops. Their data remains reachable
@@ -1878,8 +1882,9 @@
     if (meterTickerRunning) return;
     meterTickerRunning = true;
     const loop = () => {
+      // A falling peak, a test signal or a needle on its way (utils/meterMotion.js) each want a frame.
       const anyPeak = flatControls(orderedControls ?? []).some((c) =>
-        (isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true) || peakChannels(c).length > 0);
+        (isMeterFamily(c?._children?.Core?.controlType) && meterMoves(c?._children?.Meter)) || peakChannels(c).length > 0);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
       if (hostShown) meterClock = Date.now();   // the peak decays by the time, seen or not
       meterAnimationFrame = requestAnimationFrame(loop);
@@ -1929,6 +1934,14 @@
     return peaks;
   }
 
+  // What moves a meter on the ticker: its peak falling, a test signal, a needle's ballistics.
+  const meterTestKind = (meter) => (testSignals ? String(meter?.testSignal ?? '') : '');
+  function meterMoves(meter) {
+    return meter?.peakHold === true || !!meterTestKind(meter) || !!meterBallistics(meter);
+  }
+  // Each needle with ballistics: where it is drawn, how fast it is going, and when that was.
+  let meterNeedleState = {};
+
   // Inject the meter's live value + peak-hold onto the resolved Meter section:
   // the value comes from a routed/session value, a linked range control
   // (valueSourceId), or the static config; the peak decays via the ticker. The renderer reads Meter.__value /
@@ -1942,11 +1955,31 @@
     const range = meter.valueSourceId ? lcdRangeForSource(meter.valueSourceId) : null;
     const session = sessionFor(control);
     const routed = session?.valueOverrideEnabled === true;
+    // A test signal is the level only while nothing else gives one (utils/meterMotion.js).
+    const testKind = !routed && !(range && range.value !== undefined) ? meterTestKind(meter) : '';
+    if (testKind) { ensureMeterTicker(); void meterClock; }
     const value = routed
       ? numberOr(session.valueOverride, 0)
-      : range && range.value !== undefined ? range.value : numberOr(meter.value, 0);
+      : range && range.value !== undefined ? range.value
+        : testKind ? meterValueAt(meterTestLevel(testKind, Date.now()), meter)
+          : numberOr(meter.value, 0);
     const nextMeter = { ...meter, __value: value };
     if (range && !routed) { nextMeter.valueMin = range.min; nextMeter.valueMax = range.max; }
+
+    // A needle's ballistics: the drawing goes to the level as a spring would (`__drawn`, 0 to 1 along
+    // the scale); the reading, the Label and the animations keep the level itself.
+    const ballistics = meterBallistics(meter);
+    if (ballistics) {
+      ensureMeterTicker();
+      void meterClock;
+      const id = getControlId(control);
+      const now = Date.now();
+      const target = meterPosition(value, nextMeter);
+      const prev = meterNeedleState[id];
+      const next = stepNeedle(prev ?? { pos: target, vel: 0 }, target, prev ? now - prev.at : 0, ballistics);
+      meterNeedleState[id] = { ...next, at: now };
+      nextMeter.__drawn = next.pos;
+    }
 
     // Crossing into a different threshold band, which is what an overload LED is lit from. The
     // zones are the meter's OWN, via meterZoneIndexAt, so the band a script hears about is the

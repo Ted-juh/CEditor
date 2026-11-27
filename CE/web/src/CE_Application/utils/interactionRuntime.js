@@ -565,6 +565,9 @@ export function readTrigger(animation) {
     leaving: trigger.leaving === true,
     // valueStep: how many steps the range is cut into; 0, the control's own (stepsOfControl).
     steps: Math.max(0, Math.min(400, Math.round(Number(trigger.steps) || 0))),
+    // level: the line a meter's level crosses, 0 to 1 along its scale, and the way that counts.
+    at: Number.isFinite(Number(trigger.at)) && trigger.at !== null && trigger.at !== '' ? Math.max(0, Math.min(1, Number(trigger.at))) : 0.9,
+    way: ['up', 'down', 'both'].includes(trigger.way) ? trigger.way : 'up',
   };
 }
 

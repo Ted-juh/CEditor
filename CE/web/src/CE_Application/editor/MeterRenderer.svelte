@@ -6,7 +6,7 @@
   // Visual only; the live value + peak are injected by the preview surface onto the Meter section
   // (Meter.__value / Meter.__peak).
   import {
-    meterConfig, meterPosition, meterZones, meterFillColourAt,
+    meterConfig, meterDrawnPosition, meterZones, meterFillColourAt,
     meterSegmentsLit, meterSegmentCenter, meterTicks, meterTickLabel,
     meterArcPath, meterArcAngle, meterPolar,
   } from '../utils/meterLayout.js';
@@ -29,8 +29,7 @@
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
 
   let cfg = $derived(meterConfig(control));
-  let value = $derived(cfg.__value !== undefined ? cfg.__value : cfg.value);
-  let pos = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : meterPosition(value, cfg));
+  let pos = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : meterDrawnPosition(cfg));
   let peak = $derived(cfg.__peak); // normalized 0..1, or undefined in static editor view
   let orientation = $derived(String(cfg.orientation ?? 'horizontal'));
   let vertical = $derived(orientation === 'vertical');

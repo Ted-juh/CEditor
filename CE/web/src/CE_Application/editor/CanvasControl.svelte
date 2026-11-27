@@ -19,6 +19,7 @@
   import { anatomyForm } from '../models/controlAnatomy.js';
   import { BUTTON_DEVICE_TYPES, buttonDeviceDrawn, isButtonDevicePart } from '../models/buttonDeviceParts.js';
   import { METER_DEVICE_TYPES, meterDeviceDrawn, isMeterDevicePart } from '../models/meterDeviceParts.js';
+  import { meterLevelSignals } from '../utils/meterLayout.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import ParameterStatusEditor from './ParameterStatusEditor.svelte';
   import { parameterStatusDesignModel } from '../utils/parameterStatus.js';
@@ -1841,7 +1842,15 @@
     if (!choiceListChanges) return null;
     return Object.fromEntries(keyframeEntries.filter((entry) => entry.trigger?.type === 'optionsChange').map((entry) => [entry.name, `options:${choiceListChanges}`]));
   });
-  let playerKeyframes = $derived(keyframePlayer.next(previewSessionOverride != null ? interactionRuntime : null,
+  // A meter's level is the value its animations hear (the Meter, phase 2): On change, Each step, When
+  // it clips and When it crosses a level all listen to it. It has no Behavior for the runtime to read
+  // a value from, so its level, as it arrives, takes the value's place in what the player is given.
+  // Heard, never sent.
+  let keyframeRuntime = $derived.by(() => {
+    if (!interactionRuntime || !METER_DEVICE_TYPES.has(String(core?.controlType ?? ''))) return interactionRuntime;
+    return { ...interactionRuntime, signals: { ...(interactionRuntime.signals ?? {}), ...meterLevelSignals(renderControl) } };
+  });
+  let playerKeyframes = $derived(keyframePlayer.next(previewSessionOverride != null ? keyframeRuntime : null,
     { reducedMotion: $systemReducedMotion, beats: beatsNow, plays: choiceListPlays ? { ...playsNow, ...choiceListPlays } : playsNow }));
   // The Animation Designer's stage (stores/sceneStage.js): the scene it shows, posed at its playhead
   // or playing, joins this control's own animations. Anywhere else there is no stage, and nothing.
@@ -2442,13 +2451,14 @@
 
   let textFill = $derived(text?._children?.Fill ?? null);
   let textFont = $derived(text?._children?.Font ?? null);
-  // Words a button throws (utils/keyframeAnimation.js EMIT): words of its own or a count, rising from
-  // the key (`centre`) or its top edge (`tip`), in its caption's colour and face. Drawn here, beside
-  // the control's content and not in it, so the box does not cut them off as they rise; each fades
-  // as it goes, and the player forgets it once it has flown. A knob's and a slider's are the slider
-  // renderer's. The Components showcase's Button.
+  // Words a button or a meter throws (utils/keyframeAnimation.js EMIT): words of its own or a count,
+  // rising from the key or the meter (`centre`) or its top edge (`tip`), in its caption's colour and
+  // face. Drawn here, beside the control's content and not in it, so the box does not cut them off as
+  // they rise; each fades as it goes, and the player forgets it once it has flown. A knob's and a
+  // slider's are the slider renderer's. The Components showcase's Button, and the Meter's "OVER".
   let keyWords = $derived.by(() => {
-    if (!BUTTON_DEVICE_TYPES.has(String(core?.controlType ?? '')) || !activeKeyframes?.emits?.length) return [];
+    const type = String(core?.controlType ?? '');
+    if (!(BUTTON_DEVICE_TYPES.has(type) || METER_DEVICE_TYPES.has(type)) || !activeKeyframes?.emits?.length) return [];
     return activeKeyframes.emits.map((word) => {
       const emit = word.emit;
       const said = emit.shows === 'count' ? String(word.count ?? 1) : (emit.words || '+1');

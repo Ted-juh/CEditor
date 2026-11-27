@@ -33,7 +33,9 @@ function wear(control, entry, carried, setId = '') {
   const { patch, reason } = applyPresetPatch(control, entry.preset, { drawn });
   if (!patch) throw new Error(`${entry.id} does not fit ${control._children.Core.name}: ${reason}`);
   applyPatch(control, patch);
-  carried.set(entry.preset.id, entry.preset);
+  // Settings alone (a needle's ballistics) leave nothing that follows the preset, so the panel does not
+  // carry it, as Apply does not (stores/animationPresetLibrary.js).
+  if (Object.keys(entry.preset.animations).length) carried.set(entry.preset.id, entry.preset);
 }
 
 const pascal = (slug) => slug.replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase());
@@ -699,7 +701,20 @@ const METER_LOOKS = {
   attention: { set: 'graphite', bg: 'FF2C2D30', ink: 'FFF1F3F5', how: 'FF89C2FF', what: 'FFBFC9D3', size: [240, 44], meter: { segments: 16, segmentGap: 2 } },
   needle: { set: 'valve', bg: 'FF4A321F', ink: 'FFF6E7C8', how: 'FFE3C67A', what: 'FFD9C7A6', size: [210, 118], meter: {} },
   readout: { set: 'ivory', bg: 'FFEFEAE0', ink: 'FF22201C', how: 'FF1F5C88', what: 'FF4E4A43', size: [220, 64], meter: { valueMin: -48, valueMax: 0, valuePrecision: 1, valueSuffix: ' dB' } },
+  // Phase 2: nothing is plugged in, so each meter runs a test signal (utils/meterMotion.js), which
+  // moves it in Preview and never in an exported plug-in.
+  parts: { set: 'anodised', bg: 'FFC2C7CD', ink: 'FF111317', how: 'FF0F2D4D', what: 'FF22262B', size: [208, 130], meter: { testSignal: 'program' } },
+  level: { set: 'carbon-pro', bg: 'FF282D2E', ink: 'FFEDEFF0', how: 'FFFFB547', what: 'FFB9C0C2', size: [208, 130], meter: { testSignal: 'bursts' } },
+  ballistics: {
+    set: 'valve-console', bg: 'FF28231F', ink: 'FFF3E6CC', how: 'FFE6BC6E', what: 'FFD2C4AA', size: [208, 130], meter: { testSignal: 'program' },
+    note: 'how the needle gets to each new level, set by one built-in preset a meter. All five hear one test signal',
+  },
+  segments: { set: 'gimbal-ring', bg: 'FF263238', ink: 'FFE6F2F1', how: 'FF9ED5D4', what: 'FFB1C5C8', size: [208, 130], meter: { testSignal: 'bursts' } },
 };
+// A preset that wants another signal than its group's: one that clips often, or one that moves all the time.
+const METER_SIGNALS = { 'lamp-flash': 'bursts', cascade: 'program', sparkle: 'program' };
+// The clip lamp, which no set draws, inside Anodised's dial face (its corner of the frame is off the case).
+const METER_PART_LAYOUTS = { 'lamp-flash': { lamp: { x: 73, y: 20, width: 5, height: 8 } } };
 // Where each starts: a sweep or a kick shows best from a level part-way up.
 const METER_LEVELS = { 'self-test': 0.55, 'wake-up': 0.7, 'beat-kick': 0.45, 'tap-sweep': 0.4, shiver: 0.62, 'drop-out': 0.66 };
 const METER_TILE_W = 320;
@@ -718,7 +733,7 @@ function meterGroupPanel(group) {
   const f = panelMaker(`meter-${group.id}`, `Meter ${group.label}`, { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
   const carried = new Map();
   f.label('Title', `Meter · ${group.label}`, 30, 22, 620, 34, { size: 24, colour: look.ink, align: 'left' });
-  f.label('Note', `${group.note}. Each meter wears one built-in preset: Preview (F5) plays it.`, 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
+  f.label('Note', look.note ? `${look.note}.` : `${group.note}. Each meter wears one built-in preset: Preview (F5) plays it.`, 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
   entries.forEach((entry, i) => {
     const x = 30 + (i % columns) * METER_TILE_W;
     const y = TOP + Math.floor(i / columns) * tileH;
@@ -727,6 +742,8 @@ function meterGroupPanel(group) {
     Object.assign(meter._children.Meter, look.meter);
     const { valueMin = 0, valueMax = 1 } = look.meter;
     meter._children.Meter.value = valueMin + (valueMax - valueMin) * (METER_LEVELS[entry.slug] ?? 0.6);
+    if (look.meter.testSignal) meter._children.Meter.testSignal = METER_SIGNALS[entry.slug] ?? look.meter.testSignal;
+    for (const [part, layout] of Object.entries(METER_PART_LAYOUTS[entry.slug] ?? {})) Object.assign(meter._children.Parts._children[part]._children.Layout, layout);
     meter._children.Core.description = `${entry.name}: ${entry.what}.`;
     let captionTop = y + mh + 12;
     if (entry.on === 'label') {
@@ -738,7 +755,8 @@ function meterGroupPanel(group) {
       wear(shows, entry, carried);
       captionTop += 30;
     } else {
-      wear(meter, entry, carried);
+      // Judged as the set draws it: a preset on a part the set does not draw is refused.
+      wear(meter, entry, carried, look.set);
     }
     f.label(`${name}Caption`, entry.name, x + 10, captionTop, METER_TILE_W - 20, 22, { size: 16, colour: look.ink });
     f.label(`${name}How`, entry.how.toUpperCase(), x + 10, captionTop + 22, METER_TILE_W - 20, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600 });
@@ -826,8 +844,11 @@ function meterTogether() {
   ]);
 }
 
+// Phase 1's three and Together, then phase 2's four.
+const METER_PHASE_ONE = ['attention', 'needle', 'readout'];
 export const METER_PANELS = [
-  ...METER_PRESET_GROUPS.map((group) => [`meter-${group.id}`, () => meterGroupPanel(group)]),
+  ...METER_PRESET_GROUPS.filter((group) => METER_PHASE_ONE.includes(group.id)).map((group) => [`meter-${group.id}`, () => meterGroupPanel(group)]),
   ['meter-together', meterTogether],
+  ...METER_PRESET_GROUPS.filter((group) => !METER_PHASE_ONE.includes(group.id)).map((group) => [`meter-${group.id}`, () => meterGroupPanel(group)]),
 ];
 

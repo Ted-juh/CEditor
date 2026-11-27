@@ -32,6 +32,7 @@ import {
 import { readTrigger, stepsOfControl } from '../src/CE_Application/utils/interactionRuntime.js';
 import { readTextEffect } from '../src/CE_Application/utils/textEffects.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { meterClipAt, meterLevelSignals } from '../src/CE_Application/utils/meterLayout.js';
 
 const node = (trigger, extra = {}) => ({
   _type: 'Animation', name: 'pulse', enabled: true, kind: 'keyframes',
@@ -47,7 +48,9 @@ test('the trigger types a keyframe animation answers', () => {
   // time a knob's value crosses into another of its steps (the Components showcase's Detent).
   // `hold` on 2026-11-27: while a timed button is held to confirm, over its own hold time.
   // `optionsChange` the same day: a choice group whose list of options changed (choiceGroupParts.test.js).
-  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold', 'optionsChange']);
+  // `clip` and `level` the same day: a meter's level reaching where it clips, or crossing a line.
+  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold', 'optionsChange', 'clip', 'level']);
+  assert.equal(defaultIterations('clip'), 1, 'once a clip');
   assert.equal(defaultIterations('always'), 'infinite');
   assert.equal(defaultIterations('stateChange'), 'infinite', 'a state animation loops while the state holds');
   assert.equal(defaultIterations('valueChange'), 1);
@@ -311,6 +314,63 @@ test('a step animation fires each time the value comes to another step, during a
   assert.equal(phaseOf(step(['Dragging'], { valueNormalized: 1, dragging: true })), 'b', 'the next step restarts it at once, as a detent does');
   clock.t = 240;
   assert.equal(phaseOf(step([], { valueNormalized: 0.99 })), 'b', 'rounded: 0.99 is still the top step');
+});
+
+// --- A meter's level crossing a line (2026-11-27, the Meter, phase 2) ----------------------------
+
+test('When it clips fires each time the level reaches the clip point, and again only after falling back', () => {
+  const { step, clock } = rig(node({ type: 'clip' }));
+  assert.equal(phaseOf(step([], { valueNormalized: 0.95, clipAt: 0.9 })), null, 'already over as it is first seen: not a clip');
+  clock.t = 100;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.5, clipAt: 0.9 })), null, 'falling is not clipping');
+  clock.t = 200;
+  const clipped = step([], { valueNormalized: 0.9, clipAt: 0.9 });
+  assert.equal(phaseOf(clipped), 'a', 'at the clip point, it clips');
+  assert.deepEqual(clipped.fired, ['pulse']);
+  clock.t = 300;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.89, clipAt: 0.9 })), 'a', 'a hair under the line is still over it');
+  clock.t = 320;
+  assert.equal(phaseOf(step([], { valueNormalized: 1, clipAt: 0.9 })), 'a', 'so coming back up is not a second clip');
+  clock.t = 400;
+  step([], { valueNormalized: 0.6, clipAt: 0.9 });
+  clock.t = 500;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.97, clipAt: 0.9 })), 'b', 'fallen back and over again: the next clip');
+});
+
+test('When it crosses a level answers the way it is asked: up, down or either', () => {
+  const crossings = (way) => {
+    const { step, clock } = rig(node({ type: 'level', at: 0.5, way }));
+    const fired = [];
+    for (const [t, v] of [[0, 0.2], [100, 0.6], [200, 0.3], [300, 0.7]]) {
+      clock.t = t;
+      if (step([], { valueNormalized: v }).fired.length) fired.push(t);
+    }
+    return fired;
+  };
+  assert.deepEqual(crossings('up'), [100, 300]);
+  assert.deepEqual(crossings('down'), [200]);
+  assert.deepEqual(crossings('both'), [100, 200, 300]);
+  assert.deepEqual(readTrigger({ trigger: { type: 'level' } }).at, 0.9, 'a level not named: 90% of the scale');
+  assert.equal(readTrigger({ trigger: { type: 'level', at: 3 } }).at, 1);
+  assert.equal(readTrigger({ trigger: { type: 'level', way: 'sideways' } }).way, 'up');
+});
+
+test('a meter\'s level is what its animations hear, and where it clips is its lamp, its top zone or full scale', () => {
+  const meter = createControl('Meter');
+  meter._children.Meter = { ...meter._children.Meter, valueMin: -48, valueMax: 0, __value: -12 };
+  const signals = meterLevelSignals(meter);
+  assert.equal(signals.valueRaw, -12);
+  assert.equal(signals.valueNormalized, 0.75);
+  assert.equal(signals.clipAt, 0.9, 'the default zones: red from 90%');
+  meter._children.Parts._children.lamp.visible = true;
+  meter._children.Parts._children.lamp.clipFrom = 0.8;
+  assert.equal(meterClipAt(meter), 0.8, 'a clip lamp says where it lights');
+  meter._children.Parts._children.lamp.visible = false;
+  meter._children.Meter.zones = [{ from: 0, colour: 'FF5B9BD5' }];
+  assert.equal(meterClipAt(meter), 1, 'one zone and no lamp: full scale');
+  delete meter._children.Meter.__value;
+  meter._children.Meter.value = -48;
+  assert.equal(meterLevelSignals(meter).valueNormalized, 0, 'nothing arriving: its own value');
 });
 
 test('a step trigger reads its count, kept in range, and a control steps as its own steps say', () => {

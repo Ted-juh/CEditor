@@ -79,7 +79,16 @@ import { readOptionStagger, staggeredDelay } from './optionStagger.js';
 // `optionsChange`: a choice group's list of options changed (a group whose options depend on
 // another's choice, choiceGroupLayout.js dependent rows). CanvasControl asks for the play itself, as
 // a script would; the player needs no branch for it. The Choice group's New options. 2026-11-27.
-export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold', 'optionsChange'];
+// `clip` and `level`: a meter's level reaching where it clips (its clip lamp's level, else its top
+// zone, else full scale: meterLayout.js meterClipAt), or crossing a line of the trigger's own
+// (`at`, 0 to 1 along its scale, `way` up, down or both). The level is the meter's reading as it
+// arrives, heard and never sent (CanvasControl gives a meter's level as its value). The Meter,
+// phase 2. 2026-11-27.
+export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold', 'optionsChange', 'clip', 'level'];
+/** The triggers that only a meter's level fires. */
+export const LEVEL_TRIGGER_TYPES = Object.freeze(['clip', 'level']);
+// How far under its line a level must fall before it can cross it again.
+const LEVEL_SLACK = 0.02;
 
 /** What a frame can set, and the value each has when a frame leaves it out. */
 export const FRAME_PROPERTIES = ['scale', 'rotate', 'x', 'y', 'opacity'];
@@ -499,6 +508,22 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
   let previousPlays = {};
   const heldBefore = new Map();         // name -> whether a looping state animation's state held
   const runs = new Map();               // name -> { phase, startedAt } for anything that has played
+  const levelSides = new Map();         // name -> 1 above its line, -1 below: a level trigger's side
+
+  // Which side of its line a level is on now, and whether it just crossed the way the trigger asks.
+  // Above at the line itself; below again only once a little under it (LEVEL_SLACK), so a level that
+  // sits on the line does not cross it every frame.
+  const levelCrossing = (name, signals, trigger) => {
+    const v = Number(signals?.valueNormalized);
+    if (!Number.isFinite(v)) return false;
+    const at = trigger.type === 'clip' ? Number(signals?.clipAt ?? 1) : trigger.at;
+    const way = trigger.type === 'clip' ? 'up' : trigger.way;
+    const before = levelSides.get(name);
+    const side = v >= at - 1e-9 ? 1 : (before === 1 && v > at - LEVEL_SLACK ? 1 : -1);
+    levelSides.set(name, side);
+    if (before === undefined || side === before) return false;
+    return way === 'both' || (way === 'up' ? side > 0 : side < 0);
+  };
   let last = { parts: new Map(), colours: new Map(), texts: new Map(), values: [], emits: [], rules: '', fired: [], key: '' };
 
   // A word thrown: the value now and the value at the last word, for a delta.
@@ -591,6 +616,12 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
           }
           if (runs.has(entry.name)) playing.set(entry.name, runs.get(entry.name).phase);
           continue;
+        } else if (trigger.type === 'clip' || trigger.type === 'level') {
+          // A meter's level crossing a line: its clip point (signals.clipAt, utils/meterLayout.js), or
+          // the trigger's own, the way it says. Once a crossing; the first sighting only sets which
+          // side it is on, as a panel opening loud has not "clipped".
+          const crossed = levelCrossing(entry.name, frame.signals, trigger);
+          fire = crossed && !requested;
         } else if (trigger.type === 'beat') {
           const every = Math.max(1, trigger.every || 1);
           const slot = Number.isFinite(beats) ? Math.floor(beats / every) : null;
@@ -677,6 +708,7 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
       previousBeatSlot = new Map();
       previousStepSlot = new Map();
       previousEmitValue.clear();
+      levelSides.clear();
       emitted = [];
       previousPlays = {};
       heldBefore.clear();

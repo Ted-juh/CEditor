@@ -30,12 +30,23 @@ export const PRESET_FORMAT = 'ceditor-animation-preset';
 export const PRESET_FORMAT_VERSION = 1;
 export const PRESET_FILE_EXTENSION = '.ceanim';
 // 'scene' — several controls on one time axis — arrives with panel scenes (step 5).
-export const PRESET_SIZES = ['effect', 'recipe'];
+// 'settings': no animation, only settings — a needle's ballistics (the Meter, phase 2): how it moves
+// is a setting of the meter, not something that plays.
+export const PRESET_SIZES = ['effect', 'recipe', 'settings'];
 export const PRESET_COLOURS = ['keep', 'control'];
 export const LINK_KEY = 'preset';
 
 /** The most a preset file may hold: past this, a mistake or not a preset. */
 const LIMITS = { animations: 64, bytes: 1024 * 1024, name: 80, category: 40, tags: 12, tag: 24, rule: 200 };
+
+// The numbers a preset may set on a meter, and their ranges.
+const METER_FIELD_RANGES = Object.freeze({
+  'Meter.riseTime': [0, 5000],
+  'Meter.fallTime': [0, 5000],
+  'Meter.overshoot': [0, 0.5],
+  'Meter.peakHoldMs': [0, 10000],
+  'Meter.peakDecayPerSec': [0, 10],
+});
 
 const text = (value, max) => String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 
@@ -57,7 +68,6 @@ export function cleanPreset(raw) {
     const { [LINK_KEY]: _link, ...rest } = deepCopy(node);
     animations[name] = { ...rest, _type: 'Animation', name };
   }
-  if (!Object.keys(animations).length) return null;
   const states = {};
   for (const [key, state] of Object.entries(raw.states ?? {})) {
     if (!/^[A-Za-z][A-Za-z0-9_ -]{0,39}$/.test(key) || !state || typeof state !== 'object') continue;
@@ -88,7 +98,16 @@ export function cleanPreset(raw) {
     else if (path === 'Parts.labelCurrent.anchor' && ['tip', 'centre'].includes(value)) fields[path] = value;
     // A fader cap that can be lifted (the Slider's Lift and Grip): its lift at rest, 1.
     else if (/^Parts\.pointer(Current|Start|End)\.Layout\.lift$/.test(path) && Number.isFinite(Number(value))) fields[path] = Math.min(2, Math.max(0.5, Number(value)));
+    // A meter's clip lamp, which no set draws, turned on to play on (the Meter, phase 2).
+    else if (path === 'Parts.lamp.visible' && typeof value === 'boolean') fields[path] = value;
+    // A meter's marker made its peak lamp: lit by the held peak rather than the reading.
+    else if (path === 'Parts.marker.source' && ['reading', 'peak'].includes(value)) fields[path] = value;
+    // A meter's needle: its ballistics (utils/meterMotion.js), and the peak it holds.
+    else if (METER_FIELD_RANGES[path] && Number.isFinite(Number(value))) fields[path] = Math.min(METER_FIELD_RANGES[path][1], Math.max(METER_FIELD_RANGES[path][0], Number(value)));
+    else if (path === 'Meter.peakHold' && typeof value === 'boolean') fields[path] = value;
   }
+  // Settings alone are a preset too (a needle's ballistics); nothing at all is not.
+  if (!Object.keys(animations).length && !Object.keys(fields).length) return null;
   return {
     format: PRESET_FORMAT,
     version: PRESET_FORMAT_VERSION,
@@ -96,7 +115,7 @@ export function cleanPreset(raw) {
     name: text(raw.name, LIMITS.name) || 'Animation preset',
     category: text(raw.category, LIMITS.category),
     tags: (Array.isArray(raw.tags) ? raw.tags : []).map((tag) => text(tag, LIMITS.tag)).filter(Boolean).slice(0, LIMITS.tags),
-    size: Object.keys(animations).length > 1 ? 'recipe' : 'effect',
+    size: Object.keys(animations).length > 1 ? 'recipe' : Object.keys(animations).length ? 'effect' : 'settings',
     colours: PRESET_COLOURS.includes(raw.colours) ? raw.colours : 'keep',
     revision: Math.max(1, Math.round(Number(raw.revision) || 1)),
     animations,

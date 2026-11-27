@@ -177,7 +177,8 @@ export function applyAnimationPreset(controlIds, presetId, { link = true } = {})
       applyControlPatch(controlId, result.patch);
       applied.push({ controlId, names: result.names });
     }
-    if (link && applied.length) carryInPanel(preset);
+    // Settings alone leave nothing that follows the preset: nothing for the panel to carry it for.
+    if (link && applied.length && Object.keys(preset.animations ?? {}).length) carryInPanel(preset);
   });
   return { applied, refused };
 }

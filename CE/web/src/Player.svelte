@@ -777,7 +777,7 @@
     {#if panel}
       <div class="player-stage" style="width: {panel.width * scale}px; height: {panel.height * scale}px;">
         {#key panelLoadGeneration}
-          <PanelPreviewSurface {panel} {scale} {bgLayers} {gridStyle} />
+          <PanelPreviewSurface {panel} {scale} {bgLayers} {gridStyle} testSignals={false} />
         {/key}
       </div>
     {:else}

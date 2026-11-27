@@ -1,6 +1,7 @@
 // meterPresets.test.js — the Meter's built-in animation presets (utils/meterPresets.js) and the
-// Components showcase's Meter panels (scripts/componentPanels.js, CE/panels/Components/Meter/), phase
-// 1: what plays on a meter today (docs/design/component-presets.md, The Meter).
+// Components showcase's Meter panels (scripts/componentPanels.js, CE/panels/Components/Meter/):
+// phase 1, what played on a meter before (docs/design/component-presets.md, The Meter), and phase 2,
+// what plays on its parts, its level, its needle and its lamps (at the end of this file).
 //
 // The promises: three groups of ordinary presets under Meter, each surviving its own file; the whole
 // meter's and its reading's go on any meter in any set, and the Needle's, which move what the level
@@ -23,14 +24,22 @@ import { COMPONENT_PRESETS } from '../src/CE_Application/stores/animationPresetL
 import { BUTTON_PANELS, CHOICE_PANELS, KNOB_PANELS, METER_PANELS, SLIDER_PANELS } from '../scripts/componentPanels.js';
 
 const byId = (slug) => METER_PRESETS.find((entry) => entry.slug === slug);
-const SETS = { 'meter-attention': 'graphite', 'meter-needle': 'valve', 'meter-readout': 'ivory', 'meter-together': 'phosphor' };
+const SETS = {
+  'meter-attention': 'graphite', 'meter-needle': 'valve', 'meter-readout': 'ivory', 'meter-together': 'phosphor',
+  'meter-parts': 'anodised', 'meter-level': 'carbon-pro', 'meter-ballistics': 'valve-console', 'meter-segments': 'gimbal-ring',
+};
+const PHASE_ONE = new Set(['attention', 'needle', 'readout']);
 
-test('the catalogue: three groups in order, each preset an ordinary preset under Meter, ids of its own', () => {
-  assert.deepEqual(METER_PRESET_GROUPS.map((group) => group.id), ['attention', 'needle', 'readout']);
+test('the catalogue: seven groups in order, each preset an ordinary preset under Meter, ids of its own', () => {
+  assert.deepEqual(METER_PRESET_GROUPS.map((group) => group.id), ['attention', 'needle', 'readout', 'parts', 'level', 'ballistics', 'segments']);
   assert.deepEqual(METER_PRESETS.map((entry) => entry.slug), [
     'pulse', 'breathe', 'knock', 'beat-pulse', 'look-here', 'pop-in',
     'self-test', 'wake-up', 'beat-kick', 'tap-sweep', 'shiver', 'drop-out',
     'odometer', 'reel', 'roll', 'push', 'crossfade',
+    'lamp-flash', 'face-glow', 'needle-glow', 'cover-glint', 'scale-light-up',
+    'clip-flash', 'clip-shake', 'red-wash', 'peak-flare', 'over-thrown',
+    'vu', 'ppm', 'bouncy', 'lazy', 'sticky-peak',
+    'cascade', 'ripple', 'sparkle', 'peak-drop',
   ]);
   for (const entry of METER_PRESETS) {
     assert.equal(entry.id, meterPresetId(entry.slug));
@@ -49,7 +58,7 @@ test('every preset goes on a meter as each panel\'s set draws it, or on its read
   for (const setId of Object.values(SETS)) {
     const meter = createControl('Meter');
     const drawn = resolveControlForSet(meter, getControlSet(setId));
-    for (const entry of METER_PRESETS.filter((e) => e.on !== 'label')) {
+    for (const entry of METER_PRESETS.filter((e) => e.on !== 'label' && PHASE_ONE.has(e.group))) {
       const { patch, reason } = applyPresetPatch(createControl('Meter'), entry.preset, { drawn });
       assert.ok(patch, `${entry.slug} in ${setId}: ${reason}`);
     }
@@ -77,7 +86,7 @@ test('a needle preset moves what the level draws and hands back to the level; no
 });
 
 test('nothing loops that does not say so', () => {
-  const loops = new Set(['pulse', 'breathe', 'shiver']);
+  const loops = new Set(['pulse', 'breathe', 'shiver', 'sparkle']);
   for (const entry of METER_PRESETS) {
     for (const node of Object.values(entry.preset.animations)) {
       assert.equal(node.iterations === 'infinite', loops.has(entry.slug), `${entry.slug}: ${node.iterations === 'infinite' ? 'loops' : 'plays once'}`);
@@ -88,12 +97,12 @@ test('nothing loops that does not say so', () => {
 test('the library lists them under Meter, after the Choice group, by group', () => {
   assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button', 'Choice group', 'Meter']);
   const meter = COMPONENT_PRESETS.find((entry) => entry.component === 'Meter');
-  assert.deepEqual(meter.groups.map((group) => group.label), ['Attention', 'Needle', 'Readout']);
+  assert.deepEqual(meter.groups.map((group) => group.label), ['Attention', 'Needle', 'Readout', 'Parts', 'Level', 'Ballistics', 'Segments']);
   assert.equal(meter.groups.reduce((n, group) => n + group.entries.length, 0), METER_PRESETS.length);
 });
 
 test('the showcase: one panel a group and Together, every meter (or its reading) wearing its preset, each panel in a set of its own', () => {
-  assert.deepEqual(METER_PANELS.map(([id]) => id), [...METER_PRESET_GROUPS.map((group) => `meter-${group.id}`), 'meter-together']);
+  assert.deepEqual(METER_PANELS.map(([id]) => id), ['meter-attention', 'meter-needle', 'meter-readout', 'meter-together', 'meter-parts', 'meter-level', 'meter-ballistics', 'meter-segments']);
   const taken = new Set([...KNOB_PANELS, ...SLIDER_PANELS, ...BUTTON_PANELS, ...CHOICE_PANELS].map(([, make]) => make().controlSet.id));
   const seen = new Set();
   for (const [id, make] of METER_PANELS) {
@@ -107,9 +116,16 @@ test('the showcase: one panel a group and Together, every meter (or its reading)
       continue;
     }
     const entries = METER_PRESETS.filter((entry) => entry.group === id.slice('meter-'.length));
-    assert.deepEqual(panel.animationPresets.map((preset) => preset.id).sort(), entries.map((entry) => entry.id).sort(), `${id} carries its presets`);
+    // Settings alone (a needle's ballistics) leave nothing following the preset: the panel carries none.
+    const animated = entries.filter((entry) => Object.keys(entry.preset.animations).length);
+    assert.deepEqual((panel.animationPresets ?? []).map((preset) => preset.id).sort(), animated.map((entry) => entry.id).sort(), `${id} carries its presets`);
     const byName = Object.fromEntries(panel.controls.map((control) => [control._children.Core.name, control]));
     for (const entry of entries) {
+      if (!Object.keys(entry.preset.animations).length) {
+        const meter = byName[entry.slug.replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase())];
+        for (const [path, value] of Object.entries(entry.preset.fields)) assert.equal(meter._children.Meter[path.slice('Meter.'.length)], value, `${entry.slug}: ${path}`);
+        continue;
+      }
       const wearing = panel.controls.find((control) => Object.values(control._children.Animations?._children ?? {}).some((node) => presetLink(node)?.id === entry.id));
       assert.ok(wearing, `${id}: something wears ${entry.slug}`);
       if (entry.on === 'label') {
@@ -163,4 +179,66 @@ test('applied as Apply applies it, a preset is linked to the library\'s', () => 
   const { patch } = applyPresetPatch(meter, byId('self-test').preset);
   for (const [path, value] of Object.entries(patch)) setNestedValue(meter, path, value);
   assert.equal(presetLink(meter._children.Animations._children.selfTest)?.id, meterPresetId('self-test'));
+});
+
+// --- Phase 2: its parts, its level, its needle, its lamps (2026-11-27) ----------------------------
+
+test('phase 2: each preset goes on a meter as its panel\'s set draws it, and is refused where a set draws no such part', () => {
+  const PANEL_SET = { parts: 'anodised', level: 'carbon-pro', ballistics: 'valve-console', segments: 'gimbal-ring' };
+  for (const entry of METER_PRESETS.filter((e) => !PHASE_ONE.has(e.group))) {
+    const drawn = resolveControlForSet(createControl('Meter'), getControlSet(PANEL_SET[entry.group]));
+    const { patch, reason } = applyPresetPatch(createControl('Meter'), entry.preset, { drawn });
+    assert.ok(patch, `${entry.slug} in ${PANEL_SET[entry.group]}: ${reason}`);
+  }
+  const valve = resolveControlForSet(createControl('Meter'), getControlSet('valve'));
+  assert.match(applyPresetPatch(createControl('Meter'), byId('sparkle').preset, { drawn: valve }).reason, /every lamp, which this meter's set does not draw/);
+  const graphite = resolveControlForSet(createControl('Meter'), getControlSet('graphite'));
+  assert.match(applyPresetPatch(createControl('Meter'), byId('needle-glow').preset, { drawn: graphite }).reason, /draws it plain/);
+  for (const entry of METER_PRESETS.filter((e) => !PHASE_ONE.has(e.group))) {
+    assert.match(presetDoesNotFit(entry.preset, createControl('Knob')), /does not have|has none|is none of them|is no meter/, `${entry.slug} is a meter's`);
+  }
+});
+
+test('phase 2: Level plays as the level clips or crosses a line, Lamp flash turns its lamp on, Peak drop makes its marker the peak lamp', () => {
+  for (const slug of ['lamp-flash', 'clip-flash', 'clip-shake', 'red-wash', 'over-thrown', 'ripple']) {
+    assert.deepEqual(Object.values(byId(slug).preset.animations)[0].trigger, { type: 'clip' }, slug);
+  }
+  assert.deepEqual(byId('peak-flare').preset.animations.peakFlare.trigger, { type: 'level', at: 0.8, way: 'up' });
+  assert.deepEqual(byId('peak-drop').preset.animations.peakDrop.trigger, { type: 'level', at: 0.8, way: 'down' });
+  assert.equal(byId('lamp-flash').preset.fields['Parts.lamp.visible'], true);
+  assert.equal(byId('peak-drop').preset.fields['Parts.marker.source'], 'peak');
+  const over = byId('over-thrown').preset.animations.over;
+  assert.deepEqual([over.kind, over.shows, over.words], ['emit', 'words', 'OVER']);
+  for (const slug of ['cascade', 'ripple', 'sparkle']) {
+    const node = Object.values(byId(slug).preset.animations)[0];
+    assert.equal(node.targets[0].path, 'Parts.cell', `${slug} plays on every lamp`);
+    assert.ok(node.optionStagger > 0, `${slug}: one after another`);
+  }
+  assert.deepEqual(['cascade', 'ripple', 'sparkle'].map((slug) => Object.values(byId(slug).preset.animations)[0].optionOrder), ['forward', 'fromChosen', 'scattered']);
+});
+
+test('phase 2: Ballistics are settings alone, survive their own file, and set how the needle moves', () => {
+  const expected = { vu: [300, 300, 0.015], ppm: [10, 1700, 0], bouncy: [180, 260, 0.25], lazy: [900, 1400, 0], 'sticky-peak': [15, 4000, 0] };
+  for (const [slug, [rise, fall, overshoot]] of Object.entries(expected)) {
+    const { preset } = byId(slug);
+    assert.equal(preset.size, 'settings');
+    assert.deepEqual(preset.animations, {});
+    assert.deepEqual(preset.fields, { 'Meter.riseTime': rise, 'Meter.fallTime': fall, 'Meter.overshoot': overshoot });
+    assert.deepEqual(readPresetFile(presetFileText(preset)).preset, preset);
+  }
+  assert.match(readPresetFile(JSON.stringify({ ...byId('vu').preset, fields: {} })).error ?? '', /./, 'nothing at all is not a preset');
+});
+
+test('phase 2: each panel\'s meters run a test signal, so they move in Preview with nothing plugged in', () => {
+  for (const [id, make] of METER_PANELS.filter(([panelId]) => ['meter-parts', 'meter-level', 'meter-ballistics', 'meter-segments'].includes(panelId))) {
+    const meters = make().controls.filter((control) => control._children.Core.controlType === 'Meter');
+    assert.ok(meters.length >= 4, id);
+    for (const meter of meters) assert.ok(['program', 'bursts'].includes(meter._children.Meter.testSignal), `${id} ${meter._children.Core.name}`);
+  }
+  const ballistics = METER_PANELS.find(([panelId]) => panelId === 'meter-ballistics')[1]();
+  const signals = new Set(ballistics.controls.filter((c) => c._children.Core.controlType === 'Meter').map((c) => c._children.Meter.testSignal));
+  assert.equal(signals.size, 1, 'the five needles hear one signal, so they can be compared');
+  const parts = METER_PANELS.find(([panelId]) => panelId === 'meter-parts')[1]();
+  const lamp = parts.controls.find((c) => c._children.Core.name === 'LampFlash')._children.Parts._children.lamp;
+  assert.deepEqual([lamp.visible, lamp._children.Layout.x, lamp._children.Layout.y], [true, 73, 20], 'its lamp, in the dial face');
 });

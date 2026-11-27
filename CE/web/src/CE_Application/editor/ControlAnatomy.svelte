@@ -3,7 +3,7 @@
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import AdditionalAnatomy from './AdditionalAnatomy.svelte';
   import { anatomyForm, anatomyValue } from '../models/controlAnatomy.js';
-  import { meterConfig, meterPosition } from '../utils/meterLayout.js';
+  import { meterConfig, meterDrawnPosition } from '../utils/meterLayout.js';
   import { formatSliderNumericValue } from '../utils/sliderBehavior.js';
   import { markPieceStyles, markClipBox } from '../utils/anatomyWords.js';
   import { textEffectClips } from '../utils/textEffects.js';
@@ -38,7 +38,7 @@
   let signals = $derived(runtime?.signals ?? {});
   let value = $derived(anatomyValue(control, signals));
   let cfg = $derived(meterConfig(control));
-  let p = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : (meter ? meterPosition(cfg.__value ?? cfg.value, cfg) : value.normalized));
+  let p = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : (meter ? meterDrawnPosition(cfg) : value.normalized));
   let active = $derived(toggle ? checked : signals.pressed === true);
   let depth = $derived(Math.max(0, Math.min(1, Number(core.formDepth ?? 60) / 100)));
   let detail = $derived(Math.max(4, Math.min(48, Math.round(Number(core.formDivisions) || 12))));
@@ -177,7 +177,7 @@
     </g>
     {#if core.formShowValue!==false && !['lens','vernier','encoder'].includes(form)}{#if readoutClip}{@const rb = readoutBox(80, 164, 12)}<g clip-path={`url(#${uid}-ro164)`}><clipPath id={`${uid}-ro164`}><rect x={rb.x} y={rb.y} width={rb.width} height={rb.height}/></clipPath><text x="80" y="164" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text></g>{:else}<text x="80" y="164" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text>{/if}{/if}
   {:else if meter && meterPartsDrawn}
-    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} peak={cfg.__peak ?? null} meter={cfg} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} />
+    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} peak={cfg.__peak ?? null} meter={cfg} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} {partAnimations} {partColours} {partTransitions} />
     <!-- Its reading is a Label of its own beside it (utils/labelShows.js); a legend part prints what the design prints. -->
   {:else if meter}
     <g transform={`translate(80 46) scale(${size}) translate(-80 -46)`}>

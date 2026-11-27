@@ -955,3 +955,96 @@ Verified locally:
   right-aligned Label had it; `meterShowcase` holds a crossfade's two readings centred on each other.
 - *The Reel spun through letters.* A reel rolls through capitals, digits and signs unless it names its
   own; a reading's now rolls through digits.
+
+**A guard, between the phases.** Asked whether animations are kept apart from what is sent when a
+meter, a knob or a slider moves: they are, by design (`utils/valueDrawn.js`: a value effect "moves
+the DRAWING, never the value"), and the browser check `noSendWhileAnimating` now holds it. A knob
+bound to a CC wears value effects, a loop and a scene's value clip; a meter sweeps and shivers, and
+since phase 2 a meter on a test signal clips every 2.4 s and plays all of Level, words thrown and all.
+Three seconds of it send nothing that would reach a synth or a host (no MIDI, SysEx, device or host
+parameter); then the knob turned by hand sends its CC, so the spy's silence means something.
+
+### As built: phase 2 (2026-11-27)
+
+**The engine.**
+- *Its parts play.* `MeterDeviceParts.svelte` plays what is put on each part, as a key's parts do:
+  keyframes inside the part's own turn (a needle's glow rides on the needle), colour frames through
+  the shape channel, eased colour and opacity. A scale's numerals, drawn upright outside its turn,
+  play what the scale plays.
+- *Its level is the value its animations hear* (`CanvasControl.svelte`, `meterLevelSignals` in
+  `utils/meterLayout.js`): On change and Each step play on it, and two triggers only a meter has:
+  **When it clips**, as the level reaches the level its clip lamp lights at, else where its top zone
+  starts, else full scale; and **When it crosses a level**, a line of its own, up, down or either
+  way. Once a crossing: a level that sits on its line crosses again only after falling 2% under it,
+  and the first sighting crosses nothing, so a panel opening loud has not clipped. A preset that
+  plays on either is refused on anything but a meter. The level is heard, never sent.
+- *Ballistics* (`utils/meterMotion.js`, the Meter tab's **Motion**): **Rise** and **Fall** in ms and
+  **Overshoot**, a damped spring stiff as the rise going up and as the fall coming down, stepped
+  implicitly in 4 ms steps so a 10 ms PPM stays steady. Only the drawing follows the needle
+  (`Meter.__drawn`, read by the plain look, the parts and the value effects alike); the reading, its
+  Label and the triggers keep the level as it arrives. Both at 0 (every meter till now), it jumps.
+- *Every lamp* (`Parts.cell`, `models/meterDeviceParts.js` `METER_CELL_PART`): while something
+  plays on it, an indicator that lights cells draws each lamp alone, each saying where it stands, and
+  one animation reaches them one after another as the Choice group's options are
+  (`utils/optionStagger.js`): along the row, from the top down, out from the level, or **Scattered**,
+  a fourth order, a fixed shuffle that a choice group can use as well. No set gives its lamps a
+  gradient, a finish or an image, so a lamp drawn alone in its flat colour looks as the row did.
+- *A test signal* (**Test signal**: Programme, Sweep, Bursts) moves a meter in Preview while nothing
+  else gives it a level. Every meter on one signal moves as one, so needles can be compared. The
+  exported plug-in's surface is told not to play it (`Player.svelte`, `testSignals={false}`).
+- *A meter throws words*, as a key does, rising from it or from above it; words of its own or a
+  count, it having no pointer to throw a value from. Its thrown words wait for it to clip unless told.
+- *A preset of settings alone.* Ballistics are settings of the meter, not animations, and a preset
+  had to hold an animation. One may now hold settings only (`size: 'settings'`); it is set rather
+  than linked, and so not carried by the panel. A preset may set what these need and no more: the
+  clip lamp on, a marker made the peak lamp, a needle's ballistics and the peak it holds.
+
+**Its presets**, after phase 1's, each refused with its reason where the meter's set does not draw
+the part it plays on (`meterPartsNotDrawn`, as `keyPartsNotDrawn` for a key):
+
+| Group | Presets |
+|---|---|
+| Parts | Lamp flash (turns the clip lamp on), Face glow, Needle glow, Cover glint (a click), Scale light-up |
+| Level | Clip flash, Clip shake, Red wash, Peak flare (past 80%), "OVER" thrown |
+| Ballistics | VU (300/300 ms, 1.5% over), PPM (10/1700 ms), Bouncy (25% over), Lazy (900/1400 ms), Sticky peak (15/4000 ms) |
+| Segments | Cascade, Ripple (out from the level as it clips), Sparkle (scattered, always), Peak drop |
+
+**Four panels**, in the sets put to the owner, each meter on a test signal: Parts on Anodised,
+Level on Carbon Pro, Ballistics on Valve Console (five needles, one Programme signal), Segments on
+Gimbal Ring.
+
+Where what was put to the owner met the sets as they are:
+- *No set draws the clip lamp.* Anodised was chosen as "a VU with a lamp"; its VU has none, and no
+  set draws the lamp a meter has. Lamp flash turns it on, and the Parts panel moves it inside the dial.
+- *No set's marker shows the peak.* Gimbal Ring's second row of lamps lights with the reading. Peak
+  drop makes the marker the peak lamp (`Parts.marker.source: 'peak'`) and drops it as the level falls
+  back under 80%.
+- *Sticky peak is a needle's.* Valve Console draws no peak marker, so Sticky peak is ballistics: a
+  needle that catches each peak at once and lets go of it over four seconds.
+- *Cover glint* plays on what a set draws as the cover: on Anodised, the needle's hub.
+
+Verified locally:
+- `test/meterMotion.test.js` (new): no motion until asked; each test signal on the scale and moving
+  as it says; one signal, one level; a test signal's reading in the meter's own units; a needle at
+  99% in about its rise time and past it by about its overshoot; a PPM up in a few frames and still
+  on its way down half a second later; none, a jump; the drawing following the needle.
+- `test/meterPartsPlay.test.js` (new): each lamp alone and lit up to the level; Every lamp offered
+  on a meter and named in the picker; the sets that draw lamps; a preset on a part a set does not
+  draw refused, unless it turns that part on; the renderer's wiring.
+- `test/keyframeAnimation.test.js`: When it clips, once and again only after falling back; a level
+  crossed up, down or either way; a meter's level and clip point. `test/meterPresets.test.js`: the
+  seven groups, the phase 2 presets on their panels' sets, Level's and Segments' triggers, the
+  ballistics as settings surviving their own file, every phase 2 meter on a test signal, Ballistics'
+  one signal, every caption at 4.5:1 (Anodised's finish took the first ground under it).
+- Browser checks: `meterShowcase` (now 23 checks) plays all four panels: the lamp flares at each clip,
+  the face and needle light at their lines, the scale lights as the panel opens, a click glints the
+  cover; each burst flashes, shakes, washes and throws "OVER"; five needles apart on one signal, the
+  PPM above the lazy one; Cascade's lamps in order, Sparkle's scattered, Ripple out from the level,
+  Peak drop at the fall. `noSendWhileAnimating` with a clipping meter. `animationTab`: the library's
+  seven Meter groups.
+
+Left open:
+- Every lamp is a part only on a meter drawn with parts that light cells; the plain look's LED
+  segments are drawn by `MeterRenderer.svelte`, which has no parts to play on.
+- A value effect draws where it says, past a needle's ballistics: a Self-test on a Lazy needle sweeps
+  as fast as on any other.

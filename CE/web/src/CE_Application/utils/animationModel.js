@@ -35,6 +35,7 @@ import { controlDrawsValue } from './valueDrawn.js';
 import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { BUTTON_DEVICE_TYPES } from '../models/buttonDeviceParts.js';
+import { METER_DEVICE_TYPES } from '../models/meterDeviceParts.js';
 import {
   KEYFRAME_TRIGGER_TYPES,
   FRAME_PROPERTIES,
@@ -81,13 +82,24 @@ export const VALUE_KIND = 'value';
  * button's key: words of its own, or a count (CanvasControl draws them); the Button, 2026-11-27.
  */
 export const EMIT_KIND = 'emit';
-/** Whether a control throws words from a key: a button of any kind. */
-export const throwsFromKey = (control) => BUTTON_DEVICE_TYPES.has(String(control?._children?.Core?.controlType ?? ''));
-/** The kinds an animation on this control may be: a knob or a slider has the value kind too. */
+/**
+ * Whether a control throws words from its box rather than from a pointer: a button of any kind, from
+ * its key, or a meter (the Meter, phase 2: "OVER" as it clips). Neither has a pointer to throw from.
+ */
+export const throwsFromKey = (control) => {
+  const type = String(control?._children?.Core?.controlType ?? '');
+  return BUTTON_DEVICE_TYPES.has(type) || METER_DEVICE_TYPES.has(type);
+};
+/** Whether a control is a meter, whose words thrown wait for it to clip unless told otherwise. */
+const isMeter = (control) => METER_DEVICE_TYPES.has(String(control?._children?.Core?.controlType ?? ''));
+/**
+ * The kinds an animation on this control may be: a knob, a slider, a Macro or a meter has the value
+ * kind too; a slider, a button and a meter throw words.
+ */
 export function animationKindsFor(control) {
-  if (throwsFromKey(control)) return [...ANIMATION_KINDS, EMIT_KIND];
-  if (!controlDrawsValue(control)) return ANIMATION_KINDS;
-  return isSliderFamily(control) ? [...ANIMATION_KINDS, VALUE_KIND, EMIT_KIND] : [...ANIMATION_KINDS, VALUE_KIND];
+  const value = controlDrawsValue(control) ? [VALUE_KIND] : [];
+  const emit = throwsFromKey(control) || (value.length && isSliderFamily(control)) ? [EMIT_KIND] : [];
+  return [...ANIMATION_KINDS, ...value, ...emit];
 }
 /** A new value animation's frames: the ring sweep — nothing, round to full, back to the value. */
 export const VALUE_SWEEP_FRAMES = Object.freeze([{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]);
@@ -646,6 +658,8 @@ export const KEYFRAME_TRIGGER_LABELS = {
   event: 'On a click or gesture',
   hold: 'While held to confirm',
   optionsChange: 'When its options change',
+  clip: 'When it clips',
+  level: 'When it crosses a level',
 };
 
 /** Where a keyframe animation plays, as a targets list: a part, or the control itself. */
@@ -734,7 +748,7 @@ export function kindPatch(row, kind, control = null) {
       direction: ['pointer', 'up'].includes(animation.direction) ? animation.direction : 'pointer',
       travel: Number(animation.travel) > 0 ? Number(animation.travel) : 36,
       size: Number(animation.size) > 0 ? Number(animation.size) : 12,
-      trigger: type ? { ...trigger, type } : (key ? { type: 'event', event: 'click' } : { type: 'valueStep' }),
+      trigger: type ? { ...trigger, type } : (isMeter(control) ? { type: 'clip' } : key ? { type: 'event', event: 'click' } : { type: 'valueStep' }),
       targets: [],
       iterations: 1,
     };

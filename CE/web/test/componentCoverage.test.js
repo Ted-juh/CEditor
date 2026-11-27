@@ -98,6 +98,12 @@ const EXEMPT = {
   'constellation.presets': 'ditto (open)',
   'matrix.rows': 'the matrix names its own axes from the panel (open)',
   'matrix.cols': 'ditto (open)',
+  // How a meter's drawing gets to a level, and a level made up in Preview (utils/meterMotion.js): a
+  // script gives a meter its level (meter.value), and the needle follows it as these say.
+  'meter.riseTime': 'how the drawing reaches a level, set with the meter\'s look; a script moves the level itself',
+  'meter.fallTime': 'ditto',
+  'meter.overshoot': 'ditto',
+  'meter.testSignal': 'a stand-in for a signal in Preview only; a script gives a meter its level with meter.value',
 };
 
 /** Every field of a family's section that no verb writes. */

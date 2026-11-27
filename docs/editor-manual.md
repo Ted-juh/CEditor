@@ -457,6 +457,16 @@ so, and keeps its rendered fields for when they are off.
 While
 the parts draw the meter, the plain meter's own fill, arc and tick settings are hidden.
 
+Two things move a meter by itself, under **Motion** on its **Meter** tab. **Rise** and **Fall** say
+how long its drawing takes to reach a new level going up and coming back, and **Overshoot** how far
+past it the needle swings first: a VU meter's 300 ms with a little overshoot, a PPM's quick rise
+and slow fall. Both at 0, it jumps to each level, as before. Only the drawing waits: its reading,
+a Label showing it, and what its animations hear are the level as it arrives. **Test signal** moves
+a meter in Preview while nothing else gives it a level: **Programme** (a beat and a phrase that
+reaches the top), **Sweep** (up and down in six seconds) or **Bursts** (quiet, with a burst to the
+top every 2.4 seconds). Every meter on one signal moves as one. An exported plug-in never plays it:
+there a meter shows what it is sent.
+
 The **context bar** above the canvas holds the settings you change most often — text, fill, border,
 size and position, effects and icon — so you can often work without the properties panel.
 
@@ -1261,7 +1271,13 @@ There are four kinds, and two more for what a value draws:
   button, also **While held to confirm**, which plays once over exactly as long as the button must be
   held and stops if it is let go early: a lamp that fills as you hold; on a choice group, also
   **When its options change**, for a group whose options follow another group's choice: it plays
-  over the new ones. **On each step
+  over the new ones; on a meter, also **When it clips**, as its level reaches the level its clip
+  lamp lights at (else where its top colour zone starts, else full scale), and **When it crosses a
+  level**, a line of your own, going up, down or either way. A meter's level is the value its
+  animations hear, so **When the value changes** and **On each step of the value** play on it too;
+  it is only heard, and nothing is ever sent. On a meter that lights lamps, **Every lamp** plays on
+  each of them, and **Each lamp** sets them off one after another: along the row, from the top
+  down, out from the level, or **Scattered**. **On each step
   of the value** plays once each time the value comes to another step, while it is turned too: as
   many steps as the control has (a knob of five choices, four), one every 5% on a knob with none,
   or the number under **Steps**. A detent felt as you turn. With **Step back** set to
@@ -1362,9 +1378,14 @@ left it and back, **Lift** and **Grip** lift and squeeze the fader cap. **Choice
 **Attention** and **Choosing**, which move the whole group (**Lean** leans the way the choice went),
 and **Thumb**, **The chosen**, **Appear**, **Hover** and **New options**, which play on its options.
 **Meter** has **Attention**; **Needle**, which moves what the level draws (a sweep, a kick, a shiver)
-and hands it back to the level, the reading never changing; and **Readout**, which goes on the Label
-that shows the meter's reading and plays on each new one. A meter has no states, so what a hand plays
-there, a click or a double-click plays. Each row
+and hands it back to the level, the reading never changing; **Readout**, which goes on the Label
+that shows the meter's reading and plays on each new one; **Parts**, on its own parts (a clip lamp
+that flares, a face that warms, a needle that burns bright, a glint on its cover, a scale that lights
+up); **Level**, as the level clips or crosses a line (a flash, a shudder, a red wash, "OVER" thrown);
+**Ballistics**, how its needle moves (VU, PPM, Bouncy, Lazy, Sticky peak), which are settings and
+not animations, so they are set rather than linked; and **Segments**, on every lamp of a row, one
+after another. A meter has no states, so what a hand plays there, a click or a double-click plays.
+Each row
 says what plays it (hover, let go, panel opens, a flick) and what it does, and **Apply** puts it on
 the selected controls, linked, as one of yours. A few need something the control may not show: a
 preset on the scale's numbers is refused on a knob whose numbers are off, and one on a key's lamp
@@ -1566,7 +1587,9 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
   fifth, each meter drawn as its set draws one: **Meter Attention**; **Needle**, a valve VU's needle
   sweeping, kicking and trembling; **Readout**, readings that roll, spin and push as the level moves;
   and **Meter Together**, rows of lamps that power on in turn, move like an analyser, chase a peak
-  and bounce on the beat.
+  and bounce on the beat; then **Meter Parts**, **Meter Level**, **Meter Ballistics** (five needles
+  on one signal, each moving its own way) and **Meter Segments**, each meter on a test signal of
+  its own so it moves in Preview with nothing plugged in.
 
 Most of them play by themselves. A few wait for you:
 

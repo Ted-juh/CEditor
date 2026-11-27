@@ -17,6 +17,7 @@ import {
   RIBBON_ORIENTATIONS, RIBBON_STYLES,
 } from '../scripting/componentTables.js';
 import { METER_SCALES } from '../utils/meterLayout.js';
+import { METER_TEST_SIGNALS, METER_TEST_SIGNAL_LABELS } from '../utils/meterMotion.js';
 import { RIBBON_MODES, RIBBON_MODE_LABELS } from '../utils/noteRibbonLayout.js';
 import {
   CHORDPAD_MODES, CHORDPAD_VOICINGS, CHORD_TYPES, SCALES, SCALE_LABELS,
@@ -298,6 +299,19 @@ export const METER_PEAK_FIELDS = [
   { slot: 'peakColour', when: peakHold },
 ];
 
+// What moves a meter by itself (utils/meterMotion.js): a needle's ballistics, as drawn, and a test
+// signal so it moves in Preview with nothing connected.
+export const METER_MOTION_FIELDS = [
+  { key: 'riseTime', kind: 'number', label: 'Rise (ms)', numberLabel: 'Rise', span: 1, compact: true, min: 0, max: 5000, step: 10, default: 0, round: true, clamp: 'min', hint: 'How long the drawing takes to rise to a new level. 0 with Fall 0: it jumps. Its reading does not wait.' },
+  { key: 'fallTime', kind: 'number', label: 'Fall (ms)', numberLabel: 'Fall', span: 1, compact: true, min: 0, max: 5000, step: 10, default: 0, round: true, clamp: 'min', hint: 'How long the drawing takes to fall back. A PPM falls slowly.' },
+  { key: 'overshoot', kind: 'number', label: 'Overshoot', numberLabel: 'Over', span: 1, compact: true, min: 0, max: 0.5, step: 0.01, default: 0, clamp: 'min', hint: 'How far past a new level the needle swings first, as a share of the move (a VU about 0.015).' },
+  {
+    key: 'testSignal', kind: 'select', label: 'Test signal', span: 2, default: '', table: METER_TEST_SIGNALS,
+    hint: 'Moves the meter in Preview while nothing drives it. Never in an exported plug-in.',
+    options: METER_TEST_SIGNALS.map((value) => [value, METER_TEST_SIGNAL_LABELS[value]]),
+  },
+];
+
 // A meter's reading and caption are Labels of their own (utils/labelShows.js; its Labels section):
 // what is left here is how a Label showing its reading prints it.
 export const METER_READOUT_FIELDS = [
@@ -336,7 +350,7 @@ export const FIELD_SETS = {
   NoteRibbon: [...NOTERIBBON_KEYBOARD_FIELDS, ...NOTERIBBON_PERFORMANCE_FIELDS, ...NOTERIBBON_APPEARANCE_FIELDS],
   ChordPad: [...CHORDPAD_FIELDS, ...CHORDPAD_PERFORMANCE_FIELDS],
   Matrix: MATRIX_FIELDS,
-  Meter: [...METER_FIELDS, ...METER_VALUE_FIELDS, ...METER_FILL_FIELDS, ...METER_PEAK_FIELDS, ...METER_READOUT_FIELDS, ...METER_ARC_FIELDS],
+  Meter: [...METER_FIELDS, ...METER_VALUE_FIELDS, ...METER_FILL_FIELDS, ...METER_PEAK_FIELDS, ...METER_MOTION_FIELDS, ...METER_READOUT_FIELDS, ...METER_ARC_FIELDS],
 };
 
 /**

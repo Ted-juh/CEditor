@@ -8,8 +8,9 @@
  *
  * Why it is a check of its own: the engine promises it (utils/valueDrawn.js: "It moves the DRAWING,
  * never the value. Nothing is sent, no binding fires"), and nothing else held it. The Meter's phase 2
- * makes a meter's level its value and gives a needle physics; both must stay on this side of the
- * line.
+ * makes a meter's level the value its animations hear and gives a needle ballistics; both stay on
+ * this side of the line: a meter on a test signal, clipping every 2.4 s and playing everything the
+ * Level presets play, sends nothing either.
  *
  * Every message out goes through `window.__JUCE__.backend.emitEvent` (bridge/bridge.js). There is
  * no backend in a browser, so one is stood in, as behaviourKit's `wire()` does, and it keeps
@@ -50,6 +51,12 @@ try {
     for (const slug of ['ring-sweep', 'modulated']) wear(knob, KNOB_PRESETS, slug);
     const meter = f.add('Meter', 'Level', 300, 100, 240, 44);
     for (const slug of ['self-test', 'shiver', 'pulse']) wear(meter, METER_PRESETS, slug);
+    // A meter whose level clips, on its own test signal (a burst every 2.4 s): its level is the value
+    // its animations hear, and every one of the Level presets plays on it, words thrown and all.
+    const clipping = f.add('Meter', 'Clipping', 600, 100, 208, 130);
+    clipping._children.Meter.testSignal = 'bursts';
+    Object.assign(clipping._children.Meter, { riseTime: 300, fallTime: 300, overshoot: 0.015 });
+    for (const slug of ['clip-flash', 'clip-shake', 'red-wash', 'peak-flare', 'over-thrown']) wear(clipping, METER_PRESETS, slug);
     f.clip('Bound', 'Value', 0, { kind: 'value', easing: 'inOutSine', frames: [{ at: 0 }, { at: 0.5, value: 1 }, { at: 1 }] }, 1200, 0);
     const panel = deserializePanel(serializePanel(f.scenes([{ name: 'Sweep', length: 1200, loop: true }])), '/tmp/guard.cepanel', null);
     addPanel(panel);
@@ -66,12 +73,19 @@ try {
   });
 
   await kit.preview(true);
-  // Three seconds of the bound knob's drawing, so the silence is over something that moved.
+  // Three seconds of the bound knob's drawing, so the silence is over something that moved; and a
+  // clipping meter's, which must have clipped in that time (OVER thrown).
   const looks = [];
-  for (let k = 0; k < 30; k += 1) { looks.push(await page.evaluate((id) => document.querySelector(`.preview-surface [data-control-id="${id}"] svg`)?.innerHTML ?? '', ids.Bound)); await page.waitForTimeout(100); }
+  let over = false;
+  for (let k = 0; k < 30; k += 1) {
+    looks.push(await page.evaluate((id) => document.querySelector(`.preview-surface [data-control-id="${id}"] svg`)?.innerHTML ?? '', ids.Bound));
+    over ||= await page.evaluate((id) => [...document.querySelectorAll(`.preview-surface [data-control-id="${id}"] *`)].some((e) => !e.children.length && e.textContent === 'OVER'), ids.Clipping);
+    await page.waitForTimeout(100);
+  }
   const quiet = await page.evaluate(() => window.__backendEvents.map((e) => e.name));
-  check('while value effects, a scene\'s value clip, keyframes and loops play for three seconds, nothing is sent', () => {
+  check('while value effects, a scene\'s value clip, keyframes, loops and a meter\'s clips play for three seconds, nothing is sent', () => {
     assert.ok(new Set(looks).size > 5, `the bound knob's drawing moved (${new Set(looks).size} looks)`);
+    assert.ok(over, 'the meter clipped and threw its words');
     const sent = quiet.filter((name) => SENDS.has(name));
     assert.deepEqual(sent, [], `sent: ${sent.join(', ')}`);
   });

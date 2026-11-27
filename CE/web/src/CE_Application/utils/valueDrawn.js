@@ -18,7 +18,7 @@ import { readEasing, easeAt } from './easing.js';
 import { VALUE_TARGET } from './sceneFormat.js';
 import { isSliderBehavior, getSliderGeometry, getSliderValueMode } from './sliderBehavior.js';
 import { macroConfig, macroValue } from './macroLayout.js';
-import { meterConfig, meterPosition } from './meterLayout.js';
+import { meterConfig, meterDrawnPosition } from './meterLayout.js';
 
 /** The controls that draw a value of their own rather than through a Behavior: the Macro, the meters. */
 const METER_TYPES = new Set(['Meter', 'ProgressBar']);
@@ -147,7 +147,8 @@ export function liveDrawnValue(control, signals = {}) {
   }
   if (METER_TYPES.has(type)) {
     const cfg = meterConfig(control);
-    return clamp01(meterPosition(cfg.__value !== undefined ? cfg.__value : cfg.value, cfg));
+    // Where its needle is drawn, ballistics and all: an effect starts from there and hands back.
+    return clamp01(meterDrawnPosition(cfg));
   }
   const current = Number(signals?.currentValueNormalized);
   if (signals?.currentValueNormalized !== undefined && signals?.currentValueNormalized !== null && Number.isFinite(current)) return clamp01(current);

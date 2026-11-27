@@ -1,0 +1,539 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "2dd52f69-c0b5-4e1a-9f3d-2dd52f692dd5",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Meter Segments",
+  "scriptId": "component_meter-segments",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 574,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF263238",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "gimbal-ring"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1748946025000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Meter · Segments","_children":{"Fill":{"colour":"FFE6F2F1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1748946025001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"every lamp of a row, one after another. Each meter wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFB1C5C8"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Cascade","id":"ctrl_1748946025002","description":"Cascade: its lamps come on one after another as the panel opens.","controlType":"Meter"},
+        "Transform": {"x":86,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"program"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"cascade":{"_type":"Animation","name":"cascade","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Parts.cell"}],"frames":[{"at":0,"opacity":0,"scale":0.4},{"at":1,"opacity":1,"scale":1}],"duration":280,"delay":300,"easing":"outQuad","iterations":1,"direction":"normal","optionStagger":80,"optionOrder":"forward","preset":{"id":"ce:meter:cascade","revision":1,"from":"cascade"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeCaption","id":"ctrl_1748946025003","controlType":"Label"},
+        "Transform": {"x":40,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Cascade","_children":{"Fill":{"colour":"FFE6F2F1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeHow","id":"ctrl_1748946025004","controlType":"Label"},
+        "Transform": {"x":40,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF9ED5D4"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeWhat","id":"ctrl_1748946025005","controlType":"Label"},
+        "Transform": {"x":44,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its lamps come on one after another as the panel opens","_children":{"Fill":{"colour":"FFB1C5C8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple","id":"ctrl_1748946025006","description":"Ripple: a ripple runs out from the level along the row as it clips.","controlType":"Meter"},
+        "Transform": {"x":406,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"bursts"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"ripple":{"_type":"Animation","name":"ripple","enabled":true,"kind":"keyframes","trigger":{"type":"clip"},"targets":[{"path":"Parts.cell"}],"frames":[{"at":0,"scale":1},{"at":0.4,"scale":1.45,"opacity":0.6},{"at":1,"scale":1,"opacity":1}],"duration":380,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","optionStagger":45,"optionOrder":"fromChosen","preset":{"id":"ce:meter:ripple","revision":1,"from":"ripple"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleCaption","id":"ctrl_1748946025007","controlType":"Label"},
+        "Transform": {"x":360,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Ripple","_children":{"Fill":{"colour":"FFE6F2F1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleHow","id":"ctrl_1748946025008","controlType":"Label"},
+        "Transform": {"x":360,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"AS IT CLIPS","_children":{"Fill":{"colour":"FF9ED5D4"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleWhat","id":"ctrl_1748946025009","controlType":"Label"},
+        "Transform": {"x":364,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a ripple runs out from the level along the row as it clips","_children":{"Fill":{"colour":"FFB1C5C8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sparkle","id":"ctrl_1748946025010","description":"Sparkle: its lamps twinkle, now one, now another.","controlType":"Meter"},
+        "Transform": {"x":726,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"program"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"sparkle":{"_type":"Animation","name":"sparkle","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Parts.cell"}],"frames":[{"at":0,"opacity":1},{"at":0.08,"opacity":0.2},{"at":0.16,"opacity":1},{"at":1,"opacity":1}],"duration":1800,"delay":0,"easing":"linear","iterations":"infinite","direction":"normal","optionStagger":210,"optionOrder":"scattered","preset":{"id":"ce:meter:sparkle","revision":1,"from":"sparkle"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SparkleCaption","id":"ctrl_1748946025011","controlType":"Label"},
+        "Transform": {"x":680,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Sparkle","_children":{"Fill":{"colour":"FFE6F2F1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SparkleHow","id":"ctrl_1748946025012","controlType":"Label"},
+        "Transform": {"x":680,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF9ED5D4"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SparkleWhat","id":"ctrl_1748946025013","controlType":"Label"},
+        "Transform": {"x":684,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its lamps twinkle, now one, now another","_children":{"Fill":{"colour":"FFB1C5C8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PeakDrop","id":"ctrl_1748946025014","description":"Peak drop: its marker holds the peak, and drops away as the level falls back under 80%.","controlType":"Meter"},
+        "Transform": {"x":86,"y":330,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"bursts"},
+        "Parts": {
+          "_children": {
+            "marker": {"source":"peak"}
+          }
+        },
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"peakDrop":{"_type":"Animation","name":"peakDrop","enabled":true,"kind":"keyframes","trigger":{"type":"level","at":0.8,"way":"down"},"targets":[{"path":"Parts.marker"}],"frames":[{"at":0,"y":0,"opacity":1},{"at":0.55,"y":8,"opacity":0.15},{"at":1,"y":0,"opacity":1}],"duration":750,"delay":0,"easing":"inOutQuad","iterations":1,"direction":"normal","preset":{"id":"ce:meter:peak-drop","revision":1,"from":"peakDrop"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PeakDropCaption","id":"ctrl_1748946025015","controlType":"Label"},
+        "Transform": {"x":40,"y":472,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Peak drop","_children":{"Fill":{"colour":"FFE6F2F1"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PeakDropHow","id":"ctrl_1748946025016","controlType":"Label"},
+        "Transform": {"x":40,"y":494,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LEVEL FALLS BACK","_children":{"Fill":{"colour":"FF9ED5D4"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PeakDropWhat","id":"ctrl_1748946025017","controlType":"Label"},
+        "Transform": {"x":44,"y":512,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its marker holds the peak, and drops away as the level falls back under 80%","_children":{"Fill":{"colour":"FFB1C5C8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:cascade",
+      "name": "Cascade",
+      "category": "Meter",
+      "tags": [
+        "Segments",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "cascade": {
+          "_type": "Animation",
+          "name": "cascade",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.cell"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 0,
+              "scale": 0.4
+            },
+            {
+              "at": 1,
+              "opacity": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 280,
+          "delay": 300,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal",
+          "optionStagger": 80,
+          "optionOrder": "forward"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:ripple",
+      "name": "Ripple",
+      "category": "Meter",
+      "tags": [
+        "Segments",
+        "as it clips"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "ripple": {
+          "_type": "Animation",
+          "name": "ripple",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "clip"
+          },
+          "targets": [
+            {
+              "path": "Parts.cell"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.4,
+              "scale": 1.45,
+              "opacity": 0.6
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 380,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal",
+          "optionStagger": 45,
+          "optionOrder": "fromChosen"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:sparkle",
+      "name": "Sparkle",
+      "category": "Meter",
+      "tags": [
+        "Segments",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "sparkle": {
+          "_type": "Animation",
+          "name": "sparkle",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.cell"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.08,
+              "opacity": 0.2
+            },
+            {
+              "at": 0.16,
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 1800,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": "infinite",
+          "direction": "normal",
+          "optionStagger": 210,
+          "optionOrder": "scattered"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:peak-drop",
+      "name": "Peak drop",
+      "category": "Meter",
+      "tags": [
+        "Segments",
+        "level falls back"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "peakDrop": {
+          "_type": "Animation",
+          "name": "peakDrop",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "level",
+            "at": 0.8,
+            "way": "down"
+          },
+          "targets": [
+            {
+              "path": "Parts.marker"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "y": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.55,
+              "y": 8,
+              "opacity": 0.15
+            },
+            {
+              "at": 1,
+              "y": 0,
+              "opacity": 1
+            }
+          ],
+          "duration": 750,
+          "delay": 0,
+          "easing": "inOutQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {
+        "Parts.marker.source": "peak"
+      }
+    }
+  ]
+}

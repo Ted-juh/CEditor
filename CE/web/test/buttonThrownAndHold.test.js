@@ -72,7 +72,14 @@ test('a button takes words of its own or a count, not a value; the Words kind st
   assert.equal(presetDoesNotFit(preset('words'), key), '');
   assert.equal(presetDoesNotFit(preset('count'), createControl('ToggleButton')), '');
   assert.match(presetDoesNotFit(preset('value'), key), /a button has none to throw/);
-  assert.match(presetDoesNotFit(preset('words'), createControl('Label')), /goes on a knob, a slider or a button/);
+  assert.match(presetDoesNotFit(preset('words'), createControl('Label')), /goes on a knob, a slider, a button or a meter/);
+  // A meter throws words too, as it clips (the Meter, phase 2), and no value, having no pointer.
+  const meter = createControl('Meter');
+  assert.ok(animationKindsFor(meter).includes(EMIT_KIND) && animationKindsFor(meter).includes('value'), 'a meter keeps its value kind and gains words');
+  assert.equal(presetDoesNotFit(preset('words'), meter), '');
+  assert.match(presetDoesNotFit(preset('value'), meter), /a meter has none/);
+  const fromMeter = kindPatch({ animation: { kind: 'keyframes' }, kind: 'keyframes' }, EMIT_KIND, meter);
+  assert.deepEqual([fromMeter.shows, fromMeter.from, fromMeter.direction, fromMeter.trigger.type], ['words', 'centre', 'up', 'clip'], 'from the meter, up, as it clips');
 });
 
 test('the hold plays from the moment the button is held, over its own hold time, and stops if let go', () => {

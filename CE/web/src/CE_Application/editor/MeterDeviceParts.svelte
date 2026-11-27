@@ -6,6 +6,13 @@
    * with its fill, a gradient laid over it, a border and a finish, its lit cells and its zone in
    * the active colour, and where the meter's colour zones decide, in theirs. A scale's numerals are
    * drawn upright, outside the part's own turn.
+   *
+   * Each part also plays what is put on it, as a key's parts do (editor/ButtonDeviceParts.svelte; the
+   * Components showcase's Meter, phase 2: docs/design/component-presets.md): a keyframe animation
+   * moves and fades it about its own centre (`partAnimations`, on a group inside the part's own turn,
+   * so a needle's glow rides on the needle); a colour frame recolours what it fills (`partColours`, the
+   * shape channel); a change eases its colour and opacity (`partTransitions`). Every part sets all of
+   * these, `none` where it has nothing, so none borrows the control's own.
    */
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
@@ -14,8 +21,12 @@
   import { numberOr } from '../utils/primitives.js';
   import { renderedFrame, renderedLooks, renderedMeterPartSpec, requestRenderedLook } from '../utils/renderedLook.js';
   import { activeControlSet } from '../stores/controlSets.js';
+  import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
+  import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
+  import { optionRankVars } from '../utils/optionStagger.js';
+  import { METER_CELL_PART } from '../models/meterDeviceParts.js';
 
-  let { parts = {}, p = 0, peak = null, figures = '0', meter = {}, uid = 'meter' } = $props();
+  let { parts = {}, p = 0, peak = null, figures = '0', meter = {}, uid = 'meter', partAnimations = null, partColours = null, partTransitions = null } = $props();
 
   const W = METER_FRAME.width;
   const H = METER_FRAME.height;
@@ -93,8 +104,51 @@
         fontFamily: String(part.fontFamily ?? '').trim() || 'inherit',
         shadow: shadowOf(part),
         rendered: renderedPart(name, part, drawing),
+        ...playing(name),
+        cells: name === 'indicator' && lampsPlay && drawing.cells?.length ? eachLamp(drawing.cells, fill, activeColour) : null,
       };
     }));
+
+  // Every lamp (models/meterDeviceParts.js METER_CELL_PART): while something plays on it, the
+  // indicator draws each of its lamps alone, in its own colour, each saying where it stands along the
+  // row, from the top down, out from the level and in a scattered order (utils/optionStagger.js), so
+  // one animation can reach them one after another. A gradient, a finish or an image on the part is
+  // not drawn on a lamp alone: no set gives its lamps one.
+  let lampsPlay = $derived.by(() => {
+    const moves = animationDeclaration(partAnimations?.get?.(METER_CELL_PART) ?? null, { svg: true });
+    const channels = partColours?.get?.(METER_CELL_PART) ?? null;
+    return moves || channels ? { moves, colours: colourVariables(channels) } : null;
+  });
+  function eachLamp(cells, fill, activeColour) {
+    const top = cells.reduce((at, cell) => (cell.lit ? Math.max(at, cell.index) : at), -1);
+    const unlit = fill.solidEnabled === false ? 'transparent' : css(fill.colour, 'transparent');
+    const lit = css(activeColour || fill.colour, 'transparent');
+    return cells.map((cell) => ({
+      d: cell.d,
+      lit: cell.lit,
+      index: cell.index,
+      colour: cell.lit ? (cell.colour ? css(cell.colour) : lit) : unlit,
+      vars: `${optionRankVars(cell.index, cell.count, top)}${lampsPlay.colours}`,
+    }));
+  }
+
+  /**
+   * What plays on one part: its group's timing and colour channels, and its own motion. A part's
+   * turn (a needle's swing) is an SVG transform attribute; its keyframes move it inside that turn.
+   */
+  function playing(name) {
+    const bucket = partTransitions?.get?.(name) ?? null;
+    const channels = partColours ? (partColours.get(name) ?? {}) : null;
+    const eased = bucket ? { transform: null, size: null, opacity: bucket.opacity ?? null, colour: bucket.colour ?? null, visibility: null } : null;
+    return {
+      timing: `${transitionDeclaration(eased, { target: 'svg' })}${colourTransitionVar(bucket?.colour ?? null, { svg: true })}${colourVariables(channels)}`,
+      moves: animationDeclaration(partAnimations?.get?.(name) ?? null, { svg: true }),
+    };
+  }
+
+  // What a shape paints with, as a style: its colour, eased on the part's colour timing, and the
+  // part's colour frames (the shape channel) over it.
+  const paint = (colour) => `fill:${colour};transition:var(--ce-colour-transition, none);animation:var(--ce-kf-shape, none);`;
 
   // A housing or clip lamp whose look is 'rendered' (utils/renderedLook.js): a low block its box's
   // size, or a turned body for a round lamp, as an image centred on its box, lit by the set's lamp. A
@@ -129,7 +183,20 @@
 
 {#each drawn as item (item.name)}
   <g data-part={item.name} transform={item.drawing.transform || undefined}>
-    {#if item.rendered}
+  <g style={item.timing}>
+  <g data-part-moves={item.moves ? '' : undefined} style={item.moves || undefined}>
+    {#if item.cells}
+      <!-- Every lamp alone, each its own animation's place (lampsPlay, above). -->
+      {#each item.cells as cell, i (i)}
+        <g style={cell.vars}>
+          <g data-lamp={cell.index} data-lamp-lit={cell.lit ? '' : undefined} data-part-moves={lampsPlay.moves ? '' : undefined} style={lampsPlay.moves || undefined}>
+            <path d={cell.d} style={paint(cell.colour)} fill-rule="evenodd" opacity={cell.lit ? item.activeOpacity : item.opacity}
+              transform={cell.lit && (item.litOffset.x || item.litOffset.y) ? `translate(${item.litOffset.x} ${item.litOffset.y})` : undefined} />
+            {#if item.stroke}<path d={cell.d} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={cell.lit ? item.activeOpacity : item.opacity} />{/if}
+          </g>
+        </g>
+      {/each}
+    {:else if item.rendered}
       <image data-rendered-look={item.name} href={item.rendered.url} x={item.rendered.x} y={item.rendered.y} width={item.rendered.w} height={item.rendered.h} opacity={item.opacity} preserveAspectRatio="none" />
     {:else if item.drawing.zoneFill && item.base}
       <!-- A fill coloured by position: the zones along its own direction, across its whole box. -->
@@ -153,7 +220,7 @@
             shape={{ kind: 'filled-path', d: item.base }} maskId={`${uid}-${item.name}`} svgWidth={W} svgHeight={H} />
         </g>
       {:else}
-        <path d={item.base} fill={item.colour} fill-rule="evenodd" opacity={item.opacity} />
+        <path d={item.base} style={paint(item.colour)} fill-rule="evenodd" opacity={item.opacity} />
       {/if}
       {#if item.gradient}
         <defs>
@@ -173,27 +240,35 @@
         <path d={item.base} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.opacity} />
       {/if}
     {/if}
-    {#if !item.rendered}
+    {#if !item.rendered && !item.cells}
     {#each item.zoned as path, i (i)}
       <path d={path.d} fill={path.colour} fill-rule="evenodd" opacity={item.opacity} />
     {/each}
     {#if item.zone}
-      <path d={item.zone} fill={item.activeColour} fill-rule="evenodd" opacity={item.opacity} />
+      <path d={item.zone} style={paint(item.activeColour)} fill-rule="evenodd" opacity={item.opacity} />
     {/if}
     {#if item.lit.length}
       <g transform={item.litOffset.x || item.litOffset.y ? `translate(${item.litOffset.x} ${item.litOffset.y})` : undefined}>
         {#each item.lit as path, i (i)}
-          <path d={path.d} fill={path.colour ? css(path.colour) : item.activeColour} fill-rule="evenodd" opacity={item.activeOpacity} />
+          <path d={path.d} style={paint(path.colour ? css(path.colour) : item.activeColour)} fill-rule="evenodd" opacity={item.activeOpacity} />
           {#if item.stroke}<path d={path.d} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.activeOpacity} />{/if}
         {/each}
       </g>
     {/if}
     {/if}
     {#each item.drawing.texts as text, i (i)}
-      <text x={text.x} y={text.y} text-anchor="middle" fill={item.textColour} opacity={item.opacity} font-size={text.size} font-family={item.fontFamily}>{text.text}</text>
+      <text x={text.x} y={text.y} text-anchor="middle" style={paint(item.textColour)} opacity={item.opacity} font-size={text.size} font-family={item.fontFamily}>{text.text}</text>
     {/each}
   </g>
-  {#each item.drawing.labels as label, i (i)}
-    <text data-numeral={item.name} x={label.x} y={label.y} text-anchor={label.anchor} dominant-baseline="central" fill={item.textColour} opacity={item.opacity} font-size={label.size} font-family={item.fontFamily}>{label.text}</text>
-  {/each}
+  </g>
+  </g>
+  {#if item.drawing.labels.length}
+    <!-- Upright, outside the part's turn, and playing what the part plays: a scale that lights up
+         lights its numerals. -->
+    <g style={item.timing}><g style={item.moves || undefined}>
+    {#each item.drawing.labels as label, i (i)}
+      <text data-numeral={item.name} x={label.x} y={label.y} text-anchor={label.anchor} dominant-baseline="central" style={paint(item.textColour)} opacity={item.opacity} font-size={label.size} font-family={item.fontFamily}>{label.text}</text>
+    {/each}
+    </g></g>
+  {/if}
 {/each}

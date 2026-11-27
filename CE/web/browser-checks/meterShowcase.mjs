@@ -13,6 +13,17 @@
  *   - Together (rows of lamps): Power-on reaches each meter of its row in turn; Spectrum and Chase
  *     keep moving; Beat bounce kicks its row on the beats.
  *
+ * Phase 2, each meter running a test signal (utils/meterMotion.js), nothing plugged in:
+ *   - Parts (Anodised): Lamp flash's lamp is drawn and flares each time the level clips; Face glow
+ *     and Needle glow light as the level crosses their lines; Scale light-up lights as the panel
+ *     opens; a click makes Cover glint catch the light.
+ *   - Level (Carbon Pro): as each burst clips, the lamps flash, the meter shakes, its case washes
+ *     red and "OVER" rises from it; Peak flare swells it as the level crosses 80%.
+ *   - Ballistics (Valve Console): one signal, five needles, each where its ballistics put it: the
+ *     PPM reads higher than the lazy needle, which never catches a peak.
+ *   - Segments (Gimbal Ring): Cascade's lamps come on along the row, Sparkle's in a scattered
+ *     order, Ripple's out from the level as it clips; Peak drop's peak lamp drops as the level falls.
+ *
  *   node browser-checks/meterShowcase.mjs
  */
 import assert from 'node:assert/strict';
@@ -255,6 +266,112 @@ try {
   await transport(false);
   check('Together: Beat bounce kicks its row on the transport\'s beats', () => {
     for (let n = 0; n < 6; n += 1) assert.ok(looks(groupOf(bounce, n)) > 2, `meter ${n + 1}`);
+  });
+
+  // --- Phase 2 ------------------------------------------------------------------------------------
+  // What plays on a part, each sample: the animation names on its elements (its moves and its paint),
+  // so a play is a change of name (each play alternates between two).
+  const playing = (list) => page.evaluate((list) => list.map(({ sel, part }) => {
+    const root = document.querySelector(sel);
+    const els = part ? [...(root?.querySelectorAll(`[data-part="${part}"], [data-part="${part}"] *`) ?? [])] : [root, ...(root?.querySelectorAll('*') ?? [])];
+    return [...new Set(els.filter(Boolean).map((e) => getComputedStyle(e).animationName).filter((n) => n && n !== 'none'))].sort().join(' ');
+  }), list);
+  /** How many times each place started something over `ms`, sampled every 60 ms. */
+  async function plays(list, ms) {
+    const starts = list.map(() => 0);
+    const was = list.map(() => '');
+    for (let t = 0; t < ms; t += 60) {
+      (await playing(list)).forEach((names, i) => { if (names && names !== was[i]) starts[i] += 1; was[i] = names || was[i]; });
+      await page.waitForTimeout(60);
+    }
+    return starts;
+  }
+  const at = (id, part = '') => ({ sel: inPreview(id), part });
+
+  // Parts, on Anodised.
+  ids = await open('Parts');
+  await kit.preview(true);
+  const scaleLit = await plays([at(ids.ScaleLightUp, 'scale')], 900);
+  check('Parts: Scale light-up lights the scale as the panel opens', () => assert.ok(scaleLit[0] >= 1));
+  const parts = await plays([at(ids.LampFlash, 'lamp'), at(ids.FaceGlow, 'face'), at(ids.NeedleGlow, 'indicator')], 9000);
+  check('Parts: the clip lamp is drawn and flares each time the level clips; the face and the needle light as the level crosses their lines', () => {
+    assert.ok(parts[0] >= 2, `Lamp flash ${parts[0]}`);
+    assert.ok(parts[1] >= 1, `Face glow ${parts[1]}`);
+    assert.ok(parts[2] >= 1, `Needle glow ${parts[2]}`);
+  });
+  const glintBefore = (await playing([at(ids.CoverGlint, 'cover')]))[0];
+  await page.mouse.click(...(await centre(ids.CoverGlint)));
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(150);
+  const glint = (await playing([at(ids.CoverGlint, 'cover')]))[0];
+  check('Parts: a click makes Cover glint catch the light', () => assert.ok(glint && glint !== glintBefore, `${glintBefore} → ${glint}`));
+
+  // Level, on Carbon Pro: a burst every 2.4 s, each one a clip.
+  ids = await open('Level');
+  await kit.preview(true);
+  await startFrames([ids.ClipShake, ids.PeakFlare], 5200);
+  const level = await plays([at(ids.ClipFlash, 'indicator'), at(ids.RedWash, 'housing')], 5000);
+  const levelRun = await frames(0);
+  const shake = groupOf(levelRun, 0).map((g) => g.x);
+  const flare = groupOf(levelRun, 1).map((g) => g.width);
+  const over = await page.evaluate((sel) => [...document.querySelectorAll(`${sel} *`)].some((e) => !e.children.length && e.textContent === 'OVER'), inPreview(ids.OverThrown));
+  check('Level: as each burst clips, the lamps flash, the meter shakes and its case washes red', () => {
+    assert.ok(level[0] >= 2, `Clip flash ${level[0]}`);
+    assert.ok(level[1] >= 2, `Red wash ${level[1]}`);
+    assert.ok(Math.max(...shake) - Math.min(...shake) > 2, `Clip shake moved ${(Math.max(...shake) - Math.min(...shake)).toFixed(1)} px`);
+    assert.ok(Math.max(...flare) / Math.min(...flare) > 1.02, 'Peak flare swells');
+  });
+  let thrown = over;
+  for (let k = 0; k < 40 && !thrown; k += 1) {
+    await page.waitForTimeout(60);
+    thrown = await page.evaluate((sel) => [...document.querySelectorAll(`${sel} *`)].some((e) => !e.children.length && e.textContent === 'OVER'), inPreview(ids.OverThrown));
+  }
+  check('Level: "OVER" rises from the meter as it clips', () => assert.ok(thrown));
+
+  // Ballistics, on Valve Console: one signal, five needles.
+  ids = await open('Ballistics');
+  await kit.preview(true);
+  await kit.settle(1200);
+  const needles = ['Vu', 'Ppm', 'Bouncy', 'Lazy', 'StickyPeak'];
+  const angles = needles.map(() => []);
+  for (let k = 0; k < 60; k += 1) {
+    const now = await page.evaluate((sels) => sels.map((sel) => Number((/rotate\(([-\d.]+)/.exec(document.querySelector(`${sel} [data-part="indicator"]`)?.getAttribute('transform') ?? '') ?? [])[1])), needles.map((name) => inPreview(ids[name])));
+    now.forEach((a, i) => angles[i].push(a));
+    await page.waitForTimeout(50);
+  }
+  const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+  check('Ballistics: one signal, five needles, each where its ballistics put it; the PPM reads higher than the lazy needle', () => {
+    for (let i = 0; i < needles.length; i += 1) assert.ok(new Set(angles[i]).size > 4, `${needles[i]} moves`);
+    const apart = angles[0].map((_, k) => new Set(angles.map((list) => list[k].toFixed(1))).size);
+    assert.ok(mean(apart) > 3, `needles apart: ${mean(apart).toFixed(1)} of 5 on average`);
+    assert.ok(mean(angles[1]) > mean(angles[3]) + 3, `PPM ${mean(angles[1]).toFixed(1)}°, Lazy ${mean(angles[3]).toFixed(1)}°`);
+  });
+
+  // Segments, on Gimbal Ring.
+  ids = await open('Segments');
+  await kit.preview(true);
+  await page.waitForTimeout(400);
+  const delays = (id) => page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-lamp]`)]
+    .map((g) => [Number(g.dataset.lamp), parseFloat(getComputedStyle(g).animationDelay) || 0]), inPreview(id));
+  const cascade = await delays(ids.Cascade);
+  check('Segments: Cascade\'s lamps come on along the row, each after the last', () => {
+    assert.ok(cascade.length >= 8, `${cascade.length} lamps`);
+    const byIndex = new Map(cascade);
+    const order = [...byIndex.keys()].sort((a, b) => a - b).map((i) => byIndex.get(i));
+    assert.ok(order.every((d, i) => i === 0 || d > order[i - 1]), order.join(' '));
+  });
+  const sparkle = await delays(ids.Sparkle);
+  check('Segments: Sparkle\'s lamps twinkle in a scattered order, each at a time of its own', () => {
+    const byIndex = [...new Map(sparkle).entries()].sort((a, b) => a[0] - b[0]).map(([, d]) => d);
+    assert.equal(new Set(byIndex).size, byIndex.length, byIndex.join(' '));
+    assert.ok(byIndex.some((d, i) => i > 0 && d < byIndex[i - 1]), `not in order: ${byIndex.join(' ')}`);
+  });
+  const segs = await plays([at(ids.Ripple, 'indicator'), at(ids.PeakDrop, 'marker')], 5200);
+  const ripple = await delays(ids.Ripple);
+  check('Segments: Ripple runs out from the level as it clips; Peak drop\'s peak lamp drops as the level falls back', () => {
+    assert.ok(segs[0] >= 1 && ripple.length >= 8, `Ripple ${segs[0]}, ${ripple.length} lamps`);
+    assert.ok(new Set(ripple.map(([, d]) => d)).size >= 3, 'out from the level, a lamp at a time');
+    assert.ok(segs[1] >= 1, `Peak drop ${segs[1]}`);
   });
 
   assert.deepEqual(kit.failures, [], 'no page errors');

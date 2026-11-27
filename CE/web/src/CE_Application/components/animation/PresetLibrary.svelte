@@ -59,13 +59,14 @@
   });
   let panelById = $derived(new Map($panelAnimationPresets.map((preset) => [preset.id, preset])));
 
-  const sizeWord = (preset) => (preset.size === 'recipe' ? `recipe of ${Object.keys(preset.animations).length}` : 'effect');
+  const sizeWord = (preset) => (preset.size === 'recipe' ? `recipe of ${Object.keys(preset.animations).length}` : preset.size === 'settings' ? 'settings' : 'effect');
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
   function apply(preset) {
     const { applied, refused } = applyAnimationPreset(targets, preset.id);
     const parts = [];
-    if (applied.length) parts.push(`${preset.name} on ${plural(applied.length, 'control')}, linked`);
+    // Settings alone (a needle's ballistics) are set, with nothing to follow the preset.
+    if (applied.length) parts.push(`${preset.name} on ${plural(applied.length, 'control')}${Object.keys(preset.animations ?? {}).length ? ', linked' : ''}`);
     if (refused.length) parts.push(`not on ${refused.length}: ${refused[0].reason}`);
     onreport(parts.join('; ') || 'Nothing to put it on.');
   }

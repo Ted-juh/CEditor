@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 
 import { CHOICE_PARTS, choicePartNames, OPTION_STATE_SIGNALS } from '../src/CE_Application/utils/choiceGroupLayout.js';
 import { animatedParts, thumbBox, thumbDirection, thumbEdges, thumbTransition } from '../src/CE_Application/utils/choiceGroupMotion.js';
-import { optionRankVars, readOptionStagger, staggeredDelay } from '../src/CE_Application/utils/optionStagger.js';
+import { optionRankVars, readOptionStagger, scatteredRank, staggeredDelay } from '../src/CE_Application/utils/optionStagger.js';
 import { resolveChoiceOption } from '../src/CE_Application/utils/choiceGroupStyle.js';
 import { animationValue, readKeyframes, KEYFRAME_TRIGGER_TYPES } from '../src/CE_Application/utils/keyframeAnimation.js';
 import { readTextEffect, textPieceStyles, splitText, TEXT_TRIGGER_TYPES, TEXT_TRIGGER_LABELS } from '../src/CE_Application/utils/textEffects.js';
@@ -71,8 +71,13 @@ test('every option one after another: the delay is the browser\'s, by the option
   assert.deepEqual(readOptionStagger({ optionStagger: 90, optionOrder: 'fromChosen' }, 2), { by: 180, order: 'fromChosen' });
   assert.equal(staggeredDelay(40), '40ms');
   assert.equal(staggeredDelay(40, { by: 90, order: 'reverse' }), 'calc(40ms + var(--ce-rank-reverse, 0) * 90ms)');
-  assert.equal(optionRankVars(1, 5, 3), '--ce-rank-forward:1;--ce-rank-reverse:3;--ce-rank-chosen:2;');
-  assert.equal(optionRankVars(2, 5, -1), '--ce-rank-forward:2;--ce-rank-reverse:2;--ce-rank-chosen:2;', 'with none chosen, from the first');
+  // A fourth, scattered: a meter's lamps sparkling (the Meter, phase 2), each place once.
+  assert.equal(optionRankVars(1, 5, 3), `--ce-rank-forward:1;--ce-rank-reverse:3;--ce-rank-chosen:2;--ce-rank-scattered:${scatteredRank(1, 5)};`);
+  assert.equal(optionRankVars(2, 5, -1), `--ce-rank-forward:2;--ce-rank-reverse:2;--ce-rank-chosen:2;--ce-rank-scattered:${scatteredRank(2, 5)};`, 'with none chosen, from the first');
+  for (const n of [1, 5, 8, 16]) {
+    assert.deepEqual(Array.from({ length: n }, (_, i) => scatteredRank(i, n)).sort((a, b) => a - b), Array.from({ length: n }, (_, i) => i), `scattered over ${n}: each place once`);
+  }
+  assert.equal(staggeredDelay(0, { by: 50, order: 'scattered' }), 'calc(0ms + var(--ce-rank-scattered, 0) * 50ms)');
 
   const cascade = readKeyframes(byId('cascade').preset.animations.cascade);
   assert.deepEqual(cascade.optionStagger, { by: 110, order: 'forward' });

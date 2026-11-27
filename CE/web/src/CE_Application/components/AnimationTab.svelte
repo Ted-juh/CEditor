@@ -77,7 +77,9 @@
   import PropertyText from '../properties/PropertyText.svelte';
   import { isTimedButtonBehavior } from '../utils/timedButtonPreview.js';
   import { choicePartNames } from '../utils/choiceGroupLayout.js';
-  import { OPTION_ORDERS, OPTION_ORDER_LABELS } from '../utils/optionStagger.js';
+  import { LAMP_ORDER_LABELS, OPTION_ORDERS, OPTION_ORDER_LABELS } from '../utils/optionStagger.js';
+  import { LEVEL_TRIGGER_TYPES } from '../utils/keyframeAnimation.js';
+  import { METER_CELL_PART, METER_DEVICE_TYPES, meterPartNames } from '../models/meterDeviceParts.js';
   import { activePanel, selectedComponentIds, openAnimationDesigner } from '../stores/panels.js';
   import Maximize2 from 'lucide-svelte/icons/maximize-2';
   import { updateControlProperty, removeControlNode, getSection, applyControlPatch } from '../stores/controls.js';
@@ -151,11 +153,16 @@
   let controlName = $derived(control?._children?.Core?.name || control?._children?.Core?.controlType || '');
   let section = $derived(getSection(control, 'Animations'));
   // Its own parts, and a choice group's drawn from its rows (the thumb, the chosen option, every option).
-  let partNames = $derived([...Object.keys(getSection(control, 'Parts')?._children ?? {}), ...choicePartNames(control)]);
+  let partNames = $derived([...Object.keys(getSection(control, 'Parts')?._children ?? {}), ...choicePartNames(control), ...meterPartNames(control)]);
   // A choice group's own trigger: its list of options changed (a group that depends on another's choice).
   let choiceOffered = $derived(choicePartNames(control).length > 0);
+  // A meter's own triggers: its level reaching where it clips, or crossing a line (the Meter, phase 2).
+  let levelOffered = $derived(METER_DEVICE_TYPES.has(String(control?._children?.Core?.controlType ?? '')));
   // Playing on every option or every label, it can take them one after another.
-  let staggerOffered = $derived(choiceOffered && ['option', 'optionLabel'].includes(String(selected?.part ?? (selected?.animation?.targets?.[0]?.path ?? '').replace(/^Parts\./, ''))));
+  let selectedPartName = $derived(String(selected?.part ?? (selected?.animation?.targets?.[0]?.path ?? '').replace(/^Parts\./, '')));
+  // Or on every lamp of a meter (models/meterDeviceParts.js METER_CELL_PART): one after another too.
+  let lampsStagger = $derived(levelOffered && selectedPartName === METER_CELL_PART);
+  let staggerOffered = $derived((choiceOffered && ['option', 'optionLabel'].includes(selectedPartName)) || lampsStagger);
 
   let rows = $derived(control ? readAnimations(control) : []);
   let allOn = $derived(control ? animationsEnabled(control) : true);
@@ -825,14 +832,14 @@ onMount(() => {
                   <!-- On a choice group's every option or label: each this many ms after the last
                        (utils/optionStagger.js), in this order. -->
                   <div class="r">
-                    <span class="lab">Each option</span>
+                    <span class="lab">{lampsStagger ? 'Each lamp' : 'Each option'}</span>
                     <div class="cell"><NumberCell label="ms later" value={selected.animation.optionStagger ?? 0} min={0} max={2000} step={10}
                       onchange={(value) => setProp('optionStagger', Math.max(0, Math.min(2000, Math.round(value))))} /></div>
                   </div>
                   {#if (selected.animation.optionStagger ?? 0) > 0}
                     <div class="r">
                       <span class="lab">Order</span>
-                      <Segmented options={OPTION_ORDERS.map((value) => ({ value, label: OPTION_ORDER_LABELS[value] }))}
+                      <Segmented options={OPTION_ORDERS.map((value) => ({ value, label: (lampsStagger ? LAMP_ORDER_LABELS : OPTION_ORDER_LABELS)[value] }))}
                                  value={selected.animation.optionOrder ?? 'forward'} ariaLabel="Option order"
                                  onchange={(value) => setProp('optionOrder', value)} />
                     </div>
@@ -888,6 +895,7 @@ onMount(() => {
                   <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES.filter((type) => !(valueKind || emitKind) || type !== 'always'))
                                     .filter((type) => type !== 'hold' || holdOffered || selected.triggerType === 'hold')
                                     .filter((type) => type !== 'optionsChange' || choiceOffered || selected.triggerType === 'optionsChange')
+                                    .filter((type) => !LEVEL_TRIGGER_TYPES.includes(type) || levelOffered || selected.triggerType === type)
                                     .map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] ?? KEYFRAME_TRIGGER_LABELS[value] }))}
                                   value={selected.triggerType} ariaLabel="Keyframe trigger"
                                   onchange={(value) => setProps({ trigger: {
@@ -956,6 +964,21 @@ onMount(() => {
                       onchange={(value) => setProp('trigger.every', Math.max(1, Math.round(value)))} /></div>
                   </div>
                   <p class="hint">Plays on every {selected.trigger.every === 1 ? 'beat' : `${selected.trigger.every}th beat`} while the transport runs.</p>
+                {:else if selected.triggerType === 'clip'}
+                  <p class="hint">Plays each time the level reaches where the meter clips: the level its clip lamp lights at, else where its top zone starts, else full scale. Not again until it has fallen back.</p>
+                {:else if selected.triggerType === 'level'}
+                  <div class="r">
+                    <span class="lab">Level</span>
+                    <div class="cell"><NumberCell label="% of the scale" value={Math.round((selected.animation.trigger?.at ?? 0.9) * 100)} min={0} max={100} step={1}
+                      onchange={(value) => setProp('trigger.at', Math.max(0, Math.min(100, Math.round(value))) / 100)} /></div>
+                  </div>
+                  <div class="r">
+                    <span class="lab">Crossing</span>
+                    <Segmented options={[{ value: 'up', label: 'Up' }, { value: 'down', label: 'Down' }, { value: 'both', label: 'Either way' }]}
+                               value={selected.animation.trigger?.way ?? 'up'} ariaLabel="Crossing"
+                               onchange={(value) => setProp('trigger.way', value)} />
+                  </div>
+                  <p class="hint">Plays each time the meter's level crosses this line the way chosen.</p>
                 {:else if selected.triggerType === 'event'}
                   {@const gesture = MOTION_EVENTS.find((entry) => entry.id === selected.animation.trigger?.event) ?? MOTION_EVENTS[0]}
                   <div class="r">
@@ -1127,7 +1150,7 @@ onMount(() => {
                 <div class="r">
                   <span class="lab">From</span>
                   <Segmented options={fromKey
-                    ? [{ value: 'centre', label: 'The key' }, { value: 'tip', label: 'Above it' }]
+                    ? [{ value: 'centre', label: levelOffered ? 'The meter' : 'The key' }, { value: 'tip', label: 'Above it' }]
                     : [{ value: 'tip', label: 'The pointer’s tip' }, { value: 'centre', label: 'The centre' }]}
                              value={selected.animation.from ?? (fromKey ? 'centre' : 'tip')} ariaLabel="From" onchange={(value) => setProp('from', value)} />
                 </div>

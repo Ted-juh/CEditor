@@ -5,7 +5,7 @@
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
   import FieldList from '../properties/FieldList.svelte';
   import {
-    METER_ARC_FIELDS, METER_FIELDS, METER_FILL_FIELDS, METER_PEAK_FIELDS, METER_READOUT_FIELDS, METER_VALUE_FIELDS,
+    METER_ARC_FIELDS, METER_FIELDS, METER_FILL_FIELDS, METER_MOTION_FIELDS, METER_PEAK_FIELDS, METER_READOUT_FIELDS, METER_VALUE_FIELDS,
   } from '../models/inspectorFieldSets.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
@@ -19,6 +19,7 @@
   import Mountain from 'lucide-svelte/icons/mountain';
   import Ruler from 'lucide-svelte/icons/ruler';
   import Radius from 'lucide-svelte/icons/radius';
+  import Activity from 'lucide-svelte/icons/activity';
   import MeterPartsEditor from './MeterPartsEditor.svelte';
   import AttachedLabelsEditor from './AttachedLabelsEditor.svelte';
   import { meterDeviceDrawn, meterNeedsPeak } from '../models/meterDeviceParts.js';
@@ -155,6 +156,11 @@
                   onchange={() => toggle('peakHold')} />
     {/snippet}
     <FieldList fields={peakFields} values={peakValues} {set} slots={{ peakColour }} />
+  </PropertySection>
+
+  <!-- How the drawing gets to a new level, and a level made up in Preview (utils/meterMotion.js). -->
+  <PropertySection title="Motion" icon={Activity}>
+    <FieldList fields={METER_MOTION_FIELDS} values={m} {set} />
   </PropertySection>
 
   <MeterPartsEditor {control} />
