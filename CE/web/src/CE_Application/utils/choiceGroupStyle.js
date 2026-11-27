@@ -85,6 +85,35 @@ export function colourContrast(left, right) {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
+/** `colour` taken `amount` (0 to 1) of the way toward `toward`, as `AARRGGBB`. */
+function mixColour(colour, toward, amount) {
+  const from = argb(colour);
+  const to = argb(toward);
+  if (!from || !to) return colour;
+  const channel = (a, b) => Math.round(a + (b - a) * amount).toString(16).padStart(2, '0');
+  return `${Math.round(from.a * 255).toString(16).padStart(2, '0')}${channel(from.r, to.r)}${channel(from.g, to.g)}${channel(from.b, to.b)}`.toUpperCase();
+}
+
+/**
+ * The chosen colour under the pointer: a shade off it while hovered and two while pressed, so the
+ * choice still shows and so does the pointer. The shade goes away from `others` (what the options
+ * not chosen look like), lighter or darker, so it never drifts toward them; the other way where it
+ * can hardly move (a near-white cannot get lighter), and then no further than keeps the chosen
+ * option standing out from the others by most of what it does at rest.
+ */
+export function chosenUnderPointer(colour, pressed = false, others = null) {
+  if (!argb(colour)) return colour;
+  const shade = (lighter, amount) => mixColour(colour, lighter ? 'FFFFFFFF' : 'FF000000', amount);
+  let lighter = argb(others)
+    ? colourContrast(shade(true, 0.2), others) >= colourContrast(shade(false, 0.2), others)
+    : luminance(argb(colour)) < 0.4;
+  if (colourContrast(shade(lighter, 0.16), colour) < 1.12) lighter = !lighter;
+  const amounts = pressed ? [0.3, 0.24, 0.18, 0.13, 0.09] : [0.16, 0.12, 0.09];
+  if (!argb(others)) return shade(lighter, amounts[0]);
+  const keep = 1 + 0.6 * (colourContrast(colour, others) - 1);
+  return shade(lighter, amounts.find((amount) => colourContrast(shade(lighter, amount), others) >= keep) ?? amounts.at(-1));
+}
+
 /** Black or white, whichever reads better on `colour`. */
 export function inkOn(colour) {
   return colourContrast('FFFFFFFF', colour) >= colourContrast('FF141414', colour) ? 'FFFFFFFF' : 'FF141414';
@@ -372,7 +401,6 @@ export function resolveChoiceOption({
   // The Segments tab leaves layers out to find what a field inherits (SegmentsEditor.svelte).
   if (includeRowBase) applyLegacyRow(look, row, selected);
   applyStyleLayer(look, valueSection?.segmentStyle, includeRowBase ? rowId : '');
-  const restingFill = fillSignature(fillOf(look.tree));
 
   const optionSignals = {
     ...signals,
@@ -388,27 +416,42 @@ export function resolveChoiceOption({
   // any other state that holds is the control's, and paints it, except in the buttons style, where
   // the Background is each key. Either one's `segments` patch reaches every option.
   const paintsOptions = choiceStyleDrawsFrame(style) || style === 'buttons';
+  // What the options look like at rest, not chosen: their own face, else the strip's frame.
+  const frameTone = choiceStyleDrawsFrame(style) ? backgroundTone(background, palette.panel) : null;
+  const restingTone = bodyShows(look.tree) ? backgroundTone(look.tree._children.Background, frameTone ?? palette.panel) : frameTone;
+  // Which kinds of state changed the option's fill: one about being chosen, one about the pointer
+  // (hover, pressed), or another.
+  const fillPaintedBy = new Set();
   for (const [name, state] of statesInPrecedence(statesSection)) {
     const ofOption = isOptionState(state);
     const forced = previewState && name === previewState && state?.enabled !== false;
     if (!forced && !stateMatches(state, ofOption ? optionSignals : signals)) continue;
+    const before = fillSignature(fillOf(look.tree));
     if (ofOption ? paintsOptions : style === 'buttons') {
       const patch = optionPatchMap(state?.patches?.component);
       applyStatePatchMap(look.tree, patch);
       if (patch['Text.Fill.colour'] != null) look.labelChosen = false;
     }
     applyStyleLayer(look, state?.patches?.segments, includeStateRows ? rowId : '');
+    if (fillSignature(fillOf(look.tree)) !== before) {
+      const when = state?.when ?? {};
+      fillPaintedBy.add(when.checked === true || when.selected === true || when.selectionActive === true ? 'chosen'
+        : when.hover === true || when.pressed === true ? 'pointer' : 'other');
+    }
   }
 
-  // A chosen option whose fill no state changed (78 of the built-in sets give the radio group a
-  // Selected state that colours only the border and the text) takes the thumb: in a strip it would
-  // be invisible, and a key would differ by its outline alone.
-  if (selected && paintsOptions && fillSignature(fillOf(look.tree)) === restingFill) {
-    Object.assign(fillOf(look.tree), { colour: palette.thumb ?? 'FF2D6F9C', solidEnabled: true, gradientEnabled: false, imageEnabled: false });
+  // A chosen option whose fill no state about being chosen changed (78 of the built-in sets give the
+  // radio group a Selected state that colours only the border and the text) takes the thumb: in a
+  // strip it would be invisible, and a key would differ by its outline alone. Under the pointer it
+  // keeps it, a shade lighter or deeper (chosenUnderPointer): a set's Hover and Pressed paint every
+  // option alike, and painted a chosen one as if it were not.
+  if (selected && paintsOptions && !fillPaintedBy.has('chosen') && !fillPaintedBy.has('other')) {
+    const thumb = palette.thumb ?? 'FF2D6F9C';
+    const colour = fillPaintedBy.has('pointer') ? chosenUnderPointer(thumb, flags.pressed === true, restingTone) : thumb;
+    Object.assign(fillOf(look.tree), { colour, solidEnabled: true, gradientEnabled: false, imageEnabled: false });
   }
   // What the label sits on: its own body, else (an option with none, in a strip) the frame.
   const body = bodyShows(look.tree);
-  const frameTone = choiceStyleDrawsFrame(style) ? backgroundTone(background, palette.panel) : null;
   const underLabel = body ? backgroundTone(look.tree._children.Background, frameTone ?? palette.panel) : frameTone;
   const labelFill = textFillOf(look.tree);
   if (underLabel && !look.labelChosen && colourContrast(labelFill.colour ?? 'FFFFFFFF', underLabel) < 3) {

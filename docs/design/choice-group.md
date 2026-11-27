@@ -60,8 +60,9 @@ resolver (`utils/choiceGroupStyle.js`) guarantees two things, and checking every
 both:
 
 - *A chosen option shows.* In the segmented and buttons styles, a chosen option whose fill no state
-  changed takes the thumb: the first of the set's `surface.checked`, `accent`, `control.fill` and
-  `accent.hot` that stands out from the face (1.4:1), else the one that stands out most.
+  about being chosen changed takes the thumb: the first of the set's `surface.checked`, `accent`,
+  `control.fill` and `accent.hot` that stands out from the face (1.4:1), else the one that stands out
+  most. It keeps it under the pointer too (below, "Under the pointer").
 - *Its lettering reads.* A label reading at under 3:1 on what it sits on takes black or white. What
   it sits on is measured as drawn: the option's fill, or the strip's frame, laid over the panel's
   colour; a gradient by its stops' average at the gradient's opacity (a 22% gloss is not a white
@@ -87,3 +88,37 @@ with `aria-checked`. A focus ring marks the focused option.
 and part names (`whole`, `indicatorOuter`, `indicatorInner`, `label`); the legacy fields (row
 `visualOverrides`, `whole.borderColour`/`borderWidth`/`shape`/`radius`) are read, never written. A
 group saved with the old default style has no `visualStyle` of its own, so it opens as `segmented`.
+
+## Under the pointer (2026-11-27)
+
+**What was wrong.** A set's Hover and Pressed states paint every option's fill alike, and the thumb
+was given only to a chosen option whose fill *no* state had changed. So the moment the pointer was on
+the chosen option, or pressing it, it took the hover or press colour and stopped looking chosen.
+Recorded in Preview over the 66 offered sets, a row of keys and a strip in each, the middle option
+chosen: the chosen key faded to an ordinary one in 52 sets, the chosen strip segment in 34.
+
+**The owner's choice, of three put** (the chosen colour simply winning, which loses the hover
+feedback; a colour of its own under the pointer; or leaving it to each author's own state): a colour
+of its own, in every set. The owner saw every set it touches, before and after, and chose to apply it
+to all of them rather than only where the choice faded.
+
+**As built** (`utils/choiceGroupStyle.js`). The resolver notes which kind of state changed an
+option's fill: one about being chosen (`checked`), one about the pointer (`hover`, `pressed`), or
+another. A chosen option whose fill no state about being chosen and no other kind of state changed
+takes the thumb, as before; where the pointer's states changed it, the thumb a shade off
+(`chosenUnderPointer`): one shade hovered, two pressed, toward lighter or darker, whichever goes away
+from what the options not chosen look like (their face, or the strip's frame), and the other way where
+the colour can hardly move (a near-white cannot get lighter), then no further than keeps 60% of the
+contrast it has with them at rest. Its lettering is checked against the new fill, as ever.
+
+Left as they were: every option at rest, every option not chosen, a set whose own Selected state
+paints the fill (it wins, as before), an author's state about the chosen option under the pointer
+(`hover` and `checked` both on: it wins), and a state about something else that paints the fill.
+
+Measured after, on the same recordings: under the pointer the chosen option stands out from the
+options beside it by at least half what it does at rest in every set and both styles, hovered; pressed,
+in all but Leatherbound's and Valve's keys, whose textured faces defeat a one-spot colour reading and
+which read as chosen on the sheets. In 33 more cases (9 sets' keys, 24 sets' strips) the set's hover
+colour had happened to keep the choice visible, and those change too: the hover colour becomes a shade
+of the chosen. Held by `test/choiceGroupStyle.test.js`.
+

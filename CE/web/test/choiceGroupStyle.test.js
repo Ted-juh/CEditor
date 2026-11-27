@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { backgroundTone, colourContrast, fillTone, resolveChoiceOption, standsOutFrom } from '../src/CE_Application/utils/choiceGroupStyle.js';
+import { backgroundTone, chosenUnderPointer, colourContrast, fillTone, resolveChoiceOption, standsOutFrom } from '../src/CE_Application/utils/choiceGroupStyle.js';
 import { resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 
@@ -77,6 +77,55 @@ test('a chosen key whose fill no state changed takes the thumb, so it differs by
   assert.equal(chosen.body._children.Fill.gradientEnabled, false, 'flat, over the face\'s gradient');
   assert.equal(chosen.body._children.Border.colour, 'FFFFAA00', 'the set\'s edge kept');
   assert.equal(option('buttons', {}, { statesSection, background }).body._children.Fill.gradientEnabled, true, 'the others untouched');
+});
+
+test('under the pointer a chosen option keeps the thumb, a shade off it, where the set\'s Hover and Pressed would paint it as any other', () => {
+  // As in most sets: Selected colours only an edge, so the thumb is what shows the choice, and
+  // Hover and Pressed paint every option's fill alike. They painted the chosen one as if it were not.
+  const statesSection = { _children: {
+    Hover: state({ hover: true }, { 'Background.Fill.colour': 'FFD8D8D8' }),
+    Pressed: state({ pressed: true }, { 'Background.Fill.colour': 'FFC4C4C4' }),
+    Selected: state({ checked: true }, { 'Background.Border.colour': 'FFFFAA00' }),
+  } };
+  const background = { ...sections().background, _children: { ...sections().background._children, Fill: { colour: 'FFF4F4F4', solidEnabled: true } } };
+  const fill = (flags) => option('buttons', flags, { statesSection, background }).body._children.Fill.colour;
+  const thumb = 'FF2D6F9C';
+  const look = (flags) => resolveChoiceOption({ style: 'buttons', row: rows[0], flags, palette: { ...palette, thumb }, ...sections(), statesSection, background }).body._children.Fill.colour;
+  assert.equal(look({ selected: true }), thumb, 'at rest, the thumb, as ever');
+  const hovered = look({ selected: true, hover: true });
+  const pressed = look({ selected: true, hover: true, pressed: true });
+  assert.equal(hovered, chosenUnderPointer(thumb, false, 'FFF4F4F4'));
+  assert.equal(pressed, chosenUnderPointer(thumb, true, 'FFF4F4F4'));
+  assert.equal(new Set([thumb, hovered, pressed, 'FFD8D8D8', 'FFC4C4C4']).size, 5, 'not the thumb, not the hover colour; pressed apart from hovered');
+  assert.ok(colourContrast(hovered, 'FFF4F4F4') > colourContrast(thumb, 'FFF4F4F4'), 'darker, away from the light keys beside it');
+  assert.equal(fill({ hover: true }), 'FFD8D8D8', 'an option not chosen is hovered as the set says');
+  assert.equal(fill({ pressed: true }), 'FFC4C4C4');
+});
+
+test('under the pointer, what a state about the chosen option paints still wins; and a state of another kind is left alone', () => {
+  assert.equal(option('buttons', { selected: true, hover: true }).body._children.Fill.colour, 'FF4A90D9', 'a Selected that paints the fill');
+  const authored = { _children: { ...sections().statesSection._children,
+    Selected: state({ checked: true }, { 'Background.Border.colour': 'FFFFAA00' }),
+    ChosenHover: state({ hover: true, checked: true }, { 'Background.Fill.colour': 'FF8844CC' }) } };
+  assert.equal(option('buttons', { selected: true, hover: true }, { statesSection: authored }).body._children.Fill.colour, 'FF8844CC', 'an author\'s chosen-and-hovered colour');
+  const rule = { _children: { Selected: state({ checked: true }, { 'Background.Border.colour': 'FFFFAA00' }), Low: { enabled: true, when: {}, rule: 'value < 1', patches: { component: { 'Background.Fill.colour': 'FF00AA00' }, parts: {} } } } };
+  const ruled = option('buttons', { selected: true, hover: true }, { statesSection: rule, signals: { value: 0 } });
+  assert.equal(ruled.body._children.Fill.colour, 'FF00AA00', 'a state about something else keeps the colour it gives');
+});
+
+test('the shade goes away from the options not chosen, the other way where it cannot move, and never so far it blends in', () => {
+  const darker = (a, b) => colourContrast(a, 'FFFFFFFF') > colourContrast(b, 'FFFFFFFF');
+  assert.ok(darker(chosenUnderPointer('FF2D6F9C', false, 'FFF4F4F4'), 'FF2D6F9C'), 'dark on light keys: darker');
+  assert.ok(darker('FF4A90D9', chosenUnderPointer('FF4A90D9', false, 'FF1E1E1E')), 'on dark keys: lighter');
+  assert.ok(darker('FF101010', chosenUnderPointer('FF101010', false, 'FFF4F4F4')), 'a near-black cannot get darker: lighter');
+  const pale = 'FFF2F2F2';
+  for (const pressed of [false, true]) {
+    const shade = chosenUnderPointer(pale, pressed, 'FF2A3A44');
+    assert.ok(darker(shade, pale), 'a near-white cannot get lighter: darker');
+    assert.ok(colourContrast(shade, 'FF2A3A44') >= 1 + 0.6 * (colourContrast(pale, 'FF2A3A44') - 1), `still stands out from the others${pressed ? ', pressed' : ''}`);
+  }
+  assert.notEqual(chosenUnderPointer('FF2D6F9C', true, 'FFF4F4F4'), chosenUnderPointer('FF2D6F9C', false, 'FFF4F4F4'));
+  assert.equal(chosenUnderPointer('{accent}'), '{accent}', 'not a colour: as it was');
 });
 
 test('the thumb is the first of the set\'s colours that stands out from the face', () => {
