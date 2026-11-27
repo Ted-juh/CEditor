@@ -425,3 +425,87 @@ Verified locally:
   three sections.
 - Every preset driven by hand in Preview, in Chromium; no drawing code changed, so WebKitGTK was not
   asked.
+
+### As built: phase 2, a key's own parts
+
+**The engine.** A device key drew its parts and played nothing on them: `ButtonDeviceParts.svelte`
+took only the parts and whether the key was down, and the canvas handed `ControlAnatomy` only the
+text effects of a knob's words. Now:
+
+- A **keyframe animation on a part** (`Parts.indicator`, `Parts.key`, …) moves and fades it about
+  its own centre, on a group of its own inside the part's travel, so a lamp that flares still rides
+  a key that goes down.
+- A **colour frame on a part** recolours every shape that part paints with (the shape channel,
+  `--ce-kf-shape`), and no other part: every part sets all its channels, `none` where it has
+  nothing, as the knob's parts do.
+- A **state change eases a part's colour and opacity** on the part's own timing (a lamp that fades
+  up as the toggle goes on). The fill is a style now, not an attribute, so a transition can reach
+  it. A part's travel (`travelX`, `travelY`, `swing`) is still an SVG transform attribute, which no
+  transition moves; a preset that wants a key to go over slowly cannot ask for it yet.
+- The **legend plays a text effect** on its words, whole (SVG text has no letters to move one at a
+  time), in a box of its own for a roll or a push.
+- A **button's caption plays the control's own text effects**, whole, and its text colour frames
+  (`--ce-kf-text`). On a key the caption is the only place the button's words are drawn, and no
+  effect on them played before.
+- **A preset on a part a set does not draw is refused, saying why**, judged as the panel's set
+  draws the button (`keyPartsNotDrawn`, given the drawn control by the library). A button keeps its
+  six parts hidden in the document whatever its set draws, so the stored control cannot say: a lamp
+  preset on Graphite's flat face, or on Tolex's key, which has no lamp, is refused; on Stompbox's it
+  goes on.
+
+**The presets**, 23 more (41 in all):
+
+| Group | Presets | On |
+|---|---|---|
+| Light | Lamp fade, Afterglow, Flare, Breathe while on, Beat blink, From the synth | the lamp |
+| Switch | Kick, Key lights, Housing flash, Guard glow, Caption turns | the key, its plate, its guard, the caption |
+| Words | Roll in, Push on press, O / I roll, Hover fade, Ink flash, Wipe | the caption, the legend |
+| Signals | Sent, Refused, Pending, Done, Working, Alert | the lamp, the key, the caption |
+
+"On/off" in the proposal is **Switch**: a slash cannot go in the panel's file name.
+
+| Panel | Set | Why that set |
+|---|---|---|
+| Light | Stompbox | an amber lamp on the key that lights on a momentary button and a toggle alike |
+| Switch | Bakelite | a rocker that tilts over, with a guard round it and a lamp that lights |
+| Words | Neon | a toggle whose legend reads O and I, on a dark panel |
+| Signals | Porcelain | a lamp on a light key, where green, amber and red read |
+
+**Together** gains **Chase**: a light runs along the bars printed on the keys, a clip on each key's
+`Parts.symbol`. A clip waiting for its turn shows its first frame, so its first frame names no
+colour and the light comes on just after.
+
+**Found while building it:**
+
+- From the synth's stand-in script did not load: it named a variable `on`, which the script API
+  already passes every script, and the console said "invalid redefinition of parameter name". The
+  browser check now opens the Light and Signals panels with their scripts trusted and fails on any
+  script error.
+- **Not fixed, for the owner:** in three sets (Ivory, Pop, Atelier) a toggle's caption is white once
+  it is on, on a light panel, and cannot be read (1.2 to 1.4:1). The type's Selected state letters
+  the text in the set's inverse colour, made for a filled face; on a key the caption stands on the
+  panel. The other 58 sets that draw a toggle as a key happen to have an inverse that reads there.
+  Which colour a toggle's caption takes when on is a design call across every set, so it is left
+  as it is; the Switch panel uses Bakelite.
+- **Not built:** a word thrown from a button (emitted words are a knob's and a slider's, from a
+  pointer a button does not have) and a hold's progress on a timed button. Both were in the
+  proposal; neither has an engine to play on yet.
+
+Verified locally:
+- `test/buttonDeviceAnimation.test.js` (new) renders keys through `ControlAnatomy`: every part's
+  channels `none` at rest and its shapes painting through them; a part's keyframes on its own group
+  and its colour on it alone; a part's colour and opacity eased on its timing, and not its travel;
+  the legend's words with an effect, in a box when it moves them; the caption with the control's
+  effect, and its colour frames otherwise; a knob's caption untouched. All five fail on the
+  renderer as it was.
+- `test/buttonAnimationPresets.test.js`: seven groups; each key-part preset goes on its panel's set
+  as drawn; refused on Graphite's flat face and on Tolex's lampless key, through the library too;
+  loops; the panels, Chase on `Parts.symbol`, the scripts, a toggle that starts on.
+- The browser check `buttonShowcase`: Lamp fade eases, Flare grows and whitens the lamp, From the
+  synth flashes under its script and the script loads, Key lights eases, the O / I legend rolls, Ink
+  flash colours the caption, Alert's script blinks the lamp red, Chase lights a few bars at a time.
+  `animationTab`: the library's Button section in seven groups, 41 presets.
+- Every second-half preset driven by hand in Preview, and its part read as it played.
+- WebKitGTK 2.52 against Chromium, on live loops on a key's parts (a lamp that grows, a key that
+  changes colour, a lamp that fades amber, a caption and a legend that roll): the same values
+  computed through the loop in both, and drawn the same.

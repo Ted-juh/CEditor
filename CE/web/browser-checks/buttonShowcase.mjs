@@ -8,8 +8,12 @@
  *     preset's state used to keep that as though someone had chosen it (authorsStateValue.js).
  *     Lift grows under the pointer; Focus nod nods when Tab reaches it.
  *   - Gestures: a flick spins Spin round; the wheel bumps Wheel bump the way it turns.
+ *   - The second half, on a key's own parts (editor/ButtonDeviceParts.svelte): Lamp fade eases the
+ *     lamp up rather than snapping it; Flare grows the lamp and whitens it; From the synth flashes
+ *     when its script switches it, the script loaded and running; Key lights eases the key off;
+ *     the O / I legend rolls; Ink flash colours the caption; Alert's script blinks the lamp red.
  *   - Together: Pop in keeps each key hidden until its turn; a click on the first Ripple key runs a
- *     press along the row, the scene a click on a key plays.
+ *     press along the row, the scene a click on a key plays; Chase lights one key's bar at a time.
  *
  *   node browser-checks/buttonShowcase.mjs
  */
@@ -44,6 +48,34 @@ const box = (id) => page.evaluate((sel) => {
   const r = el.getBoundingClientRect();
   return { x: r.x + r.width / 2, y: r.y + r.height / 2, width: r.width, height: r.height, top: r.top, opacity: Number(getComputedStyle(el).opacity) };
 }, inPreview(id));
+/** A part of a key as drawn: the fill it paints, and its moving group's scale. */
+const partOf = (id, name) => page.evaluate(({ sel, name }) => {
+  const part = document.querySelector(`${sel} [data-part="${name}"]`);
+  const shape = part?.querySelector('path, text');
+  const moves = part?.querySelector('[data-part-moves]');
+  const scale = moves ? getComputedStyle(moves).scale : 'none';
+  return { fill: shape ? getComputedStyle(shape).fill : '', scale: scale === 'none' ? 1 : Number(scale), animated: shape ? shape.getAnimations().length > 0 : false };
+}, { sel: inPreview(id), name });
+const captionOf = (id) => page.evaluate((sel) => {
+  const text = [...document.querySelectorAll(`${sel} svg text`)].at(-1);
+  return { colour: getComputedStyle(text).color, animated: text.getAnimations().length > 0 };
+}, inPreview(id));
+async function partSeries(id, name, ms, step = 40) {
+  const out = [];
+  for (let t = 0; t < ms; t += step) { out.push(await partOf(id, name)); await page.waitForTimeout(step); }
+  return out;
+}
+/** Its scripts trusted for the session, as the bar at the foot of the window offers. */
+async function trustScripts() {
+  const button = page.getByRole('button', { name: 'Enable scripts for this session' });
+  if (await button.count()) { await button.first().click(); await kit.settle(600); }
+}
+const scriptErrors = () => page.evaluate(async () => {
+  const { scriptTrace } = await window.__ceImport('/src/CE_Application/stores/scriptConsole.js');
+  let trace; scriptTrace.subscribe((v) => { trace = v; })();
+  return (trace ?? []).filter((t) => t.kind === 'error').map((t) => String(t.message ?? ''));
+});
+
 /** Samples of one measure of a key, every `step` ms for `ms`. */
 async function watch(id, measure, ms, step = 25) {
   const out = [];
@@ -122,6 +154,83 @@ try {
     assert.ok(Math.min(...up) < -3, `${up.map((d) => d.toFixed(1)).join(' ')}`);
   });
 
+  // --- Light ------------------------------------------------------------------------------------
+  ids = await open('Light');
+  await kit.preview(true);
+  await kit.settle(800);
+  await trustScripts();
+  await page.mouse.move(5, 5);
+  const fade = await box(ids.LampFade);
+  const unlit = (await partOf(ids.LampFade, 'indicator')).fill;
+  await page.mouse.click(fade.x, fade.y - fade.height * 0.15);
+  const fading = (await partSeries(ids.LampFade, 'indicator', 560)).map((p) => p.fill);
+  check('Light: Lamp fade eases the lamp up rather than snapping it', () => {
+    assert.ok(new Set(fading).size >= 4, `${unlit} then ${[...new Set(fading)].join(' / ')}`);
+    assert.notEqual(fading.at(-1), unlit, 'and it ends lit');
+  });
+  const flare = await box(ids.Flare);
+  await page.mouse.move(flare.x, flare.y - flare.height * 0.15);
+  await page.mouse.down();
+  const flaring = await partSeries(ids.Flare, 'indicator', 420, 25);
+  await page.mouse.up();
+  await page.mouse.move(5, 5);
+  check('Light: Flare grows the lamp and whitens it as it lights', () => {
+    assert.ok(Math.max(...flaring.map((p) => p.scale)) > 1.35, flaring.map((p) => p.scale).join(' '));
+    assert.ok(flaring.some((p) => p.animated));
+  });
+  const synth = await partSeries(ids.FromTheSynth, 'indicator', 3600, 50);
+  const lightErrors = await scriptErrors();
+  check('Light: From the synth flashes when its script switches it, the script loaded', () => {
+    assert.deepEqual(lightErrors, []);
+    assert.ok(Math.max(...synth.map((p) => p.scale)) > 1.5, 'a flash within one switch');
+  });
+
+  // --- Switch -----------------------------------------------------------------------------------
+  ids = await open('Switch');
+  await kit.preview(true);
+  await kit.settle(800);
+  await page.mouse.move(5, 5);
+  const lit = (await partOf(ids.KeyLights, 'key')).fill;
+  const keyLights = await box(ids.KeyLights);
+  await page.mouse.click(keyLights.x, keyLights.y - keyLights.height * 0.15);
+  const easing = (await partSeries(ids.KeyLights, 'key', 420)).map((p) => p.fill);
+  check('Switch: Key lights starts on, lit, and eases the key back as it goes off', () => {
+    assert.ok(new Set(easing).size >= 4, `${lit} then ${[...new Set(easing)].join(' / ')}`);
+    assert.notEqual(easing.at(-1), lit);
+  });
+
+  // --- Words ------------------------------------------------------------------------------------
+  ids = await open('Words');
+  await kit.preview(true);
+  await kit.settle(800);
+  await page.mouse.move(5, 5);
+  const oi = await box(ids.OIRoll);
+  await page.mouse.click(oi.x, oi.y - oi.height * 0.15);
+  await page.waitForTimeout(60);
+  const rolling = await partOf(ids.OIRoll, 'legend');
+  await page.mouse.move(5, 5);
+  const ink = await box(ids.InkFlash);
+  const inkRest = (await captionOf(ids.InkFlash)).colour;
+  await page.mouse.click(ink.x, ink.y - ink.height * 0.15);
+  await page.waitForTimeout(80);
+  const inked = await captionOf(ids.InkFlash);
+  check('Words: the O / I legend rolls as it switches, and Ink flash colours the caption', () => {
+    assert.ok(rolling.animated, 'the legend\'s words move');
+    assert.ok(inked.animated && inked.colour !== inkRest, `${inkRest} → ${inked.colour}`);
+  });
+
+  // --- Signals ----------------------------------------------------------------------------------
+  ids = await open('Signals');
+  await kit.preview(true);
+  await kit.settle(600);
+  await trustScripts();
+  const alerting = await partSeries(ids.Alert, 'indicator', 5200, 80);
+  const signalErrors = await scriptErrors();
+  check('Signals: Alert\'s script blinks the lamp red', () => {
+    assert.deepEqual(signalErrors, []);
+    assert.ok(alerting.some((p) => p.fill === 'rgb(229, 72, 77)'), [...new Set(alerting.map((p) => p.fill))].join(' / '));
+  });
+
   // --- Together ---------------------------------------------------------------------------------
   ids = await open('Together');
   await kit.preview(true);
@@ -141,6 +250,17 @@ try {
   check('Together: a click on the first Ripple key runs a press along the row', () => {
     assert.ok(Math.min(...fourth) < 0.93 * ripple[1].width, `${fourth.map((w) => w.toFixed(0)).join(' ')}`);
     assert.ok(Math.abs(fourth.at(-1) - ripple[1].width) < 0.5, 'and it settles');
+  });
+
+  const lights = [];
+  for (let t = 0; t < 1500; t += 50) {
+    lights.push(await page.evaluate((sels) => sels.filter((sel) => getComputedStyle(document.querySelector(`${sel} [data-part="symbol"] path`)).fill === 'rgb(255, 179, 71)').length,
+      [1, 2, 3, 4, 5, 6].map((k) => inPreview(ids[`Chase${k}`]))));
+    await page.waitForTimeout(50);
+  }
+  check('Together: Chase lights the keys\' bars in turn, never all at once', () => {
+    assert.ok(Math.max(...lights) >= 1, lights.join(' '));
+    assert.ok(Math.max(...lights) <= 3, `at most a few at a time: ${lights.join(' ')}`);
   });
 
   if (kit.failures.length) throw new Error(`page errors: ${kit.failures.join('; ')}`);

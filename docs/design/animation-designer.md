@@ -2054,8 +2054,13 @@ The third component, in [component-presets.md](component-presets.md): 18 presets
 whole button, in three groups, and four panels. For this record: a preset's state used to keep every
 value the control already set, the type's own included, so Sink and the Animation tab's Press squish
 pressed every button to the 0.985 its type gives it; a value still at what the type made is now
-nobody's choice and gives way (`authorsStateValue.js`). Phase 2, animating a device key's parts
-(its lamp, its legend, the key), is next.
+nobody's choice and gives way (`authorsStateValue.js`).
+
+Phase 2, the same day: a device key's own parts play keyframes, colour frames and eased state
+changes, its legend plays text effects and its caption the control's own (ButtonDeviceParts and
+ControlAnatomy, given what CanvasControl plays); a preset on a part the button's set does not draw
+is refused, judged as drawn. 23 presets on the lamp, the key, the legend and the caption, four
+panels, and Chase in Together.
 
 ## Open
 

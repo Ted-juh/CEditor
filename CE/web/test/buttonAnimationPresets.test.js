@@ -3,10 +3,12 @@
 //
 // The promises: every preset is an ordinary preset that survives its own file and goes on a
 // momentary or a toggle button in every set the showcase dresses one in; what a preset's state sets
-// takes the place of what the button's type made the state with, never of what someone chose; nothing
-// loops that does not say so; the library lists them under Button after the Knob and the Slider; and
-// the showcase panels are those presets on buttons, one panel a group, each in a set of its own and
-// none shared with the Knob's or the Slider's, every caption readable on its panel as drawn.
+// takes the place of what the button's type made the state with, never of what someone chose; a
+// preset on a key's own parts (its lamp, its legend, the key) is refused where the button's set does
+// not draw that part, and goes on in each of its own panel's sets; nothing loops that does not say
+// so; the library lists them under Button after the Knob and the Slider; and the showcase panels are
+// those presets on buttons, one panel a group, each in a set of its own and none shared with the
+// Knob's or the Slider's, every caption readable on its panel as drawn.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +16,7 @@ import assert from 'node:assert/strict';
 import { BUTTON_PRESETS, BUTTON_PRESET_GROUPS, buttonPresetId } from '../src/CE_Application/utils/buttonPresets.js';
 import { KNOB_PRESETS } from '../src/CE_Application/utils/knobPresets.js';
 import { SLIDER_PRESETS } from '../src/CE_Application/utils/sliderPresets.js';
-import { applyPresetPatch, presetDoesNotFit, presetFileText, readPresetFile, presetLink } from '../src/CE_Application/utils/animationPresetModel.js';
+import { applyPresetPatch, keyPartsNotDrawn, presetDoesNotFit, presetFileText, readPresetFile, presetLink, presetNeeds } from '../src/CE_Application/utils/animationPresetModel.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { getControlSet, resolveColourLiteral } from '../src/CE_Application/models/controlSets.js';
 import { resolveControlForSet } from '../src/CE_Application/models/controlSetFamilies.js';
@@ -23,6 +25,12 @@ import { finishedColour } from '../src/CE_Application/utils/materialFilter.js';
 import { setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 import { COMPONENT_PRESETS } from '../src/CE_Application/stores/animationPresetLibrary.js';
 import { BUTTON_PANELS, KNOB_PANELS, SLIDER_PANELS } from '../scripts/componentPanels.js';
+import { initHistory, flushHistory } from '../src/CE_Application/stores/history.js';
+import { panels, activePanelId, activeEditorTab, selectedComponentIds, addPanel, createPanel } from '../src/CE_Application/stores/panels.js';
+import { addControl } from '../src/CE_Application/stores/controls.js';
+import { componentWorkspaceMode } from '../src/CE_Application/stores/componentWorkspace.js';
+import { applyAnimationPreset, resetAnimationPresetLibraryForTesting } from '../src/CE_Application/stores/animationPresetLibrary.js';
+import { setActivePanelControlSet } from '../src/CE_Application/stores/controlSets.js';
 
 const byId = (slug) => BUTTON_PRESETS.find((entry) => entry.slug === slug);
 const applied = (control, preset) => {
@@ -33,8 +41,8 @@ const applied = (control, preset) => {
 };
 const scaleWhen = (control, session) => resolveInteractiveControl(control, session).control._children.Transform.scale;
 
-test('the catalogue: three groups in order, each preset an ordinary preset under Button, ids of its own', () => {
-  assert.deepEqual(BUTTON_PRESET_GROUPS.map((group) => group.id), ['press', 'attention', 'gestures']);
+test('the catalogue: seven groups in order, each preset an ordinary preset under Button, ids of its own', () => {
+  assert.deepEqual(BUTTON_PRESET_GROUPS.map((group) => group.id), ['press', 'attention', 'gestures', 'light', 'switch', 'words', 'signals']);
   for (const group of BUTTON_PRESET_GROUPS) assert.ok(BUTTON_PRESETS.some((entry) => entry.group === group.id), `${group.id} has presets`);
   const ids = BUTTON_PRESETS.map((entry) => entry.id);
   assert.equal(new Set(ids).size, ids.length, 'no id twice');
@@ -45,7 +53,7 @@ test('the catalogue: three groups in order, each preset an ordinary preset under
     assert.match(entry.id, /^ce:button:[a-z-]+$/);
     assert.equal(entry.preset.category, 'Button');
     assert.equal(entry.preset.tags[0], entry.groupLabel);
-    assert.equal(entry.type, 'MomentaryButton', `${entry.slug}: the kind of button the showcase puts it on`);
+    assert.ok(['MomentaryButton', 'ToggleButton'].includes(entry.type), `${entry.slug}: the kind of button the showcase puts it on`);
     assert.ok(entry.how && entry.what, `${entry.slug} says what plays it and what it does`);
     assert.deepEqual(readPresetFile(presetFileText(entry.preset)).preset, entry.preset, `${entry.slug} survives its file`);
   }
@@ -89,8 +97,56 @@ test('what a preset\'s state sets takes the place of the type\'s own value, neve
   }
 });
 
+// The second half plays on a key's own parts, which a set draws or does not.
+const KEY_GROUPS = new Set(['light', 'switch', 'words', 'signals']);
+const drawnIn = (type, setId) => resolveControlForSet(createControl(type), getControlSet(setId));
+
+test('the second half plays on a key\'s own parts, and goes on in its own panel\'s set, drawn', () => {
+  const setOf = Object.fromEntries(BUTTON_PANELS.map(([id, make]) => [id.slice('button-'.length), make().controlSet.id]));
+  const onParts = BUTTON_PRESETS.filter((entry) => KEY_GROUPS.has(entry.group));
+  assert.equal(onParts.length, 23);
+  for (const entry of onParts) {
+    assert.equal(keyPartsNotDrawn(entry.preset, drawnIn(entry.type, setOf[entry.group])), '', `${entry.slug} on a ${setOf[entry.group]} ${entry.type}`);
+  }
+  // A key part each group is about: the lamp, the key and its plate, the legend, the lamp.
+  const parts = (group) => new Set(BUTTON_PRESETS.filter((entry) => entry.group === group).flatMap((entry) => presetNeeds(entry.preset).parts));
+  assert.deepEqual([...parts('light')], ['indicator']);
+  assert.deepEqual([...parts('switch')].sort(), ['guard', 'housing', 'key']);
+  assert.deepEqual([...parts('words')], ['legend'], 'and the caption, which is the control\'s own text');
+  assert.deepEqual([...parts('signals')].sort(), ['indicator', 'key']);
+});
+
+test('a preset on a key\'s part is refused, saying why, where the set draws no such part; judged as drawn', () => {
+  const lamp = byId('flare').preset;
+  assert.match(keyPartsNotDrawn(lamp, drawnIn('MomentaryButton', 'graphite')), /set draws it whole, with no parts to play on/);
+  assert.match(keyPartsNotDrawn(lamp, drawnIn('MomentaryButton', 'tolex')), /^It plays on the key's indicator, which this button's set does not draw\.$/, 'Tolex\'s key has no lamp');
+  assert.equal(keyPartsNotDrawn(lamp, drawnIn('MomentaryButton', 'stompbox')), '');
+  assert.equal(keyPartsNotDrawn(byId('sink').preset, drawnIn('MomentaryButton', 'graphite')), '', 'what moves the whole button goes on any');
+  assert.equal(keyPartsNotDrawn(lamp, createControl('Knob')), '', 'not a button: not this rule\'s');
+  // Applying: refused with the reason when the drawn control is given, as the library gives it.
+  const { patch, reason } = applyPresetPatch(createControl('MomentaryButton'), lamp, { drawn: drawnIn('MomentaryButton', 'graphite') });
+  assert.equal(patch, null);
+  assert.match(reason, /draws it whole/);
+  assert.ok(applyPresetPatch(createControl('MomentaryButton'), lamp, { drawn: drawnIn('MomentaryButton', 'stompbox') }).patch);
+});
+
+test('in the library, a lamp preset is judged as the panel\'s set draws the button', () => {
+  componentWorkspaceMode.set('panel'); panels.set([]); activePanelId.set(null);
+  activeEditorTab.set({ type: 'panel', id: null }); selectedComponentIds.set(new Set());
+  resetAnimationPresetLibraryForTesting();
+  initHistory(); addPanel(createPanel('Keys')); flushHistory();
+  const key = addControl('MomentaryButton')._children.Core.id;
+  setActivePanelControlSet('graphite');
+  const flat = applyAnimationPreset([key], byId('flare').id);
+  assert.equal(flat.applied.length, 0);
+  assert.match(flat.refused[0].reason, /draws it whole/, 'Graphite draws a flat face');
+  assert.equal(applyAnimationPreset([key], byId('sink').id).applied.length, 1, 'the whole button moves on any');
+  setActivePanelControlSet('stompbox');
+  assert.equal(applyAnimationPreset([key], byId('flare').id).applied.length, 1, 'Stompbox draws a key with a lamp');
+});
+
 test('nothing loops that does not say so', () => {
-  const loops = new Set(['pulse', 'breathe', 'alarm']);
+  const loops = new Set(['pulse', 'breathe', 'alarm', 'breathe-while-on', 'pending', 'working']);
   for (const entry of BUTTON_PRESETS) {
     for (const node of Object.values(entry.preset.animations)) {
       assert.equal(node.iterations === 'infinite', loops.has(entry.slug), `${entry.slug}: ${node.iterations === 'infinite' ? 'loops' : 'plays once'}`);
@@ -115,7 +171,8 @@ test('the showcase: one panel a group and Together, every button wearing its pre
     assert.ok(!sets.has(set) && !taken.has(set), `${id}: a set of its own (${set})`);
     sets.add(set);
     if (id === 'button-together') {
-      assert.deepEqual(panel.animationScenes.map((scene) => scene.name), ['Pop in', 'Wave', 'Ripple']);
+      assert.deepEqual(panel.animationScenes.map((scene) => scene.name), ['Pop in', 'Wave', 'Ripple', 'Chase']);
+      assert.ok(panel.animationScenes[3].clips.every((clip) => clip.target === 'Parts.symbol'), 'Chase lights a part of each key');
       const first = panel.controls.find((control) => control._children.Core.name === 'Ripple1');
       assert.deepEqual(panel.animationScenes[2].trigger, { type: 'event', controlId: first._children.Core.id, event: 'click' }, 'Ripple plays on a click on the first key');
       continue;
@@ -125,8 +182,14 @@ test('the showcase: one panel a group and Together, every button wearing its pre
     const followed = new Set(panel.controls.flatMap((control) => Object.values(control._children.Animations?._children ?? {}).map((node) => presetLink(node)?.id).filter(Boolean)));
     for (const entry of entries) assert.ok(followed.has(entry.id), `${id}: a button wears ${entry.slug}`);
   }
-  const attention = BUTTON_PANELS.find(([id]) => id === 'button-attention')[1]();
-  assert.match(attention.scripts.find((script) => script.name === 'Look here').source, /ce\.anim\.play\('LookHere', 'lookHere'\)/, 'a script plays Look here');
+  const scriptOf = (panelId, name) => BUTTON_PANELS.find(([id]) => id === panelId)[1]().scripts.find((script) => script.name === name).source;
+  assert.match(scriptOf('button-attention', 'Look here'), /ce\.anim\.play\('LookHere', 'lookHere'\)/, 'a script plays Look here');
+  assert.match(scriptOf('button-signals', 'Alert'), /ce\.anim\.play\('Alert', 'alert'\)/, 'and Alert');
+  assert.match(scriptOf('button-light', 'The synth'), /set\('FromTheSynth\.normalizedValue', /, 'a script switches From the synth from outside');
+  const light = BUTTON_PANELS.find(([id]) => id === 'button-light')[1]();
+  const named = (name) => light.controls.find((control) => control._children.Core.name === name);
+  assert.equal(named('BreatheWhileOn')._children.Behavior.defaultValue, true, 'a toggle that breathes while on starts on');
+  assert.equal(named('BreatheWhileOn')._children.Core.controlType, 'ToggleButton');
 });
 
 // The panels stand on their sets' own panels, Machined's and Rackmount's lightened: a mid grey under

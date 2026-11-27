@@ -22,9 +22,13 @@ function applyPatch(control, patch) {
   for (const [path, value] of Object.entries(patch)) setNestedValue(control, path, value);
 }
 
-/** Put a built-in preset on a control as Apply does; the panel carries what it puts on. */
-function wear(control, entry, carried) {
-  const { patch, reason } = applyPresetPatch(control, entry.preset);
+/**
+ * Put a built-in preset on a control as Apply does; the panel carries what it puts on. With `setId`,
+ * judged as that set draws the control too, as the library judges it (a key's lamp it does not draw).
+ */
+function wear(control, entry, carried, setId = '') {
+  const drawn = setId ? resolveControlForSet(control, getControlSet(setId)) : null;
+  const { patch, reason } = applyPresetPatch(control, entry.preset, { drawn });
   if (!patch) throw new Error(`${entry.id} does not fit ${control._children.Core.name}: ${reason}`);
   applyPatch(control, patch);
   carried.set(entry.preset.id, entry.preset);
@@ -325,13 +329,26 @@ const BUTTON_LOOKS = {
   press: { set: 'tolex', bg: 'FF1C1A17', ink: 'FFF1E6CC', how: 'FFF08A5D', what: 'FFCDBF9E' },
   attention: { set: 'pop', bg: 'FFF6D96B', ink: 'FF1B1B1B', how: 'FF9C1F12', what: 'FF5A4A1E' },
   gestures: { set: 'machined', bg: 'FFC4C8CE', ink: 'FF1B1D20', how: 'FF0A2540', what: 'FF2A2D31' },
+  // The second half, on a key's own parts: sets whose keys draw the part each group plays on. A lamp
+  // that lights on both kinds of button (Stompbox's amber bar), a rocker that tilts over with a lamp
+  // and a guard (Bakelite), a toggle with an O and I legend (Neon), a lamp on a light key (Porcelain).
+  light: { set: 'stompbox', bg: 'FF242A2B', ink: 'FFF7F4EC', how: 'FFF2B84B', what: 'FFBDB8AC' },
+  switch: { set: 'bakelite', bg: 'FF24262A', ink: 'FFF7F4EC', how: 'FFF08A3C', what: 'FFBDB8AC' },
+  words: { set: 'neon', bg: 'FF0E1116', ink: 'FFEAF2FF', how: 'FF6EF2E8', what: 'FF8FA3B8' },
+  signals: { set: 'porcelain', bg: 'FFD8D9D4', ink: 'FF202529', how: 'FF0E5A73', what: 'FF3A4045' },
 };
 // What each key says: a word a panel's key would carry, so the row reads as keys rather than labels.
 const LEGENDS = {
   sink: 'Play', lift: 'Stop', 'bounce-back': 'Rec', jelly: 'Tap', tilt: 'Shift', 'focus-nod': 'Enter',
   pulse: 'Start', breathe: 'Sleep', wiggle: 'Help', 'beat-pulse': 'Tempo', 'look-here': 'Look', alarm: 'Alarm', 'pop-in': 'New',
   'double-flash': 'Mute', pop: 'Hold', nudge: 'Next', spin: 'Turn', 'wheel-bump': 'Scroll',
+  'lamp-fade': 'Power', afterglow: 'Tap', flare: 'Fire', 'breathe-while-on': 'Standby', 'beat-blink': 'Tempo', 'from-the-synth': 'Sync',
+  kick: 'Bypass', 'key-lights': 'Hold', 'housing-flash': 'Mute', 'guard-glow': 'Arm', 'caption-turns': 'Loop',
+  'roll-in': 'Start', 'push-on-press': 'Next', 'o-i-roll': 'Power', 'hover-fade': 'Info', 'ink-flash': 'Copy', wipe: 'Clear',
+  sent: 'Send', refused: 'Delete', pending: 'Hold', done: 'Save', working: 'Sync', alert: 'Alarm',
 };
+// Toggles that start on: one that breathes while on, and one whose key is lit while on.
+const STARTS_ON = new Set(['breathe-while-on', 'key-lights']);
 const BUTTON_TILE_W = 260;
 const BUTTON_TILE_H = 216;
 const KEY_W = 200;
@@ -357,12 +374,37 @@ function buttonGroupPanel(group) {
     const button = f.add(entry.type ?? 'MomentaryButton', name, x + (BUTTON_TILE_W - KEY_W) / 2, y, KEY_W, KEY_H);
     button._children.Text.content = LEGENDS[entry.slug] ?? entry.name;
     button._children.Core.description = `${entry.name}: ${entry.what}.`;
-    wear(button, entry, carried);
+    if (STARTS_ON.has(entry.slug)) button._children.Behavior.defaultValue = true;
+    wear(button, entry, carried, look.set);
     const captionTop = y + KEY_H + 10;
     f.label(`${name}Caption`, entry.name, x + 10, captionTop, BUTTON_TILE_W - 20, 22, { size: 16, colour: look.ink });
     f.label(`${name}How`, entry.how.toUpperCase(), x + 10, captionTop + 22, BUTTON_TILE_W - 20, 16, { size: 10, colour: look.how, spacing: 1.5, weight: 600 });
     f.label(`${name}What`, entry.what, x + 14, captionTop + 40, BUTTON_TILE_W - 28, 36, { size: 12, colour: look.what, weight: 400, lineHeight: 1.25 });
   });
+  if (entries.some((entry) => entry.slug === 'from-the-synth')) {
+    // Nothing is plugged in, so a script plays the synth: it switches the toggle every three
+    // seconds, which the toggle hears as a change from outside. Clicking it yourself flashes nothing.
+    f.script('The synth', `// Stands in for a synth switching this toggle: a change from outside, which the From the
+// synth preset answers and a click does not.
+let switchedOn = false;
+function send() {
+  switchedOn = !switchedOn;
+  set('FromTheSynth.normalizedValue', switchedOn ? 1 : 0);
+  after(3000, send);
+}
+after(1200, send);
+`);
+  }
+  if (entries.some((entry) => entry.slug === 'alert')) {
+    f.script('Alert', `// Plays the Alert button's own animation every five seconds, as a panel calls for attention:
+// ce.anim.play(control, animation).
+function alert() {
+  ce.anim.play('Alert', 'alert');
+  after(5000, alert);
+}
+after(2000, alert);
+`);
+  }
   if (entries.some((entry) => entry.slug === 'look-here')) {
     f.script('Look here', `// Plays the Look here button's own animation every four seconds, as a panel would to draw the
 // eye to one control: ce.anim.play(control, animation).
@@ -381,12 +423,12 @@ after(1500, lookHere);
 /**
  * Together, on a row of keys: Pop in grows each in from nothing as the panel opens, one after
  * another; Wave lifts them in turn, over and over; Ripple sends a press along the row from the first,
- * each time it is clicked.
+ * each time it is clicked; Chase runs a light along the bars printed on the keys, a part of each.
  */
 function buttonTogether() {
   const look = { set: 'rackmount', bg: 'FFBFC2C6', ink: 'FF1B1B1D', how: 'FF0A2540', what: 'FF2A2D31' };
   const width = 1040;
-  const height = 560;
+  const height = 706;
   const f = panelMaker('button-together', 'Button Together', { set: look.set, bg: look.bg, kind: COMPONENT_KIND, width, height, fields: { gridEnabled: false } });
   f.label('Title', 'Button · Together', 30, 22, 520, 34, { size: 24, colour: look.ink, align: 'left' });
   f.label('Note', 'scenes over a row of keys: one effect on many, each a little after the last.', 30, 58, width - 60, 22, { size: 13, colour: look.what, weight: 400, align: 'left' });
@@ -394,6 +436,7 @@ function buttonTogether() {
     ['PopIn', 'Pop in', 'PANEL OPENS', 'each key grows in from nothing, 120 ms after the last'],
     ['Wave', 'Wave', 'ALWAYS', 'the keys rise in turn along the row'],
     ['Ripple', 'Ripple', 'CLICK THE FIRST', 'a press runs along the row from it'],
+    ['Chase', 'Chase', 'ALWAYS', 'a light runs along the keys\' legend bars'],
   ];
   const words = ['Kick', 'Snare', 'Hat', 'Clap', 'Tom', 'Rim'];
   const COUNT = words.length;
@@ -417,11 +460,16 @@ function buttonTogether() {
     f.clip(`PopIn${k + 1}`, 'Transform', 0, frames([{ at: 0, scale: 0.2, opacity: 0 }, { at, scale: 0.2, opacity: 0 }, { at: grown, scale: 1.1, opacity: 1 }, { at: 1, scale: 1, opacity: 1 }], { easing: 'linear' }), popLength, 0);
     f.clip(`Wave${k + 1}`, 'Transform', 400 + k * 140, frames([{ at: 0, y: 0 }, { at: 0.4, y: -10 }, { at: 1, y: 0 }], { easing: 'inOutSine' }), 560, 1);
     f.clip(`Ripple${k + 1}`, 'Transform', k * 90, frames([{ at: 0, scale: 1 }, { at: 0.35, scale: 0.9 }, { at: 0.7, scale: 1.05 }, { at: 1, scale: 1 }], { easing: 'outQuad' }), 360, 2);
+    // On a key's own part: the bar printed on it (its symbol), lit amber in turn. A clip waiting for
+    // its turn shows its first frame, so the first frame leaves the bar its own colour (it names no
+    // fill), and the light comes on just after.
+    f.clip(`Chase${k + 1}`, 'Parts.symbol', k * 200, frames([{ at: 0, scale: 1 }, { at: 0.08, fill: 'FFFFB347' }, { at: 0.5, fill: 'FFFFB347' }, { at: 1, scale: 1 }], { easing: 'linear' }), 500, 3);
   }
   return f.scenes([
     { name: 'Pop in', length: popLength, loop: false },
     { name: 'Wave', length: 3000, loop: true },
     { name: 'Ripple', length: (COUNT - 1) * 90 + 360, trigger: { type: 'event', controlId: f.ids.Ripple1, event: 'click' }, loop: false },
+    { name: 'Chase', length: COUNT * 200 + 300, loop: true },
   ]);
 }
 

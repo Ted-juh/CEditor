@@ -48,6 +48,7 @@ import { readTrigger } from './interactionRuntime.js';
 import { labelShows } from './labelShows.js';
 import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
 import { setByAuthor } from './authorsStateValue.js';
+import { BUTTON_DEVICE_PARTS, BUTTON_DEVICE_TYPES, buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
 
 /** The fields of an animation that are its identity in a control, not a setting. */
 const IDENTITY = new Set(['_type', 'name', LINK_KEY]);
@@ -235,6 +236,24 @@ export function presetDoesNotFit(preset, control) {
 }
 
 /**
+ * Why a preset that plays on a key's own parts (its lamp, its legend, the key: models/buttonDeviceParts.js)
+ * would play on nothing on this button as its set draws it, or ''. `drawn` is the button with its
+ * set's design on it (controlSetFamilies.resolveControlForSet): a button keeps its six parts hidden
+ * in the document whatever its set draws, so the stored control cannot say. A set that draws a
+ * button whole (a flat face, an illustration) draws none of them; one that draws a key may draw it
+ * without a lamp. The Components showcase's Button, second half.
+ */
+export function keyPartsNotDrawn(preset, drawn) {
+  if (!BUTTON_DEVICE_TYPES.has(String(drawn?._children?.Core?.controlType ?? ''))) return '';
+  const wanted = presetNeeds(preset).parts.filter((part) => BUTTON_DEVICE_PARTS.includes(part));
+  if (!wanted.length) return '';
+  const names = (list) => list.join(' and ');
+  if (!buttonDeviceDrawn(drawn)) return `It plays on the key's ${names(wanted)}, and this button's set draws it whole, with no parts to play on.`;
+  const hidden = wanted.filter((part) => drawn._children.Parts?._children?.[part]?.visible !== true);
+  return hidden.length ? `It plays on the key's ${names(hidden)}, which this button's set does not draw.` : '';
+}
+
+/**
  * Why a text effect in the preset would play on words this knob does not show (its scale's numbers
  * turned off, say), or ''. Judged as the knob will be once the preset's own fields are set, so a
  * preset that turns the readout on is not refused for its being off.
@@ -292,10 +311,11 @@ export function presetFitsTypes(preset, types, create) {
  * control has — it keeps everything, and gains only the values it does not set already, as the
  * built-in presets merge (a value still at what its type made it with is not set by anyone:
  * authorsStateValue.js) — or made; and the recipe's fields. `{ patch, names }`, or
- * `{ patch: null, reason }`.
+ * `{ patch: null, reason }`. With `drawn`, the control as its set draws it, a preset on a key's own
+ * parts is refused where the set draws none of them (keyPartsNotDrawn).
  */
-export function applyPresetPatch(control, preset, { link = true } = {}) {
-  const reason = presetDoesNotFit(preset, control);
+export function applyPresetPatch(control, preset, { link = true, drawn = null } = {}) {
+  const reason = presetDoesNotFit(preset, control) || (drawn ? keyPartsNotDrawn(preset, drawn) : '');
   if (reason) return { patch: null, reason };
   const taken = Object.keys(control._children.Animations?._children ?? {});
   const nodes = {};

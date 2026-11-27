@@ -1,0 +1,848 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "b2b2a389-c0b5-4e1a-9f3d-b2b2a389b2b2",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Signals",
+  "scriptId": "component_button-signals",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 840,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFD8D9D4",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [
+    {
+      "id": "component_button-signals_1",
+      "name": "Alert",
+      "language": "javascript",
+      "source": "// Plays the Alert button's own animation every five seconds, as a panel calls for attention:\n// ce.anim.play(control, animation).\nfunction alert() {\n  ce.anim.play('Alert', 'alert');\n  after(5000, alert);\n}\nafter(2000, alert);\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "porcelain"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1728051721000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Signals","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1728051721001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":780,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp saying what happened. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF3A4045"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sent","id":"ctrl_1728051721002","description":"Sent: the lamp shows green a moment, and the caption rolls.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Send"},
+        "Animations": {"_children":{"sentLamp":{"_type":"Animation","name":"sentLamp","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"click"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"fill":"FF2BB673","scale":1.2},{"at":0.2,"fill":"FF2BB673","scale":1},{"at":0.8,"fill":"FF2BB673"},{"at":1}],"duration":1200,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:sent","revision":1,"from":"sentLamp"}},"sentWords":{"_type":"Animation","name":"sentWords","enabled":true,"kind":"text","effect":"roll","way":"in","delay":0,"easing":"outQuad","iterations":1,"duration":320,"direction":"up","trigger":{"type":"event","event":"click"},"targets":[{"path":"Text"}],"preset":{"id":"ce:button:sent","revision":1,"from":"sentWords"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SentCaption","id":"ctrl_1728051721003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Sent","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SentHow","id":"ctrl_1728051721004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FF0E5A73"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SentWhat","id":"ctrl_1728051721005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp shows green a moment, and the caption rolls","_children":{"Fill":{"colour":"FF3A4045"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Refused","id":"ctrl_1728051721006","description":"Refused: the key shakes its head and the lamp shows red.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Delete"},
+        "Animations": {"_children":{"refusedShake":{"_type":"Animation","name":"refusedShake","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"click"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"x":0},{"at":0.2,"x":-6},{"at":0.4,"x":5},{"at":0.6,"x":-3},{"at":0.8,"x":2},{"at":1,"x":0}],"duration":380,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:refused","revision":1,"from":"refusedShake"}},"refusedLamp":{"_type":"Animation","name":"refusedLamp","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"click"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"fill":"FFE5484D"},{"at":0.8,"fill":"FFE5484D"},{"at":1}],"duration":1000,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:refused","revision":1,"from":"refusedLamp"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RefusedCaption","id":"ctrl_1728051721007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Refused","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RefusedHow","id":"ctrl_1728051721008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FF0E5A73"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RefusedWhat","id":"ctrl_1728051721009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the key shakes its head and the lamp shows red","_children":{"Fill":{"colour":"FF3A4045"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pending","id":"ctrl_1728051721010","description":"Pending: the lamp blinks amber for as long as you hold it.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Hold"},
+        "Animations": {"_children":{"pending":{"_type":"Animation","name":"pending","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","to":["pressed"]},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"fill":"FFF5A524","opacity":1},{"at":0.5,"fill":"FFF5A524","opacity":0.2},{"at":1,"fill":"FFF5A524","opacity":1}],"duration":600,"delay":0,"easing":"linear","iterations":"infinite","direction":"normal","preset":{"id":"ce:button:pending","revision":1,"from":"pending"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PendingCaption","id":"ctrl_1728051721011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pending","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PendingHow","id":"ctrl_1728051721012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE HELD","_children":{"Fill":{"colour":"FF0E5A73"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PendingWhat","id":"ctrl_1728051721013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp blinks amber for as long as you hold it","_children":{"Fill":{"colour":"FF3A4045"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Done","id":"ctrl_1728051721014","description":"Done: held long enough, the lamp turns green and the key nods.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Save"},
+        "Animations": {"_children":{"doneLamp":{"_type":"Animation","name":"doneLamp","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"longPress"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"fill":"FF2BB673","scale":1.4},{"at":0.15,"fill":"FF2BB673","scale":1},{"at":0.85,"fill":"FF2BB673"},{"at":1}],"duration":1500,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:done","revision":1,"from":"doneLamp"}},"doneNod":{"_type":"Animation","name":"doneNod","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"longPress"},"targets":[{"path":"Parts.key"}],"frames":[{"at":0,"scale":1},{"at":0.4,"scale":1.08},{"at":1,"scale":1}],"duration":320,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:done","revision":1,"from":"doneNod"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoneCaption","id":"ctrl_1728051721015","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Done","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoneHow","id":"ctrl_1728051721016","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LONG PRESS","_children":{"Fill":{"colour":"FF0E5A73"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoneWhat","id":"ctrl_1728051721017","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"held long enough, the lamp turns green and the key nods","_children":{"Fill":{"colour":"FF3A4045"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Working","id":"ctrl_1728051721018","description":"Working: the lamp pulses amber, a job under way.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Sync"},
+        "Animations": {"_children":{"working":{"_type":"Animation","name":"working","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"fill":"FFF5A524","opacity":1},{"at":0.5,"fill":"FFF5A524","opacity":0.35},{"at":1,"fill":"FFF5A524","opacity":1}],"duration":900,"delay":0,"easing":"inOutSine","iterations":"infinite","direction":"normal","preset":{"id":"ce:button:working","revision":1,"from":"working"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WorkingCaption","id":"ctrl_1728051721019","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Working","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WorkingHow","id":"ctrl_1728051721020","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF0E5A73"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WorkingWhat","id":"ctrl_1728051721021","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp pulses amber, a job under way","_children":{"Fill":{"colour":"FF3A4045"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Alert","id":"ctrl_1728051721022","description":"Alert: the lamp blinks red three times, as a panel calls for you.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":312,"width":200,"height":100},
+        "Text": {"content":"Alarm"},
+        "Animations": {"_children":{"alert":{"_type":"Animation","name":"alert","enabled":true,"kind":"keyframes","trigger":{"type":"script","from":["*"],"to":[]},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"fill":"FFE5484D","opacity":1},{"at":0.17,"fill":"FFE5484D","opacity":0.15},{"at":0.33,"fill":"FFE5484D","opacity":1},{"at":0.5,"fill":"FFE5484D","opacity":0.15},{"at":0.67,"fill":"FFE5484D","opacity":1},{"at":0.83,"fill":"FFE5484D","opacity":0.15},{"at":1,"fill":"FFE5484D","opacity":1}],"duration":1200,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:alert","revision":1,"from":"alert"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AlertCaption","id":"ctrl_1728051721023","controlType":"Label"},
+        "Transform": {"x":560,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Alert","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AlertHow","id":"ctrl_1728051721024","controlType":"Label"},
+        "Transform": {"x":560,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A SCRIPT PLAYS IT","_children":{"Fill":{"colour":"FF0E5A73"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AlertWhat","id":"ctrl_1728051721025","controlType":"Label"},
+        "Transform": {"x":564,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp blinks red three times, as a panel calls for you","_children":{"Fill":{"colour":"FF3A4045"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:sent",
+      "name": "Sent",
+      "category": "Button",
+      "tags": [
+        "Signals",
+        "click"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "sentLamp": {
+          "_type": "Animation",
+          "name": "sentLamp",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FF2BB673",
+              "scale": 1.2
+            },
+            {
+              "at": 0.2,
+              "fill": "FF2BB673",
+              "scale": 1
+            },
+            {
+              "at": 0.8,
+              "fill": "FF2BB673"
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1200,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        },
+        "sentWords": {
+          "_type": "Animation",
+          "name": "sentWords",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "duration": 320,
+          "direction": "up",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:refused",
+      "name": "Refused",
+      "category": "Button",
+      "tags": [
+        "Signals",
+        "click"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "refusedShake": {
+          "_type": "Animation",
+          "name": "refusedShake",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "x": 0
+            },
+            {
+              "at": 0.2,
+              "x": -6
+            },
+            {
+              "at": 0.4,
+              "x": 5
+            },
+            {
+              "at": 0.6,
+              "x": -3
+            },
+            {
+              "at": 0.8,
+              "x": 2
+            },
+            {
+              "at": 1,
+              "x": 0
+            }
+          ],
+          "duration": 380,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        },
+        "refusedLamp": {
+          "_type": "Animation",
+          "name": "refusedLamp",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FFE5484D"
+            },
+            {
+              "at": 0.8,
+              "fill": "FFE5484D"
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1000,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:pending",
+      "name": "Pending",
+      "category": "Button",
+      "tags": [
+        "Signals",
+        "while held"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pending": {
+          "_type": "Animation",
+          "name": "pending",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "pressed"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FFF5A524",
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "fill": "FFF5A524",
+              "opacity": 0.2
+            },
+            {
+              "at": 1,
+              "fill": "FFF5A524",
+              "opacity": 1
+            }
+          ],
+          "duration": 600,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:done",
+      "name": "Done",
+      "category": "Button",
+      "tags": [
+        "Signals",
+        "long press"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "doneLamp": {
+          "_type": "Animation",
+          "name": "doneLamp",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "longPress"
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FF2BB673",
+              "scale": 1.4
+            },
+            {
+              "at": 0.15,
+              "fill": "FF2BB673",
+              "scale": 1
+            },
+            {
+              "at": 0.85,
+              "fill": "FF2BB673"
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1500,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        },
+        "doneNod": {
+          "_type": "Animation",
+          "name": "doneNod",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "longPress"
+          },
+          "targets": [
+            {
+              "path": "Parts.key"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.4,
+              "scale": 1.08
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:working",
+      "name": "Working",
+      "category": "Button",
+      "tags": [
+        "Signals",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "working": {
+          "_type": "Animation",
+          "name": "working",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FFF5A524",
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "fill": "FFF5A524",
+              "opacity": 0.35
+            },
+            {
+              "at": 1,
+              "fill": "FFF5A524",
+              "opacity": 1
+            }
+          ],
+          "duration": 900,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:alert",
+      "name": "Alert",
+      "category": "Button",
+      "tags": [
+        "Signals",
+        "a script plays it"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "alert": {
+          "_type": "Animation",
+          "name": "alert",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "script",
+            "from": [
+              "*"
+            ],
+            "to": []
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FFE5484D",
+              "opacity": 1
+            },
+            {
+              "at": 0.17,
+              "fill": "FFE5484D",
+              "opacity": 0.15
+            },
+            {
+              "at": 0.33,
+              "fill": "FFE5484D",
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "fill": "FFE5484D",
+              "opacity": 0.15
+            },
+            {
+              "at": 0.67,
+              "fill": "FFE5484D",
+              "opacity": 1
+            },
+            {
+              "at": 0.83,
+              "fill": "FFE5484D",
+              "opacity": 0.15
+            },
+            {
+              "at": 1,
+              "fill": "FFE5484D",
+              "opacity": 1
+            }
+          ],
+          "duration": 1200,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

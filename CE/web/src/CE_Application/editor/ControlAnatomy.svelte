@@ -18,7 +18,11 @@
   // `drawnValue`: what a value effect draws instead of a knob's value or a meter's place, 0 to 1, or null (step 6).
   // `partTexts`: text effects playing on a knob form's own words, by part (utils/anatomyWords.js):
   // tickMajor is its ring of ticks, labelCurrent its readout. The keyframe player's `texts`, or null.
-  let { control, runtime = null, drawnValue = null, width = 160, height = 160, checked = false, label = '', captionShown = false, partTexts = null } = $props();
+  // `partAnimations`, `partColours`, `partTransitions`: what plays on a key's own parts (its lamp, its
+  // legend, the key), handed to ButtonDeviceParts. A button's caption plays the control's own text
+  // effects and text colour frames: it is the only place a button drawn here shows its words.
+  let { control, runtime = null, drawnValue = null, width = 160, height = 160, checked = false, label = '', captionShown = false, partTexts = null,
+    partAnimations = null, partColours = null, partTransitions = null } = $props();
   const uid = $props.id();
   let core = $derived(control?._children?.Core ?? {});
   let form = $derived(core.controlForm);
@@ -73,6 +77,26 @@
     return item ? markPieceStyles({ ...item.effect, split: 'whole' }, [readout], { phase: item.phase, seedText: `labelCurrent:${item.name}`, at: item.at ?? null })[0] ?? '' : '';
   });
   const readoutAttrs = (colour) => (readoutFx ? { fill: 'currentColor', style: `color:${colour};${readoutFx}`, 'data-word-piece': '' } : { fill: colour });
+  // A button's or a switch's caption: the control's own text effect, whole (SVG text has no letters
+  // to move one at a time), and the control's text colour frames (`--ce-kf-text`, set on the
+  // control's box) on it. Nothing on a knob or a meter, whose words are their readouts.
+  let captionItem = $derived(!knob && !meter ? partTexts?.get?.('')?.at(-1) ?? null : null);
+  const captionFxFor = (text) => (captionItem
+    ? markPieceStyles({ ...captionItem.effect, split: 'whole' }, [text], { phase: captionItem.phase, seedText: `caption:${captionItem.name}`, at: captionItem.at ?? null })[0] ?? ''
+    : '');
+  const captionAttrs = (text) => {
+    const fx = captionFxFor(text);
+    return fx
+      ? { fill: 'currentColor', style: `color:${legend};${fx}`, 'data-word-piece': '' }
+      : { fill: 'currentColor', style: `color:${legend};animation:var(--ce-kf-text, none);` };
+  };
+  // A roll or a push moves the words through a box about them, as a Label's box clips its words.
+  let captionClips = $derived(!!captionItem && textEffectClips(captionItem.effect));
+  function captionBox(text, x, y, size, anchor = 'middle') {
+    const box = markClipBox({ text, x, y: y - size * 0.35, size });
+    const shift = anchor === 'start' ? box.width / 2 : anchor === 'end' ? -box.width / 2 : 0;
+    return { ...box, x: box.x + shift };
+  }
   // A roll or a push moves a mark through a box about itself, as a Label's box clips its words: the
   // clip is on a group that stays still, the tick or the readout moving inside it.
   let tickClip = $derived(!!tickFx && textEffectClips(wordsItem('tickMajor')?.effect));
@@ -185,7 +209,7 @@
   {:else}
     <g transform={partsDrawn ? undefined : `translate(80 40) scale(${size}) translate(-80 -40)`}>
     {#if partsDrawn}
-      <ButtonDeviceParts parts={control?._children?.Parts?._children ?? {}} {active} uid={`${uid}-device`} />
+      <ButtonDeviceParts parts={control?._children?.Parts?._children ?? {}} {active} uid={`${uid}-device`} {partAnimations} {partColours} {partTransitions} {partTexts} />
     {:else if toggle}
       {#if form==='slide'}
         <rect x="18" y="18" width="124" height="45" rx="22" fill={ink} opacity=".18"/><rect x={active?81:21} y="21" width="58" height="39" rx="19" fill={active?accent:face}/><text x={active?49:112} y="47" fill={ink} text-anchor="middle" font-size="12">{active?'ON':'OFF'}</text>
@@ -229,10 +253,18 @@
       </g>
     {/if}
     </g>
-    {#if !lay && !bareDevice}<text x="80" y="96" text-anchor="middle" fill={legend} font-size="11" font-family="inherit">{label || (toggle ? 'SWITCH' : 'PRESS')}{toggle && !partsDrawn ? ` · ${active?'ON':'OFF'}` : ''}</text>{/if}
+    {#if !lay && !bareDevice}
+      {@const words = `${label || (toggle ? 'SWITCH' : 'PRESS')}${toggle && !partsDrawn ? ` · ${active?'ON':'OFF'}` : ''}`}
+      {#if captionClips}{@const cb = captionBox(words, 80, 96, 11)}<g clip-path={`url(#${uid}-cap-frame)`}><clipPath id={`${uid}-cap-frame`}><rect x={cb.x} y={cb.y} width={cb.width} height={cb.height}/></clipPath><text x="80" y="96" text-anchor="middle" {...captionAttrs(words)} font-size="11" font-family="inherit">{words}</text></g>
+      {:else}<text x="80" y="96" text-anchor="middle" {...captionAttrs(words)} font-size="11" font-family="inherit">{words}</text>{/if}
+    {/if}
   {/if}
   </g>
-  {#if lay?.caption}<text class="caption" x={lay.caption.x} y={lay.caption.y} text-anchor={lay.caption.anchor} fill={legend} font-size={lay.caption.size} font-family={captionFamily} font-weight={captionWeight} letter-spacing={captionSpacing}>{lay.caption.text}</text>{/if}
+  {#if lay?.caption}
+    {@const cap = lay.caption}
+    {#if captionClips}{@const cb = captionBox(cap.text, cap.x, cap.y, cap.size, cap.anchor)}<g clip-path={`url(#${uid}-cap-lay)`}><clipPath id={`${uid}-cap-lay`}><rect x={cb.x} y={cb.y} width={cb.width} height={cb.height}/></clipPath><text class="caption" x={cap.x} y={cap.y} text-anchor={cap.anchor} {...captionAttrs(cap.text)} font-size={cap.size} font-family={captionFamily} font-weight={captionWeight} letter-spacing={captionSpacing}>{cap.text}</text></g>
+    {:else}<text class="caption" x={cap.x} y={cap.y} text-anchor={cap.anchor} {...captionAttrs(cap.text)} font-size={cap.size} font-family={captionFamily} font-weight={captionWeight} letter-spacing={captionSpacing}>{cap.text}</text>{/if}
+  {/if}
 </svg>
 
 <style>

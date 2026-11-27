@@ -27,6 +27,8 @@
 import { derived, get, writable } from 'svelte/store';
 import { activePanel, updatePanel } from './panels.js';
 import { applyControlPatch } from './controls.js';
+import { activeControlSet, controlSetSources } from './controlSets.js';
+import { resolveControlForSet } from '../models/controlSetFamilies.js';
 import { beginHistoryTransaction, commitHistoryTransaction } from './history.js';
 import { flatControls } from '../utils/containment.js';
 import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
@@ -163,7 +165,10 @@ export function applyAnimationPreset(controlIds, presetId, { link = true } = {})
   if (!preset) return { applied, refused: controlIds.map((controlId) => ({ controlId, reason: 'That preset is gone.' })) };
   step(`Apply animation preset ${preset.name}`, () => {
     for (const controlId of controlIds) {
-      const result = applyPresetPatch(controlById(controlId), preset, { link });
+      const control = controlById(controlId);
+      // Judged as the control is drawn too: a button's set decides which of a key's parts it shows.
+      const drawn = control ? resolveControlForSet(control, get(activeControlSet), get(controlSetSources)) : null;
+      const result = applyPresetPatch(control, preset, { link, drawn });
       if (!result.patch) { refused.push({ controlId, reason: result.reason }); continue; }
       applyControlPatch(controlId, result.patch);
       applied.push({ controlId, names: result.names });

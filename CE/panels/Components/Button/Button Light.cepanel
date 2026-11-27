@@ -1,0 +1,749 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "ec5ba89a-c0b5-4e1a-9f3d-ec5ba89aec5b",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Light",
+  "scriptId": "component_button-light",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 840,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF242A2B",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "LampFade.value",
+      "label": "LampFade",
+      "controlName": "LampFade",
+      "path": "LampFade.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "BreatheWhileOn.value",
+      "label": "BreatheWhileOn",
+      "controlName": "BreatheWhileOn",
+      "path": "BreatheWhileOn.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FromTheSynth.value",
+      "label": "FromTheSynth",
+      "controlName": "FromTheSynth",
+      "path": "FromTheSynth.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [
+    {
+      "id": "component_button-light_1",
+      "name": "The synth",
+      "language": "javascript",
+      "source": "// Stands in for a synth switching this toggle: a change from outside, which the From the\n// synth preset answers and a click does not.\nlet switchedOn = false;\nfunction send() {\n  switchedOn = !switchedOn;\n  set('FromTheSynth.normalizedValue', switchedOn ? 1 : 0);\n  after(3000, send);\n}\nafter(1200, send);\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "stompbox"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1705429914000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Light","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1705429914001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":780,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp on the key. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LampFade","id":"ctrl_1705429914002","description":"Lamp fade: the lamp fades up and down rather than snapping.","controlType":"ToggleButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Power"},
+        "Animations": {"_children":{"lampFade":{"_type":"Animation","name":"lampFade","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["selected"],"reverse":true},"targets":[{"path":"Parts.indicator.Background.Fill.colour","properties":["colour"]},{"path":"Parts.indicator.opacity","properties":["opacity"]}],"duration":420,"delay":0,"easing":"inOutSine","preset":{"id":"ce:button:lamp-fade","revision":1,"from":"lampFade"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LampFadeCaption","id":"ctrl_1705429914003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Lamp fade","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LampFadeHow","id":"ctrl_1705429914004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SWITCH ON OR OFF","_children":{"Fill":{"colour":"FFF2B84B"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LampFadeWhat","id":"ctrl_1705429914005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp fades up and down rather than snapping","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Afterglow","id":"ctrl_1705429914006","description":"Afterglow: the lamp dies away slowly after the press.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Tap"},
+        "Animations": {"_children":{"afterglow":{"_type":"Animation","name":"afterglow","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["pressed"],"to":["*"],"leaving":true},"targets":[{"path":"Parts.indicator.Background.Fill.colour","properties":["colour"]},{"path":"Parts.indicator.opacity","properties":["opacity"]}],"duration":1600,"delay":0,"easing":"outQuad","preset":{"id":"ce:button:afterglow","revision":1,"from":"afterglow"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AfterglowCaption","id":"ctrl_1705429914007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Afterglow","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AfterglowHow","id":"ctrl_1705429914008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FFF2B84B"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AfterglowWhat","id":"ctrl_1705429914009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp dies away slowly after the press","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flare","id":"ctrl_1705429914010","description":"Flare: the lamp flares white as it lights.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Fire"},
+        "Animations": {"_children":{"flare":{"_type":"Animation","name":"flare","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["pressed"]},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"scale":1},{"at":0.3,"scale":1.5,"fill":"FFFFF6D8"},{"at":1,"scale":1}],"duration":420,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:flare","revision":1,"from":"flare"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlareCaption","id":"ctrl_1705429914011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Flare","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlareHow","id":"ctrl_1705429914012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FFF2B84B"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlareWhat","id":"ctrl_1705429914013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp flares white as it lights","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheWhileOn","id":"ctrl_1705429914014","description":"Breathe while on: the lamp breathes for as long as it is on.","controlType":"ToggleButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Standby"},
+        "Behavior": {"defaultValue":true},
+        "Animations": {"_children":{"breathe":{"_type":"Animation","name":"breathe","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","to":["selected"]},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"opacity":1},{"at":0.5,"opacity":0.35},{"at":1,"opacity":1}],"duration":1800,"delay":0,"easing":"inOutSine","iterations":"infinite","direction":"normal","preset":{"id":"ce:button:breathe-while-on","revision":1,"from":"breathe"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheWhileOnCaption","id":"ctrl_1705429914015","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Breathe while on","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheWhileOnHow","id":"ctrl_1705429914016","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE ON","_children":{"Fill":{"colour":"FFF2B84B"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheWhileOnWhat","id":"ctrl_1705429914017","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp breathes for as long as it is on","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatBlink","id":"ctrl_1705429914018","description":"Beat blink: the lamp blinks on each beat while the transport plays.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Tempo"},
+        "Animations": {"_children":{"beatBlink":{"_type":"Animation","name":"beatBlink","enabled":true,"kind":"keyframes","trigger":{"type":"beat","every":1},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"scale":1.25,"fill":"FFFFE08A"},{"at":1,"scale":1}],"duration":260,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:beat-blink","revision":1,"from":"beatBlink"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatBlinkCaption","id":"ctrl_1705429914019","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Beat blink","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatBlinkHow","id":"ctrl_1705429914020","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TRANSPORT BEAT","_children":{"Fill":{"colour":"FFF2B84B"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatBlinkWhat","id":"ctrl_1705429914021","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp blinks on each beat while the transport plays","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynth","id":"ctrl_1705429914022","description":"From the synth: the lamp flashes when the synth switches it, not you.","controlType":"ToggleButton"},
+        "Transform": {"x":580,"y":312,"width":200,"height":100},
+        "Text": {"content":"Sync"},
+        "Animations": {"_children":{"fromSynth":{"_type":"Animation","name":"fromSynth","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized","origin":"external"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"scale":1.8,"fill":"FFFFFFFF"},{"at":1,"scale":1}],"duration":600,"delay":0,"easing":"outCubic","iterations":1,"direction":"normal","preset":{"id":"ce:button:from-the-synth","revision":1,"from":"fromSynth"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthCaption","id":"ctrl_1705429914023","controlType":"Label"},
+        "Transform": {"x":560,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"From the synth","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthHow","id":"ctrl_1705429914024","controlType":"Label"},
+        "Transform": {"x":560,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SWITCHED FROM OUTSIDE","_children":{"Fill":{"colour":"FFF2B84B"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthWhat","id":"ctrl_1705429914025","controlType":"Label"},
+        "Transform": {"x":564,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp flashes when the synth switches it, not you","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:lamp-fade",
+      "name": "Lamp fade",
+      "category": "Button",
+      "tags": [
+        "Light",
+        "switch on or off"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "lampFade": {
+          "_type": "Animation",
+          "name": "lampFade",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "selected"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator.Background.Fill.colour",
+              "properties": [
+                "colour"
+              ]
+            },
+            {
+              "path": "Parts.indicator.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "inOutSine"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:afterglow",
+      "name": "Afterglow",
+      "category": "Button",
+      "tags": [
+        "Light",
+        "let go"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "afterglow": {
+          "_type": "Animation",
+          "name": "afterglow",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "pressed"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator.Background.Fill.colour",
+              "properties": [
+                "colour"
+              ]
+            },
+            {
+              "path": "Parts.indicator.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 1600,
+          "delay": 0,
+          "easing": "outQuad"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:flare",
+      "name": "Flare",
+      "category": "Button",
+      "tags": [
+        "Light",
+        "press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "flare": {
+          "_type": "Animation",
+          "name": "flare",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.3,
+              "scale": 1.5,
+              "fill": "FFFFF6D8"
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:breathe-while-on",
+      "name": "Breathe while on",
+      "category": "Button",
+      "tags": [
+        "Light",
+        "while on"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "breathe": {
+          "_type": "Animation",
+          "name": "breathe",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "selected"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "opacity": 0.35
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 1800,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:beat-blink",
+      "name": "Beat blink",
+      "category": "Button",
+      "tags": [
+        "Light",
+        "transport beat"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "beatBlink": {
+          "_type": "Animation",
+          "name": "beatBlink",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "beat",
+            "every": 1
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1.25,
+              "fill": "FFFFE08A"
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 260,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:from-the-synth",
+      "name": "From the synth",
+      "category": "Button",
+      "tags": [
+        "Light",
+        "switched from outside"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "fromSynth": {
+          "_type": "Animation",
+          "name": "fromSynth",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized",
+            "origin": "external"
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1.8,
+              "fill": "FFFFFFFF"
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 600,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

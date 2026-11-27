@@ -840,7 +840,7 @@ assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
 }, {
   component: 'Slider', groups: ['Numbers', 'Ticks', 'Touch', 'Moving', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
 }, {
-  component: 'Button', groups: ['Press', 'Attention', 'Gestures'], count: 18, first: 'Sink press',
+  component: 'Button', groups: ['Press', 'Attention', 'Gestures', 'Light', 'Switch', 'Words', 'Signals'], count: 41, first: 'Sink press',
 }]);
 await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
 await settle();

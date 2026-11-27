@@ -3565,7 +3565,8 @@
   {/if}
   <div bind:this={controlContentElement} class="control-content" class:labels-hang={labelsHang} class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
-      <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} partTexts={activeKeyframes?.texts ?? null} />
+      <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} partTexts={activeKeyframes?.texts ?? null}
+        partAnimations={activeKeyframes?.parts ?? null} partColours={keyframeColours} partTransitions={activeTransitions?.partTransitions ?? null} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
       <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} {imageMoves} />
