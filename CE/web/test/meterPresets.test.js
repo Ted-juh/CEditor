@@ -42,6 +42,7 @@ test('the catalogue: three groups in order, each preset an ordinary preset under
     assert.equal(entry.on, 'label', `${entry.slug} goes on the meter's reading`);
     assert.equal(entry.preset.fields['Text.shows'], 'value');
   }
+  assert.equal(byId('reel').preset.animations.reel.glyphs, '0123456789', 'a reading reels through digits, not letters');
 });
 
 test('every preset goes on a meter as each panel\'s set draws it, or on its reading; the Needle\'s on nothing that draws no value', () => {

@@ -2041,7 +2041,7 @@
   }
 
   // The words as they were last drawn, so a change can leave a ghost of them; and the ghost.
-  let shownTextFrame = { text: null, shownAs: '', lines: [], anchor: '', span: '', glyph: '' };
+  let shownTextFrame = { text: null, shownAs: '', lines: [], lineStyles: [], anchor: '', span: '', glyph: '' };
   let ghostText = $state(null);
   let ghostTimer = null;
   onDestroy(() => clearTimeout(ghostTimer));
@@ -2050,6 +2050,9 @@
       text: renderedTextContent,
       shownAs: String(text?.shownAs ?? ''),
       lines: svgTextLines,
+      // Each line's alignment and spacing, as the live words carry it: a centred caption's ghost is
+      // centred too, where its words were, not set flush left beside the new ones.
+      lineStyles: textSet.usesCustomFlow ? [] : svgTextLines.map((_, index) => blockLinePaintStyles(index).join('; ')),
       anchor: textAnchorStyle,
       span: textSpanStyle,
       glyph: textGlyphStyle,
@@ -4262,8 +4265,8 @@
           {#key ghostText.seq}
             <span class="text-span text-ghost" aria-hidden="true" style="{ghostText.anchor}; {ghostText.span}">
               <span class="text-glyphs" style={ghostText.glyph}>
-                {#each ghostPieces as linePieces}
-                  <span class="text-line ghost-line">{#each linePieces as piece}{@render wordPiece(piece)}{/each}</span>
+                {#each ghostPieces as linePieces, index}
+                  <span class="text-line ghost-line" style={ghostText.lineStyles?.[index] ?? ''}>{#each linePieces as piece}{@render wordPiece(piece)}{/each}</span>
                 {/each}
               </span>
             </span>

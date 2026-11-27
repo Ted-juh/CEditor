@@ -220,7 +220,7 @@
         "Transform": {"x":390,"y":164,"width":240,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"","_children":{"Fill":{"colour":"FF1F5C88"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":18}},"shows":"value","showsControl":"ctrl_1783090629007"},
-        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"reel":{"_type":"Animation","name":"reel","enabled":true,"kind":"text","effect":"reel","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":40,"duration":420,"trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:reel","revision":1,"from":"reel"}}}}
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"reel":{"_type":"Animation","name":"reel","enabled":true,"kind":"text","effect":"reel","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":40,"duration":420,"glyphs":"0123456789","trigger":{"type":"textChange","from":["*"],"to":["*"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:meter:reel","revision":1,"from":"reel"}}}}
       },
       "_type": "Control"
     },
@@ -475,6 +475,7 @@
           "order": "forward",
           "stagger": 40,
           "duration": 420,
+          "glyphs": "0123456789",
           "trigger": {
             "type": "textChange",
             "from": [

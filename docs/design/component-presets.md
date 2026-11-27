@@ -944,3 +944,14 @@ Verified locally:
   each meter of its row in turn; Spectrum and Chase keep moving; Beat bounce kicks its row.
   `animationTab`: the library's Meter section.
 - All four panels watched in Preview.
+
+**Found recording them, and fixed.**
+- *A swap's words leaving were set flush left.* A Label that swaps its words (a reading, Name ↔
+  value) draws the words leaving as a ghost while the new ones come in. The live words of a single
+  line take their alignment from a style folded onto the line's span, and the ghost's lines were
+  drawn without it: on a centred Label the old reading sat left of the new, "-8.9 dB-11.1 dB", in
+  place of one fading over the other. The ghost now keeps each line's alignment and spacing from when
+  its words were drawn (`CanvasControl.svelte`, `lineStyles`). Every swap on a centred or
+  right-aligned Label had it; `meterShowcase` holds a crossfade's two readings centred on each other.
+- *The Reel spun through letters.* A reel rolls through capitals, digits and signs unless it names its
+  own; a reading's now rolls through digits.

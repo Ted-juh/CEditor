@@ -101,7 +101,7 @@ const READOUT = [
   },
   {
     id: 'reel', name: 'Reel', how: 'new reading', what: 'each new reading spins in through other digits', ...READING,
-    animations: { reel: words('reel', NEW_READING, '', 'reel', 'in', { split: 'letter', order: 'forward', stagger: 40, duration: 420 }, ON_THE_READING) },
+    animations: { reel: words('reel', NEW_READING, '', 'reel', 'in', { split: 'letter', order: 'forward', stagger: 40, duration: 420, glyphs: '0123456789' }, ON_THE_READING) },
   },
   {
     id: 'roll', name: 'Roll', how: 'new reading', what: 'the new reading rolls up into place, whole', ...READING,

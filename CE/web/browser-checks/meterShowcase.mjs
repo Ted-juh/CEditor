@@ -169,6 +169,37 @@ try {
   // --- Readout -------------------------------------------------------------------------------------
   ids = await open('Readout');
   await kit.preview(true);
+  await kit.settle(800);
+  // Before the script moves anything: two readings by hand, and the swap caught half-way. The words
+  // leaving fade where they were, centred as the new ones are, not set flush left beside them.
+  const setLevel = (id, v) => page.evaluate(async ({ id, v }) => {
+    const { updatePanelPreviewSession } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
+    updatePanelPreviewSession(id, { valueOverrideEnabled: true, valueOverride: v });
+  }, { id, v });
+  await setLevel(ids.Crossfade, -8.9);
+  await kit.settle(700);
+  await setLevel(ids.Crossfade, -11.1);
+  await page.waitForTimeout(120);
+  const swap = await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    const range = document.createRange();
+    return [...el.querySelectorAll('.text-span')].map((span) => {
+      const nodes = [...span.querySelectorAll('.text-glyphs, .text-glyphs *')].flatMap((e) => [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim()));
+      const rs = nodes.map((n) => { range.selectNodeContents(n); return range.getBoundingClientRect(); }).filter((r) => r.width > 0);
+      return { ghost: span.classList.contains('text-ghost'), centre: (Math.min(...rs.map((r) => r.left)) + Math.max(...rs.map((r) => r.right))) / 2 };
+    });
+  }, inPreview(ids.CrossfadeReading));
+  check('Readout: a reading crossfades in place, the old words centred where they were', () => {
+    const ghost = swap.find((w) => w.ghost);
+    const live = swap.find((w) => !w.ghost);
+    assert.ok(ghost && live, JSON.stringify(swap));
+    assert.ok(Math.abs(ghost.centre - live.centre) < 2, `${ghost.centre.toFixed(1)} against ${live.centre.toFixed(1)}`);
+  });
+  // A level set by hand wins over a script's: let the script's through again.
+  await page.evaluate(async (id) => {
+    const { updatePanelPreviewSession } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
+    updatePanelPreviewSession(id, { valueOverrideEnabled: false });
+  }, ids.Crossfade);
   await trustScripts();
   const readings = ['Odometer', 'Reel', 'Roll', 'Push', 'Crossfade'];
   const words = () => page.evaluate((sels) => sels.map((sel) => {
