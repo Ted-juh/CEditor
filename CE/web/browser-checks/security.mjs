@@ -1,7 +1,7 @@
 // Run with: node browser-checks/security.mjs (Edge on Windows, the installed Chromium elsewhere, or CHROMIUM_PATH).
 import { createServer, preview } from 'vite';
 import { chromium } from 'playwright-core';
-import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
+import { chromiumLaunchOptions, DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
@@ -16,7 +16,9 @@ try {
   page.setDefaultTimeout(15000);
   page.on('pageerror', error => { errors.push(error.message); console.error('PAGE ERROR:', error.stack); });
   page.on('console', message => { if (message.type() === 'error') console.error('BROWSER:', message.text()); });
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`);
+  // The dev server compiles the editor on this first request, which outlasts the 15 s above on a cold
+  // machine; only this load gets longer.
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { timeout: DEV_SERVER_FIRST_LOAD_MS });
   await page.waitForSelector('.statusbar-area', { timeout: 20000 }).catch(async error => {
     console.error('BODY:', (await page.locator('body').innerText()).slice(0, 1200));
     throw error;
