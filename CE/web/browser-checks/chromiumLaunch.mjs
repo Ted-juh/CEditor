@@ -2,7 +2,9 @@ import { existsSync } from 'node:fs';
 
 // Launch options for the browser checks: every check gets its browser here, and nowhere else. So
 // do the two scripts that photograph the editor for docs/media (tools/scripts/gen-manual-media.mjs
-// and gen-display-demos.mjs).
+// and gen-display-demos.mjs), the export tools' bake of rendered looks
+// (tools/scripts/lib/bakeRenderedLooks.mjs, which does without it in an installation) and
+// test/exportDocument.test.js, which draws with that bake where this names a browser.
 //
 // CHROMIUM_PATH always wins. Otherwise each check keeps its own Windows choice (Edge, a named
 // browser, or Playwright's bundled one), passed in as `windows`. Everywhere else, the Chromium this
