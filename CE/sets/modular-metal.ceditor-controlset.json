@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "fc4e83cd",
+  "fingerprint": "b395e2fd",
   "set": {
     "id": "flightdeck",
     "name": "Modular Metal",
@@ -57,10 +57,10 @@
       "control.tick.minor": "881B1D20",
       "accent": "FF97523D",
       "accent.hot": "FF97523D",
-      "text.primary": "FF202529",
-      "text.label": "FF202529",
-      "text.muted": "FF202529",
-      "text.focus": "FF202529",
+      "text.primary": "FF191D20",
+      "text.label": "FF191D20",
+      "text.muted": "FF191D20",
+      "text.focus": "FF191D20",
       "text.inverse": "FFF7F4EC",
       "display.lit": "FF7DE3FF",
       "display.unlit": "247DE3FF",
@@ -71,7 +71,7 @@
       "border.field": "66303338",
       "border.mixed": "FFC9A227",
       "panel.surface": "FFA9ACA9",
-      "control.readout": "FF000000",
+      "control.readout": "{text.label}",
       "section.surface": "FFC7C9C7"
     },
     "lamp": {
@@ -3719,7 +3719,7 @@
       "Shape": {
         "component": {
           "Shape.fillColour": "{section.surface}",
-          "Shape.strokeColour": "FF494E4F",
+          "Shape.strokeColour": "FF444849",
           "Shape.strokeWidth": 1.5,
           "Shape.cornerRadius": 4,
           "Shape.strokeStyle": "solid"

@@ -27,7 +27,7 @@ export function makeAdditionalControlSets(bases) {
     const tokens={...base.tokens};
     for(const key of Object.keys(tokens)) {
       if(key.startsWith('surface') || key.startsWith('control.button') || key==='control.cap') tokens[key]='FF'+d.face;
-      if(key.startsWith('text.')) tokens[key]=ink(d.panel);
+      if(key.startsWith('text.')) tokens[key]=d.ink?'FF'+d.ink:ink(d.panel);
     }
     Object.assign(tokens,{'accent':'FF'+d.accent,'accent.hot':'FF'+d.accent,'control.field':'FF'+d.panel,'control.track':'FF'+d.panel,'control.fill':'FF'+d.accent,'text.inverse':ink(d.face)});
     const families={...base.families,Label:{component:{...base.families?.Label?.component,'Text.Fill.colour':'{text.primary}'}}};

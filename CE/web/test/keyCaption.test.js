@@ -77,6 +77,23 @@ test('the caption reads on the panel when the toggle is mixed, in the 26 sets wh
   }
 });
 
+// Machined, Anodised, Modular Metal (flightdeck) and Obsidian read at 4.0 to 4.2:1, their own text
+// colour on their own panel; the owner had it nudged, a few shades, rather than their panels.
+test('a key\'s caption reads at 4.5:1 on its set\'s panel at rest, in every set that draws one', () => {
+  for (const { id } of OFFERED_CONTROL_SETS) {
+    const set = getControlSet(id);
+    for (const type of ['ToggleButton', 'Button']) {
+      const key = resolveControlForSet(createControl(type), set);
+      if (!buttonDeviceDrawn(key)) continue;
+      const caption = captionWhen(key, set, {});
+      assert.ok(contrast(caption, panelColour(set)) >= 4.5, `${id} ${type}: ${caption} on ${panelColour(set)}, ${contrast(caption, panelColour(set)).toFixed(2)}:1`);
+    }
+  }
+  for (const [id, text] of [['machined', 'FF0F1012'], ['anodised', 'FF141518'], ['flightdeck', 'FF191D20'], ['obsidian', 'FFF9FCFE']]) {
+    assert.equal(getControlSet(id).tokens['text.label'], text, `${id}: its text nudged, not its panel`);
+  }
+});
+
 test('a flat face, which fills when on or mixed, is left as its set draws it: Graphite\'s words go inverse on the fill', () => {
   for (const id of ['graphite', 'graphite-studio', 'ceramic']) {
     const set = getControlSet(id);

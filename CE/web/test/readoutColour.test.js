@@ -61,10 +61,12 @@ test('the first that reads: the cap\'s colour, the label text\'s, the inverse te
   }
   assert.equal(getControlSet('ceramic').tokens['control.readout'], '{text.label}', 'a white cap on a white panel');
   assert.equal(getControlSet('backlit').tokens['control.readout'], '{control.cap}', 'a cap that reads');
-  assert.equal(getControlSet('obsidian').tokens['control.readout'], 'FFFFFFFF', 'its glass panel drawn a mid grey, on which its label text does not read');
+  assert.equal(getControlSet('obsidian').tokens['control.readout'], '{text.label}', 'its label text, lightened to read on its glass panel drawn a mid grey');
   assert.equal(BASE_CONTROL_SET.tokens['control.readout'], '{control.cap}', 'the base set\'s follows a set\'s own cap');
   const counts = BUILT_IN_CONTROL_SETS.reduce((n, set) => ({ ...n, [set.tokens['control.readout']]: (n[set.tokens['control.readout']] ?? 0) + 1 }), {});
-  assert.deepEqual(counts, { '{control.cap}': 38, '{text.label}': 36, FF000000: 4, FFFFFFFF: 1 });
+  // Machined, Anodised, Modular Metal and Obsidian took black or white till their text was nudged to
+  // read at 4.5:1 on their panels (component-presets.md, "Four sets' captions").
+  assert.deepEqual(counts, { '{control.cap}': 38, '{text.label}': 40, FF000000: 1 });
 });
 
 test('a set that names its own readout keeps it; a set read without one is given one by the same rule', () => {
