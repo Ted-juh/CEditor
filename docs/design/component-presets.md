@@ -1053,6 +1053,28 @@ Verified locally:
   disappeared at the moment it was to glow. It burns red-hot instead, which shows on a light face and
   a dark one.
 
+**Words inside the meter (2026-11-28).** Asked whether text animations play on the words inside a
+meter, "LEVEL" on its face: they did not. A text effect could be aimed at the legend, and the tab took
+it, and nothing played; the same gap phase 2 closed for keyframes. Fourteen sets draw a legend: a word
+(LEVEL, VU, SIGNAL) or the reading as figures in cells (Neon, Obsidian, Ladder); none draws its
+scale's numbers until an author turns them on. Now (`utils/meterWords.js`, `MeterDeviceParts.svelte`):
+- *The legend's word, a letter at a time.* SVG text has no letters to move on their own, which is why a
+  key's legend plays an effect only whole. A meter's is measured instead: the word is drawn whole and
+  hidden, the browser says where it set each letter (`getStartPositionOfChar`), and each letter is
+  drawn there as a piece of its own, typed, scattered or rolled along the word as a Label's are. A word
+  at a time splits at the spaces; whole plays it as one. Until the letters are measured (the first
+  frame) the word plays whole.
+- *Figures in cells*, a piece a figure; *the scale's numbers*, a piece a number, round the scale, as a
+  knob's are.
+- A roll or a push is cut to a box about each piece. The words take their colour from the effect
+  (`currentColor`) while it plays on them, not from the part's colour frames.
+- A text effect on a meter plays on When it clips and When it crosses a level too.
+
+`meterWords.test.js` (new) holds the pieces, each letter where it was measured, the fall-back to whole,
+words, figures and numbers, and the wiring; `meterShowcase` types "LEVEL" a letter at a time in
+Preview, each letter where the word had it, and the scale's numbers a number at a time. No preset or
+panel plays on them yet.
+
 Left open:
 - Every lamp is a part only on a meter drawn with parts that light cells; the plain look's LED
   segments are drawn by `MeterRenderer.svelte`, which has no parts to play on.

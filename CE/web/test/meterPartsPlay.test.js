@@ -59,7 +59,7 @@ test('a preset on a meter\'s part is refused where its set does not draw that pa
 
 test('the renderer plays each part\'s animations, colours and easing, and every lamp\'s, one after another', () => {
   const anatomy = src('editor/ControlAnatomy.svelte');
-  assert.match(anatomy, /<MeterDeviceParts [^>]*\{partAnimations\} \{partColours\} \{partTransitions\} \/>/);
+  assert.match(anatomy, /<MeterDeviceParts [^>]*\{partAnimations\} \{partColours\} \{partTransitions\} \{partTexts\} \/>/);
   const parts = src('editor/MeterDeviceParts.svelte');
   assert.match(parts, /moves: animationDeclaration\(partAnimations\?\.get\?\.\(name\) \?\? null, \{ svg: true \}\)/);
   assert.match(parts, /<g data-part-moves=\{item\.moves \? '' : undefined\} style=\{item\.moves \|\| undefined\}>/);

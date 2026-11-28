@@ -24,6 +24,10 @@
  *   - Segments (Gimbal Ring): Cascade's lamps come on along the row, Sparkle's in a scattered
  *     order, Ripple's out from the level as it clips; Peak drop's peak lamp drops as the level falls.
  *
+ * And the words a meter draws itself (utils/meterWords.js), on a meter built here: a typewriter on
+ * Anodised's "LEVEL" writes it a letter at a time, each where the word had it; on its scale's numbers,
+ * a number at a time.
+ *
  *   node browser-checks/meterShowcase.mjs
  */
 import assert from 'node:assert/strict';
@@ -372,6 +376,45 @@ try {
     assert.ok(segs[0] >= 1 && ripple.length >= 8, `Ripple ${segs[0]}, ${ripple.length} lamps`);
     assert.ok(new Set(ripple.map(([, d]) => d)).size >= 3, 'out from the level, a lamp at a time');
     assert.ok(segs[1] >= 1, `Peak drop ${segs[1]}`);
+  });
+
+  // --- Words inside the meter ---------------------------------------------------------------------
+  await kit.preview(false);
+  ids = await page.evaluate(async () => {
+    const { panelMaker } = await window.__ceImport('/scripts/festivalKit.js');
+    const { serializePanel, deserializePanel } = await window.__ceImport('/src/CE_Application/stores/panelModel.js');
+    const { addPanel } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { words } = await window.__ceImport('/src/CE_Application/utils/componentPresetKit.js');
+    const f = panelMaker('meter-words', 'Meter words', { set: 'anodised', bg: 'FFC2C7CD', width: 700, height: 300, fields: { gridEnabled: false } });
+    const typed = f.add('Meter', 'Typed', 40, 60, 260, 160);
+    typed._children.Animations = { _type: 'Animations', enabled: true, _children: {
+      typed: words('typed', { type: 'always' }, 'legend', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 120, duration: 300, iterations: 1 }),
+    } };
+    const numbers = f.add('Meter', 'Numbers', 340, 60, 260, 160);
+    numbers._children.Parts._children.scale.numerals = true;
+    numbers._children.Animations = { _type: 'Animations', enabled: true, _children: {
+      typed: words('typed', { type: 'always' }, 'scale', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 60, duration: 300, iterations: 1 }),
+    } };
+    const panel = deserializePanel(serializePanel(f.scenes([])), '/tmp/meter-words.cepanel', null);
+    addPanel(panel);
+    return Object.fromEntries(panel.controls.map((c) => [c._children.Core.name, c._children.Core.id]));
+  });
+  await kit.settle(500);
+  await kit.preview(true);
+  await page.waitForTimeout(500);
+  const pieces = (id) => page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-word-piece]`)]
+    .map((t) => ({ text: t.textContent, x: Number(t.getAttribute('x')), delay: parseFloat(getComputedStyle(t).animationDelay) || 0, playing: getComputedStyle(t).animationName !== 'none' })), inPreview(id));
+  const legend = await pieces(ids.Typed);
+  check('Words: a typewriter on the legend writes "LEVEL" a letter at a time, each where the word had it', () => {
+    assert.deepEqual(legend.map((p) => p.text), ['L', 'E', 'V', 'E', 'L']);
+    assert.ok(legend.every((p, i) => p.playing && (i === 0 || (p.x > legend[i - 1].x && p.delay > legend[i - 1].delay))), JSON.stringify(legend));
+  });
+  const numerals = await pieces(ids.Numbers);
+  const shown = await page.evaluate((sel) => document.querySelectorAll(`${sel} [data-numeral]`).length, inPreview(ids.Numbers));
+  check('Words: on the scale\'s numbers, a number at a time', () => {
+    assert.ok(numerals.length >= 5 && numerals.every((p) => p.playing), `${numerals.length} numbers`);
+    assert.equal(new Set(numerals.map((p) => p.delay)).size, numerals.length);
+    assert.equal(shown, 0, 'drawn as pieces, not again as they were');
   });
 
   assert.deepEqual(kit.failures, [], 'no page errors');

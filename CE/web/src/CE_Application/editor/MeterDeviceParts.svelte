@@ -13,6 +13,12 @@
    * so a needle's glow rides on the needle); a colour frame recolours what it fills (`partColours`, the
    * shape channel); a change eases its colour and opacity (`partTransitions`). Every part sets all of
    * these, `none` where it has nothing, so none borrows the control's own.
+   *
+   * A text effect plays on the words the meter draws (`partTexts`, utils/meterWords.js): its legend,
+   * a letter or a word at a time where the browser set them (measured from the word drawn whole and
+   * hidden), or a figure at a time where it draws figures in cells; and its scale's numbers, a number
+   * at a time. The words then take their colour from the effect (`currentColor`), not the part's
+   * colour frames.
    */
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
@@ -25,8 +31,9 @@
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { optionRankVars } from '../utils/optionStagger.js';
   import { METER_CELL_PART } from '../models/meterDeviceParts.js';
+  import { legendWordPieces, meterWordsSplit, numeralPieces } from '../utils/meterWords.js';
 
-  let { parts = {}, p = 0, peak = null, figures = '0', meter = {}, uid = 'meter', partAnimations = null, partColours = null, partTransitions = null } = $props();
+  let { parts = {}, p = 0, peak = null, figures = '0', meter = {}, uid = 'meter', partAnimations = null, partColours = null, partTransitions = null, partTexts = null } = $props();
 
   const W = METER_FRAME.width;
   const H = METER_FRAME.height;
@@ -107,7 +114,8 @@
         ...playing(name),
         cells: name === 'indicator' && lampsPlay && drawing.cells?.length ? eachLamp(drawing.cells, fill, activeColour) : null,
       };
-    }));
+    })
+    .map((item) => ({ ...item, words: wordsPlaying(item) })));
 
   // Every lamp (models/meterDeviceParts.js METER_CELL_PART): while something plays on it, the
   // indicator draws each of its lamps alone, in its own colour, each saying where it stands along the
@@ -144,6 +152,43 @@
       timing: `${transitionDeclaration(eased, { target: 'svg' })}${colourTransitionVar(bucket?.colour ?? null, { svg: true })}${colourVariables(channels)}`,
       moves: animationDeclaration(partAnimations?.get?.(name) ?? null, { svg: true }),
     };
+  }
+
+  // The text effect playing on a part's words: the last to start, as a Label's.
+  const wordsOn = (name) => partTexts?.get?.(name)?.at(-1) ?? null;
+
+  // Where the browser set each letter of a legend's words, measured from the word drawn whole and
+  // hidden: by the word, its place, size and face. Measured again once the fonts are in.
+  let letterAt = $state({});
+  const letterKey = (text, family) => `${text.text}|${text.x}|${text.y}|${text.size}|${family}`;
+  function measureLetters(node, key) {
+    const read = (k, again = false) => {
+      if (!again && letterAt[k]) return;
+      try {
+        const n = node.getNumberOfChars();
+        if (!n) return;
+        const xs = Array.from({ length: n }, (_, i) => node.getStartPositionOfChar(i).x);
+        letterAt = { ...letterAt, [k]: { xs, end: node.getEndPositionOfChar(n - 1).x } };
+      } catch { /* not laid out yet: the words play whole */ }
+    };
+    read(key);
+    let current = key;
+    document.fonts?.ready?.then(() => read(current, true));
+    return { update(next) { current = next; read(next); } };
+  }
+
+  /** A text effect on a legend's words or a scale's numbers, as pieces to draw; null for none. */
+  function wordsPlaying(item) {
+    const words = wordsOn(item.name);
+    if (!words) return null;
+    const opts = { phase: words.phase, seedText: `${item.name}:${words.name}`, at: words.at ?? null };
+    if (item.name === 'legend' && item.drawing.texts.length) {
+      const split = meterWordsSplit(words.effect, item.drawing.texts);
+      const measure = split === 'whole' ? [] : item.drawing.texts.map((text) => ({ ...text, key: letterKey(text, item.fontFamily) }));
+      return { pieces: legendWordPieces(words.effect, item.drawing.texts, measure.map((m) => letterAt[m.key] ?? null), opts), measure, labels: false };
+    }
+    if (item.drawing.labels.length) return { pieces: numeralPieces(words.effect, item.drawing.labels, opts), measure: [], labels: true };
+    return null;
   }
 
   // What a shape paints with, as a style: its colour, eased on the part's colour timing, and the
@@ -256,9 +301,16 @@
       </g>
     {/if}
     {/if}
-    {#each item.drawing.texts as text, i (i)}
-      <text x={text.x} y={text.y} text-anchor="middle" style={paint(item.textColour)} opacity={item.opacity} font-size={text.size} font-family={item.fontFamily}>{text.text}</text>
-    {/each}
+    {#if item.words && !item.words.labels}
+      {@render wordPieces(item, item.words.pieces, '')}
+      {#each item.words.measure as m (m.key)}
+        <text use:measureLetters={m.key} x={m.x} y={m.y} text-anchor="middle" font-size={m.size} font-family={item.fontFamily} visibility="hidden" aria-hidden="true">{m.text}</text>
+      {/each}
+    {:else}
+      {#each item.drawing.texts as text, i (i)}
+        <text x={text.x} y={text.y} text-anchor="middle" style={paint(item.textColour)} opacity={item.opacity} font-size={text.size} font-family={item.fontFamily}>{text.text}</text>
+      {/each}
+    {/if}
   </g>
   </g>
   </g>
@@ -266,9 +318,29 @@
     <!-- Upright, outside the part's turn, and playing what the part plays: a scale that lights up
          lights its numerals. -->
     <g style={item.timing}><g style={item.moves || undefined}>
-    {#each item.drawing.labels as label, i (i)}
-      <text data-numeral={item.name} x={label.x} y={label.y} text-anchor={label.anchor} dominant-baseline="central" style={paint(item.textColour)} opacity={item.opacity} font-size={label.size} font-family={item.fontFamily}>{label.text}</text>
-    {/each}
+    {#if item.words?.labels}
+      {@render wordPieces(item, item.words.pieces, 'central')}
+    {:else}
+      {#each item.drawing.labels as label, i (i)}
+        <text data-numeral={item.name} x={label.x} y={label.y} text-anchor={label.anchor} dominant-baseline="central" style={paint(item.textColour)} opacity={item.opacity} font-size={label.size} font-family={item.fontFamily}>{label.text}</text>
+      {/each}
+    {/if}
     </g></g>
   {/if}
 {/each}
+
+<!-- Words in a text effect, a piece each: coloured by the effect (currentColor, the part's colour
+     under it), each moving about its own box, a roll or a push cut to a box about it. -->
+{#snippet wordPieces(item, pieces, baseline)}
+  <g style={`color:${item.textColour};fill:currentColor;`} opacity={item.opacity}>
+    {#each pieces as piece, i (i)}
+      {#if piece.clip}
+        <clipPath id={`${uid}-${item.name}-w${i}`}><rect x={piece.clip.x} y={piece.clip.y} width={piece.clip.width} height={piece.clip.height} /></clipPath>
+      {/if}
+      <g clip-path={piece.clip ? `url(#${uid}-${item.name}-w${i})` : undefined}>
+        <text data-word-piece={item.name} x={piece.x} y={piece.y} text-anchor={piece.anchor} dominant-baseline={baseline || undefined}
+          font-size={piece.size} font-family={item.fontFamily} fill="currentColor" style={piece.style || undefined}>{piece.text}</text>
+      </g>
+    {/each}
+  </g>
+{/snippet}

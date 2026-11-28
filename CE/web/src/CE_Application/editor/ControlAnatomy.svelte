@@ -177,7 +177,7 @@
     </g>
     {#if core.formShowValue!==false && !['lens','vernier','encoder'].includes(form)}{#if readoutClip}{@const rb = readoutBox(80, 164, 12)}<g clip-path={`url(#${uid}-ro164)`}><clipPath id={`${uid}-ro164`}><rect x={rb.x} y={rb.y} width={rb.width} height={rb.height}/></clipPath><text x="80" y="164" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text></g>{:else}<text x="80" y="164" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text>{/if}{/if}
   {:else if meter && meterPartsDrawn}
-    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} peak={cfg.__peak ?? null} meter={cfg} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} {partAnimations} {partColours} {partTransitions} />
+    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} peak={cfg.__peak ?? null} meter={cfg} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} {partAnimations} {partColours} {partTransitions} {partTexts} />
     <!-- Its reading is a Label of its own beside it (utils/labelShows.js); a legend part prints what the design prints. -->
   {:else if meter}
     <g transform={`translate(80 46) scale(${size}) translate(-80 -46)`}>

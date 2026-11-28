@@ -42,7 +42,9 @@ export const TEXT_DIRECTIONS = Object.freeze(['left', 'right', 'up', 'down', 'tu
  * (a Label that shows a knob's value, or its name and its value by turns). A textChange trigger's
  * `to` waits for one of a "name, value while touched" Label's two texts: ['value'], ['name'], or any.
  */
-export const TEXT_TRIGGER_TYPES = Object.freeze(['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'textChange', 'optionsChange']);
+// `clip` and `level`: a meter's, as its level clips or crosses a line (keyframeAnimation.js); its
+// legend's words can play on them (editor/MeterDeviceParts.svelte). The Meter, 2026-11-28.
+export const TEXT_TRIGGER_TYPES = Object.freeze(['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'textChange', 'optionsChange', 'clip', 'level']);
 export const TEXT_TRIGGER_LABELS = Object.freeze({
   always: 'All the time',
   stateChange: 'In a state',
@@ -53,6 +55,8 @@ export const TEXT_TRIGGER_LABELS = Object.freeze({
   valueStep: 'On each step of the value',
   textChange: 'When its words change',
   optionsChange: 'When its options change',
+  clip: 'When it clips',
+  level: 'When it crosses a level',
 });
 
 /**
