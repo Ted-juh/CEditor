@@ -230,9 +230,15 @@
           {/if}
           {#if fx}
             <!-- A piece each: the word whole, or its letters where the word had them. -->
+            <!-- A reel's piece is its column, itself then the glyphs it rolls past, in a window of its own. -->
             {#each fx.pieces as piece, i (i)}
+              {#if piece.column && piece.clip}
+                <clipPath id={`${uid}-legend-w${i}`}><rect x={piece.clip.x} y={piece.clip.y} width={piece.clip.width} height={piece.clip.height} /></clipPath>
+              {/if}
+              <g clip-path={piece.column && piece.clip ? `url(#${uid}-legend-w${i})` : undefined}>
               <text x={piece.x} y={piece.y} text-anchor={piece.anchor} dominant-baseline="central"
-                font-size={piece.size} font-family="inherit" style={piece.style || undefined} data-word-piece="">{piece.text}</text>
+                font-size={piece.size} font-family="inherit" style={piece.style || undefined} data-word-piece="">{#if piece.column}{#each piece.column.lines as line, k (k)}<tspan x={piece.x} y={piece.y + k * piece.column.step}>{line}</tspan>{/each}{:else}{piece.text}{/if}</text>
+              </g>
             {/each}
             {#if fx.measure}
               <text use:measureLetters={{ key: fx.measure.key, measured }} x={fx.measure.x} y={fx.measure.y} text-anchor="middle" dominant-baseline="central"

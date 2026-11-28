@@ -378,6 +378,8 @@ export function sceneControlOutput(scene, controlId, { at = null, phase = 'a', e
       list.push({ name: clip.id, effect, phase, trigger: node.trigger, at: options.at, start: Number(clip.start) || 0 });
       texts.set(part, list);
       rules.push(textEffectRules(effect, { phase }));
+      // On a part's SVG words, the effect's colour plays on their fill (utils/svgWords.js).
+      if (part) rules.push(textEffectRules(effect, { phase, colourProperty: 'fill' }));
       continue;
     }
     const entry = readKeyframes(node, clip.id);

@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { resolveControlForSet } from '../src/CE_Application/models/controlSetFamilies.js';
-import { METER_CELL_PART, meterDrawsCells, meterPartNames } from '../src/CE_Application/models/meterDeviceParts.js';
+import { METER_CELL_PART, meterDrawsCells, meterPartNames, meterPlainLamps } from '../src/CE_Application/models/meterDeviceParts.js';
 import { meterPartDrawing } from '../src/CE_Application/utils/meterParts.js';
 import { applyPresetPatch, meterPartsNotDrawn, presetDoesNotFit } from '../src/CE_Application/utils/animationPresetModel.js';
 import { targetTree } from '../src/CE_Application/utils/targetPaths.js';
@@ -55,6 +55,36 @@ test('a preset on a meter\'s part is refused where its set does not draw that pa
   const { patch, reason } = applyPresetPatch(createControl('Meter'), onPart(METER_CELL_PART), { drawn: drawnIn('valve') });
   assert.equal(patch, null);
   assert.match(reason, /every lamp/);
+});
+
+// The plain look (editor/MeterRenderer.svelte), Graphite's and Ceramic's, draws LED segments where an
+// author gives it some (Meter.segments): those are its lamps. Left open by phase 2 and done since.
+test('a meter drawn plain in LED segments has them as lamps to play on; one drawn as a bar is told how to get them', () => {
+  const plain = (segments) => resolveControlForSet(createControl('Meter', segments ? { Meter: { segments } } : {}), getControlSet('graphite'));
+  assert.equal(meterPlainLamps(plain(0)), 0);
+  assert.equal(meterPlainLamps(plain(12)), 12);
+  assert.equal(meterPartsNotDrawn(onPart(METER_CELL_PART), plain(12)), '', 'twelve lamps to play on');
+  assert.match(meterPartsNotDrawn(onPart(METER_CELL_PART), plain(0)), /drawn as one bar: give it segments \(the Meter tab's Segments\)/);
+  assert.match(meterPartsNotDrawn(onPart('indicator'), plain(12)), /draws it plain, with no parts to play on/, 'its segments are lamps, not a needle');
+  // A form names what it draws (editor/ControlAnatomy.svelte), segments or none.
+  const formed = plain(12);
+  formed._children.Core = { ...formed._children.Core, controlForm: 'vu' };
+  assert.match(meterPartsNotDrawn(onPart(METER_CELL_PART), formed), /no parts to play on/);
+});
+
+test('the plain look plays every lamp on its segments, a bar\'s and an arc\'s, each with its place along the row', () => {
+  const canvas = src('editor/CanvasControl.svelte');
+  assert.match(canvas, /<MeterRenderer control=\{renderControl\} width=\{displayW\} height=\{displayH\} \{drawnValue\}\s+partAnimations=\{activeKeyframes\?\.parts \?\? null\} partColours=\{keyframeColours\} \/>/);
+  const plain = src('editor/MeterRenderer.svelte');
+  assert.match(plain, /partAnimations\?\.get\?\.\(METER_CELL_PART\)/);
+  assert.match(plain, /const lampVars = \(index, lit\) => `\$\{optionRankVars\(index, segments, lit - 1\)\}\$\{lampsPlay\.colours\}`;/);
+  // A bar's segment moves as a box and lights through the paint channel; an arc's as a shape, through its stroke.
+  assert.match(plain, /<div class="seg-lamp" data-lamp=\{idx\}[^>]*style=\{`\$\{lampVars\(idx, lit\)\}\$\{lampsPlay\.box\}`\}>/);
+  assert.match(plain, /animation:var\(--ce-kf-paint, none\);/);
+  assert.match(plain, /<g style=\{lampVars\(i, lit\)\}><g data-lamp=\{i\}[^>]*style=\{lampsPlay\.shape \|\| undefined\}>/);
+  assert.match(plain, /style="animation:var\(--ce-kf-stroke, none\);"/);
+  // Nothing playing, a segment is drawn as it always was.
+  assert.match(plain, /\{#if lampsPlay\}[\s\S]*\{:else\}\s*<div class="seg"/);
 });
 
 test('the renderer plays each part\'s animations, colours and easing, and every lamp\'s, one after another', () => {

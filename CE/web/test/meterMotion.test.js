@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  METER_TEST_SIGNALS, meterBallistics, meterTestLevel, meterValueAt, needleSettled, stepNeedle,
+  METER_TEST_SIGNALS, meterBallistics, meterTestLevel, meterValueAt, needleSettled, stepNeedle, effectNeedleStep,
 } from '../src/CE_Application/utils/meterMotion.js';
 import { meterDrawnPosition, meterPosition } from '../src/CE_Application/utils/meterLayout.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
@@ -108,4 +108,38 @@ test('the drawing follows the needle; the reading stays the level', () => {
   assert.equal(meterDrawnPosition({ ...cfg, __drawn: 0.35 }), 0.35, 'on its way: where it is');
   assert.equal(meterDrawnPosition({ ...cfg, __drawn: 1.04 }), 1, 'past the pin, drawn at the pin');
   assert.equal(meterDrawnPosition({ value: 0.4 }), 0.4, 'nothing arriving: its own value');
+});
+
+// A value effect on a meter with ballistics (editor/CanvasControl.svelte): the effect says where the
+// needle is going, the spring how it gets there. Left open by phase 2 ("a Self-test on a Lazy needle
+// sweeps as fast as on any other") and done since.
+test('a value effect moves a needle through its ballistics, and hands back to the level without a jump', () => {
+  const live = 0.3;
+  // A sweep from the level to the top and back over 600 ms, as Self-test draws.
+  const sweep = (t) => (t > 600 ? null : t < 300 ? live + (1 - live) * (t / 300) : 1 - (1 - live) * ((t - 300) / 300));
+  const run = (ballistics) => {
+    let state = null;
+    const drawn = [];
+    for (let t = 0; t <= 4000; t += 16) {
+      state = effectNeedleStep(state, { effect: sweep(t), live, now: t, ballistics });
+      drawn.push(state ? state.pos : live);
+      if (!state && t > 600) break;
+    }
+    return drawn;
+  };
+  const lazy = run(meterBallistics({ riseTime: 900, fallTime: 1400 }));
+  const vu = run(meterBallistics({ riseTime: 300, fallTime: 300, overshoot: 0.015 }));
+  const peak = (list) => Math.max(...list);
+  assert.ok(peak(lazy) < 0.8, `the lazy needle never catches the sweep: ${peak(lazy).toFixed(2)}`);
+  assert.ok(peak(vu) > peak(lazy) + 0.1, `a VU follows it closer: ${peak(vu).toFixed(2)} against ${peak(lazy).toFixed(2)}`);
+  for (const list of [lazy, vu]) {
+    const steps = list.slice(1).map((pos, i) => Math.abs(pos - list[i]));
+    assert.ok(Math.max(...steps) < 0.06, `no jump, at most ${Math.max(...steps).toFixed(3)} a frame`);
+    assert.ok(Math.abs(list.at(-1) - live) < 1e-3, 'handed back on the level');
+  }
+  assert.ok(lazy.length * 16 > 600, 'still on its way after the sweep, then handed back');
+  // Started where it is drawn, at rest.
+  assert.deepEqual(effectNeedleStep(null, { effect: 0.9, live: 0.4, now: 1000, ballistics: meterBallistics({ riseTime: 300 }) }).at, 1000);
+  assert.match(readFileSync(new URL('../src/CE_Application/editor/CanvasControl.svelte', import.meta.url), 'utf8'),
+    /effectNeedle = effectNeedleStep\(effectNeedle, \{ effect: effectValue, live: liveNormalized, now: nowMs\(\), ballistics: effectBallistics \}\);/);
 });

@@ -669,6 +669,9 @@ export function createKeyframePlayer({ now = () => (typeof performance !== 'unde
           list.push({ name: entry.name, effect, phase, trigger: entry.trigger, startedAt: runs.get(entry.name)?.startedAt ?? t });
           texts.set(entry.part, list);
           rules.push(textEffectRules(effect, { phase }));
+          // Words a part draws in SVG (a meter's legend, a key's) colour by their fill, inherited from
+          // the part's paint and its colour frames, so the effect's own colour is played on the fill.
+          if (entry.part) rules.push(textEffectRules(effect, { phase, colourProperty: 'fill' }));
           keyParts.push(`${entry.part}:tx:${entry.name}:${phase}:${effect.direction}`);
           continue;
         }

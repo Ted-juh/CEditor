@@ -28,6 +28,13 @@
  *     had it; Shimmer keeps running along it; Shatter bursts it as the level clips, Roll call rolls it
  *     as the level passes 70%; Numbers in turn writes the scale's numbers round the dial.
  *   And on a key built here (utils/svgWords.js is shared): its legend typed a letter at a time.
+ *   And built here, words that keep their part's colour while an effect plays on them, and Reel on
+ *   SVG letters: a meter's legend typed in its colour frames' red and blue, a shimmer's light on its
+ *   letters, its letters and a key's spun through other glyphs, each in a window of its own.
+ *   And on meters drawn plain (Graphite) in LED segments, built here: a bar's, a column's and an
+ *   arc's segments are lamps Cascade reaches in turn and Sparkle in a scattered order.
+ *   And a value effect through a needle's ballistics, built here: Self-test on a Lazy needle (Valve)
+ *   lags the same sweep on one that jumps, and hands back to the level without a jump.
  *
  *   node browser-checks/meterShowcase.mjs
  */
@@ -404,6 +411,64 @@ try {
     assert.ok(wordPlays[1] >= 1, `Roll call ${wordPlays[1]}`);
   });
 
+  // --- A meter's words keep their part's colour under an effect; Reel on its letters --------------
+  await kit.preview(false);
+  ids = await page.evaluate(async () => {
+    const { panelMaker } = await window.__ceImport('/scripts/festivalKit.js');
+    const { serializePanel, deserializePanel } = await window.__ceImport('/src/CE_Application/stores/panelModel.js');
+    const { addPanel } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { words, keyframes } = await window.__ceImport('/src/CE_Application/utils/componentPresetKit.js');
+    const f = panelMaker('meter-word-colour', 'Meter word colour', { set: 'reel', bg: 'FF5E6A5E', width: 900, height: 260, fields: { gridEnabled: false } });
+    const meter = (name, x, animations) => {
+      const c = f.add('Meter', name, x, 40, 260, 160);
+      c._children.Meter.value = 0.4;
+      c._children.Animations = { _type: 'Animations', enabled: true, _children: animations };
+    };
+    const forever = { iterations: 'infinite' };
+    meter('Painted', 20, {
+      colour: keyframes('colour', { type: 'always' }, 'legend', [{ at: 0, fill: 'FFFF0000' }, { at: 0.5, fill: 'FF0000FF' }, { at: 1, fill: 'FFFF0000' }], 1000, { easing: 'linear', ...forever }),
+      typed: words('typed', { type: 'always' }, 'legend', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 80, duration: 300, ...forever }),
+    });
+    meter('Shine', 310, { shine: words('shine', { type: 'always' }, 'legend', 'shimmer', 'in', { split: 'letter', order: 'forward', stagger: 90, duration: 500, colour: 'FFFF2D2D', ...forever }) });
+    meter('Spin', 600, { spin: words('spin', { type: 'always' }, 'legend', 'reel', 'in', { split: 'letter', order: 'forward', stagger: 60, duration: 700, ...forever }) });
+    const panel = deserializePanel(serializePanel(f.scenes([])), '/tmp/meter-word-colour.cepanel', null);
+    addPanel(panel);
+    return Object.fromEntries(panel.controls.map((c) => [c._children.Core.name, c._children.Core.id]));
+  });
+  await kit.settle(500);
+  await kit.preview(true);
+  await page.waitForTimeout(500);
+  const meterWordSamples = async (id, times = 20, every = 50) => {
+    const out = [];
+    for (let k = 0; k < times; k += 1) {
+      out.push(await page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-word-piece]`)].map((t) => ({
+        text: t.textContent, fill: getComputedStyle(t).fill, transform: getComputedStyle(t).transform, lines: t.querySelectorAll('tspan').length,
+        clipped: !!t.closest('[clip-path]'),
+      })), inPreview(id)));
+      await page.waitForTimeout(every);
+    }
+    return out;
+  };
+  const rgb = (fill) => (/rgb\((\d+), (\d+), (\d+)/.exec(fill) ?? []).slice(1).map(Number);
+  const painted = await meterWordSamples(ids.Painted);
+  check('Words: a meter\'s legend typed under its colour frames keeps them, red to blue, where it once took the effect\'s colour', () => {
+    assert.ok(painted.every((list) => list.length === 6), `${painted[0].length} letters`);
+    const fills = painted.map((list) => rgb(list[0].fill));
+    assert.ok(fills.some(([r, , b]) => r > 200 && b < 60), `red: ${painted.map((l) => l[0].fill).join(' | ')}`);
+    assert.ok(fills.some(([r, , b]) => b > 200 && r < 60), `blue: ${painted.map((l) => l[0].fill).join(' | ')}`);
+  });
+  const shine = await meterWordSamples(ids.Shine);
+  check('Words: a shimmer\'s light still runs along a meter\'s letters, on their fill', () => {
+    const fills = shine.flat().map((p) => rgb(p.fill));
+    assert.ok(fills.some(([r, g, b]) => r > 240 && g < 80 && b < 80), [...new Set(shine.flat().map((p) => p.fill))].join(' | '));
+  });
+  const spin = await meterWordSamples(ids.Spin);
+  check('Words: Reel spins a meter\'s legend a letter at a time through other glyphs, each in a window of its own', () => {
+    assert.ok(spin.every((list) => list.length === 6 && list.every((p) => p.lines === 7 && p.clipped)), JSON.stringify(spin[0]));
+    assert.ok(spin.every((list) => list.map((p) => p.text[0]).join('') === 'SIGNAL'), 'each column starts on its own letter');
+    assert.ok(new Set(spin.map((list) => list[2].transform)).size > 3, 'its columns roll');
+  });
+
   // --- A key's legend, a letter at a time (the same pieces) -----------------------------------------
   await kit.preview(false);
   ids = await page.evaluate(async () => {
@@ -417,6 +482,16 @@ try {
     key._children.Animations = { _type: 'Animations', enabled: true, _children: {
       typed: words('typed', { type: 'always' }, 'legend', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 120, duration: 300, iterations: 1 }),
     } };
+    const spinKey = f.add('ToggleButton', 'SpinKey', 300, 60, 200, 140);
+    Object.assign(spinKey._children.Parts._children.legend, { offText: 'MUTE', onText: 'LIVE', fontSize: 16 });
+    spinKey._children.Animations = { _type: 'Animations', enabled: true, _children: {
+      spin: words('spin', { type: 'always' }, 'legend', 'reel', 'in', { split: 'letter', order: 'forward', stagger: 60, duration: 700, iterations: 'infinite' }),
+    } };
+    const shineKey = f.add('ToggleButton', 'ShineKey', 60, 200, 200, 90);
+    Object.assign(shineKey._children.Parts._children.legend, { offText: 'SOLO', onText: 'SOLO', fontSize: 16 });
+    shineKey._children.Animations = { _type: 'Animations', enabled: true, _children: {
+      shine: words('shine', { type: 'always' }, 'legend', 'shimmer', 'in', { split: 'letter', order: 'forward', stagger: 90, duration: 500, colour: 'FFFF2D2D', iterations: 'infinite' }),
+    } };
     const panel = deserializePanel(serializePanel(f.scenes([])), '/tmp/key-words.cepanel', null);
     addPanel(panel);
     return Object.fromEntries(panel.controls.map((c) => [c._children.Core.name, c._children.Core.id]));
@@ -428,6 +503,124 @@ try {
   check('Words: a key\'s legend types a letter at a time too, each where the word had it', () => {
     assert.deepEqual(keyLetters.map((p) => p.text), ['M', 'U', 'T', 'E']);
     assert.ok(keyLetters.every((p, i) => i === 0 || (p.x > keyLetters[i - 1].x && p.delay > keyLetters[i - 1].delay)), JSON.stringify(keyLetters));
+  });
+  // What each piece draws, a few times a second: its fill, its transform, its column's lines.
+  const sampleWords = async (id, times = 16, every = 70) => {
+    const out = [];
+    for (let k = 0; k < times; k += 1) {
+      out.push(await page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-word-piece]`)].map((t) => ({
+        fill: getComputedStyle(t).fill, transform: getComputedStyle(t).transform, lines: t.querySelectorAll('tspan').length,
+        clipped: !!t.closest('[clip-path]'),
+      })), inPreview(id)));
+      await page.waitForTimeout(every);
+    }
+    return out;
+  };
+  const spinKeyFrames = await sampleWords(ids.SpinKey);
+  check('Words: Reel spins a key\'s legend a letter at a time through other glyphs, each in a window of its own', () => {
+    assert.ok(spinKeyFrames.every((list) => list.length === 4 && list.every((p) => p.lines === 7 && p.clipped)), JSON.stringify(spinKeyFrames[0]));
+    assert.ok(new Set(spinKeyFrames.map((list) => list[0].transform)).size > 3, 'its column rolls');
+  });
+  const shineKeyFrames = await sampleWords(ids.ShineKey, 20, 50);
+  check('Words: a shimmer\'s light shows on a key\'s letters, which filled with the legend\'s paint lost it', () => {
+    const fills = new Set(shineKeyFrames.flat().map((p) => p.fill));
+    assert.ok([...fills].some((f) => /rgb\(25[0-5], 4\d, 4\d\)|rgb\(255, 45, 45\)/.test(f)), [...fills].join(' | '));
+    assert.ok(fills.size > 2, 'from the legend\'s colour to the light and back');
+  });
+
+  // --- Every lamp on the plain look's LED segments (editor/MeterRenderer.svelte) -------------------
+  await kit.preview(false);
+  ids = await page.evaluate(async () => {
+    const { panelMaker } = await window.__ceImport('/scripts/festivalKit.js');
+    const { serializePanel, deserializePanel } = await window.__ceImport('/src/CE_Application/stores/panelModel.js');
+    const { addPanel } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { METER_PRESETS } = await window.__ceImport('/src/CE_Application/utils/meterPresets.js');
+    const { applyPresetPatch } = await window.__ceImport('/src/CE_Application/utils/animationPresetModel.js');
+    const { getControlSet } = await window.__ceImport('/src/CE_Application/models/controlSets.js');
+    const { resolveControlForSet } = await window.__ceImport('/src/CE_Application/models/controlSetFamilies.js');
+    const { setNestedValue } = await window.__ceImport('/src/CE_Application/stores/controlTreeUtils.js');
+    const preset = (id) => METER_PRESETS.find((p) => p.id === `ce:meter:${id}`).preset;
+    const f = panelMaker('plain-lamps', 'Plain lamps', { set: 'graphite', bg: 'FF202326', width: 900, height: 320, fields: { gridEnabled: false } });
+    const wear = (name, x, y, w, h, meter, id) => {
+      const c = f.add('Meter', name, x, y, w, h);
+      Object.assign(c._children.Meter, { value: 0.6, ...meter });
+      const { patch, reason } = applyPresetPatch(c, preset(id), { drawn: resolveControlForSet(c, getControlSet('graphite')) });
+      if (!patch) throw new Error(`${id} on ${name}: ${reason}`);
+      for (const [path, value] of Object.entries(patch)) setNestedValue(c, path, value);
+    };
+    wear('Bar', 40, 40, 360, 40, { segments: 12, orientation: 'horizontal' }, 'cascade');
+    wear('Column', 440, 30, 50, 240, { segments: 10, orientation: 'vertical' }, 'cascade');
+    wear('Arc', 540, 40, 200, 200, { segments: 16, orientation: 'arc' }, 'cascade');
+    wear('Twinkle', 40, 140, 360, 40, { segments: 12, orientation: 'horizontal' }, 'sparkle');
+    const panel = deserializePanel(serializePanel(f.scenes([])), '/tmp/plain-lamps.cepanel', null);
+    addPanel(panel);
+    return Object.fromEntries(panel.controls.map((c) => [c._children.Core.name, c._children.Core.id]));
+  });
+  await kit.settle(500);
+  await kit.preview(true);
+  await page.waitForTimeout(400);
+  const inOrder = (list) => [...new Map(list).entries()].sort((a, b) => a[0] - b[0]).map(([, d]) => d);
+  const plainBar = await delays(ids.Bar);
+  const plainColumn = await delays(ids.Column);
+  const plainArc = await delays(ids.Arc);
+  const plainTwinkle = await delays(ids.Twinkle);
+  check('Every lamp on the plain look: Cascade reaches a bar\'s, a column\'s and an arc\'s segments in turn along the row', () => {
+    for (const [name, list, count] of [['bar', plainBar, 12], ['column', plainColumn, 10], ['arc', plainArc, 16]]) {
+      assert.equal(list.length, count, `${name}: ${list.length} lamps`);
+      const order = inOrder(list);
+      assert.ok(order.every((d, i) => i === 0 || d > order[i - 1]), `${name}: ${order.join(' ')}`);
+    }
+  });
+  check('Every lamp on the plain look: Sparkle twinkles a bar\'s segments in a scattered order', () => {
+    const order = inOrder(plainTwinkle);
+    assert.equal(new Set(order).size, 12, order.join(' '));
+    assert.ok(order.some((d, i) => i > 0 && d < order[i - 1]), `not in order: ${order.join(' ')}`);
+  });
+
+  // --- A value effect through a needle's ballistics (editor/CanvasControl.svelte) ------------------
+  await kit.preview(false);
+  ids = await page.evaluate(async () => {
+    const { panelMaker } = await window.__ceImport('/scripts/festivalKit.js');
+    const { serializePanel, deserializePanel } = await window.__ceImport('/src/CE_Application/stores/panelModel.js');
+    const { addPanel } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { METER_PRESETS } = await window.__ceImport('/src/CE_Application/utils/meterPresets.js');
+    const { applyPresetPatch } = await window.__ceImport('/src/CE_Application/utils/animationPresetModel.js');
+    const { getControlSet } = await window.__ceImport('/src/CE_Application/models/controlSets.js');
+    const { resolveControlForSet } = await window.__ceImport('/src/CE_Application/models/controlSetFamilies.js');
+    const { setNestedValue } = await window.__ceImport('/src/CE_Application/stores/controlTreeUtils.js');
+    const preset = (id) => METER_PRESETS.find((p) => p.id === `ce:meter:${id}`).preset;
+    const f = panelMaker('needle-ballistics', 'Needle ballistics', { set: 'valve', bg: 'FF1E1A16', width: 700, height: 260, fields: { gridEnabled: false } });
+    const meter = (name, x, ...presets) => {
+      const c = f.add('Meter', name, x, 40, 260, 160);
+      Object.assign(c._children.Meter, { value: 0.3 });
+      for (const id of presets) {
+        const { patch, reason } = applyPresetPatch(c, preset(id), { drawn: resolveControlForSet(c, getControlSet('valve')) });
+        if (!patch) throw new Error(`${id} on ${name}: ${reason}`);
+        for (const [path, value] of Object.entries(patch)) setNestedValue(c, path, value);
+      }
+    };
+    meter('Jumps', 40, 'self-test');
+    meter('Lazy', 380, 'lazy', 'self-test');
+    const panel = deserializePanel(serializePanel(f.scenes([])), '/tmp/needle-ballistics.cepanel', null);
+    addPanel(panel);
+    return Object.fromEntries(panel.controls.map((c) => [c._children.Core.name, c._children.Core.id]));
+  });
+  await kit.settle(500);
+  await kit.preview(true);
+  const swing = [[], []];
+  for (let k = 0; k < 90; k += 1) {
+    const now = await page.evaluate((sels) => sels.map((sel) => Number((/rotate\(([-\d.]+)/.exec(document.querySelector(`${sel} [data-part="indicator"]`)?.getAttribute('transform') ?? '') ?? [])[1])), [inPreview(ids.Jumps), inPreview(ids.Lazy)]);
+    now.forEach((a, i) => swing[i].push(a));
+    await page.waitForTimeout(30);
+  }
+  check('Ballistics: Self-test on a Lazy needle lags the sweep it draws on one that jumps, and settles where the other does, without a jump', () => {
+    const [jumps, lazy] = swing;
+    const span = (list) => Math.max(...list) - Math.min(...list);
+    assert.ok(span(jumps) > 30, `the sweep: ${span(jumps).toFixed(1)}°`);
+    assert.ok(span(lazy) < span(jumps) - 10, `the lazy needle never catches it: ${span(lazy).toFixed(1)}° of ${span(jumps).toFixed(1)}°`);
+    const steps = lazy.slice(1).map((a, i) => Math.abs(a - lazy[i]));
+    assert.ok(Math.max(...steps) < span(jumps) / 3, `no jump: at most ${Math.max(...steps).toFixed(1)}° between samples`);
+    assert.ok(Math.abs(lazy.at(-1) - jumps.at(-1)) < 1.5, `both on the level at the end: ${lazy.at(-1)} and ${jumps.at(-1)}`);
   });
 
   assert.deepEqual(kit.failures, [], 'no page errors');

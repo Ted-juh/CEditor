@@ -7,8 +7,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { numeralPieces, wordPieces, wordsSplit } from '../src/CE_Application/utils/svgWords.js';
-import { TEXT_TRIGGER_TYPES } from '../src/CE_Application/utils/textEffects.js';
+import { REEL_STEP, numeralPieces, wordPieces, wordsSplit } from '../src/CE_Application/utils/svgWords.js';
+import { TEXT_TRIGGER_TYPES, textEffectHash } from '../src/CE_Application/utils/textEffects.js';
 
 const typewriter = { effect: 'typewriter', way: 'in', split: 'letter', order: 'forward', stagger: 100, duration: 300, delay: 0, iterations: 1, easing: 'linear' };
 const LEVEL = [{ x: 80, y: 57, text: 'LEVEL', size: 10 }];
@@ -75,4 +75,45 @@ test('a key\'s legend plays a letter at a time too, centred on its box as it is 
   const keys = readFileSync(new URL('../src/CE_Application/editor/ButtonDeviceParts.svelte', import.meta.url), 'utf8');
   assert.match(keys, /wordPieces\(item\.words\.effect, \[text\]/);
   assert.match(keys, /use:measureLetters=\{\{ key: fx\.measure\.key, measured \}\}/);
+});
+
+// Left open by the Meter's words and done since: the words took the effect's colour and not the
+// part's colour frames (a meter's), or the part's frames and not the effect's colour (a key's).
+test('the pieces colour by their fill, the part\'s paint inherited, and an effect\'s colour plays on that fill', () => {
+  const shimmer = { ...typewriter, effect: 'shimmer', colour: 'FFFF2D2D', iterations: 'infinite' };
+  const pieces = wordPieces(shimmer, LEVEL, MEASURED);
+  const fillRules = textEffectHash(shimmer, 'fill');
+  assert.notEqual(fillRules, textEffectHash(shimmer, 'color'));
+  assert.ok(pieces.every((p) => p.style.includes(`ce-tx-${fillRules}-`)), 'each piece plays the rules that colour its fill');
+  assert.ok(numeralPieces(shimmer, [{ x: 10, y: 10, text: '-20', size: 8, anchor: 'middle' }])[0].style.includes(`ce-tx-${fillRules}-`));
+  const src = (path) => readFileSync(new URL(`../src/CE_Application/${path}`, import.meta.url), 'utf8');
+  // The meter's pieces inherit the part's paint, colour frames and all; so do a key's.
+  assert.match(src('editor/MeterDeviceParts.svelte'), /\{#snippet drawWords\(item, pieces, baseline\)\}\s*<g style=\{paint\(item\.textColour\)\} opacity=\{item\.opacity\}>/);
+  assert.doesNotMatch(src('editor/MeterDeviceParts.svelte'), /fill="currentColor"/);
+  assert.match(src('editor/ButtonDeviceParts.svelte'), /<g style=\{paint\(item\.colour\)\} clip-path=/);
+  assert.match(src('utils/keyframeAnimation.js'), /if \(entry\.part\) rules\.push\(textEffectRules\(effect, \{ phase, colourProperty: 'fill' \}\)\);/);
+  assert.match(src('utils/sceneModel.js'), /if \(part\) rules\.push\(textEffectRules\(effect, \{ phase, colourProperty: 'fill' \}\)\);/);
+});
+
+test('a reel spins each piece through other glyphs: a column, itself on top, a line each, in its own window', () => {
+  const reel = { ...typewriter, effect: 'reel', spins: 6, stagger: 60, duration: 700 };
+  const pieces = wordPieces(reel, LEVEL, MEASURED, { seedText: 'legend:spin' });
+  assert.deepEqual(pieces.map((p) => p.text), ['L', 'E', 'V', 'E', 'L']);
+  for (const piece of pieces) {
+    assert.equal(piece.column.lines.length, 7, 'itself and six glyphs');
+    assert.equal(piece.column.lines[0], piece.text, 'itself on top, where the window rests');
+    assert.equal(piece.column.step, 10 * REEL_STEP);
+    assert.match(piece.style, new RegExp(`line-height:${10 * REEL_STEP}px;`), 'a line is its step, as the keyframes count in lines');
+    assert.match(piece.style, /--ce-reel:6;/);
+    assert.ok(piece.clip && piece.clip.height < piece.column.step, 'its window is under a line high');
+  }
+  assert.deepEqual(wordPieces(reel, LEVEL, MEASURED, { seedText: 'legend:spin' }).map((p) => p.column.lines.join('')), pieces.map((p) => p.column.lines.join('')), 'the same glyphs every run');
+  assert.ok(wordPieces(typewriter, LEVEL, MEASURED).every((p) => p.column === null), 'only a reel has columns');
+  const numbers = numeralPieces(reel, [{ x: 10, y: 10, text: '-20', size: 8, anchor: 'middle' }]);
+  assert.equal(numbers[0].column.lines[0], '-20');
+  const src = (path) => readFileSync(new URL(`../src/CE_Application/${path}`, import.meta.url), 'utf8');
+  for (const file of ['editor/MeterDeviceParts.svelte', 'editor/ButtonDeviceParts.svelte']) {
+    assert.match(src(file), /\{#if piece\.column\}\{#each piece\.column\.lines as line, k \(k\)\}<tspan x=\{piece\.x\} y=\{piece\.y \+ k \* piece\.column\.step\}>\{line\}<\/tspan>\{\/each\}/, file);
+  }
+  assert.match(src('editor/ButtonDeviceParts.svelte'), /clip-path=\{piece\.column && piece\.clip \? `url\(#\$\{uid\}-legend-w\$\{i\}\)` : undefined\}/, 'a key\'s piece in a window of its own');
 });

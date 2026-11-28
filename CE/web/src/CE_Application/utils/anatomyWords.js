@@ -154,12 +154,12 @@ const OWN_BOX = 'transform-box:fill-box;transform-origin:center;';
  * ''): one piece a mark, round the scale; `whole` plays them together. For SVG: no inline display,
  * and a move about the mark's own box.
  */
-export function markPieceStyles(effect, labels, { phase = 'a', seedText = '', at = null, geometry = null } = {}) {
+export function markPieceStyles(effect, labels, { phase = 'a', seedText = '', at = null, geometry = null, colourProperty = 'color', columns = false } = {}) {
   if (!effect || !labels?.length) return [];
   const pieces = labels.map((text) => ({ text: String(text ?? ''), animated: true }));
   const run = effect.split === 'whole' ? { ...effect, stagger: 0 } : effect;
   const about = markGeometry(effect, geometry);
-  return textPieceStyles(run, pieces, { phase, seedText, at }).map((style, i) => `${style.replace(INLINE_PIECE, '')}${OWN_BOX}${about[i] ?? ''}`);
+  return textPieceStyles(run, pieces, { phase, seedText, at, colourProperty, columns }).map((style, i) => `${style.replace(INLINE_PIECE, '')}${OWN_BOX}${about[i] ?? ''}`);
 }
 
 /**

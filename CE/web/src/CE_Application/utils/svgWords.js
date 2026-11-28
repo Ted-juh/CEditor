@@ -12,9 +12,22 @@
  * and a scale's numbers a piece a number, round the scale, as a knob's are (utils/anatomyWords.js).
  *
  * Until the letters are measured the words play whole. Pure: positions in, pieces out.
+ *
+ * The pieces colour by their fill, which they inherit from the part's paint: its colour, eased, and
+ * its colour frames. An effect that colours the words (a shimmer's light, a flash) plays on the fill
+ * too (`colourProperty: 'fill'`; the keyframe player writes those rules for an effect on a part), so
+ * the part's colour frames and the effect's colour both show, where once a meter's words took the
+ * effect's colour alone and a key's lost it.
+ *
+ * A reel rolls each piece through other glyphs, as a Label's letters: the piece is a column, itself on
+ * top and the glyphs it rolls past under it a line each (`column`: `{ lines, step }`), cut to its
+ * window, a line high about it, and the column rolls down onto it. The line is `step` units, and the
+ * piece's line-height says so, since the reel's keyframes move it in lines (`lh`).
  */
+/** A reel's line, in the words' size: the window a piece rolls in is a little under it. */
+export const REEL_STEP = 1.4;
 import { markPieceStyles, markClipBox } from './anatomyWords.js';
-import { textEffectClips } from './textEffects.js';
+import { reelColumns, textEffectClips } from './textEffects.js';
 
 const round = (value) => Math.round(value * 100) / 100;
 
@@ -55,21 +68,32 @@ export function wordPieces(effect, texts, measured = [], { phase = 'a', seedText
   }
   // Played whole, the effect takes every piece at once; cut, one after another along the words.
   const run = split === 'whole' && texts.length === 1 ? { ...effect, split: 'whole' } : effect;
-  const styles = markPieceStyles(run, pieces.map((piece) => piece.text), { phase, seedText, at });
+  const reel = effect.effect === 'reel';
+  const styles = markPieceStyles(run, pieces.map((piece) => piece.text), { phase, seedText, at, colourProperty: 'fill', columns: reel });
+  const columns = reel ? reelColumns(run, pieces.map((piece) => ({ text: piece.text, animated: true })), { seedText }) : [];
   const clips = textEffectClips(effect);
   return pieces.map((piece, i) => ({
     text: piece.text, x: piece.x, y: piece.y, size: piece.size, anchor: piece.anchor,
-    style: styles[i] ?? '',
+    ...reelColumn(styles[i] ?? '', columns[i], piece.size),
     clip: clips ? wordClipBox(piece, central) : null,
   }));
+}
+
+// A piece's style and, rolling in a reel, its column: its lines, a step apart, the step its line-height.
+function reelColumn(style, column, size) {
+  if (!column) return { style, column: null };
+  const step = round(Math.max(1, Number(size) || 1) * REEL_STEP);
+  return { style: `${style}line-height:${step}px;`, column: { lines: column.split('\n'), step } };
 }
 
 /** A scale's numbers for one run of `effect`: a piece a number, round the scale. */
 export function numeralPieces(effect, labels, { phase = 'a', seedText = 'scale', at = null } = {}) {
   if (!effect || !labels?.length) return [];
-  const styles = markPieceStyles(effect, labels.map((label) => label.text), { phase, seedText, at });
+  const reel = effect.effect === 'reel';
+  const styles = markPieceStyles(effect, labels.map((label) => label.text), { phase, seedText, at, colourProperty: 'fill', columns: reel });
+  const columns = reel ? reelColumns(effect, labels.map((label) => ({ text: label.text, animated: true })), { seedText }) : [];
   const clips = textEffectClips(effect);
-  return labels.map((label, i) => ({ ...label, style: styles[i] ?? '', clip: clips ? markClipBox({ text: label.text, x: label.x, y: label.y, size: label.size }) : null }));
+  return labels.map((label, i) => ({ ...label, ...reelColumn(styles[i] ?? '', columns[i], label.size), clip: clips ? markClipBox({ text: label.text, x: label.x, y: label.y, size: label.size }) : null }));
 }
 
 // [from, to) of each word, the spaces between left out.

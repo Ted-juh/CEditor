@@ -116,6 +116,21 @@ export function stepNeedle(state, target, dt, ballistics) {
   return { pos, vel };
 }
 
+/**
+ * A value effect's needle on a meter with ballistics, one frame on: the effect says where the needle
+ * is going (`effect`, 0 to 1, or null once it has ended), the spring how it gets there. Ended, it goes
+ * on following the meter's own drawn place (`live`, its ballistics already) and is handed back, null,
+ * once it rests on it, so the needle never jumps. `state` null starts it where it is drawn, at rest.
+ * `now` in ms; editor/CanvasControl.svelte steps it once a frame.
+ */
+export function effectNeedleStep(state, { effect, live, now, ballistics }) {
+  const was = state ?? { pos: num(live, 0), vel: 0, at: num(now, 0) };
+  const going = Number.isFinite(effect);
+  const target = going ? effect : num(live, 0);
+  const next = stepNeedle(was, target, num(now, 0) - num(was.at, 0), ballistics);
+  return !going && needleSettled(next, target) ? null : { ...next, at: num(now, 0) };
+}
+
 /** Whether a needle has come to rest on its level. */
 export function needleSettled(state, target) {
   return Math.abs(num(state?.pos, 0) - num(target, 0)) < 5e-4 && Math.abs(num(state?.vel, 0)) < 5e-3;

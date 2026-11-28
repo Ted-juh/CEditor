@@ -154,6 +154,16 @@ export function meterPartNames(control) {
   return METER_DEVICE_TYPES.has(String(control?._children?.Core?.controlType ?? '')) ? [METER_CELL_PART] : [];
 }
 
+/**
+ * How many LED segments a meter drawn plain lights (editor/MeterRenderer.svelte, `Meter.segments`):
+ * the lamps `Parts.cell` plays on there. 0, a continuous bar. Whether it is drawn plain (no form, no
+ * parts) is the caller's to say: utils/animationPresetModel.js asks the forms.
+ */
+export function meterPlainLamps(control) {
+  const n = Math.round(Number(control?._children?.Meter?.segments));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 /** Whether a meter as its set draws it lights cells, so has lamps for `Parts.cell` to play on. */
 export function meterDrawsCells(drawn) {
   if (!meterDeviceDrawn(drawn)) return false;

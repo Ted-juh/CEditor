@@ -49,7 +49,8 @@ import { labelShows } from './labelShows.js';
 import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
 import { setByAuthor } from './authorsStateValue.js';
 import { BUTTON_DEVICE_PARTS, BUTTON_DEVICE_TYPES, buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
-import { METER_CELL_PART, METER_DEVICE_PARTS, METER_DEVICE_TYPES, meterDeviceDrawn, meterDrawsCells, meterPartNames } from '../models/meterDeviceParts.js';
+import { METER_CELL_PART, METER_DEVICE_PARTS, METER_DEVICE_TYPES, meterDeviceDrawn, meterDrawsCells, meterPartNames, meterPlainLamps } from '../models/meterDeviceParts.js';
+import { anatomyForm } from '../models/controlAnatomy.js';
 import { LEVEL_TRIGGER_TYPES } from './keyframeAnimation.js';
 import { choicePartNames } from './choiceGroupLayout.js';
 
@@ -284,7 +285,15 @@ export function meterPartsNotDrawn(preset, drawn) {
   if (!wanted.length) return '';
   const label = (part) => (part === METER_CELL_PART ? 'every lamp' : part);
   const names = (list) => list.map(label).join(' and ');
-  if (!meterDeviceDrawn(drawn)) return `It plays on the meter's ${names(wanted)}, and this meter's set draws it plain, with no parts to play on.`;
+  if (!meterDeviceDrawn(drawn)) {
+    // Drawn plain (no form, no parts: editor/MeterRenderer.svelte), its LED segments are its lamps.
+    const core = drawn._children.Core ?? {};
+    const plain = !anatomyForm(core.controlType, core.controlForm);
+    const lampsOnly = wanted.every((part) => part === METER_CELL_PART);
+    if (plain && lampsOnly && meterPlainLamps(drawn) > 0) return '';
+    if (plain && lampsOnly) return 'It plays on every lamp, and this meter is drawn as one bar: give it segments (the Meter tab\'s Segments) and each is a lamp.';
+    return `It plays on the meter's ${names(wanted)}, and this meter's set draws it plain, with no parts to play on.`;
+  }
   const turnedOn = (part) => preset.fields?.[`Parts.${part}.visible`] === true;
   const hidden = wanted.filter((part) => (part === METER_CELL_PART
     ? !meterDrawsCells(drawn)

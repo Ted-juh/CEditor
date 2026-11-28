@@ -74,7 +74,8 @@ test('the legend plays a text effect on its words, whole, in a box of its own wh
   const words = (fields) => new Map([['legend', [{ name: 'fx', phase: 'a', effect: effect(fields) }]]]);
   const rolled = partOf(draw(toggle, { partTexts: words({ effect: 'roll', direction: 'up' }) }), 'legend');
   assert.match(rolled, /<g style="fill:[^"]+" clip-path="url\(#([^)]+-legend-clip)\)">(<!--[^>]*-->)*<clipPath id="\1"><rect /);
-  assert.match(rolled, /<text [^>]*style="[^"]*animation:[^"]*ce-tx-[^"]*" data-word-piece="">O<\/text>/);
+  // The piece's words sit in a branch of their own (a reel draws a column there instead).
+  assert.match(rolled, /<text [^>]*style="[^"]*animation:[^"]*ce-tx-[^"]*" data-word-piece="">(<!--[^>]*-->)*O(<!--[^>]*-->)*<\/text>/);
   const faded = partOf(draw(toggle, { partTexts: words({ effect: 'crossfade' }) }), 'legend');
   assert.doesNotMatch(faded, /legend-clip/, 'a crossfade moves nothing, so nothing is clipped');
   assert.match(faded, /data-word-piece=""/);

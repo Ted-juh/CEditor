@@ -461,7 +461,9 @@ Two things move a meter by itself, under **Motion** on its **Meter** tab. **Rise
 how long its drawing takes to reach a new level going up and coming back, and **Overshoot** how far
 past it the needle swings first: a VU meter's 300 ms with a little overshoot, a PPM's quick rise
 and slow fall. Both at 0, it jumps to each level, as before. Only the drawing waits: its reading,
-a Label showing it, and what its animations hear are the level as it arrives. **Test signal** moves
+a Label showing it, and what its animations hear are the level as it arrives. A **Needle** effect
+moves through the same ballistics: a self-test on a lazy needle never quite catches its sweep, and
+hands back to the level without a jump. **Test signal** moves
 a meter in Preview while nothing else gives it a level: **Programme** (a beat and a phrase that
 reaches the top), **Sweep** (up and down in six seconds) or **Bursts** (quiet, with a burst to the
 top every 2.4 seconds). Every meter on one signal moves as one. An exported plug-in never plays it:
@@ -1277,9 +1279,12 @@ There are four kinds, and two more for what a value draws:
   animations hear, so **When the value changes** and **On each step of the value** play on it too;
   it is only heard, and nothing is ever sent. On a meter that lights lamps, **Every lamp** plays on
   each of them, and **Each lamp** sets them off one after another: along the row, from the top
-  down, out from the level, or **Scattered**. A text effect plays on the words a meter draws itself:
-  its legend ("LEVEL", "VU", or its reading in figures), a letter, a word or a figure at a time, and
-  its scale's numbers, a number at a time. A key's legend plays a letter or a word at a time too. **On each step
+  down, out from the level, or **Scattered**. A plain meter's LED segments are lamps too (give it
+  **Segments** on its **Meter** tab); one drawn as a single bar has none. A text effect plays on the
+  words a meter draws itself: its legend ("LEVEL", "VU", or its reading in figures), a letter, a
+  word or a figure at a time, and its scale's numbers, a number at a time. A key's legend plays a
+  letter or a word at a time too. Those words keep their part's colour, its colour frames included,
+  while an effect plays, and a **Reel** spins each letter in a window of its own. **On each step
   of the value** plays once each time the value comes to another step, while it is turned too: as
   many steps as the control has (a knob of five choices, four), one every 5% on a knob with none,
   or the number under **Steps**. A detent felt as you turn. With **Step back** set to

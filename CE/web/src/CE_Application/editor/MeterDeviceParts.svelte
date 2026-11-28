@@ -17,8 +17,8 @@
    * A text effect plays on the words the meter draws (`partTexts`, utils/svgWords.js): its legend,
    * a letter or a word at a time where the browser set them (measured from the word drawn whole and
    * hidden), or a figure at a time where it draws figures in cells; and its scale's numbers, a number
-   * at a time. The words then take their colour from the effect (`currentColor`), not the part's
-   * colour frames.
+   * at a time. The pieces fill with the part's paint, its colour eased and its colour frames, and an
+   * effect that colours them plays on that fill (utils/svgWords.js), so both show.
    */
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
@@ -320,17 +320,19 @@
   {/if}
 {/each}
 
-<!-- Words in a text effect, a piece each: coloured by the effect (currentColor, the part's colour
-     under it), each moving about its own box, a roll or a push cut to a box about it. -->
+<!-- Words in a text effect, a piece each: filled with the part's paint, which they inherit with its
+     colour frames, and the effect's colour on that fill; each moving about its own box, a roll or a
+     push cut to a box about it. -->
 {#snippet drawWords(item, pieces, baseline)}
-  <g style={`color:${item.textColour};fill:currentColor;`} opacity={item.opacity}>
+  <g style={paint(item.textColour)} opacity={item.opacity}>
     {#each pieces as piece, i (i)}
       {#if piece.clip}
         <clipPath id={`${uid}-${item.name}-w${i}`}><rect x={piece.clip.x} y={piece.clip.y} width={piece.clip.width} height={piece.clip.height} /></clipPath>
       {/if}
       <g clip-path={piece.clip ? `url(#${uid}-${item.name}-w${i})` : undefined}>
+        <!-- A reel's piece is its column: itself, then the glyphs it rolls past, a line each. -->
         <text data-word-piece={item.name} x={piece.x} y={piece.y} text-anchor={piece.anchor} dominant-baseline={baseline || undefined}
-          font-size={piece.size} font-family={item.fontFamily} fill="currentColor" style={piece.style || undefined}>{piece.text}</text>
+          font-size={piece.size} font-family={item.fontFamily} style={piece.style || undefined}>{#if piece.column}{#each piece.column.lines as line, k (k)}<tspan x={piece.x} y={piece.y + k * piece.column.step}>{line}</tspan>{/each}{:else}{piece.text}{/if}</text>
       </g>
     {/each}
   </g>

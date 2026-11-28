@@ -20,6 +20,7 @@
   import { BUTTON_DEVICE_TYPES, buttonDeviceDrawn, isButtonDevicePart } from '../models/buttonDeviceParts.js';
   import { METER_DEVICE_TYPES, meterDeviceDrawn, isMeterDevicePart } from '../models/meterDeviceParts.js';
   import { meterLevelSignals } from '../utils/meterLayout.js';
+  import { effectNeedleStep, meterBallistics } from '../utils/meterMotion.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import ParameterStatusEditor from './ParameterStatusEditor.svelte';
   import { parameterStatusDesignModel } from '../utils/parameterStatus.js';
@@ -1936,7 +1937,30 @@
       dragging: previewSession?.dragging === true || interactionRuntime?.signals?.dragging === true,
     })
     : { value: null, running: false });
-  let drawnValue = $derived(drawnValueState.value);
+  let effectValue = $derived(drawnValueState.value);
+  // A meter's ballistics (utils/meterMotion.js) move what a value effect draws too: the effect says
+  // where the needle is going, the spring how it gets there, so a Self-test on a Lazy needle sweeps
+  // lazily and a PPM's leaps. As it ends, the needle follows the meter's own drawn place (its
+  // ballistics already) till it catches it and hands back, so nothing jumps. A meter that jumps, as
+  // every meter did before phase 2, draws the effect as it says.
+  let effectBallistics = $derived(METER_DEVICE_TYPES.has(String(core?.controlType ?? '')) ? meterBallistics(renderControl?._children?.Meter ?? {}) : null);
+  let effectNeedle = $state(null);
+  let needleFrame = 0;
+  $effect(() => {
+    const ballistics = effectBallistics;
+    const going = Number.isFinite(effectValue);
+    const needle = effectNeedle;
+    if (!ballistics) { if (needle) effectNeedle = null; return; }
+    if (!going && !needle) return;
+    if (needleFrame || typeof requestAnimationFrame !== 'function') return;
+    needleFrame = requestAnimationFrame(() => {
+      needleFrame = 0;
+      effectNeedle = effectNeedleStep(effectNeedle, { effect: effectValue, live: liveNormalized, now: nowMs(), ballistics: effectBallistics });
+    });
+  });
+  onDestroy(() => { if (needleFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(needleFrame); needleFrame = 0; });
+  // Till the spring's first step, the needle is where it was drawn.
+  let drawnValue = $derived(effectNeedle ? effectNeedle.pos : effectBallistics && Number.isFinite(effectValue) ? liveNormalized : effectValue);
   $effect.pre(() => {
     const plays = valuePlays;
     untrack(() => {
@@ -3735,7 +3759,8 @@
       <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
       {/if}
     {:else if ownRenderer === 'Meter' && !hasAnatomy}
-      <MeterRenderer control={renderControl} width={displayW} height={displayH} {drawnValue} />
+      <MeterRenderer control={renderControl} width={displayW} height={displayH} {drawnValue}
+        partAnimations={activeKeyframes?.parts ?? null} partColours={keyframeColours} />
     {:else if ownRenderer === 'Shape'}
       <ShapeRenderer control={renderControl} width={displayW} height={displayH} />
     {:else if ownRenderer === 'Keyboard'}
