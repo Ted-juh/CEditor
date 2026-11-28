@@ -1043,6 +1043,16 @@ Verified locally:
   Peak drop at the fall. `noSendWhileAnimating` with a clipping meter. `animationTab`: the library's
   seven Meter groups.
 
+**Found recording them, and fixed.**
+- *Most bursts went unseen.* The Bursts test signal fell away from the top at once, above the clip
+  point for some 24 ms. A meter's level is read once a frame, and at the twenty frames a second of a
+  busy machine two bursts in four never clipped, so Ripple, which plays as the level clips, played
+  once in ten seconds. A burst now holds at the top for 150 ms, as a loud hit does
+  (`meterMotion.test.js` holds it there).
+- *A white-hot needle vanished.* On Anodised's light face, Needle glow's white-hot needle all but
+  disappeared at the moment it was to glow. It burns red-hot instead, which shows on a light face and
+  a dark one.
+
 Left open:
 - Every lamp is a part only on a meter drawn with parts that light cells; the plain look's LED
   segments are drawn by `MeterRenderer.svelte`, which has no parts to play on.

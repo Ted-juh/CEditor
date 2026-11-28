@@ -42,7 +42,7 @@ const grain = (t, seed) => Math.sin(t * 0.031 + seed * 7) * Math.sin(t * 0.047 +
  *   program  a beat every half second, each a kick that dies away, over a level that wanders, with
  *            a louder phrase every eight seconds that reaches the top
  *   sweep    up from nothing to full scale in three seconds and back down in three
- *   bursts   a quiet level, and every 2.4 s a burst to the top that falls away in half a second
+ *   bursts   a quiet level, and every 2.4 s a burst to the top that holds for 150 ms and falls away
  */
 export function meterTestLevel(kind, t) {
   const time = num(t, 0);
@@ -52,8 +52,11 @@ export function meterTestLevel(kind, t) {
     return clamp01(phase < 0.5 ? phase * 2 : 2 - phase * 2);
   }
   if (kind === 'bursts') {
+    // Each burst holds at the top for 150 ms, as a loud hit does, so a meter whose level is read once
+    // a frame sees it clip however slow its frames: one that fell away at once was above 90% for
+    // some 24 ms, and on a busy machine most went unseen.
     const since = time % 2400;
-    const burst = since < 30 ? since / 30 : Math.exp(-(since - 30) / 160);
+    const burst = since < 30 ? since / 30 : since < 180 ? 1 : Math.exp(-(since - 180) / 160);
     return clamp01(0.16 + grain(time, seed) * 0.03 + burst * 0.84);
   }
   if (kind === 'program') {

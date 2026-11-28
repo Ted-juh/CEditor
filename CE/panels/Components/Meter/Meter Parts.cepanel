@@ -233,10 +233,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"NeedleGlow","id":"ctrl_1781681405010","description":"Needle glow: the needle burns bright as the level goes past 85%.","controlType":"Meter"},
+        "Core": {"name":"NeedleGlow","id":"ctrl_1781681405010","description":"Needle glow: the needle burns red-hot as the level goes past 85%.","controlType":"Meter"},
         "Transform": {"x":726,"y":96,"width":208,"height":130},
         "Meter": {"value":0.6,"testSignal":"program"},
-        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"needleGlow":{"_type":"Animation","name":"needleGlow","enabled":true,"kind":"keyframes","trigger":{"type":"level","at":0.85,"way":"up"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0.2,"fill":"FFFFF4DC"}],"duration":900,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:meter:needle-glow","revision":1,"from":"needleGlow"}}}}
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"needleGlow":{"_type":"Animation","name":"needleGlow","enabled":true,"kind":"keyframes","trigger":{"type":"level","at":0.85,"way":"up"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0.2,"fill":"FFFF1F1F"}],"duration":900,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:meter:needle-glow","revision":1,"from":"needleGlow"}}}}
       },
       "_type": "Control"
     },
@@ -263,7 +263,7 @@
         "Core": {"name":"NeedleGlowWhat","id":"ctrl_1781681405013","controlType":"Label"},
         "Transform": {"x":684,"y":278,"width":292,"height":36},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
-        "Text": {"content":"the needle burns bright as the level goes past 85%","_children":{"Fill":{"colour":"FF22262B"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+        "Text": {"content":"the needle burns red-hot as the level goes past 85%","_children":{"Fill":{"colour":"FF22262B"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
       },
       "_type": "Control"
     },
@@ -486,7 +486,7 @@
           "frames": [
             {
               "at": 0.2,
-              "fill": "FFFFF4DC"
+              "fill": "FFFF1F1F"
             }
           ],
           "duration": 900,

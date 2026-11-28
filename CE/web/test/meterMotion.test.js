@@ -44,6 +44,10 @@ test('each test signal stays on the scale and moves the way it says', () => {
   const tops = bursts.map((v, i) => [v, i * 5]).filter(([v]) => v > 0.97).map(([, t]) => Math.floor(t / 2400));
   assert.deepEqual([...new Set(tops)], [0, 1, 2, 3], 'a burst in each 2.4 s');
   assert.ok(meterTestLevel('bursts', 1800) < 0.25, 'quiet between');
+  // Above the clip point long enough to be seen at ten frames a second: a burst that fell away at
+  // once was there for 24 ms, and a slow machine missed most of them.
+  const over90 = over('bursts', 0, 2399, 1).filter((v) => v >= 0.9).length;
+  assert.ok(over90 >= 150, `${over90} ms over 90%`);
   // The programme reaches the top in its loud phrase, and its beats kick.
   assert.ok(Math.max(...over('program', 0, 8000, 5)) > 0.9, 'a loud phrase clips');
   assert.ok(Math.min(...over('program', 0, 8000, 5)) < 0.55, 'and it is not always loud');

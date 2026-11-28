@@ -136,6 +136,7 @@ const CLIP = { type: 'clip' };
 const crossing = (at, way = 'up') => ({ type: 'level', at, way });
 const HOT = 'FFFF3B30';
 const WHITE_HOT = 'FFFFF4DC';
+const RED_HOT = 'FFFF1F1F';
 
 // On its own parts (models/meterDeviceParts.js), as a set draws them: a VU's face, scale, needle and
 // glass, and the clip lamp no set draws, which Lamp flash turns on.
@@ -150,8 +151,9 @@ const PARTS = [
     animations: { faceGlow: keyframes('faceGlow', crossing(0.7), 'face', [{ at: 0.3, fill: 'FFFFE2A0' }], 1400, { easing: 'inOutSine' }) },
   },
   {
-    id: 'needle-glow', name: 'Needle glow', how: 'level past 85%', what: 'the needle burns bright as the level goes past 85%', type: METER,
-    animations: { needleGlow: keyframes('needleGlow', crossing(0.85), 'indicator', [{ at: 0.2, fill: WHITE_HOT }], 900, { easing: 'outQuad' }) },
+    // Red-hot rather than white-hot: a white needle all but vanishes on a light face (Anodised's).
+    id: 'needle-glow', name: 'Needle glow', how: 'level past 85%', what: 'the needle burns red-hot as the level goes past 85%', type: METER,
+    animations: { needleGlow: keyframes('needleGlow', crossing(0.85), 'indicator', [{ at: 0.2, fill: RED_HOT }], 900, { easing: 'outQuad' }) },
   },
   {
     id: 'cover-glint', name: 'Cover glint', how: 'click', what: 'a tap, and its cover (a needle\'s hub, a glass) catches the light', type: METER,
