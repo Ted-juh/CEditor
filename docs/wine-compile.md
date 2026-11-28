@@ -63,13 +63,15 @@ like a CMake bug and is a stale configure. `rm -rf` the build directory and conf
 ```bash
 mkdir -p /tmp/juce-wine && export WINEPREFIX=/tmp/juce-wine/prefix WINEDEBUG=-all
 for h in juceaide juce_lv2_helper juce_vst3_helper; do
-  printf '#!/bin/sh\nexport WINEDEBUG=-all WINEPREFIX=/tmp/juce-wine/prefix\nexec wine %s "$@"\n' \
+  printf '#!/bin/sh\nunset TMPDIR\nexport WINEDEBUG=-all WINEPREFIX=/tmp/juce-wine/prefix\nexec wine %s "$@"\n' \
     "$PWD/JUCE/bin/JUCE-8.0.7/$h.exe" > /tmp/juce-wine/$h.exe
   chmod +x /tmp/juce-wine/$h.exe
 done
 ```
 
 The first Wine invocation initialises the prefix and takes a minute; every later one is instant.
+`unset TMPDIR` is there because Ubuntu's Wine 9.0 aborts at start (`free(): invalid pointer`, before
+it has made the prefix) whenever `TMPDIR` is set to anything; found 2026-11-28, where a shell set it.
 `wine --version` may warn that `wine32` is missing. Ignore it — these are 64-bit helpers.
 
 ### 3. The web bundle

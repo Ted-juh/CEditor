@@ -165,7 +165,10 @@ runs either one at a time, as before; any other number sets the workers. A worke
 
 `npm run test:everything` runs `test:all`, `test:browser` and `test:component-behavior` one after
 the other, each whatever the one before did, and ends on a summary; on Windows the browser checks
-find Chrome or Edge themselves when `CHROMIUM_PATH` is not set.
+find Chrome or Edge themselves when `CHROMIUM_PATH` is not set. Off Windows they look for
+`/opt/pw-browsers/chromium-1194`; where the container's Playwright browser is another build, every
+check fails at launch ("executable doesn't exist"), so set `CHROMIUM_PATH=/opt/pw-browsers/chromium`
+(the link to whichever build is there; 2026-11-28 it was 1243).
 
 `npm run test:component-behavior` runs the component acceptance harness, `componentBehavior.mjs`:
 96 cases, each a control edited through the inspector, driven by the pointer and the keys, saved
@@ -281,10 +284,14 @@ apt-get install -y wine libgtk-3-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev 
 # that suffix, and nothing requires the file behind it to be a Windows binary.
 mkdir -p /tmp/juce-wine && export WINEPREFIX=/tmp/juce-wine/prefix WINEDEBUG=-all
 for h in juceaide juce_lv2_helper juce_vst3_helper; do
-  printf '#!/bin/sh\nexport WINEDEBUG=-all WINEPREFIX=/tmp/juce-wine/prefix\nexec wine %s "$@"\n' \
+  printf '#!/bin/sh\nunset TMPDIR\nexport WINEDEBUG=-all WINEPREFIX=/tmp/juce-wine/prefix\nexec wine %s "$@"\n' \
     "$PWD/JUCE/bin/JUCE-8.0.7/$h.exe" > /tmp/juce-wine/$h.exe
   chmod +x /tmp/juce-wine/$h.exe
 done
+
+# `unset TMPDIR` is not decoration either: Ubuntu's Wine 9.0 aborts at start ("free(): invalid
+# pointer", every run, juceaide's first among them) whenever TMPDIR is set at all, and some shells
+# here set it (2026-11-28).
 
 cmake -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEDITOR_BUILD_APP=ON \
       -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCANNER_WORKER=ON \
@@ -306,7 +313,11 @@ Three things in that configure are not decoration:
 
 **Running it.** No display, no audio device: use Xvfb, and tell WebKit not to look for a GPU.
 The page takes 60-90 seconds to paint the first time under software rendering; a white window
-for a minute is not a failure.
+for a minute is not a failure. A window that stays black long after its log says the page is
+shown (the exported player's standalone did, 2026-11-28: "[webview] panel shown" in
+`/tmp/ceditor-player-scripts.log` after four seconds, black for minutes) has not been asked to
+paint: bare Xvfb has no window manager to expose it. Resize it once, `xdotool windowsize <id> 900
+640`, and it paints.
 
 ```bash
 Xvfb :99 -screen 0 1920x1080x24 &
@@ -359,6 +370,12 @@ one group per filter: WebKit ignores a list of them on one (`utils/svgFillEffect
 To see WebKit draw a fixture page: serve `dist-scenery/`, load it in a WebKit2 4.1 `WebView` from
 `/usr/bin/python3.12` with `gi` under `Xvfb` (the three environment variables in "Running it",
 above), and grab the window with ImageMagick's `import -window root`.
+`browser-checks/webkitgtk/meterButtonParts.py` does that for the editor on the Vite dev server and
+runs a scenario in the page (lamps, a legend a letter at a time, Reel, thrown words), clicking with
+xdotool; its header has the commands. Two things it learned: an `import()` in a WebKit user script
+resolves against the user script, not the page, so the loader goes in through a `<script>` element;
+and a title is cut at about a thousand characters, so a report is read back with
+`evaluate_javascript`, not sent in the title.
 
 Note that the eleven C++ test targets, the Windows-only `#if JUCE_WINDOWS` branches and MSVC's
 opinion of the source are still what they were: a green run here is not a Windows run.

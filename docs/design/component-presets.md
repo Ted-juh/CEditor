@@ -667,6 +667,33 @@ component. Everything asked for is built and verified locally; these were not do
    scrolling), which neither the Button nor the caption touches; the next run, on `9406d2d`, passed
    every job. If `ba23459` fails, it is read and reproduced here before anything is pushed again.
 
+### Closed (2026-11-28)
+
+The owner: "finish the meters and buttons, then we can move on." Each of the four, as it stands:
+
+1. **Thrown words, on Linux: seen.** `browser-checks/webkitgtk/meterButtonParts.py` (new) runs the
+   Thrown panel in a WebKit2 4.1 WebView under Xvfb and clicks its keys with xdotool: "+1" rises and
+   fades, Count throws 1, 2, 3, as in Chromium, the same scenario run there side by side.
+2. **A toggle made to start on, in an exported plug-in: clicked.** The Button Switch panel, exported as
+   the app exports one (`prepare-export-panel.mjs`) and built as the standalone player on Linux
+   (`CEditorPlayerVST_Standalone`): Key lights opens on, and goes off, on, off, on with four clicks.
+   Its host parameter's default is on too (`exportParameters`: `defaultValue: 1`). Running it found a
+   defect no other test could: the panel's title, "Button · Switch", read "Button Â· Switch". The
+   Linux webview's pipe framed its messages in UTF-8 bytes (vendored patch 2) and read them back as
+   Latin-1, one character a byte, so any non-ASCII text a panel carried came out garbled on Linux,
+   both ways across the pipe. The vendored bridge now reads them with `String::fromUTF8`
+   (JUCE/VENDORED.md, patch 2; `vendoredJucePatches.test.js` pins it); the title reads right.
+3. **Captions: the owner chose to nudge each set's text colour**, not its panel. Measured again, four
+   sets read under 4.5:1, Anodised among them (4.19), which the list above missed: Machined
+   1B1D20 → 0F1012, Anodised 1B1D20 → 141518, Modular Metal (flightdeck) 202529 → 191D20, Obsidian
+   E6F0FA → F9FCFE, each the least change that reads at 4.5:1 on the set's panel as its finish draws
+   it. The text colour is every label's in the set, so every label there is a shade crisper; their
+   readout takes the label colour now it reads. Modular Metal's comes from the dark-or-light ink the
+   physical sets pick from the panel's colour, so it is named for that set alone
+   (`physicalControlSets.js`, `PANEL_INK`). `keyCaption.test.js` holds every set's key caption at
+   4.5:1 at rest; the shipped set files and three starters are regenerated.
+4. **Windows CI on `ba23459`: passed**, and every run since.
+
 ## The Choice group (2026-11-27)
 
 The owner's fourth component, chosen after the Button over the Meter, the LCD and the wheels: the
@@ -1066,8 +1093,9 @@ scale's numbers until an author turns them on. Now (`utils/svgWords.js`, `MeterD
   frame) the word plays whole.
 - *Figures in cells*, a piece a figure; *the scale's numbers*, a piece a number, round the scale, as a
   knob's are.
-- A roll or a push is cut to a box about each piece. The words take their colour from the effect
-  (`currentColor`) while it plays on them, not from the part's colour frames.
+- A roll or a push is cut to a box about each piece. The words took their colour from the effect
+  (`currentColor`) while it played on them, not from the part's colour frames; since 2026-11-28 they
+  keep both (Finished, below).
 - A text effect on a meter plays on When it clips and When it crosses a level too.
 
 `svgWords.test.js` (new) holds the pieces, each letter where it was measured, the fall-back to whole,
@@ -1091,13 +1119,55 @@ preset may now set), as Lamp flash turns on the lamp; a preset on the scale's wo
 the scale shows none and the preset does not turn them on. The panel, **Meter Words**, is in Reel, a
 radio's dial with SIGNAL on it, which no other component's panel uses; its Numbers in turn meter reads
 -60 to 0 dB, so its numbers are whole (on a 0 to 1 reading they are 0.08, 0.17, and crowd the dial).
-Reel the effect, which spins through other letters in a Label, only rolls on SVG letters, so Roll call
-rolls. `meterPresets.test.js` holds the group, its targets and triggers, the refusals and the panel;
+Reel the effect, which spins through other letters in a Label, only rolled on SVG letters, so Roll call
+rolls (and still does: since, Reel spins there too, but the preset the owner saw is a roll). `meterPresets.test.js` holds the group, its targets and triggers, the refusals and the panel;
 `meterShowcase` plays the panel (Type on a letter at a time, Numbers in turn round the dial, Shimmer
 looping, Shatter at the clips, Roll call past 70%) and types a key's legend a letter at a time.
 
-Left open:
-- Every lamp is a part only on a meter drawn with parts that light cells; the plain look's LED
-  segments are drawn by `MeterRenderer.svelte`, which has no parts to play on.
-- A value effect draws where it says, past a needle's ballistics: a Self-test on a Lazy needle sweeps
-  as fast as on any other.
+Left open, then (all four done since, below): every lamp only on a meter drawn with parts; a value
+effect past a needle's ballistics; the words in the effect's colour; Reel only rolling on SVG letters.
+
+### Finished (2026-11-28)
+
+The owner: "finish the meters and buttons, then we can move on."
+
+- **Every lamp on the plain look.** A meter drawn plain (`MeterRenderer.svelte`: Graphite's and
+  Ceramic's, or any meter set to Original parts) in LED segments has them as its lamps: while an
+  animation or a colour frame is put on Every lamp, each segment is drawn as a lamp of its own with
+  its place along the row, from the top and out from the level, so Cascade, Ripple and Sparkle reach
+  them as they reach a parts meter's. A bar's segment moves as a box and lights through the paint
+  channel; an arc's moves as a shape and lights through its stroke. Nothing playing, a segment is
+  drawn as it always was. A preset on Every lamp is refused on a plain meter drawn as one bar, with
+  how to give it segments (the Meter tab's Segments); no set draws the plain look in segments, so
+  none of the showcase panels changes.
+- **Value effects through the ballistics.** The effect says where the needle is going, the meter's
+  spring how it gets there (`meterMotion.js`, `effectNeedleStep`, stepped once a frame by
+  CanvasControl): a Self-test on a Lazy needle never catches its sweep, a PPM's leaps. As the effect
+  ends the needle follows the meter's own drawn place till it rests on it, then hands back, so it
+  never jumps. A meter with no ballistics draws the effect as it says.
+- **The words keep their colour.** Words a part draws in SVG (a meter's legend and scale numbers, a
+  key's legend) fill with the part's paint, colour frames and all, and an effect that colours them (a
+  shimmer's light, a typewriter's arriving colour) plays on that fill: the keyframe player writes
+  each text effect on a part with `fill` as well as `color`. Before, a meter's words took the
+  effect's colour and lost the part's frames, and a key's kept the frames and lost the effect's
+  colour.
+- **Reel on SVG letters.** Each letter is a column, itself on top and the glyphs it rolls past under
+  it, a line apart (`REEL_STEP`, 1.4 of the size), in a window of its own about a line high, and the
+  column rolls down onto it in lines (`lh`) of the line-height the piece sets. On a meter's legend
+  and scale numbers and a key's legend.
+- **Seen in WebKitGTK.** `browser-checks/webkitgtk/meterButtonParts.py` (new; by hand, as
+  `fontWorker.py` is) runs the editor in a WebKit2 4.1 WebView: Every lamp on Gimbal Ring and on the
+  plain look's bar, column and arc; SIGNAL cut into letters where WebKit set the word whole, end to
+  end; the words' colour and a shimmer on their fill; Reel on a meter's and a key's letters; thrown
+  "+1", Count's 1, 2, 3 and a clipping meter's "OVER". Sixteen checks, the same sixteen pass in
+  Chromium, and the pictures of the two agree.
+
+Left as it is: until a legend's letters are measured (the first frame), a letter-by-letter effect
+plays the word whole for that frame.
+
+Verified locally: `meterPartsPlay.test.js` (the plain look's lamps, offered, refused as one bar, and
+the renderer's wiring), `meterMotion.test.js` (a sweep on a lazy needle and a VU, handed back without a
+jump), `svgWords.test.js` (the pieces' fill rules, a reel's columns), `keyCaption.test.js` and
+`readoutColour.test.js` (the four sets). `meterShowcase` adds the plain look's lamps in Chromium, a
+lazy needle lagging the Self-test it draws on a jumping one, and the words' colour and Reel on a
+meter's and a key's letters; each new check fails on the code before it.
